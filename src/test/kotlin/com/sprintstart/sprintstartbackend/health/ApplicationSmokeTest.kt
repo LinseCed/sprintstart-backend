@@ -9,5 +9,6 @@ import org.springframework.test.context.ActiveProfiles
 class ApplicationSmokeTest {
     @Test
     fun contextLoads() {
+        println("Test: Hello World")
     }
 }
