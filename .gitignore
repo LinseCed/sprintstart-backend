@@ -1,5 +1,5 @@
 .idea
 .gradle
 build
-.env
-lokal_secrets.env
+*.env
+*.local.env
