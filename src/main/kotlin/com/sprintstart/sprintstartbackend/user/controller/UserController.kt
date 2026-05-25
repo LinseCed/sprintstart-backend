@@ -3,12 +3,15 @@ package com.sprintstart.sprintstartbackend.user.controller
 import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
+import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserRequest
+import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserResponse
 import com.sprintstart.sprintstartbackend.user.service.UserService
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
@@ -48,10 +51,17 @@ class UserController (
         @PathVariable userId:UUID,
         @RequestBody request : UpdateUserRequest
     ): UpdateUserResponse {
-        return userService.updateUserById(userId, request);
+        return userService.updateUserById(userId, request)
     }
 
-//    Todo: add Patch for role
+    @PatchMapping("/{userId}")
+    @ResponseStatus(HttpStatus.OK)
+    fun patchUserById(
+        @PathVariable userId: UUID,
+        @RequestBody request : PatchUserRequest
+    ): PatchUserResponse {
+        return userService.patchUserById(userId, request)
+    }
 
     @DeleteMapping("/{userId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)

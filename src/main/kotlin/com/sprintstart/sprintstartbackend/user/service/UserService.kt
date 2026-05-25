@@ -2,10 +2,13 @@ package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.user.mapper.toCreateResponse
 import com.sprintstart.sprintstartbackend.user.mapper.toGetResponse
+import com.sprintstart.sprintstartbackend.user.mapper.toPatchResponse
 import com.sprintstart.sprintstartbackend.user.mapper.toUpdateResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
+import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserRequest
+import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserResponse
 import com.sprintstart.sprintstartbackend.user.model.entity.User
@@ -49,7 +52,8 @@ class UserService (
 
     @Transactional
     fun updateUserById(id: UUID, request: UpdateUserRequest): UpdateUserResponse {
-        val user: User = userRepository.findById(id).orElseThrow{ ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
+        val user: User = userRepository.findById(id)
+            .orElseThrow{ ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
 
         user.username = request.username
         user.firstname = request.firstname
@@ -59,6 +63,22 @@ class UserService (
         user.workingArea = request.workingArea
 
         return userRepository.save(user).toUpdateResponse()
+    }
+
+    @Transactional
+    fun patchUserById(id: UUID, request: PatchUserRequest): PatchUserResponse {
+        val user: User = userRepository.findById(id)
+            .orElseThrow{ ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
+
+        request.username?.let { user.username = it }
+        request.firstname?.let { user.firstname = it }
+        request.lastname?.let { user.lastname = it }
+        request.primaryRole?.let { user.primaryRole = it }
+        request.secondaryRole?.let { user.secondaryRole = it }
+        request.workingArea?.let { user.workingArea = it }
+
+        return userRepository.save(user).toPatchResponse()
+
     }
 
     @Transactional
