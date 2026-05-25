@@ -3,4 +3,3 @@
 build
 *.env
 *.local.env
-/.secrets
