@@ -1,10 +1,23 @@
 package com.sprintstart.sprintstartbackend.user.mapper
 
 import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserResponse
+import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 
 fun User.toCreateResponse(): CreateUserResponse {
     return CreateUserResponse(
+        id = this.id,
+        username = this.username,
+        firstname = this.firstname,
+        lastname = this.lastname,
+        primaryRole = this.primaryRole,
+        secondaryRole = this.secondaryRole,
+        workingArea = this.workingArea,
+    )
+}
+
+fun User.toGetResponse(): GetUserResponse {
+    return GetUserResponse(
         id = this.id,
         username = this.username,
         firstname = this.firstname,

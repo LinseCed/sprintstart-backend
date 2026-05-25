@@ -1,12 +1,17 @@
 package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.user.mapper.toCreateResponse
+import com.sprintstart.sprintstartbackend.user.mapper.toGetResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserResponse
+import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import jakarta.transaction.Transactional
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.web.server.ResponseStatusException
+import java.util.UUID
 
 @Service
 class UserService (
@@ -23,5 +28,19 @@ class UserService (
         )
 
         return userRepository.save(user).toCreateResponse()
+    }
+
+    @Transactional
+    fun getAllUsers(): List<GetUserResponse> {
+        return userRepository.findAll().map {
+            it.toGetResponse()
+        }
+    }
+
+    @Transactional
+    fun getUserById(id: UUID): GetUserResponse {
+        return userRepository.findById(id)
+            .orElseThrow{ ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
+            .toGetResponse()
     }
 }
