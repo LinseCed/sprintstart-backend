@@ -6,5 +6,5 @@ data class CreateUserRequest(
     val username: String,
     val firstname: String,
     val lastname: String,
-    val workingArea: WorkingAreas
+    val workingArea: WorkingAreas,
 )

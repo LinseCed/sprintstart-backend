@@ -10,10 +10,9 @@ import org.springframework.stereotype.Component
 import java.util.UUID
 
 @Component
-internal class DevUserSeeder (
+class DevUserSeeder(
     private val userRepository: UserRepository,
-): ApplicationRunner {
-
+) : ApplicationRunner {
     override fun run(args: ApplicationArguments) {
         val defaultUserId = UUID.fromString("00000000-0000-0000-0000-000000000001")
 
@@ -25,8 +24,8 @@ internal class DevUserSeeder (
                     firstname = "Default",
                     lastname = "User",
                     primaryRole = Roles.EXISTING_MEMBER,
-                    workingArea = WorkingAreas.BACKEND_DEV
-                )
+                    workingArea = WorkingAreas.BACKEND_DEV,
+                ),
             )
         }
     }

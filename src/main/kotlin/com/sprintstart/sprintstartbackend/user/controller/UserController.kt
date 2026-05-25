@@ -23,11 +23,10 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1/users")
-class UserController (
-    private val userService: UserService
+class UserController(
+    private val userService: UserService,
 ) {
-
-    @PostMapping()
+    @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun createUser(@RequestBody request: CreateUserRequest): CreateUserResponse {
         return userService.createUser(request)
@@ -48,8 +47,8 @@ class UserController (
     @PutMapping("/{userId}")
     @ResponseStatus(HttpStatus.OK)
     fun updateUserById(
-        @PathVariable userId:UUID,
-        @RequestBody request : UpdateUserRequest
+        @PathVariable userId: UUID,
+        @RequestBody request: UpdateUserRequest,
     ): UpdateUserResponse {
         return userService.updateUserById(userId, request)
     }
@@ -58,7 +57,7 @@ class UserController (
     @ResponseStatus(HttpStatus.OK)
     fun patchUserById(
         @PathVariable userId: UUID,
-        @RequestBody request : PatchUserRequest
+        @RequestBody request: PatchUserRequest,
     ): PatchUserResponse {
         return userService.patchUserById(userId, request)
     }

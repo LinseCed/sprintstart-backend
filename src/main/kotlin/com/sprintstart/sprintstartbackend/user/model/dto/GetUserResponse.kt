@@ -11,5 +11,5 @@ data class GetUserResponse(
     val lastname: String,
     val primaryRole: Roles,
     val secondaryRole: Roles,
-    val workingArea: WorkingAreas
+    val workingArea: WorkingAreas,
 )

@@ -1,9 +1,5 @@
 package com.sprintstart.sprintstartbackend.user.service
 
-import com.sprintstart.sprintstartbackend.user.model.mapper.toCreateResponse
-import com.sprintstart.sprintstartbackend.user.model.mapper.toGetResponse
-import com.sprintstart.sprintstartbackend.user.model.mapper.toPatchResponse
-import com.sprintstart.sprintstartbackend.user.model.mapper.toUpdateResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
@@ -12,6 +8,10 @@ import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserResponse
 import com.sprintstart.sprintstartbackend.user.model.entity.User
+import com.sprintstart.sprintstartbackend.user.model.mapper.toCreateResponse
+import com.sprintstart.sprintstartbackend.user.model.mapper.toGetResponse
+import com.sprintstart.sprintstartbackend.user.model.mapper.toPatchResponse
+import com.sprintstart.sprintstartbackend.user.model.mapper.toUpdateResponse
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import jakarta.transaction.Transactional
 import org.springframework.http.HttpStatus
@@ -20,18 +20,18 @@ import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @Service
-class UserService (
-    private val userRepository: UserRepository
+class UserService(
+    private val userRepository: UserRepository,
 ) {
-
     @Transactional
     fun createUser(request: CreateUserRequest): CreateUserResponse {
-        val user: User = User(
-            username = request.username,
-            firstname = request.firstname,
-            lastname = request.lastname,
-            workingArea = request.workingArea
-        )
+        val user: User =
+            User(
+                username = request.username,
+                firstname = request.firstname,
+                lastname = request.lastname,
+                workingArea = request.workingArea,
+            )
 
         return userRepository.save(user).toCreateResponse()
     }
@@ -45,15 +45,17 @@ class UserService (
 
     @Transactional
     fun getUserById(id: UUID): GetUserResponse {
-        return userRepository.findById(id)
-            .orElseThrow{ ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
+        return userRepository
+            .findById(id)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
             .toGetResponse()
     }
 
     @Transactional
     fun updateUserById(id: UUID, request: UpdateUserRequest): UpdateUserResponse {
-        val user: User = userRepository.findById(id)
-            .orElseThrow{ ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
+        val user: User = userRepository
+            .findById(id)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
 
         user.username = request.username
         user.firstname = request.firstname
@@ -67,8 +69,9 @@ class UserService (
 
     @Transactional
     fun patchUserById(id: UUID, request: PatchUserRequest): PatchUserResponse {
-        val user: User = userRepository.findById(id)
-            .orElseThrow{ ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
+        val user: User = userRepository
+            .findById(id)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
 
         request.username?.let { user.username = it }
         request.firstname?.let { user.firstname = it }
@@ -78,13 +81,13 @@ class UserService (
         request.workingArea?.let { user.workingArea = it }
 
         return userRepository.save(user).toPatchResponse()
-
     }
 
     @Transactional
     fun deleteUserById(id: UUID) {
-        val user: User = userRepository.findById(id)
-            .orElseThrow{ ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
+        val user: User = userRepository
+            .findById(id)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
 
         userRepository.delete(user)
     }
