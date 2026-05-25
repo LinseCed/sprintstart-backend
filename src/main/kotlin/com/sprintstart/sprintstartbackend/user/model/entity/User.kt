@@ -12,31 +12,32 @@ import java.util.UUID
 
 @Entity
 @Table(name = "users")
-class User {
+class User (
 
     @Id
-    val id: UUID = UUID.randomUUID()
+    val id: UUID = UUID.randomUUID(),
 
 //  Once we have auth, this is where the authSubject/authId should go
 
     @Column(nullable = false)
-    var username: String = ""
+    var username: String,
 
     @Column(nullable = false)
-    var firstname: String = ""
+    var firstname: String,
 
     @Column(nullable = false)
-    var lastname: String = ""
+    var lastname: String,
+
+//  The Roles have a default value because they are assigned separately using the selection wizard
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    var primaryRole: Roles = Roles.NO_ROLE,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var primaryRole: Roles = Roles.NO_ROLE
+    var secondaryRole: Roles = Roles.NO_ROLE,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var secondaryRole: Roles = Roles.NO_ROLE
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    var workingArea: WorkingAreas = WorkingAreas.NO_WORKING_AREA
-}
+    var workingArea: WorkingAreas
+)
