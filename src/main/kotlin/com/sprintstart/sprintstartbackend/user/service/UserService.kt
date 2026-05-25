@@ -19,10 +19,28 @@ import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
+/**
+ * Service responsible for handling user-related business logic.
+ *
+ * Provides operations for creating, retrieving, updating, partially updating,
+ * and deleting users. The service acts as the application layer between the
+ * REST controller and the user repository.
+ *
+ * @property userRepository Repository used to access and persist user entities.
+ */
 @Service
 class UserService(
     private val userRepository: UserRepository,
 ) {
+    /**
+     * Creates a new user from the provided request data.
+     *
+     * The new user is persisted in the database and then converted into a
+     * response object for the API layer.
+     *
+     * @param request The data required to create the user.
+     * @return The response containing the created user's data.
+     */
     @Transactional
     fun createUser(request: CreateUserRequest): CreateUserResponse {
         val user: User =
@@ -36,6 +54,11 @@ class UserService(
         return userRepository.save(user).toCreateResponse()
     }
 
+    /**
+     * Retrieves all existing users.
+     *
+     * @return A list containing the response data of all users.
+     */
     @Transactional
     fun getAllUsers(): List<GetUserResponse> {
         return userRepository.findAll().map {
@@ -43,6 +66,13 @@ class UserService(
         }
     }
 
+    /**
+     * Retrieves a user by their unique identifier.
+     *
+     * @param id The unique identifier of the user to retrieve.
+     * @return The response data of the found user.
+     * @throws ResponseStatusException If no user with the given identifier exists.
+     */
     @Transactional
     fun getUserById(id: UUID): GetUserResponse {
         return userRepository
@@ -51,6 +81,17 @@ class UserService(
             .toGetResponse()
     }
 
+    /**
+     * Updates an existing user with the provided data.
+     *
+     * This method replaces all the editable user fields with all the values from the
+     * given update request.
+     *
+     * @param id The unique identifier of the user to update.
+     * @param request The complete data used to update the user.
+     * @return The response data of the updated user.
+     * @throws ResponseStatusException If no user with the given identifier exists.
+     */
     @Transactional
     fun updateUserById(id: UUID, request: UpdateUserRequest): UpdateUserResponse {
         val user: User = userRepository
@@ -67,6 +108,17 @@ class UserService(
         return userRepository.save(user).toUpdateResponse()
     }
 
+    /**
+     * Partially updates an existing user with the provided data.
+     *
+     * Only fields that are present in the patch request are applied to the
+     * existing user. Fields with `null` values are left unchanged.
+     *
+     * @param id The unique identifier of the user to patch.
+     * @param request The partial data used to update the user.
+     * @return The response data of the patched user.
+     * @throws ResponseStatusException If no user with the given identifier exists.
+     */
     @Transactional
     fun patchUserById(id: UUID, request: PatchUserRequest): PatchUserResponse {
         val user: User = userRepository
@@ -83,6 +135,12 @@ class UserService(
         return userRepository.save(user).toPatchResponse()
     }
 
+    /**
+     * Deletes a user by their unique identifier.
+     *
+     * @param id The unique identifier of the user to delete.
+     * @throws ResponseStatusException If no user with the given identifier exists.
+     */
     @Transactional
     fun deleteUserById(id: UUID) {
         val user: User = userRepository
