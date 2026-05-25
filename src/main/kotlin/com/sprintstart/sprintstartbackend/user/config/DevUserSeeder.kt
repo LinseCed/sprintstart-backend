@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.config
 
-import com.sprintstart.sprintstartbackend.user.api.enums.Roles
-import com.sprintstart.sprintstartbackend.user.api.enums.WorkingAreas
+import com.sprintstart.sprintstartbackend.user.external.enums.Roles
+import com.sprintstart.sprintstartbackend.user.external.enums.WorkingAreas
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import org.springframework.boot.ApplicationArguments
