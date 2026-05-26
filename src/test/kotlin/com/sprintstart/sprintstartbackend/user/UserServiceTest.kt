@@ -478,8 +478,6 @@ class UserServiceTest {
         assertThat(exception.reason).isEqualTo("User with id: $userId not found")
     }
 
-    // Todo:
-
     // Helpers
 
     private fun assertUserMatchesResponse(user: User, response: GetUserResponse) {
