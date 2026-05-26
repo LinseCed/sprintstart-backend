@@ -67,7 +67,7 @@ class UserController(
             ApiResponse(responseCode = "200", description = "Users returned successfully"),
         ],
     )
-    @GetMapping()
+    @GetMapping
     @ResponseStatus(HttpStatus.OK)
     fun getAllUsers(): List<GetUserResponse> {
         return userService.getAllUsers()

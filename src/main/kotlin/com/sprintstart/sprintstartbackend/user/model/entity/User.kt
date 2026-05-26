@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.model.entity
 
-import com.sprintstart.sprintstartbackend.user.external.enums.Roles
-import com.sprintstart.sprintstartbackend.user.external.enums.WorkingAreas
+import com.sprintstart.sprintstartbackend.user.external.enums.Role
+import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -25,11 +25,11 @@ class User(
 //  The Roles have a default value because they are assigned separately using the selection wizard
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var primaryRole: Roles = Roles.NO_ROLE,
+    var primaryRole: Role = Role.NO_ROLE,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var secondaryRole: Roles = Roles.NO_ROLE,
+    var secondaryRole: Role = Role.NO_ROLE,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var workingArea: WorkingAreas,
+    var workingArea: WorkingArea,
 )

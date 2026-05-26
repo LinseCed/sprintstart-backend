@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.external.enums
 
-enum class WorkingAreas {
+enum class WorkingArea {
     NO_WORKING_AREA,
     FRONTEND_DEV,
     BACKEND_DEV,

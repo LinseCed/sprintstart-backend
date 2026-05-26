@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.config
 
-import com.sprintstart.sprintstartbackend.user.external.enums.Roles
-import com.sprintstart.sprintstartbackend.user.external.enums.WorkingAreas
+import com.sprintstart.sprintstartbackend.user.external.enums.Role
+import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import org.springframework.boot.ApplicationArguments
@@ -42,8 +42,8 @@ class DevUserSeeder(
                     username = "Default-User",
                     firstname = "Default",
                     lastname = "User",
-                    primaryRole = Roles.EXISTING_MEMBER,
-                    workingArea = WorkingAreas.BACKEND_DEV,
+                    primaryRole = Role.EXISTING_MEMBER,
+                    workingArea = WorkingArea.BACKEND_DEV,
                 ),
             )
         }

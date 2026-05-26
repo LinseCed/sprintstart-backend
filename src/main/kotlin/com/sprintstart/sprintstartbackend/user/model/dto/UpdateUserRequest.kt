@@ -1,13 +1,13 @@
 package com.sprintstart.sprintstartbackend.user.model.dto
 
-import com.sprintstart.sprintstartbackend.user.external.enums.Roles
-import com.sprintstart.sprintstartbackend.user.external.enums.WorkingAreas
+import com.sprintstart.sprintstartbackend.user.external.enums.Role
+import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
 
 data class UpdateUserRequest(
     val username: String,
     val firstname: String,
     val lastname: String,
-    val primaryRole: Roles,
-    val secondaryRole: Roles,
-    val workingArea: WorkingAreas,
+    val primaryRole: Role,
+    val secondaryRole: Role,
+    val workingArea: WorkingArea,
 )
