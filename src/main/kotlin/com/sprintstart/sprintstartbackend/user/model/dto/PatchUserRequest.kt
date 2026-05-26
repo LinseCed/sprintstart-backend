@@ -4,10 +4,10 @@ import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
 
 data class PatchUserRequest(
-    val username: String?,
-    val firstname: String?,
-    val lastname: String?,
-    val primaryRole: Role?,
-    val secondaryRole: Role?,
-    val workingArea: WorkingArea?,
+    val username: String? = null,
+    val firstname: String? = null,
+    val lastname: String? = null,
+    val primaryRole: Role? = null,
+    val secondaryRole: Role? = null,
+    val workingArea: WorkingArea? = null,
 )

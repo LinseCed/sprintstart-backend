@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.service
 
+import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
@@ -105,6 +106,8 @@ class UserService(
         user.secondaryRole = request.secondaryRole
         user.workingArea = request.workingArea
 
+        validateUserRoles(user)
+
         return userRepository.save(user).toUpdateResponse()
     }
 
@@ -132,6 +135,8 @@ class UserService(
         request.secondaryRole?.let { user.secondaryRole = it }
         request.workingArea?.let { user.workingArea = it }
 
+        validateUserRoles(user)
+
         return userRepository.save(user).toPatchResponse()
     }
 
@@ -148,5 +153,16 @@ class UserService(
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
 
         userRepository.delete(user)
+    }
+
+    // Helper
+
+    private fun validateUserRoles(user: User) {
+        if (user.primaryRole == Role.NO_ROLE && user.secondaryRole != Role.NO_ROLE) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Secondary role cannot be set without a primary role",
+            )
+        }
     }
 }
