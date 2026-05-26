@@ -85,13 +85,15 @@ class UserService(
     /**
      * Updates an existing user with the provided data.
      *
-     * This method replaces all the editable user fields with all the values from the
-     * given update request.
+     * This method replaces all editable user fields with the values from the
+     * given update request. After applying the new values, the user's role
+     * configuration is validated before the updated user is persisted.
      *
      * @param id The unique identifier of the user to update.
      * @param request The complete data used to update the user.
      * @return The response data of the updated user.
-     * @throws ResponseStatusException If no user with the given identifier exists.
+     * @throws ResponseStatusException If no user with the given identifier exists,
+     * or if the resulting role configuration is invalid.
      */
     @Transactional
     fun updateUserById(id: UUID, request: UpdateUserRequest): UpdateUserResponse {
@@ -115,12 +117,15 @@ class UserService(
      * Partially updates an existing user with the provided data.
      *
      * Only fields that are present in the patch request are applied to the
-     * existing user. Fields with `null` values are left unchanged.
+     * existing user. Fields with `null` values are left unchanged. After applying
+     * the changes, the user's role configuration is validated before the patched
+     * user is persisted.
      *
      * @param id The unique identifier of the user to patch.
      * @param request The partial data used to update the user.
      * @return The response data of the patched user.
-     * @throws ResponseStatusException If no user with the given identifier exists.
+     * @throws ResponseStatusException If no user with the given identifier exists,
+     * or if the resulting role configuration is invalid.
      */
     @Transactional
     fun patchUserById(id: UUID, request: PatchUserRequest): PatchUserResponse {
@@ -157,6 +162,16 @@ class UserService(
 
     // Helper
 
+    /**
+     * Validates that the user's role configuration is consistent.
+     *
+     * A secondary role is only valid when a primary role has already been set.
+     * If the user has no primary role but has a secondary role, the configuration
+     * is rejected as an invalid request.
+     *
+     * @param user The user whose role configuration should be validated.
+     * @throws ResponseStatusException If a secondary role is set without a primary role.
+     */
     private fun validateUserRoles(user: User) {
         if (user.primaryRole == Role.NO_ROLE && user.secondaryRole != Role.NO_ROLE) {
             throw ResponseStatusException(
