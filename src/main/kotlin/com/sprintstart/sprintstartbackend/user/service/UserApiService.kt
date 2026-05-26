@@ -2,6 +2,8 @@ package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
@@ -12,6 +14,7 @@ import java.util.UUID
  *
  * @property userRepository Repository used to access persisted user data.
  */
+@Service
 class UserApiService(
     private val userRepository: UserRepository,
 ) : UserApi {
@@ -21,6 +24,7 @@ class UserApiService(
      * @param id The unique identifier of the user to check.
      * @return `true` if a user with the given identifier exists, otherwise `false`.
      */
+    @Transactional(readOnly = true)
     override fun exists(id: UUID): Boolean {
         return userRepository.existsById(id)
     }

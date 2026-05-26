@@ -14,9 +14,9 @@ import com.sprintstart.sprintstartbackend.user.model.mapper.toGetResponse
 import com.sprintstart.sprintstartbackend.user.model.mapper.toPatchResponse
 import com.sprintstart.sprintstartbackend.user.model.mapper.toUpdateResponse
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
-import jakarta.transaction.Transactional
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
@@ -60,7 +60,7 @@ class UserService(
      *
      * @return A list containing the response data of all users.
      */
-    @Transactional
+    @Transactional(readOnly = true)
     fun getAllUsers(): List<GetUserResponse> {
         return userRepository.findAll().map {
             it.toGetResponse()
@@ -74,7 +74,7 @@ class UserService(
      * @return The response data of the found user.
      * @throws ResponseStatusException If no user with the given identifier exists.
      */
-    @Transactional
+    @Transactional(readOnly = true)
     fun getUserById(id: UUID): GetUserResponse {
         return userRepository
             .findById(id)
