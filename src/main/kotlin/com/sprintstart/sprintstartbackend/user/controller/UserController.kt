@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -54,7 +55,7 @@ class UserController(
     )
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    fun createUser(@RequestBody request: CreateUserRequest): CreateUserResponse {
+    fun createUser(@Valid @RequestBody request: CreateUserRequest): CreateUserResponse {
         return userService.createUser(request)
     }
 
@@ -104,7 +105,7 @@ class UserController(
     @ResponseStatus(HttpStatus.OK)
     fun updateUserById(
         @PathVariable userId: UUID,
-        @RequestBody request: UpdateUserRequest,
+        @Valid @RequestBody request: UpdateUserRequest,
     ): UpdateUserResponse {
         return userService.updateUserById(userId, request)
     }
