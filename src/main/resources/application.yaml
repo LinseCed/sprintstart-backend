@@ -1,3 +1,6 @@
+sprintstart:
+  ai:
+    base-url: ""
 spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL}
