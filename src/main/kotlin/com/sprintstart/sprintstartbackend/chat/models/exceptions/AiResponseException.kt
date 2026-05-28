@@ -8,5 +8,5 @@ package com.sprintstart.sprintstartbackend.chat.models.exceptions
  */
 internal class AiResponseException(
     message: String? = null,
-    cause: Throwable? = null
-): RuntimeException(message, cause)
+    cause: Throwable? = null,
+) : RuntimeException(message, cause)

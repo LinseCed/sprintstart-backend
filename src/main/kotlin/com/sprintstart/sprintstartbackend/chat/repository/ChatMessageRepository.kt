@@ -11,7 +11,6 @@ import java.util.UUID
 
 @Repository
 internal interface ChatMessageRepository : JpaRepository<ChatMessage, UUID> {
-
     /**
      * Fetches chat messages by chat id.
      *
@@ -29,10 +28,8 @@ internal interface ChatMessageRepository : JpaRepository<ChatMessage, UUID> {
     """,
         countQuery = """
         SELECT count(*) FROM chat_messages c WHERE c.chat_id = :chat_id
-    """, nativeQuery = true
+    """,
+        nativeQuery = true,
     )
-    fun findAllByChat(
-        @Param("chat_id") chatId: UUID,
-        pageable: Pageable
-    ): Page<ChatMessage>
+    fun findAllByChat(@Param("chat_id") chatId: UUID, pageable: Pageable): Page<ChatMessage>
 }

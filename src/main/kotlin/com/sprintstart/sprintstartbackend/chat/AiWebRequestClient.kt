@@ -12,8 +12,7 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 
 class AiWebRequestClient : WebRequestClient() {
-	companion object {
-
+    companion object {
         /**
          * Opens up a new SSE stream with a POST request.
          *
@@ -28,9 +27,9 @@ class AiWebRequestClient : WebRequestClient() {
          */
         inline fun <reified PayloadType> streamPost(
             uri: URI,
-            body: PayloadType
+            body: PayloadType,
         ): Flow<String> {
-            val jsonPayload = jsonParser.encodeToString(body)
+            val jsonPayload = WebRequestClient().jsonParser.encodeToString(body)
             return streamRequestToAi(uri, "POST", jsonPayload)
         }
 
@@ -51,11 +50,12 @@ class AiWebRequestClient : WebRequestClient() {
         internal fun streamRequestToAi(
             uri: URI,
             method: String,
-            payload: String
+            payload: String,
         ): Flow<String> = flow {
             val client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build()
 
-            val request = HttpRequest.newBuilder()
+            val request = HttpRequest
+                .newBuilder()
                 .uri(uri)
                 .header("Content-Type", "application/json")
                 .header("Accept", "text/event-stream") // Tell AI we want a stream
@@ -73,17 +73,15 @@ class AiWebRequestClient : WebRequestClient() {
                     if (line.startsWith("data:")) {
                         val rawJson = line.removePrefix("data:").trim()
 
-                        if (rawJson.isEmpty()) continue
-
                         try {
-                            val message = jsonParser.decodeFromString<AiStreamMessage>(rawJson)
+                            val message = WebRequestClient().jsonParser.decodeFromString<AiStreamMessage>(rawJson)
 
                             when (message.type) {
-                                "done" -> break
+                                "done", "" -> break
                                 "token" -> emit(rawJson)
                                 "error" -> throw AiResponseException("Ai responded with error: ${message.content}")
                             }
-                        } catch (e: Exception) {
+                        } catch (e: AiResponseException) {
                             System.err.println("Error parsing chunk incoming from ai: ${e.message}")
                         }
                     }
