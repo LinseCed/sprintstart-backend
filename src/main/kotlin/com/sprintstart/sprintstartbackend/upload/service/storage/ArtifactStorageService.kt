@@ -8,4 +8,8 @@ interface ArtifactStorageService {
         file: MultipartFile,
         artifactId: UUID,
     ): String
+
+    fun delete(
+        storagePath: String,
+    )
 }

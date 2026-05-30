@@ -45,15 +45,11 @@ class UploadValidationService(
         val filename = file.originalFilename
             ?: throw IllegalArgumentException("Missing filename")
 
-        if (filename.contains("..")) {
-            throw IllegalArgumentException("Invalid filename")
-        }
-
-        if (filename.contains("/")) {
-            throw IllegalArgumentException("Invalid filename")
-        }
-
-        if (filename.contains("\\")) {
+        if (
+            filename.contains("..") ||
+            filename.contains("/") ||
+            filename.contains("\\")
+        ) {
             throw IllegalArgumentException("Invalid filename")
         }
     }

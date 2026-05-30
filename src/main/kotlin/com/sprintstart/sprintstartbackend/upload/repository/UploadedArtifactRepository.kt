@@ -6,8 +6,10 @@ import java.util.UUID
 
 interface UploadedArtifactRepository : JpaRepository<UploadedArtifact, UUID> {
     fun findByHash(hash: String): UploadedArtifact?
+
     fun findAllByUploaderId(
-        uploaderId: UUID
+        uploaderId: UUID,
     ): List<UploadedArtifact>
+
     fun existsByHash(hash: String): Boolean
 }

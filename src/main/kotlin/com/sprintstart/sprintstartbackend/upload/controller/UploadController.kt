@@ -8,7 +8,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -53,6 +55,19 @@ class UploadController(
         @RequestParam uploaderId: UUID,
     ): ResponseEntity<List<UploadListItemResponse>> =
         ResponseEntity.ok(
-            uploadService.listUploads(uploaderId)
+            uploadService.listUploads(uploaderId),
         )
+
+    @DeleteMapping("/{artifactId}")
+    fun deleteUpload(
+        @PathVariable artifactId: UUID,
+    ): ResponseEntity<Void> {
+        uploadService.deleteUpload(
+            artifactId,
+        )
+
+        return ResponseEntity
+            .noContent()
+            .build()
+    }
 }

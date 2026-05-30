@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.upload.events.ArtifactUploadedEvent
 import com.sprintstart.sprintstartbackend.upload.model.dto.UploadArtifactResponse
 import com.sprintstart.sprintstartbackend.upload.model.dto.UploadListItemResponse
 import com.sprintstart.sprintstartbackend.upload.model.entity.UploadedArtifact
+import com.sprintstart.sprintstartbackend.upload.repository.ArtifactImageRepository
 import com.sprintstart.sprintstartbackend.upload.repository.UploadedArtifactRepository
 import com.sprintstart.sprintstartbackend.upload.service.storage.ArtifactStorageService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -17,6 +18,7 @@ import java.util.UUID
 @Service
 class UploadService(
     private val uploadedArtifactRepository: UploadedArtifactRepository,
+    private val artifactImageRepository: ArtifactImageRepository,
     private val userApi: UserApi,
     private val validationService: UploadValidationService,
     private val storageService: ArtifactStorageService,
@@ -67,7 +69,7 @@ class UploadService(
                 }
             } catch (
                 @Suppress("TooGenericExceptionCaught")
-                ex: Exception
+                ex: Exception,
             ) {
                 responses.add(
                     UploadArtifactResponse(
@@ -180,4 +182,36 @@ class UploadService(
                     uploadedAt = it.uploadedAt,
                 )
             }
+
+    @Transactional
+    fun deleteUpload(
+        artifactId: UUID,
+    ) {
+        val artifact =
+            uploadedArtifactRepository
+                .findById(artifactId)
+                .orElseThrow {
+                    IllegalArgumentException(
+                        "Artifact not found",
+                    )
+                }
+
+        artifactImageRepository
+            .deleteAllByArtifactId(
+                artifactId,
+            )
+
+        artifactImageRepository
+            .deleteAllByImageArtifactId(
+                artifactId,
+            )
+
+        storageService.delete(
+            artifact.storagePath,
+        )
+
+        uploadedArtifactRepository.delete(
+            artifact,
+        )
+    }
 }

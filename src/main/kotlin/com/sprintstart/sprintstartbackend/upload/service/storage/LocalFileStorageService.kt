@@ -37,4 +37,12 @@ class LocalFileStorageService(
 
         return targetPath.toString()
     }
+
+    override fun delete(
+        storagePath: String,
+    ) {
+        Files.deleteIfExists(
+            Paths.get(storagePath),
+        )
+    }
 }
