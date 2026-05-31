@@ -1,0 +1,35 @@
+package com.sprintstart.sprintstartbackend.onboarding.model.mapper
+
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingStep
+import com.sprintstart.sprintstartbackend.onboarding.model.response.step.GetOnboardingStepResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.step.GetOnboardingStepsResponse
+
+fun OnboardingStep.toGetAllResponse(): GetOnboardingStepsResponse {
+    return GetOnboardingStepsResponse(
+        id = this.id,
+        phaseId = this.phase.id,
+        position = this.position,
+        title = this.title,
+        description = this.description,
+        estimatedMinutes = this.estimatedMinutes,
+        status = this.status,
+        completedAt = this.completedAt,
+        skipReason = this.skipReason,
+    )
+}
+
+fun OnboardingStep.toGetResponse(): GetOnboardingStepResponse {
+    return GetOnboardingStepResponse(
+        id = this.id,
+        phaseId = this.phase.id,
+        position = this.position,
+        title = this.title,
+        description = this.description,
+        estimatedMinutes = this.estimatedMinutes,
+        tasks = this.tasks.map { task -> task.toGetAllResponse() },
+        resources = this.resources.map { resource -> resource.toGetAllResponse() },
+        status = this.status,
+        completedAt = this.completedAt,
+        skipReason = this.skipReason,
+    )
+}

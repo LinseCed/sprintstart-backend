@@ -1,10 +1,38 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.mapper
 
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhase
-import com.sprintstart.sprintstartbackend.onboarding.model.response.GetOnboardingPhaseResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.phase.GetOnboardingPhaseForUserResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.phase.GetOnboardingPhaseResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.phase.GetOnboardingPhasesResponse
+
+fun OnboardingPhase.toGetAllResponse(): GetOnboardingPhasesResponse {
+    return GetOnboardingPhasesResponse(
+        id = this.id,
+        pathId = this.path.id,
+        position = this.position,
+        title = this.title,
+        description = this.description,
+    )
+}
 
 fun OnboardingPhase.toGetResponse(): GetOnboardingPhaseResponse {
     return GetOnboardingPhaseResponse(
         id = this.id,
+        pathId = this.path.id,
+        position = this.position,
+        title = this.title,
+        description = this.description,
+        steps = this.steps.map { step -> step.toGetAllResponse()}
+    )
+}
+
+fun OnboardingPhase.toGetForUserResponse(): GetOnboardingPhaseForUserResponse {
+    return GetOnboardingPhaseForUserResponse(
+        id = this.id,
+        pathId = this.path.id,
+        position = this.position,
+        title = this.title,
+        description = this.description,
+        steps = this.steps.map { step -> step.toGetAllResponse() }
     )
 }
