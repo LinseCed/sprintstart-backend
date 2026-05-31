@@ -85,9 +85,9 @@ internal class ChatService(
     @Transactional(readOnly = true)
     fun getChat(chatId: UUID, @Valid request: GetChatMessagesRequest): GetChatMessagesResponse {
         val pageable = if (request.limit == null) {
-            Pageable.unpaged(Sort.by(Sort.Direction.ASC, "createdAt"))
+            Pageable.unpaged(Sort.by(Sort.Direction.ASC, "created_at"))
         } else {
-            PageRequest.of(0, request.limit, Sort.Direction.ASC, "createdAt")
+            PageRequest.of(0, request.limit, Sort.Direction.ASC, "created_at")
         }
 
         val msgs = messageRepository.findAllByChat(chatId, pageable).map { it.toChatMessageResponse() }.toList()
