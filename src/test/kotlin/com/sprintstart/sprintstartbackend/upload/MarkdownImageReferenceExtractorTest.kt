@@ -5,44 +5,114 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class MarkdownImageReferenceExtractorTest {
+
     private val extractor =
         MarkdownImageReferenceExtractor()
 
     @Test
-    fun `should extract image references`() {
-        val markdown =
-            """
+    fun `extract returns empty list when markdown contains no images`() {
+        val markdown = """
             # Title
             
-            ![](./img/logo.png)
-            
-            ![Diagram](../assets/test.webp)
-            """.trimIndent()
+            Some text here.
+        """.trimIndent()
 
-        val result = extractor.extract(markdown)
+        val result =
+            extractor.extract(markdown)
+
+        assertEquals(
+            emptyList<String>(),
+            result,
+        )
+    }
+
+    @Test
+    fun `extract finds single image`() {
+        val markdown = """
+            ![Logo](logo.png)
+        """.trimIndent()
+
+        val result =
+            extractor.extract(markdown)
+
+        assertEquals(
+            listOf("logo.png"),
+            result,
+        )
+    }
+
+    @Test
+    fun `extract finds multiple images`() {
+        val markdown = """
+            ![One](one.png)
+            Some text
+            ![Two](two.jpg)
+            ![Three](three.webp)
+        """.trimIndent()
+
+        val result =
+            extractor.extract(markdown)
 
         assertEquals(
             listOf(
-                "./img/logo.png",
-                "../assets/test.webp",
+                "one.png",
+                "two.jpg",
+                "three.webp",
             ),
             result,
         )
     }
 
     @Test
-    fun `should return empty list when no images`() {
-        val markdown =
-            """
-            # Title
-            
-            Some text
-            
-            ## Subtitle
-            """.trimIndent()
+    fun `extract preserves relative paths`() {
+        val markdown = """
+            ![Image](images/logo.png)
+            ![Image](../assets/banner.jpg)
+        """.trimIndent()
 
-        val result = extractor.extract(markdown)
+        val result =
+            extractor.extract(markdown)
 
-        assertEquals(emptyList<String>(), result)
+        assertEquals(
+            listOf(
+                "images/logo.png",
+                "../assets/banner.jpg",
+            ),
+            result,
+        )
+    }
+
+    @Test
+    fun `extract supports absolute urls`() {
+        val markdown = """
+            ![Image](https://example.com/image.png)
+        """.trimIndent()
+
+        val result =
+            extractor.extract(markdown)
+
+        assertEquals(
+            listOf(
+                "https://example.com/image.png",
+            ),
+            result,
+        )
+    }
+
+    @Test
+    fun `extract ignores normal links`() {
+        val markdown = """
+            [OpenAI](https://example.com)
+            
+            ![Image](image.png)
+        """.trimIndent()
+
+        val result =
+            extractor.extract(markdown)
+
+        assertEquals(
+            listOf("image.png"),
+            result,
+        )
     }
 }

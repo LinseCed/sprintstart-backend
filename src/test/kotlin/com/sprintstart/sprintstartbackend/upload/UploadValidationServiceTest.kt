@@ -1,75 +1,182 @@
 package com.sprintstart.sprintstartbackend.upload
 
 import com.sprintstart.sprintstartbackend.upload.service.UploadValidationService
+import org.junit.jupiter.api.Assertions.assertDoesNotThrow
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.springframework.mock.web.MockMultipartFile
 
 class UploadValidationServiceTest {
-    private val validationService =
+
+    private val service =
         UploadValidationService(
-            maxFileSizeBytes = 1024 * 1024,
+            maxFileSizeBytes = 100,
         )
 
     @Test
-    fun `should validate correct markdown file`() {
+    fun `accepts valid markdown file`() {
         val file = MockMultipartFile(
-            "file",
-            "intro.md",
+            "files",
+            "readme.md",
             "text/markdown",
             "# Hello".toByteArray(),
         )
 
-        validationService.validate(file)
-    }
-
-    @Test
-    fun `should reject unsupported extension`() {
-        val file = MockMultipartFile(
-            "file",
-            "virus.exe",
-            "application/octet-stream",
-            "bad".toByteArray(),
-        )
-
-        assertThrows(
-            IllegalArgumentException::class.java,
-        ) {
-            validationService.validate(file)
+        assertDoesNotThrow {
+            service.validate(file)
         }
     }
 
     @Test
-    fun `should reject invalid filename`() {
+    fun `rejects empty file`() {
         val file = MockMultipartFile(
-            "file",
+            "files",
+            "readme.md",
+            "text/markdown",
+            ByteArray(0),
+        )
+
+        val ex =
+            assertThrows(
+                IllegalArgumentException::class.java,
+            ) {
+                service.validate(file)
+            }
+
+        assertEquals(
+            "File is empty",
+            ex.message,
+        )
+    }
+
+    @Test
+    fun `rejects oversized file`() {
+        val file = MockMultipartFile(
+            "files",
+            "readme.md",
+            "text/markdown",
+            ByteArray(101),
+        )
+
+        val ex =
+            assertThrows(
+                IllegalArgumentException::class.java,
+            ) {
+                service.validate(file)
+            }
+
+        assertEquals(
+            "File exceeds maximum allowed size",
+            ex.message,
+        )
+    }
+
+    @Test
+    fun `rejects path traversal`() {
+        val file = MockMultipartFile(
+            "files",
             "../secret.md",
             "text/markdown",
-            "# bad".toByteArray(),
+            "# Hello".toByteArray(),
         )
 
-        assertThrows(
-            IllegalArgumentException::class.java,
-        ) {
-            validationService.validate(file)
+        val ex =
+            assertThrows(
+                IllegalArgumentException::class.java,
+            ) {
+                service.validate(file)
+            }
+
+        assertEquals(
+            "Invalid filename",
+            ex.message,
+        )
+    }
+
+    @Test
+    fun `rejects slash in filename`() {
+        val file = MockMultipartFile(
+            "files",
+            "folder/file.md",
+            "text/markdown",
+            "# Hello".toByteArray(),
+        )
+
+        val ex =
+            assertThrows(
+                IllegalArgumentException::class.java,
+            ) {
+                service.validate(file)
+            }
+
+        assertEquals(
+            "Invalid filename",
+            ex.message,
+        )
+    }
+
+    @Test
+    fun `rejects unsupported extension`() {
+        val file = MockMultipartFile(
+            "files",
+            "notes.txt",
+            "text/plain",
+            "hello".toByteArray(),
+        )
+
+        val ex =
+            assertThrows(
+                IllegalArgumentException::class.java,
+            ) {
+                service.validate(file)
+            }
+
+        assertEquals(
+            "Unsupported file extension: txt",
+            ex.message,
+        )
+    }
+
+    @Test
+    fun `accepts png`() {
+        val file = MockMultipartFile(
+            "files",
+            "image.png",
+            "image/png",
+            byteArrayOf(1, 2, 3),
+        )
+
+        assertDoesNotThrow {
+            service.validate(file)
         }
     }
 
     @Test
-    fun `should reject oversized file`() {
-        val bytes = ByteArray(2 * 1024 * 1024)
-
+    fun `accepts jpg`() {
         val file = MockMultipartFile(
-            "file",
-            "large.md",
-            "text/markdown",
-            bytes,
+            "files",
+            "image.jpg",
+            "image/jpeg",
+            byteArrayOf(1, 2, 3),
         )
 
-        assertThrows(
-            IllegalArgumentException::class.java,
-        ) {
-            validationService.validate(file)
+        assertDoesNotThrow {
+            service.validate(file)
+        }
+    }
+
+    @Test
+    fun `accepts webp`() {
+        val file = MockMultipartFile(
+            "files",
+            "image.webp",
+            "image/webp",
+            byteArrayOf(1, 2, 3),
+        )
+
+        assertDoesNotThrow {
+            service.validate(file)
         }
     }
 }
