@@ -12,19 +12,35 @@ import com.sprintstart.sprintstartbackend.chat.models.responses.GetChatMessagesR
 import com.sprintstart.sprintstartbackend.chat.models.responses.GetChatsResponse
 import com.sprintstart.sprintstartbackend.chat.service.ChatService
 import io.mockk.every
+import jakarta.validation.ConstraintViolationException
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
+import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.web.bind.annotation.ControllerAdvice
+import org.springframework.web.bind.annotation.ExceptionHandler
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.time.OffsetDateTime
 import java.util.UUID
+
+/**
+ * Utility to convert exception into an http response so we can test this properly
+ */
+@ControllerAdvice
+class ValidationExceptionHandler {
+    @ExceptionHandler(ConstraintViolationException::class)
+    fun handleConstraintViolation(ex: ConstraintViolationException): ResponseEntity<String> {
+        return ResponseEntity.badRequest().body(ex.message)
+    }
+}
 
 /**
  * Spring MVC slice tests for [ChatController].
@@ -33,6 +49,7 @@ import java.util.UUID
  * serialization, and @Valid rejection behaviour.
  */
 @WebMvcTest(ChatController::class)
+@Import(ValidationExceptionHandler::class)
 @AutoConfigureMockMvc(addFilters = false)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ChatControllerWebMvcTest(
@@ -61,10 +78,8 @@ class ChatControllerWebMvcTest(
             every { chatService.getChats(request) } returns GetChatsResponse(chats = listOf(sampleChatResponse))
 
             mockMvc
-                .get("/api/v1/chats") {
-                    contentType = MediaType.APPLICATION_JSON
-                    content = objectMapper.writeValueAsString(request)
-                }.andExpect {
+                .get("/api/v1/chats?limit=5")
+                .andExpect {
                     status { isOk() }
                     jsonPath("$.chats[0].id") { value(chatId.toString()) }
                     jsonPath("$.chats[0].title") { value("Sprint planning") }
@@ -90,10 +105,8 @@ class ChatControllerWebMvcTest(
         @Test
         fun `returns 400 when limit is less than 1`() {
             mockMvc
-                .get("/api/v1/chats") {
-                    contentType = MediaType.APPLICATION_JSON
-                    content = """{"limit": 0}"""
-                }.andExpect {
+                .get("/api/v1/chats?limit=-5")
+                .andExpect {
                     status { isBadRequest() }
                 }
         }
@@ -109,10 +122,8 @@ class ChatControllerWebMvcTest(
             )
 
             mockMvc
-                .get("/api/v1/chats/$chatId") {
-                    contentType = MediaType.APPLICATION_JSON
-                    content = objectMapper.writeValueAsString(request)
-                }.andExpect {
+                .get("/api/v1/chats/$chatId?limit=20")
+                .andExpect {
                     status { isOk() }
                     jsonPath("$.messages[0].content") { value("Hello") }
                     jsonPath("$.messages[0].role") { value("USER") }
@@ -140,10 +151,8 @@ class ChatControllerWebMvcTest(
         @Test
         fun `returns 400 when limit is less than 1`() {
             mockMvc
-                .get("/api/v1/chats/$chatId") {
-                    contentType = MediaType.APPLICATION_JSON
-                    content = """{"limit": -5}"""
-                }.andExpect {
+                .get("/api/v1/chats/$chatId?limit=0")
+                .andExpect {
                     status { isBadRequest() }
                 }
         }

@@ -54,7 +54,7 @@ class ChatControllerUnitTest {
             val expected = GetChatsResponse(chats = listOf(sampleChatResponse))
             every { chatService.getChats(request) } returns expected
 
-            val result = controller.getChats(request)
+            val result = controller.getChats(10)
 
             assertEquals(expected, result)
             verify(exactly = 1) { chatService.getChats(request) }
@@ -66,7 +66,7 @@ class ChatControllerUnitTest {
             val expected = GetChatsResponse(chats = emptyList())
             every { chatService.getChats(request) } returns expected
 
-            val result = controller.getChats(request)
+            val result = controller.getChats(null)
 
             assertEquals(expected, result)
             verify { chatService.getChats(request) }
@@ -83,7 +83,7 @@ class ChatControllerUnitTest {
             )
             every { chatService.getChat(chatId, request) } returns expected
 
-            val result = controller.getChatMessages(chatId, request)
+            val result = controller.getChatMessages(chatId, 5)
 
             assertEquals(expected, result)
             verify(exactly = 1) { chatService.getChat(chatId, request) }
@@ -95,7 +95,7 @@ class ChatControllerUnitTest {
             val expected = GetChatMessagesResponse(messages = emptyList())
             every { chatService.getChat(chatId, request) } returns expected
 
-            val result = controller.getChatMessages(chatId, request)
+            val result = controller.getChatMessages(chatId, null)
 
             assertEquals(expected, result)
             verify { chatService.getChat(chatId, request) }
