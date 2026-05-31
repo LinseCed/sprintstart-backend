@@ -3,7 +3,7 @@ package com.sprintstart.sprintstartbackend.onboarding.model.response
 import java.time.Instant
 import java.util.UUID
 
-data class GetAllOnboardingPathResponse(
+data class GetAllOnboardingPathsResponse(
     val id: UUID,
     val userId: UUID,
     val createdAt: Instant,

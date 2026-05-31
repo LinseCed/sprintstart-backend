@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
-import com.sprintstart.sprintstartbackend.onboarding.model.response.GetAllOnboardingPathResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.GetAllOnboardingPathsResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.GetOnboardingPathResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingService
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -17,7 +17,7 @@ class OnboardingController(
 ) {
     // Get: All paths
     @GetMapping("/paths")
-    fun getAllPaths(): List<GetAllOnboardingPathResponse> {
+    fun getAllPaths(): List<GetAllOnboardingPathsResponse> {
         return onboardingService.getAllOnboardingPaths()
     }
 
@@ -33,8 +33,10 @@ class OnboardingController(
         onboardingService.deleteOnboardingPathById(pathId)
     }
 
+
     // Todo: - endpoints for phase
     //       - endpoints for step
     //       - endpoints for task
     //       - endpoints for resource
+    //       - add way to load default paths
 }

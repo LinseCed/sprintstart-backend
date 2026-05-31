@@ -2,7 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toGetAllResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toGetResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.GetAllOnboardingPathResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.GetAllOnboardingPathsResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.GetOnboardingPathResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
 import org.springframework.http.HttpStatus
@@ -14,7 +14,7 @@ import java.util.UUID
 class OnboardingService(
     private val onboardingPathRepository: OnboardingPathRepository,
 ) {
-    fun getAllOnboardingPaths(): List<GetAllOnboardingPathResponse> {
+    fun getAllOnboardingPaths(): List<GetAllOnboardingPathsResponse> {
         return onboardingPathRepository.findAll().map {
             it.toGetAllResponse()
         }

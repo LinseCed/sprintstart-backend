@@ -2,11 +2,11 @@ package com.sprintstart.sprintstartbackend.onboarding.model.mapper
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
-import com.sprintstart.sprintstartbackend.onboarding.model.response.GetAllOnboardingPathResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.GetAllOnboardingPathsResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.GetOnboardingPathResponse
 
-fun OnboardingPath.toGetAllResponse(): GetAllOnboardingPathResponse {
-    return GetAllOnboardingPathResponse(
+fun OnboardingPath.toGetAllResponse(): GetAllOnboardingPathsResponse {
+    return GetAllOnboardingPathsResponse(
         id = this.id,
         userId = this.userId,
         createdAt = this.createdAt,
