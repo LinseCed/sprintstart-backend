@@ -35,9 +35,6 @@ import java.util.UUID
  * and deletions automatically shift sibling tasks to maintain a contiguous, gap-free ordering.
  * The `finished` flag can be toggled freely without any additional side-effects.
  *
- * Access rules:
- * - `GET /tasks` — admin only (flat listing of all tasks across all steps)
- * - All other endpoints — accessible to users with the appropriate role
  */
 @RestController
 @RequestMapping("/api/v1/onboarding")
@@ -63,7 +60,7 @@ class OnboardingTaskController(
             "Tasks are leaf nodes and have no children.",
     )
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Task created successfully"),
+        ApiResponse(responseCode = "201", description = "Task created successfully"),
         ApiResponse(responseCode = "404", description = "No onboarding step found with the given ID"),
     )
     @ResponseStatus(HttpStatus.CREATED)
@@ -187,7 +184,7 @@ class OnboardingTaskController(
             "Subsequent sibling tasks are shifted back by one to keep ordering contiguous.",
     )
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Task deleted successfully"),
+        ApiResponse(responseCode = "204", description = "Task deleted successfully"),
         ApiResponse(responseCode = "404", description = "No onboarding task found with the given ID"),
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)

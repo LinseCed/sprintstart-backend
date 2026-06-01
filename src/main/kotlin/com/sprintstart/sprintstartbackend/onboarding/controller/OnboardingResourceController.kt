@@ -35,9 +35,6 @@ import java.util.UUID
  * Unlike phases, steps, and tasks, resources are unordered — they have no position field
  * and are not subject to any reordering on create, update, or delete.
  *
- * Access rules:
- * - `GET /resources` — admin only (flat listing of all resources across all steps)
- * - All other endpoints — accessible to users with the appropriate role
  */
 @RestController
 @RequestMapping("/api/v1/onboarding")
@@ -63,7 +60,7 @@ class OnboardingResourceController(
             " tasks, they have no position field.",
     )
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Resource created successfully"),
+        ApiResponse(responseCode = "201", description = "Resource created successfully"),
         ApiResponse(responseCode = "404", description = "No onboarding step found with the given ID"),
     )
     @ResponseStatus(HttpStatus.CREATED)
@@ -185,7 +182,7 @@ class OnboardingResourceController(
             "Resources are unordered, so no sibling reordering is needed after deletion.",
     )
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Resource deleted successfully"),
+        ApiResponse(responseCode = "204", description = "Resource deleted successfully"),
         ApiResponse(responseCode = "404", description = "No onboarding resource found with the given ID"),
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)

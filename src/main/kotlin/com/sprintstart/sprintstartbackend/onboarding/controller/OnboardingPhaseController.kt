@@ -34,9 +34,6 @@ import java.util.UUID
  * Phases are ordered within their parent path by a numeric position. Insertions, updates,
  * and deletions automatically shift sibling phases to maintain a contiguous, gap-free ordering.
  *
- * Access rules:
- * - `GET /phases` — admin only (flat listing of all phases across all paths)
- * - All other endpoints — accessible to users with the appropriate role
  */
 @RestController
 @RequestMapping("/api/v1/onboarding")
@@ -63,7 +60,7 @@ class OnboardingPhaseController(
             "Position values are not stable and should not be used as external references.",
     )
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Phase created successfully"),
+        ApiResponse(responseCode = "201", description = "Phase created successfully"),
         ApiResponse(responseCode = "404", description = "No onboarding path found with the given ID"),
     )
     @ResponseStatus(HttpStatus.CREATED)
@@ -194,7 +191,7 @@ class OnboardingPhaseController(
             "All child steps, tasks, and resources are removed via cascade.",
     )
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Phase deleted successfully"),
+        ApiResponse(responseCode = "204", description = "Phase deleted successfully"),
         ApiResponse(responseCode = "404", description = "No onboarding phase found with the given ID"),
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)

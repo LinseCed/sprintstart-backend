@@ -39,9 +39,6 @@ import java.util.UUID
  * - `SKIPPED` — records a completion timestamp and a skip reason
  * - `WAITING` — clears both the completion timestamp and the skip reason
  *
- * Access rules:
- * - `GET /steps` — admin only (flat listing of all steps across all phases)
- * - All other endpoints — accessible to users with the appropriate role
  */
 @RestController
 @RequestMapping("/api/v1/onboarding")
@@ -68,7 +65,7 @@ class OnboardingStepController(
             "The new step is always initialized with status WAITING regardless of request content.",
     )
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Step created successfully"),
+        ApiResponse(responseCode = "201", description = "Step created successfully"),
         ApiResponse(responseCode = "404", description = "No onboarding phase found with the given ID"),
     )
     @ResponseStatus(HttpStatus.CREATED)
@@ -199,7 +196,7 @@ class OnboardingStepController(
             "All child tasks and resources are removed via cascade.",
     )
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Step deleted successfully"),
+        ApiResponse(responseCode = "204", description = "Step deleted successfully"),
         ApiResponse(responseCode = "404", description = "No onboarding step found with the given ID"),
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)

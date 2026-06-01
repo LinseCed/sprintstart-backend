@@ -25,9 +25,6 @@ import java.util.UUID
  * Paths are the top-level entity in the onboarding hierarchy and can be looked up either
  * by their own UUID or by the UUID of the user they belong to.
  *
- * Access rules:
- * - `GET /paths` — admin only (flat listing of all paths across all users)
- * - All other endpoints — accessible to users with the appropriate role
  */
 @RestController
 @RequestMapping("/api/v1/onboarding")
@@ -65,7 +62,7 @@ class OnboardingPathController(
     @Operation(
         summary = "Get onboarding path by ID",
         description = "Returns a single onboarding path by its UUID. Includes one level of nesting: " +
-            " the path's direct phases are included, but steps within those phases are not.",
+            "the path's direct phases are included, but steps within those phases are not.",
     )
     @ApiResponses(
         ApiResponse(responseCode = "200", description = "Onboarding path with direct phases"),
@@ -122,7 +119,7 @@ class OnboardingPathController(
             " This operation is not reversible.",
     )
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Onboarding path deleted"),
+        ApiResponse(responseCode = "204", description = "Onboarding path deleted"),
         ApiResponse(responseCode = "404", description = "No onboarding path found with the given ID"),
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -149,7 +146,7 @@ class OnboardingPathController(
             "All associated phases, steps, tasks, and resources are removed via cascade.",
     )
     @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Onboarding path deleted"),
+        ApiResponse(responseCode = "204", description = "Onboarding path deleted"),
         ApiResponse(responseCode = "404", description = "No user or onboarding path found for the given user ID"),
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)

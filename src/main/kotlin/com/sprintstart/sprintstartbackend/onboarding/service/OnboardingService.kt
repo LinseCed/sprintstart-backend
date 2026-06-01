@@ -206,7 +206,7 @@ class OnboardingService(
      */
     @Transactional(readOnly = true)
     fun getOnboardingPhases(): List<GetOnboardingPhasesResponse> {
-        return onboardingPhaseRepository.findAll().map { phase -> phase.toGetAllResponse() }
+        return onboardingPhaseRepository.findAll().map { it.toGetAllResponse() }
     }
 
     /**
@@ -221,7 +221,7 @@ class OnboardingService(
         if (!onboardingPathRepository.existsById(pathId)) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "No path found with id: $pathId")
         }
-        return onboardingPhaseRepository.findAllByPath_Id(pathId).map { phase -> phase.toGetResponse() }
+        return onboardingPhaseRepository.findAllByPath_Id(pathId).map { it.toGetResponse() }
     }
 
     /**
@@ -351,7 +351,7 @@ class OnboardingService(
     fun getOnboardingSteps(): List<GetOnboardingStepsResponse> {
         return onboardingStepRepository
             .findAll()
-            .map { step -> step.toGetAllResponse() }
+            .map { it.toGetAllResponse() }
     }
 
     /**
@@ -368,7 +368,7 @@ class OnboardingService(
         }
         return onboardingStepRepository
             .findAllByPhase_Id(phaseId)
-            .map { step -> step.toGetResponse() }
+            .map { it.toGetResponse() }
     }
 
     /**
@@ -521,7 +521,7 @@ class OnboardingService(
      */
     @Transactional(readOnly = true)
     fun getOnboardingTasks(): List<GetOnboardingTasksResponse> {
-        return onboardingTaskRepository.findAll().map { task -> task.toGetAllResponse() }
+        return onboardingTaskRepository.findAll().map { it.toGetAllResponse() }
     }
 
     /**
@@ -536,7 +536,7 @@ class OnboardingService(
         if (!onboardingStepRepository.existsById(stepId)) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "No step found with id: $stepId")
         }
-        return onboardingTaskRepository.findAllByStep_Id(stepId).map { task -> task.toGetResponse() }
+        return onboardingTaskRepository.findAllByStep_Id(stepId).map { it.toGetResponse() }
     }
 
     /**
@@ -655,7 +655,7 @@ class OnboardingService(
     fun getOnboardingResources(): List<GetOnboardingResourcesResponse> {
         return onboardingResourceRepository
             .findAll()
-            .map { resource -> resource.toGetAllResponse() }
+            .map { it.toGetAllResponse() }
     }
 
     /**
@@ -671,7 +671,7 @@ class OnboardingService(
         }
         return onboardingResourceRepository
             .findAllByStep_Id(stepId)
-            .map { resource -> resource.toGetResponse() }
+            .map { it.toGetResponse() }
     }
 
     /**
