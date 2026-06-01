@@ -16,12 +16,45 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
+/**
+ * Provides development and demo seeding operations for onboarding data.
+ *
+ * This service creates onboarding paths from predefined seed files and can remove
+ * all onboarding data for a given user. The seed operation is intentionally
+ * defensive: it only creates data if the user exists, if the user does not already
+ * have onboarding data, and if the selected seed resource is available.
+ *
+ * The seeded data is loaded from classpath resources and mapped into the onboarding
+ * entity graph. Persisting the root [OnboardingPath] is enough because the nested
+ * onboarding entities are expected to be persisted through cascading.
+ *
+ * @property onboardingPathRepository Repository used to read, create, and delete onboarding paths.
+ * @property userApi Module-facing API used to check whether a user exists.
+ * @property resourceLoader Loader used to access seed files from the classpath.
+ */
 @Service
 class SeedingService(
     private val onboardingPathRepository: OnboardingPathRepository,
     private val userApi: UserApi,
     private val resourceLoader: ResourceLoader,
 ) {
+    /**
+     * Seeds onboarding data for the given user.
+     *
+     * The method exits without creating data if:
+     * - the user does not exist,
+     * - the user already has an onboarding path,
+     * - the selected seed file does not exist,
+     * - or the selected seed file has no filename.
+     *
+     * If seeding is possible, one of the configured seed files is selected randomly,
+     * parsed as YAML or JSON depending on the file extension, and converted into
+     * onboarding path, phase, step, task, and resource entities.
+     *
+     * All seeded steps are initialized with [StepStatus.WAITING].
+     *
+     * @param userId The unique identifier of the user for whom onboarding data should be created.
+     */
     @Transactional
     fun seed(userId: UUID) {
         if (!userApi.exists(userId)) return
@@ -100,6 +133,15 @@ class SeedingService(
         }
     }
 
+    /**
+     * Deletes all onboarding data associated with the given user.
+     *
+     * The repository is flushed immediately after deletion so the reset is executed
+     * within the current transaction before the method returns. This is useful for
+     * development and test flows where seed data may be recreated right after reset.
+     *
+     * @param userId The unique identifier of the user whose onboarding data should be deleted.
+     */
     @Transactional
     fun reset(userId: UUID) {
         onboardingPathRepository.deleteByUserId(userId)
