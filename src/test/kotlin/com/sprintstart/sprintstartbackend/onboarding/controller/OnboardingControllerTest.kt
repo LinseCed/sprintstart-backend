@@ -158,7 +158,7 @@ class OnboardingControllerTest(
     }
 
     @Test
-    fun `deletePath should return 200`() {
+    fun `deletePath should return 204`() {
         every { onboardingService.deleteOnboardingPathById(pathId) } just Runs
 
         mockMvc.delete("/api/v1/onboarding/paths/$pathId")
@@ -170,7 +170,7 @@ class OnboardingControllerTest(
     }
 
     @Test
-    fun `deletePathByUserId should return 200`() {
+    fun `deletePathByUserId should return 204`() {
         every { onboardingService.deleteOnboardingPathByUserId(userId) } just Runs
 
         mockMvc.delete("/api/v1/onboarding/$userId/path")
@@ -206,7 +206,7 @@ class OnboardingControllerTest(
             contentType = MediaType.APPLICATION_JSON
             content = objectMapper.writeValueAsString(request)
         }.andExpect {
-            status { isOk() }
+            status { isCreated() }
             jsonPath("$.id") { value(phaseId.toString()) }
             jsonPath("$.pathId") { value(pathId.toString()) }
             jsonPath("$.position") { value(1) }
@@ -321,7 +321,7 @@ class OnboardingControllerTest(
     }
 
     @Test
-    fun `deleteOnboardingPhaseForPathId should return 200`() {
+    fun `deleteOnboardingPhaseForPathId should return 204`() {
         every { onboardingService.deleteOnboardingPhase(phaseId) } just Runs
 
         mockMvc.delete("/api/v1/onboarding/phases/$phaseId")
@@ -337,7 +337,7 @@ class OnboardingControllerTest(
     // -------------------------------------------------------------------------
 
     @Test
-    fun `createOnboardingStep should return 200 and created step`() {
+    fun `createOnboardingStep should return 201 and created step`() {
         val request = CreateOnboardingStepRequest(
             position = 1,
             title = "Read docs",
@@ -363,7 +363,7 @@ class OnboardingControllerTest(
             contentType = MediaType.APPLICATION_JSON
             content = objectMapper.writeValueAsString(request)
         }.andExpect {
-            status { isOk() }
+            status { isCreated() }
             jsonPath("$.id") { value(stepId.toString()) }
             jsonPath("$.phaseId") { value(phaseId.toString()) }
             jsonPath("$.status") { value("WAITING") }
@@ -502,7 +502,7 @@ class OnboardingControllerTest(
     }
 
     @Test
-    fun `deleteOnboardingStepForPhaseId should return 200`() {
+    fun `deleteOnboardingStepForPhaseId should return 204`() {
         every { onboardingService.deleteOnboardingStep(stepId) } just Runs
 
         mockMvc.delete("/api/v1/onboarding/steps/$stepId")
@@ -539,7 +539,7 @@ class OnboardingControllerTest(
             contentType = MediaType.APPLICATION_JSON
             content = objectMapper.writeValueAsString(request)
         }.andExpect {
-            status { isOk() }
+            status { isCreated() }
             jsonPath("$.id") { value(taskId.toString()) }
             jsonPath("$.stepId") { value(stepId.toString()) }
             jsonPath("$.finished") { value(false) }
@@ -654,7 +654,7 @@ class OnboardingControllerTest(
     }
 
     @Test
-    fun `deleteOnboardingTaskForStepId should return 200`() {
+    fun `deleteOnboardingTaskForStepId should return 204`() {
         every { onboardingService.deleteOnboardingTask(taskId) } just Runs
 
         mockMvc.delete("/api/v1/onboarding/tasks/$taskId")
@@ -690,7 +690,7 @@ class OnboardingControllerTest(
             contentType = MediaType.APPLICATION_JSON
             content = objectMapper.writeValueAsString(request)
         }.andExpect {
-            status { isOk() }
+            status { isCreated() }
             jsonPath("$.id") { value(resourceId.toString()) }
             jsonPath("$.stepId") { value(stepId.toString()) }
             jsonPath("$.url") { value("https://example.com/docs") }
@@ -800,7 +800,7 @@ class OnboardingControllerTest(
     }
 
     @Test
-    fun `deleteOnboardingResourceForStepId should return 200`() {
+    fun `deleteOnboardingResourceForStepId should return 204`() {
         every { onboardingService.deleteOnboardingResource(resourceId) } just Runs
 
         mockMvc.delete("/api/v1/onboarding/resources/$resourceId")
