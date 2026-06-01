@@ -9,9 +9,11 @@ import com.sprintstart.sprintstartbackend.upload.repository.UploadedArtifactRepo
 import com.sprintstart.sprintstartbackend.upload.service.storage.ArtifactStorageService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
+import org.springframework.web.server.ResponseStatusException
 import java.security.MessageDigest
 import java.util.UUID
 
@@ -30,7 +32,8 @@ class UploadService(
         uploaderId: UUID,
     ): List<UploadArtifactResponse> {
         if (!userApi.exists(uploaderId)) {
-            throw IllegalArgumentException(
+            throw ResponseStatusException(
+                HttpStatus.NOT_FOUND,
                 "Uploader does not exist",
             )
         }
@@ -191,7 +194,8 @@ class UploadService(
             uploadedArtifactRepository
                 .findById(artifactId)
                 .orElseThrow {
-                    IllegalArgumentException(
+                    ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
                         "Artifact not found",
                     )
                 }
