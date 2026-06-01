@@ -408,9 +408,10 @@ class OnboardingService(
         step.expectedOutcome = request.expectedOutcome
 
         if (step.status != request.status) {
-            when (step.status) {
+            when (request.status) {
                 StepStatus.FINISHED -> {
                     step.completedAt = Instant.now()
+                    step.skipReason = null
                 }
 
                 StepStatus.SKIPPED -> {
@@ -629,6 +630,7 @@ class OnboardingService(
      */
     @Transactional(readOnly = true)
     fun getOnboardingResourceByStepId(stepId: UUID): List<GetOnboardingResourceResponse> {
+        if (!onboardingStepRepository.existsById(stepId)) throw ResponseStatusException(HttpStatus.NOT_FOUND, "No step found with id: $stepId")
         return onboardingResourceRepository
             .findAllByStep_Id(stepId)
             .map { resource -> resource.toGetResponse() }

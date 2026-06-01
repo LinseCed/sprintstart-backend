@@ -12,6 +12,5 @@ data class UpdateOnboardingStepRequest(
     val estimatedMinutes: Int,
     val expectedOutcome: String,
     val status: StepStatus,
-    val completedAt: Instant?,
     val skipReason: String?,
 )
