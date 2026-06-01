@@ -16,7 +16,7 @@ class AiPromptRequestTest {
 
         val request = chatMessage.toAiContextEntry()
 
-        assertEquals(chatMessage.role, request.role)
+        assertEquals(chatMessage.role.name.lowercase(), request.role)
         assertEquals(chatMessage.content, request.content)
     }
 }

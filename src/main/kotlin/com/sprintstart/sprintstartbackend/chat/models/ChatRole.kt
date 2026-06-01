@@ -7,8 +7,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 enum class ChatRole {
-    AI, // Answers from the AI
+    ASSISTANT, // Answers from the AI
     USER, // Prompts from the user
     SYSTEM, // System prompts fine-tuning AI behaviour
-    ORCHESTRATOR, // idk...
 }

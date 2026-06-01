@@ -198,7 +198,7 @@ internal class ChatService(
                 if (cause == null) {
                     val finalPromptResponse = sb.toString()
                     val msg = ChatMessage(
-                        role = ChatRole.AI,
+                        role = ChatRole.ASSISTANT,
                         chat = chat,
                         content = finalPromptResponse,
                         createdAt = OffsetDateTime.now(),

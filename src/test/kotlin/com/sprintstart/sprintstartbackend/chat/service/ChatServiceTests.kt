@@ -278,7 +278,7 @@ class ChatServiceTests {
 
             // First save = user message, second save = AI response
             assertEquals(2, savedMessages.size)
-            assertEquals(ChatRole.AI, savedMessages[1].role)
+            assertEquals(ChatRole.ASSISTANT, savedMessages[1].role)
             assertEquals("Hello world", savedMessages[1].content)
         }
 

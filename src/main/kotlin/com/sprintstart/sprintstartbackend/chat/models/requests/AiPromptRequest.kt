@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.chat.models.requests
 
 import com.sprintstart.sprintstartbackend.chat.models.ChatMessage
-import com.sprintstart.sprintstartbackend.chat.models.ChatRole
 import jakarta.validation.constraints.NotBlank
 import kotlinx.serialization.Serializable
 
@@ -19,13 +18,13 @@ data class AiPromptRequest(
 
 @Serializable
 data class ContextEntry(
-    @NotBlank val role: ChatRole,
+    @NotBlank val role: String,
     @NotBlank val content: String,
 )
 
 internal fun ChatMessage.toAiContextEntry(): ContextEntry {
     return ContextEntry(
-        role = this.role,
+        role = this.role.name.lowercase(),
         content = this.content,
     )
 }
