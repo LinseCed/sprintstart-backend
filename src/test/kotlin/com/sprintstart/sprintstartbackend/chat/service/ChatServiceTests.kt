@@ -10,7 +10,7 @@ import com.sprintstart.sprintstartbackend.chat.models.requests.CreateChatRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.GetChatMessagesRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.GetChatsRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.PromptRequest
-import com.sprintstart.sprintstartbackend.chat.models.responses.AiChatTitleResponse
+import com.sprintstart.sprintstartbackend.chat.models.responses.AiGenerateChatTitleResponse
 import com.sprintstart.sprintstartbackend.chat.models.responses.toChatMessageResponse
 import com.sprintstart.sprintstartbackend.chat.models.responses.toChatResponse
 import com.sprintstart.sprintstartbackend.chat.repository.ChatMessageRepository
@@ -290,7 +290,7 @@ class ChatServiceTests {
             every { chatRepository.save(any()) } answers { firstArg() }
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(any()) } answers { firstArg() }
-            every { webRequestClient.getChatTitle(any()) } returns AiChatTitleResponse("Sprint planning")
+            every { webRequestClient.getChatTitle(any(), any()) } returns AiGenerateChatTitleResponse("Sprint planning")
             every { webRequestClient.streamPrompt(any(), aiPromptRequest) } returns flowOf()
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
 
@@ -311,7 +311,7 @@ class ChatServiceTests {
 
             chatService.prompt(PromptRequest(chatId = chatId, msg = "Hello")).toList()
 
-            verify(exactly = 0) { webRequestClient.getChatTitle(any()) }
+            verify(exactly = 0) { webRequestClient.getChatTitle(any(), any()) }
             verify(exactly = 0) { chatRepository.save(any()) }
         }
 

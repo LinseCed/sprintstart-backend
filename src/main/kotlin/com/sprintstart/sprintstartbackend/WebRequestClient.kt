@@ -116,6 +116,7 @@ open class WebRequestClient {
             val client = HttpClient
                 .newBuilder()
                 .followRedirects(HttpClient.Redirect.NORMAL)
+                .version(HttpClient.Version.HTTP_1_1)
                 .build()
 
             val requestBuilder = HttpRequest

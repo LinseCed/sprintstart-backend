@@ -2,8 +2,9 @@ package com.sprintstart.sprintstartbackend.chat
 
 import com.sprintstart.sprintstartbackend.WebRequestClient
 import com.sprintstart.sprintstartbackend.chat.models.exceptions.AiResponseException
+import com.sprintstart.sprintstartbackend.chat.models.requests.AiGenerateChatTitleRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.AiPromptRequest
-import com.sprintstart.sprintstartbackend.chat.models.responses.AiChatTitleResponse
+import com.sprintstart.sprintstartbackend.chat.models.responses.AiGenerateChatTitleResponse
 import com.sprintstart.sprintstartbackend.chat.models.responses.AiStreamMessage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -20,8 +21,8 @@ class AiWebClientImpl {
 
     val jsonParser = client.jsonParser
 
-    fun getChatTitle(uri: URI): AiChatTitleResponse =
-        client.get<AiChatTitleResponse>(uri)
+    fun getChatTitle(uri: URI, prompt: String): AiGenerateChatTitleResponse =
+        client.post<AiGenerateChatTitleRequest, AiGenerateChatTitleResponse>(uri, AiGenerateChatTitleRequest(prompt))
 
     fun streamPrompt(uri: URI, body: AiPromptRequest): Flow<String> =
         client.streamPost<AiPromptRequest>(uri, body)
@@ -67,7 +68,11 @@ class AiWebRequestClient : WebRequestClient() {
         method: String,
         payload: String,
     ): Flow<String> = flow {
-        val client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build()
+        val client = HttpClient
+            .newBuilder()
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .version(HttpClient.Version.HTTP_1_1)
+            .build()
 
         val request = HttpRequest
             .newBuilder()

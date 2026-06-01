@@ -156,8 +156,8 @@ internal class ChatService(
 
         // If the title is empty, the chat is new, and a title needs to be generated
         if (chat.title.isBlank()) {
-            val uri = URI.create("${applicationConfig.ai.baseUrl}/generate-title")
-            val generatedTitle = webRequestClient.getChatTitle(uri)
+            val uri = URI.create("${applicationConfig.ai.baseUrl}/api/v1/generate-title")
+            val generatedTitle = webRequestClient.getChatTitle(uri, request.msg)
             chat.title = generatedTitle.title
             chatRepository.save(chat)
         }
@@ -175,7 +175,7 @@ internal class ChatService(
         // Make call to AI repo
         val promptingPayload = AiPromptRequest(request.msg, context)
         val stream = webRequestClient.streamPrompt(
-            URI.create("${applicationConfig.ai.baseUrl}/prompt"),
+            URI.create("${applicationConfig.ai.baseUrl}/api/v1/chat"),
             promptingPayload,
         )
         val sb = StringBuilder()
