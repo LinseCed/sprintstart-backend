@@ -16,7 +16,6 @@ internal class UploadEventListener(
     @Value("\${ai.base-url}")
     private val aiBaseUrl: String,
 ) {
-
     @EventListener
     fun handleArtifactUploaded(
         event: ArtifactUploadedEvent,

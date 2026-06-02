@@ -7,4 +7,8 @@ data class AiIngestRequest(
     val artifactId: UUID,
     val filename: String,
     val content: String,
-) : Serializable
+) : Serializable {
+    companion object {
+        private const val serialVersionUID = 1L
+    }
+}

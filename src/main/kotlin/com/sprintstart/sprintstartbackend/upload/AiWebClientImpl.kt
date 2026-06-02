@@ -26,9 +26,9 @@ class AiWebClientImpl {
         body: AiIngestRequest,
     ): AiIngestResponse =
         client.post<
-                AiIngestRequest,
-                AiIngestResponse
-                >(
+            AiIngestRequest,
+            AiIngestResponse,
+        >(
             uri,
             body,
         )
