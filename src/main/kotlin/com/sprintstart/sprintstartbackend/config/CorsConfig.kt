@@ -4,6 +4,8 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.web.servlet.config.annotation.CorsRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 
+const val MAX_AGE = 3600L
+
 @Configuration
 class CorsConfig : WebMvcConfigurer {
     override fun addCorsMappings(registry: CorsRegistry) {
@@ -16,6 +18,6 @@ class CorsConfig : WebMvcConfigurer {
             ).allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
             .allowedHeaders("*")
             .allowCredentials(true)
-            .maxAge(3600)
+            .maxAge(MAX_AGE)
     }
 }
