@@ -1,11 +1,8 @@
 package com.sprintstart.sprintstartbackend.upload.external.events
 
-import java.io.Serializable
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class AiIngestResponse(
     val success: Boolean,
-) : Serializable {
-    companion object {
-        private const val serialVersionUID = 1L
-    }
-}
+)
