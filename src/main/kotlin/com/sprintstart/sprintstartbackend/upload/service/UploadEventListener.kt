@@ -27,7 +27,7 @@ internal class UploadEventListener(
         aiWebClient.ingest(
             URI("$aiBaseUrl/api/v1/ingest"),
             AiIngestRequest(
-                artifactId = event.artifactId,
+                artifactId = event.artifactId.toString(),
                 filename = event.filename,
                 content = content,
             ),
