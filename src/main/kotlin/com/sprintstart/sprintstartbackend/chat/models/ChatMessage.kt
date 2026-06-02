@@ -17,6 +17,6 @@ internal data class ChatMessage(
     @Column @Id val id: UUID = UUID.randomUUID(),
     @Enumerated(EnumType.STRING) @Column(nullable = false) val role: ChatRole,
     @JoinColumn("chat_id", nullable = false) @ManyToOne val chat: Chat,
-    @Column(nullable = false) val content: String,
+    @Column(nullable = false, columnDefinition = "TEXT") val content: String,
     @Column("created_at") val createdAt: OffsetDateTime,
 )
