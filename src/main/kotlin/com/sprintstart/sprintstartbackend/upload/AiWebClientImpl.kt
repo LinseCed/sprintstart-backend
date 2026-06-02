@@ -6,7 +6,7 @@ import com.sprintstart.sprintstartbackend.upload.external.events.AiIngestRespons
 import org.springframework.stereotype.Component
 import java.net.URI
 
-@Component
+@Component("uploadAiWebClient")
 class AiWebClientImpl {
     private val client = WebRequestClient()
 

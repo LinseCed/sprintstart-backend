@@ -13,7 +13,7 @@ import java.nio.file.Paths
 @Component
 internal class UploadEventListener(
     private val aiWebClient: AiWebClientImpl,
-    @Value("\${ai.base-url}")
+    @Value("\${sprintstart.ai.base-url}")
     private val aiBaseUrl: String,
 ) {
     @EventListener
