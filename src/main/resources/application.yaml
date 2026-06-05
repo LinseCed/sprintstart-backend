@@ -1,6 +1,9 @@
 sprintstart:
   ai:
     base-url: "http://host.docker.internal:8000"
+  github:
+    base-url: "https://api.github.com/graphql"
+    token: ${GITHUB_PAT}
     
 spring:
   config:

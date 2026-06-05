@@ -9,11 +9,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * ```yml
  * sprintstart:
  *     ai: ...
+ *     github: ...
  * ```
  */
 @ConfigurationProperties(prefix = "sprintstart")
 data class ApplicationConfig(
     val ai: AiConfig,
+    val github: GithubConfig
 )
 
 /**
@@ -28,4 +30,21 @@ data class ApplicationConfig(
 data class AiConfig(
     @get:JsonProperty("base-url")
     val baseUrl: String,
+)
+
+/**
+ * Contains the following application.yml config parameters
+ * 
+ * ´´´yml
+ * sprintstart:
+ *     github:
+ *         base-url: ...
+ *         token: ...
+ * ´´´
+ */
+data class GithubConfig(
+    @get:JsonProperty("base-url")
+    val baseUrl: String,
+    @get:JsonProperty("token")
+    val token: String,
 )
