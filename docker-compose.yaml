@@ -27,8 +27,7 @@ services:
     command:
       - start-dev
       - --import-realm
-      - --hostname=localhost
-      - --hostname-port=8081
+      - --hostname=http://localhost:8081/
       - --hostname-backchannel-dynamic=true
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
