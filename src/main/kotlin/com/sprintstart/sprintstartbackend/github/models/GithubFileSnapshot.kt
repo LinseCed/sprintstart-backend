@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.github.models
 
+import com.sprintstart.sprintstartbackend.github.models.client.Commit
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
@@ -24,4 +25,12 @@ data class GithubFileSnapshot(
     var contentHash: String,
     @Column(nullable = false)
     var lastIngestedAt: Instant,
-)
+) {
+    fun of(commit: Commit): GithubFileSnapshot {
+        return GithubFileSnapshot(
+            filePath = commit.url,
+            contentHash = commit.oid,
+            lastIngestedAt = Instant.now(),
+        )
+    }
+}

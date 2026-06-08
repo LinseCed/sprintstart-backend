@@ -3,6 +3,8 @@ package com.sprintstart.sprintstartbackend.github.models
 import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.FetchType
 import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
@@ -19,6 +21,9 @@ data class GithubRepositoryConnection(
     var owner: String,
     @Column(nullable = false)
     var name: String,
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    var status: ConnectionStatus = ConnectionStatus.UPDATING,
     @JoinColumn(name = "snapshot_id")
     @OneToOne(
         cascade = [CascadeType.ALL],

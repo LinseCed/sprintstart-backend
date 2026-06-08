@@ -18,11 +18,11 @@ data class GithubRepositorySnapshot(
     @OneToOne(mappedBy = "snapshot", fetch = FetchType.LAZY)
     var repository: GithubRepositoryConnection,
     @OneToMany(mappedBy = "snapshot", fetch = FetchType.LAZY)
-    val files: List<GithubFileSnapshot>,
+    val files: List<GithubFileSnapshot> = emptyList(),
     @Column(nullable = false)
-    var lastCommitsSyncAt: Instant,
+    var lastCommitsSyncAt: Instant = Instant.now(),
     @Column(nullable = false)
-    var lastIssuesSyncAt: Instant,
+    var lastIssuesSyncAt: Instant = Instant.now(),
     @Column(nullable = false)
-    var lastPullRequestsSyncAt: Instant,
+    var lastPullRequestsSyncAt: Instant = Instant.now(),
 )

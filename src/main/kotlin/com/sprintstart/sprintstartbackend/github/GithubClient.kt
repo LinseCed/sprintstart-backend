@@ -14,25 +14,20 @@ class GithubClient(
 ) {
     private val objectMapper = jacksonObjectMapper()
 
-    suspend fun fetchAndIngestAllGithubCommits(owner: String, name: String) {
+    suspend fun fetchAllCommits(owner: String, name: String): List<Commit> {
         val query = ClassPathResource("github/graphql/last-100-commits.graphql")
             .inputStream
             .bufferedReader()
             .readText()
-        val response = doFetchAll<Commit, GithubCommitsResponse>(owner, name, query)
-
-        println("Issues: ${objectMapper.writeValueAsString(response)}")
+        return doFetchAll<Commit, GithubCommitsResponse>(owner, name, query)
     }
 
-    suspend fun fetchAndIngestAllIssues(owner: String, name: String) {
+    suspend fun fetchAllIssues(owner: String, name: String): List<Issue> {
         val query = ClassPathResource("github/graphql/last-100-issues.graphql")
             .inputStream
             .bufferedReader()
             .readText()
-
-        val response = doFetchAll<Issue, GithubIssuesResponse>(owner, name, query)
-
-        println("Issues: ${objectMapper.writeValueAsString(response)}")
+        return doFetchAll<Issue, GithubIssuesResponse>(owner, name, query)
     }
 
     private suspend inline fun <S, reified T : PageableResponse<S>> doFetchAll(
