@@ -25,7 +25,6 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import java.util.UUID
 
 /**
  * REST controller for managing users.
@@ -76,22 +75,6 @@ class UserController(
     }
 
     @Operation(
-        summary = "Get user by ID",
-        description = "Returns a single user by their unique ID.",
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "User found"),
-            ApiResponse(responseCode = "404", description = "User not found"),
-        ],
-    )
-    @GetMapping("/{userId}")
-    @ResponseStatus(HttpStatus.OK)
-    fun getUserById(@PathVariable userId: UUID): GetUserResponse {
-        return userService.getUserById(userId)
-    }
-
-    @Operation(
         summary = "Get user by auth id",
         description = "Returns a single user by their Keycloak auth id.",
     )
@@ -101,35 +84,35 @@ class UserController(
             ApiResponse(responseCode = "404", description = "User not found"),
         ],
     )
-    @GetMapping("/auth-id/{authId}")
+    @GetMapping("/{authId}")
     @ResponseStatus(HttpStatus.OK)
     fun getUserByAuthId(@PathVariable authId: String): GetUserResponse {
         return userService.getUserByAuthId(authId)
     }
 
     @Operation(
-        summary = "Patch user by ID",
-        description = "Partially updates the user with the given ID. Only provided fields are changed.",
+        summary = "Update user by auth id",
+        description = "Updates the user with the given Keycloak auth id.",
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "User patched successfully"),
+            ApiResponse(responseCode = "200", description = "User updated successfully"),
             ApiResponse(responseCode = "400", description = "Invalid request body"),
             ApiResponse(responseCode = "404", description = "User not found"),
         ],
     )
-    @PutMapping("/{userId}")
+    @PutMapping("/{authId}")
     @ResponseStatus(HttpStatus.OK)
-    fun updateUserById(
-        @PathVariable userId: UUID,
+    fun updateUserByAuthId(
+        @PathVariable authId: String,
         @Valid @RequestBody request: UpdateUserRequest,
     ): UpdateUserResponse {
-        return userService.updateUserById(userId, request)
+        return userService.updateUserByAuthId(authId, request)
     }
 
     @Operation(
-        summary = "Patch user by ID",
-        description = "Partially updates the user with the given ID. Only provided fields are changed.",
+        summary = "Patch user by auth id",
+        description = "Partially updates the user with the given Keycloak auth id. Only provided fields are changed.",
     )
     @ApiResponses(
         value = [
@@ -138,18 +121,18 @@ class UserController(
             ApiResponse(responseCode = "404", description = "User not found"),
         ],
     )
-    @PatchMapping("/{userId}")
+    @PatchMapping("/{authId}")
     @ResponseStatus(HttpStatus.OK)
-    fun patchUserById(
-        @PathVariable userId: UUID,
+    fun patchUserByAuthId(
+        @PathVariable authId: String,
         @RequestBody request: PatchUserRequest,
     ): PatchUserResponse {
-        return userService.patchUserById(userId, request)
+        return userService.patchUserByAuthId(authId, request)
     }
 
     @Operation(
-        summary = "Delete user by ID",
-        description = "Deletes the user with the given ID.",
+        summary = "Delete user by auth id",
+        description = "Deletes the user with the given Keycloak auth id.",
     )
     @ApiResponses(
         value = [
@@ -157,10 +140,10 @@ class UserController(
             ApiResponse(responseCode = "404", description = "User not found"),
         ],
     )
-    @DeleteMapping("/{userId}")
+    @DeleteMapping("/{authId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    fun deleteUserById(@PathVariable userId: UUID) {
-        userService.deleteUserById(userId)
+    fun deleteUserByAuthId(@PathVariable authId: String) {
+        userService.deleteUserByAuthId(authId)
     }
 
     @Operation(

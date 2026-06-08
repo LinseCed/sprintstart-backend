@@ -18,7 +18,6 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
-import java.util.UUID
 import kotlin.jvm.optionals.getOrNull
 
 /**
@@ -72,26 +71,15 @@ class UserService(
     }
 
     /**
-     * Retrieves a user by their unique identifier.
+     * Retrieves a user by their Keycloak auth id.
      *
-     * @param id The unique identifier of the user to retrieve.
+     * @param authId The Keycloak auth id of the user to retrieve.
      * @return The response data of the found user.
-     * @throws ResponseStatusException If no user with the given identifier exists.
+     * @throws ResponseStatusException If no user with the given auth id exists.
      */
     @Transactional(readOnly = true)
-    fun getUserById(id: UUID): GetUserResponse {
-        return userRepository
-            .findById(id)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
-            .toGetResponse()
-    }
-
-    @Transactional(readOnly = true)
     fun getUserByAuthId(authId: String): GetUserResponse {
-        return userRepository
-            .findByAuthId(authId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with authId: $authId not found") }
-            .toGetResponse()
+        return findUserByAuthId(authId).toGetResponse()
     }
 
     /**
@@ -100,16 +88,14 @@ class UserService(
      * This method replaces all editable user fields with the values from the
      * given update request before the updated user is persisted.
      *
-     * @param id The unique identifier of the user to update.
+     * @param authId The Keycloak auth id of the user to update.
      * @param request The complete data used to update the user.
      * @return The response data of the updated user.
-     * @throws ResponseStatusException If no user with the given identifier exists.
+     * @throws ResponseStatusException If no user with the given auth id exists.
      */
     @Transactional
-    fun updateUserById(id: UUID, request: UpdateUserRequest): UpdateUserResponse {
-        val user: User = userRepository
-            .findById(id)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
+    fun updateUserByAuthId(authId: String, request: UpdateUserRequest): UpdateUserResponse {
+        val user = findUserByAuthId(authId)
 
         user.username = request.username
         user.firstname = request.firstname
@@ -126,16 +112,14 @@ class UserService(
      * existing user. Fields with `null` values are left unchanged before the
      * patched user is persisted.
      *
-     * @param id The unique identifier of the user to patch.
+     * @param authId The Keycloak auth id of the user to patch.
      * @param request The partial data used to update the user.
      * @return The response data of the patched user.
-     * @throws ResponseStatusException If no user with the given identifier exists.
+     * @throws ResponseStatusException If no user with the given auth id exists.
      */
     @Transactional
-    fun patchUserById(id: UUID, request: PatchUserRequest): PatchUserResponse {
-        val user: User = userRepository
-            .findById(id)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
+    fun patchUserByAuthId(authId: String, request: PatchUserRequest): PatchUserResponse {
+        val user = findUserByAuthId(authId)
 
         request.username?.let { user.username = it }
         request.firstname?.let { user.firstname = it }
@@ -169,18 +153,21 @@ class UserService(
     }
 
     /**
-     * Deletes a user by their unique identifier.
+     * Deletes a user by their Keycloak auth id.
      *
-     * @param id The unique identifier of the user to delete.
-     * @throws ResponseStatusException If no user with the given identifier exists.
+     * @param authId The Keycloak auth id of the user to delete.
+     * @throws ResponseStatusException If no user with the given auth id exists.
      */
     @Transactional
-    fun deleteUserById(id: UUID) {
-        val user: User = userRepository
-            .findById(id)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
-
+    fun deleteUserByAuthId(authId: String) {
+        val user = findUserByAuthId(authId)
         userRepository.delete(user)
+    }
+
+    private fun findUserByAuthId(authId: String): User {
+        return userRepository
+            .findByAuthId(authId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with authId: $authId not found") }
     }
 
     private fun validateAuthIdAvailability(authId: String) {

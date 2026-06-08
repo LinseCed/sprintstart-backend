@@ -129,29 +129,6 @@ class UserServiceTest {
     }
 
     @Test
-    fun `getUserById should return user when found`() {
-        val user = user(
-            authId = "keycloak-id-1",
-            username = "max_backend",
-            firstname = "Max",
-            lastname = "Backend",
-            workingArea = WorkingArea.BACKEND_DEV,
-        )
-
-        every {
-            userRepository.findById(user.id)
-        } returns Optional.of(user)
-
-        val response = userService.getUserById(user.id)
-
-        verify(exactly = 1) {
-            userRepository.findById(user.id)
-        }
-
-        assertUserMatchesResponse(user, response)
-    }
-
-    @Test
     fun `getUserByAuthId should return user when found`() {
         val user = user(
             authId = "keycloak-id-1",
@@ -195,7 +172,7 @@ class UserServiceTest {
     }
 
     @Test
-    fun `updateUserById should update and return user`() {
+    fun `updateUserByAuthId should update and return user`() {
         val user = user(
             authId = "keycloak-id-1",
             username = "old_username",
@@ -212,17 +189,17 @@ class UserServiceTest {
         )
 
         every {
-            userRepository.findById(user.id)
+            userRepository.findByAuthId(user.authId)
         } returns Optional.of(user)
 
         every {
             userRepository.save(user)
         } returns user
 
-        val response = userService.updateUserById(user.id, request)
+        val response = userService.updateUserByAuthId(user.authId, request)
 
         verify(exactly = 1) {
-            userRepository.findById(user.id)
+            userRepository.findByAuthId(user.authId)
             userRepository.save(user)
         }
 
@@ -235,7 +212,7 @@ class UserServiceTest {
     }
 
     @Test
-    fun `patchUserById should update and return user`() {
+    fun `patchUserByAuthId should update and return user`() {
         val user = user(
             authId = "keycloak-id-1",
             username = "max_backend",
@@ -250,17 +227,17 @@ class UserServiceTest {
         )
 
         every {
-            userRepository.findById(user.id)
+            userRepository.findByAuthId(user.authId)
         } returns Optional.of(user)
 
         every {
             userRepository.save(user)
         } returns user
 
-        val response = userService.patchUserById(user.id, request)
+        val response = userService.patchUserByAuthId(user.authId, request)
 
         verify(exactly = 1) {
-            userRepository.findById(user.id)
+            userRepository.findByAuthId(user.authId)
             userRepository.save(user)
         }
 
@@ -348,7 +325,7 @@ class UserServiceTest {
     }
 
     @Test
-    fun `deleteUserById should delete existing user`() {
+    fun `deleteUserByAuthId should delete existing user`() {
         val user = user(
             authId = "keycloak-id-1",
             username = "max_backend",
@@ -358,17 +335,17 @@ class UserServiceTest {
         )
 
         every {
-            userRepository.findById(user.id)
+            userRepository.findByAuthId(user.authId)
         } returns Optional.of(user)
 
         every {
             userRepository.delete(user)
         } returns Unit
 
-        userService.deleteUserById(user.id)
+        userService.deleteUserByAuthId(user.authId)
 
         verify(exactly = 1) {
-            userRepository.findById(user.id)
+            userRepository.findByAuthId(user.authId)
             userRepository.delete(user)
         }
     }

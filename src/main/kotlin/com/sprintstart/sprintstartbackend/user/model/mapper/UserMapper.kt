@@ -1,13 +1,12 @@
 package com.sprintstart.sprintstartbackend.user.model.mapper
 
-import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserResponse
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 
-fun User.toCreateResponse(): CreateUserResponse {
-    return CreateUserResponse(
+fun User.toGetResponse(): GetUserResponse =
+    GetUserResponse(
         id = this.id,
         authId = this.authId,
         username = this.username,
@@ -15,10 +14,9 @@ fun User.toCreateResponse(): CreateUserResponse {
         lastname = this.lastname,
         workingArea = this.workingArea,
     )
-}
 
-fun User.toGetResponse(): GetUserResponse {
-    return GetUserResponse(
+fun User.toUpdateResponse(): UpdateUserResponse =
+    UpdateUserResponse(
         id = this.id,
         authId = this.authId,
         username = this.username,
@@ -26,10 +24,9 @@ fun User.toGetResponse(): GetUserResponse {
         lastname = this.lastname,
         workingArea = this.workingArea,
     )
-}
 
-fun User.toUpdateResponse(): UpdateUserResponse {
-    return UpdateUserResponse(
+fun User.toPatchResponse(): PatchUserResponse =
+    PatchUserResponse(
         id = this.id,
         authId = this.authId,
         username = this.username,
@@ -37,15 +34,3 @@ fun User.toUpdateResponse(): UpdateUserResponse {
         lastname = this.lastname,
         workingArea = this.workingArea,
     )
-}
-
-fun User.toPatchResponse(): PatchUserResponse {
-    return PatchUserResponse(
-        id = this.id,
-        authId = this.authId,
-        username = this.username,
-        firstname = this.firstname,
-        lastname = this.lastname,
-        workingArea = this.workingArea,
-    )
-}
