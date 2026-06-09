@@ -1,20 +1,15 @@
 package com.sprintstart.sprintstartbackend.user
 
 import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
-import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserRequest
-import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
+import com.sprintstart.sprintstartbackend.user.model.dto.PatchMeRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserRequest
-import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserResponse
-import com.sprintstart.sprintstartbackend.user.model.dto.SyncUserRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserRequest
-import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserResponse
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import com.sprintstart.sprintstartbackend.user.service.UserService
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.slot
 import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -22,378 +17,198 @@ import org.junit.jupiter.api.assertThrows
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import java.util.Optional
+import java.util.UUID
 
 class UserServiceTest {
     private val userRepository: UserRepository = mockk()
     private val userService: UserService = UserService(userRepository)
 
+    // --- getAllUsers ---
+
     @Test
-    fun `createUser should save and return created user`() {
-        val request = CreateUserRequest(
-            authId = "keycloak-id-1",
-            username = "max_backend",
-            firstname = "Max",
-            lastname = "Backend",
-            workingArea = WorkingArea.BACKEND_DEV,
-        )
+    fun `getAllUsers should return mapped list`() {
+        val user1 = user(authId = "auth-1", username = "alice", workingArea = WorkingArea.BACKEND_DEV)
+        val user2 = user(authId = "auth-2", username = "bob", workingArea = WorkingArea.FRONTEND_DEV)
+        every { userRepository.findAll() } returns listOf(user1, user2)
 
-        val savedUserSlot = slot<User>()
+        val result = userService.getAllUsers()
 
-        every {
-            userRepository.existsByAuthId(request.authId)
-        } returns false
+        assertThat(result).hasSize(2)
+        assertThat(result.map { it.username }).containsExactlyInAnyOrder("alice", "bob")
+        verify(exactly = 1) { userRepository.findAll() }
+    }
 
-        every {
-            userRepository.save(capture(savedUserSlot))
-        } answers {
-            savedUserSlot.captured
-        }
+    // --- getMe ---
 
-        val response = userService.createUser(request)
+    @Test
+    fun `getMe should return user for given authId`() {
+        val user = user(authId = "auth-1", username = "alice", workingArea = WorkingArea.BACKEND_DEV)
+        every { userRepository.findByAuthId("auth-1") } returns Optional.of(user)
 
-        verify(exactly = 1) {
-            userRepository.existsByAuthId(request.authId)
-            userRepository.save(any())
-        }
+        val result = userService.getMe("auth-1")
 
-        val savedUser = savedUserSlot.captured
-        assertThat(savedUser.id).isNotNull()
-        assertThat(savedUser.authId).isEqualTo(request.authId)
-        assertThat(savedUser.username).isEqualTo(request.username)
-        assertThat(savedUser.firstname).isEqualTo(request.firstname)
-        assertThat(savedUser.lastname).isEqualTo(request.lastname)
-        assertThat(savedUser.workingArea).isEqualTo(request.workingArea)
-        assertUserMatchesResponse(savedUser, response)
+        assertUserMatchesResponse(user, result)
+        verify(exactly = 1) { userRepository.findByAuthId("auth-1") }
     }
 
     @Test
-    fun `createUser should throw BAD_REQUEST when auth id already exists`() {
-        val request = CreateUserRequest(
-            authId = "keycloak-id-1",
-            username = "max_backend",
-            firstname = "Max",
-            lastname = "Backend",
-            workingArea = WorkingArea.BACKEND_DEV,
-        )
+    fun `getMe should throw NOT_FOUND when user missing`() {
+        every { userRepository.findByAuthId("missing") } returns Optional.empty()
 
-        every {
-            userRepository.existsByAuthId(request.authId)
-        } returns true
+        val ex = assertThrows<ResponseStatusException> { userService.getMe("missing") }
 
-        val exception = assertThrows<ResponseStatusException> {
-            userService.createUser(request)
-        }
-
-        verify(exactly = 1) {
-            userRepository.existsByAuthId(request.authId)
-        }
-
-        verify(exactly = 0) {
-            userRepository.save(any())
-        }
-
-        assertThat(exception.statusCode).isEqualTo(HttpStatus.BAD_REQUEST)
-        assertThat(exception.reason).isEqualTo("User with authId: ${request.authId} already exists")
+        assertThat(ex.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
     }
 
-    @Test
-    fun `getAllUsers should return mapped users`() {
-        val user1 = user(
-            authId = "keycloak-id-1",
-            username = "max_backend",
-            firstname = "Max",
-            lastname = "Backend",
-            workingArea = WorkingArea.BACKEND_DEV,
-        )
-        val user2 = user(
-            authId = "keycloak-id-2",
-            username = "anna_frontend",
-            firstname = "Anna",
-            lastname = "Frontend",
-            workingArea = WorkingArea.FRONTEND_DEV,
-        )
-
-        every {
-            userRepository.findAll()
-        } returns listOf(user1, user2)
-
-        val response = userService.getAllUsers()
-
-        verify(exactly = 1) {
-            userRepository.findAll()
-        }
-
-        assertThat(response).hasSize(2)
-        assertThat(response).anySatisfy { assertUserMatchesResponse(user1, it) }
-        assertThat(response).anySatisfy { assertUserMatchesResponse(user2, it) }
-    }
+    // --- patchMe ---
 
     @Test
-    fun `getUserByAuthId should return user when found`() {
-        val user = user(
-            authId = "keycloak-id-1",
-            username = "max_backend",
-            firstname = "Max",
-            lastname = "Backend",
-            workingArea = WorkingArea.BACKEND_DEV,
-        )
+    fun `patchMe should update app-owned fields and return user`() {
+        val user = user(authId = "auth-1", username = "alice", workingArea = WorkingArea.NO_WORKING_AREA)
+        every { userRepository.findByAuthId("auth-1") } returns Optional.of(user)
+        every { userRepository.save(user) } returns user
 
-        every {
-            userRepository.findByAuthId(user.authId)
-        } returns Optional.of(user)
+        val result = userService.patchMe("auth-1", PatchMeRequest(workingArea = WorkingArea.BACKEND_DEV))
 
-        val response = userService.getUserByAuthId(user.authId)
-
-        verify(exactly = 1) {
-            userRepository.findByAuthId(user.authId)
-        }
-
-        assertUserMatchesResponse(user, response)
-    }
-
-    @Test
-    fun `getUserByAuthId should throw NOT_FOUND when missing`() {
-        val authId = "missing-id"
-
-        every {
-            userRepository.findByAuthId(authId)
-        } returns Optional.empty()
-
-        val exception = assertThrows<ResponseStatusException> {
-            userService.getUserByAuthId(authId)
-        }
-
-        verify(exactly = 1) {
-            userRepository.findByAuthId(authId)
-        }
-
-        assertThat(exception.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
-        assertThat(exception.reason).isEqualTo("User with authId: $authId not found")
-    }
-
-    @Test
-    fun `updateUserByAuthId should update and return user`() {
-        val user = user(
-            authId = "keycloak-id-1",
-            username = "old_username",
-            firstname = "Old",
-            lastname = "Username",
-            workingArea = WorkingArea.NO_WORKING_AREA,
-        )
-
-        val request = UpdateUserRequest(
-            username = "max_backend",
-            firstname = "Max",
-            lastname = "Backend",
-            workingArea = WorkingArea.BACKEND_DEV,
-        )
-
-        every {
-            userRepository.findByAuthId(user.authId)
-        } returns Optional.of(user)
-
-        every {
-            userRepository.save(user)
-        } returns user
-
-        val response = userService.updateUserByAuthId(user.authId, request)
-
-        verify(exactly = 1) {
-            userRepository.findByAuthId(user.authId)
-            userRepository.save(user)
-        }
-
-        assertThat(user.authId).isEqualTo("keycloak-id-1")
-        assertThat(user.username).isEqualTo(request.username)
-        assertThat(user.firstname).isEqualTo(request.firstname)
-        assertThat(user.lastname).isEqualTo(request.lastname)
-        assertThat(user.workingArea).isEqualTo(request.workingArea)
-        assertUserMatchesResponse(user, response)
-    }
-
-    @Test
-    fun `patchUserByAuthId should update and return user`() {
-        val user = user(
-            authId = "keycloak-id-1",
-            username = "max_backend",
-            firstname = "Old",
-            lastname = "Backend",
-            workingArea = WorkingArea.BACKEND_DEV,
-        )
-
-        val request = PatchUserRequest(
-            firstname = "Max",
-            workingArea = WorkingArea.FRONTEND_DEV,
-        )
-
-        every {
-            userRepository.findByAuthId(user.authId)
-        } returns Optional.of(user)
-
-        every {
-            userRepository.save(user)
-        } returns user
-
-        val response = userService.patchUserByAuthId(user.authId, request)
-
-        verify(exactly = 1) {
-            userRepository.findByAuthId(user.authId)
-            userRepository.save(user)
-        }
-
-        assertThat(user.authId).isEqualTo("keycloak-id-1")
-        assertThat(user.username).isEqualTo("max_backend")
-        assertThat(user.firstname).isEqualTo("Max")
-        assertThat(user.lastname).isEqualTo("Backend")
-        assertThat(user.workingArea).isEqualTo(WorkingArea.FRONTEND_DEV)
-        assertUserMatchesResponse(user, response)
-    }
-
-    @Test
-    fun `syncUser should update existing user by auth id`() {
-        val user = user(
-            authId = "keycloak-id-1",
-            username = "old_username",
-            firstname = "Old",
-            lastname = "Name",
-            workingArea = WorkingArea.BACKEND_DEV,
-        )
-        val request = SyncUserRequest(
-            authId = "keycloak-id-1",
-            username = "new_username",
-            firstname = "New",
-            lastname = "Name",
-        )
-
-        every {
-            userRepository.findByAuthId(request.authId)
-        } returns Optional.of(user)
-
-        every {
-            userRepository.save(user)
-        } returns user
-
-        val response = userService.syncUser(request)
-
-        verify(exactly = 1) {
-            userRepository.findByAuthId(request.authId)
-            userRepository.save(user)
-        }
-
-        assertThat(user.username).isEqualTo(request.username)
-        assertThat(user.firstname).isEqualTo(request.firstname)
-        assertThat(user.lastname).isEqualTo(request.lastname)
         assertThat(user.workingArea).isEqualTo(WorkingArea.BACKEND_DEV)
-        assertUserMatchesResponse(user, response)
+        assertThat(user.username).isEqualTo("alice") // identity field unchanged
+        assertUserMatchesResponse(user, result)
     }
 
     @Test
-    fun `syncUser should create new user when auth id does not exist`() {
-        val request = SyncUserRequest(
-            authId = "keycloak-id-1",
-            username = "new_username",
-            firstname = "New",
-            lastname = "Name",
-        )
+    fun `patchMe should leave null fields unchanged`() {
+        val user = user(authId = "auth-1", username = "alice", workingArea = WorkingArea.BACKEND_DEV)
+        every { userRepository.findByAuthId("auth-1") } returns Optional.of(user)
+        every { userRepository.save(user) } returns user
 
-        val savedUserSlot = slot<User>()
+        userService.patchMe("auth-1", PatchMeRequest(workingArea = null))
 
-        every {
-            userRepository.findByAuthId(request.authId)
-        } returns Optional.empty()
-
-        every {
-            userRepository.save(capture(savedUserSlot))
-        } answers {
-            savedUserSlot.captured
-        }
-
-        val response = userService.syncUser(request)
-
-        verify(exactly = 1) {
-            userRepository.findByAuthId(request.authId)
-            userRepository.save(any())
-        }
-
-        val savedUser = savedUserSlot.captured
-        assertThat(savedUser.authId).isEqualTo(request.authId)
-        assertThat(savedUser.username).isEqualTo(request.username)
-        assertThat(savedUser.firstname).isEqualTo(request.firstname)
-        assertThat(savedUser.lastname).isEqualTo(request.lastname)
-        assertThat(savedUser.workingArea).isEqualTo(WorkingArea.NO_WORKING_AREA)
-        assertUserMatchesResponse(savedUser, response)
+        assertThat(user.workingArea).isEqualTo(WorkingArea.BACKEND_DEV)
     }
 
     @Test
-    fun `deleteUserByAuthId should delete existing user`() {
-        val user = user(
-            authId = "keycloak-id-1",
-            username = "max_backend",
-            firstname = "Max",
-            lastname = "Backend",
-            workingArea = WorkingArea.BACKEND_DEV,
-        )
+    fun `patchMe should throw NOT_FOUND when user missing`() {
+        every { userRepository.findByAuthId("missing") } returns Optional.empty()
 
-        every {
-            userRepository.findByAuthId(user.authId)
-        } returns Optional.of(user)
-
-        every {
-            userRepository.delete(user)
-        } returns Unit
-
-        userService.deleteUserByAuthId(user.authId)
-
-        verify(exactly = 1) {
-            userRepository.findByAuthId(user.authId)
-            userRepository.delete(user)
+        val ex = assertThrows<ResponseStatusException> {
+            userService.patchMe("missing", PatchMeRequest(workingArea = WorkingArea.BACKEND_DEV))
         }
+
+        assertThat(ex.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
     }
+
+    // --- getUserById ---
+
+    @Test
+    fun `getUserById should return user for given UUID`() {
+        val user = user(authId = "auth-1", username = "alice", workingArea = WorkingArea.BACKEND_DEV)
+        every { userRepository.findById(user.id) } returns Optional.of(user)
+
+        val result = userService.getUserById(user.id)
+
+        assertUserMatchesResponse(user, result)
+    }
+
+    @Test
+    fun `getUserById should throw NOT_FOUND when missing`() {
+        val id = UUID.randomUUID()
+        every { userRepository.findById(id) } returns Optional.empty()
+
+        val ex = assertThrows<ResponseStatusException> { userService.getUserById(id) }
+
+        assertThat(ex.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
+    }
+
+    // --- updateUserById ---
+
+    @Test
+    fun `updateUserById should replace app-owned fields`() {
+        val user = user(authId = "auth-1", username = "alice", workingArea = WorkingArea.NO_WORKING_AREA)
+        every { userRepository.findById(user.id) } returns Optional.of(user)
+        every { userRepository.save(user) } returns user
+
+        val result = userService.updateUserById(user.id, UpdateUserRequest(workingArea = WorkingArea.BACKEND_DEV))
+
+        assertThat(user.workingArea).isEqualTo(WorkingArea.BACKEND_DEV)
+        assertThat(user.username).isEqualTo("alice") // identity field untouched
+        assertThat(result.workingArea).isEqualTo(WorkingArea.BACKEND_DEV)
+    }
+
+    @Test
+    fun `updateUserById should throw NOT_FOUND when missing`() {
+        val id = UUID.randomUUID()
+        every { userRepository.findById(id) } returns Optional.empty()
+
+        val ex = assertThrows<ResponseStatusException> {
+            userService.updateUserById(id, UpdateUserRequest(workingArea = WorkingArea.BACKEND_DEV))
+        }
+
+        assertThat(ex.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
+    }
+
+    // --- patchUserById ---
+
+    @Test
+    fun `patchUserById should update only provided fields`() {
+        val user = user(authId = "auth-1", username = "alice", workingArea = WorkingArea.NO_WORKING_AREA)
+        every { userRepository.findById(user.id) } returns Optional.of(user)
+        every { userRepository.save(user) } returns user
+
+        userService.patchUserById(user.id, PatchUserRequest(workingArea = WorkingArea.FRONTEND_DEV))
+
+        assertThat(user.workingArea).isEqualTo(WorkingArea.FRONTEND_DEV)
+    }
+
+    @Test
+    fun `patchUserById should throw NOT_FOUND when missing`() {
+        val id = UUID.randomUUID()
+        every { userRepository.findById(id) } returns Optional.empty()
+
+        val ex = assertThrows<ResponseStatusException> {
+            userService.patchUserById(id, PatchUserRequest(workingArea = WorkingArea.BACKEND_DEV))
+        }
+
+        assertThat(ex.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
+    }
+
+    // --- deleteUserById ---
+
+    @Test
+    fun `deleteUserById should delete user`() {
+        val user = user(authId = "auth-1", username = "alice", workingArea = WorkingArea.BACKEND_DEV)
+        every { userRepository.findById(user.id) } returns Optional.of(user)
+        every { userRepository.delete(user) } returns Unit
+
+        userService.deleteUserById(user.id)
+
+        verify(exactly = 1) { userRepository.delete(user) }
+    }
+
+    @Test
+    fun `deleteUserById should throw NOT_FOUND when missing`() {
+        val id = UUID.randomUUID()
+        every { userRepository.findById(id) } returns Optional.empty()
+
+        val ex = assertThrows<ResponseStatusException> { userService.deleteUserById(id) }
+
+        assertThat(ex.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
+    }
+
+    // --- helpers ---
 
     private fun user(
         authId: String,
         username: String,
-        firstname: String,
-        lastname: String,
         workingArea: WorkingArea,
-    ): User {
-        return User(
-            authId = authId,
-            username = username,
-            firstname = firstname,
-            lastname = lastname,
-            workingArea = workingArea,
-        )
-    }
+    ) = User(
+        authId = authId,
+        username = username,
+        firstname = "First",
+        lastname = "Last",
+        workingArea = workingArea,
+    )
 
     private fun assertUserMatchesResponse(user: User, response: GetUserResponse) {
-        assertThat(response.id).isEqualTo(user.id)
-        assertThat(response.authId).isEqualTo(user.authId)
-        assertThat(response.username).isEqualTo(user.username)
-        assertThat(response.firstname).isEqualTo(user.firstname)
-        assertThat(response.lastname).isEqualTo(user.lastname)
-        assertThat(response.workingArea).isEqualTo(user.workingArea)
-    }
-
-    private fun assertUserMatchesResponse(user: User, response: CreateUserResponse) {
-        assertThat(response.id).isEqualTo(user.id)
-        assertThat(response.authId).isEqualTo(user.authId)
-        assertThat(response.username).isEqualTo(user.username)
-        assertThat(response.firstname).isEqualTo(user.firstname)
-        assertThat(response.lastname).isEqualTo(user.lastname)
-        assertThat(response.workingArea).isEqualTo(user.workingArea)
-    }
-
-    private fun assertUserMatchesResponse(user: User, response: UpdateUserResponse) {
-        assertThat(response.id).isEqualTo(user.id)
-        assertThat(response.authId).isEqualTo(user.authId)
-        assertThat(response.username).isEqualTo(user.username)
-        assertThat(response.firstname).isEqualTo(user.firstname)
-        assertThat(response.lastname).isEqualTo(user.lastname)
-        assertThat(response.workingArea).isEqualTo(user.workingArea)
-    }
-
-    private fun assertUserMatchesResponse(user: User, response: PatchUserResponse) {
         assertThat(response.id).isEqualTo(user.id)
         assertThat(response.authId).isEqualTo(user.authId)
         assertThat(response.username).isEqualTo(user.username)

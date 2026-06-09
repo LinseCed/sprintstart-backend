@@ -4,12 +4,10 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.user.controller.UserController
 import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
-import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserRequest
-import com.sprintstart.sprintstartbackend.user.model.dto.CreateUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
+import com.sprintstart.sprintstartbackend.user.model.dto.PatchMeRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserResponse
-import com.sprintstart.sprintstartbackend.user.model.dto.SyncUserRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserResponse
 import com.sprintstart.sprintstartbackend.user.service.UserService
@@ -27,7 +25,6 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -46,294 +43,173 @@ class UserControllerTest(
     private lateinit var userService: UserService
 
     @Test
-    fun `createUser should return 201 and created user`() {
-        val request = CreateUserRequest(
-            authId = "keycloak-id-1",
-            username = "max_backend",
-            firstname = "Max",
-            lastname = "Backend",
-            workingArea = WorkingArea.BACKEND_DEV,
-        )
-        val response = GetUserFixtures.createResponse(
+    fun `getAllUsers should return 200 and all users`() {
+        val response1 = GetUserResponse(
             id = UUID.randomUUID(),
-            authId = request.authId,
-            username = request.username,
-            firstname = request.firstname,
-            lastname = request.lastname,
-            workingArea = request.workingArea,
-        )
-
-        every {
-            userService.createUser(request)
-        } returns CreateUserResponse(
-            id = response.id,
-            authId = response.authId,
-            username = response.username,
-            firstname = response.firstname,
-            lastname = response.lastname,
-            workingArea = response.workingArea,
-        )
-
-        mockMvc.perform(
-            post("/api/v1/users")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)),
-        )
-            .andExpect(status().isCreated)
-            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.id").value(response.id.toString()))
-            .andExpect(jsonPath("$.authId").value(request.authId))
-            .andExpect(jsonPath("$.username").value(request.username))
-            .andExpect(jsonPath("$.firstname").value(request.firstname))
-            .andExpect(jsonPath("$.lastname").value(request.lastname))
-            .andExpect(jsonPath("$.workingArea").value("BACKEND_DEV"))
-
-        verify(exactly = 1) {
-            userService.createUser(request)
-        }
-    }
-
-    @Test
-    fun `createUser should return 400 on invalid body`() {
-        val invalidRequest = CreateUserRequest(
-            authId = "",
-            username = "",
-            firstname = "Max",
-            lastname = "",
+            authId = "auth-1",
+            username = "alice",
+            firstname = "Alice",
+            lastname = "Developer",
             workingArea = WorkingArea.BACKEND_DEV,
         )
-
-        mockMvc.perform(
-            post("/api/v1/users")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(invalidRequest)),
-        )
-            .andExpect(status().isBadRequest)
-
-        verify(exactly = 0) {
-            userService.createUser(any())
-        }
-    }
-
-    @Test
-    fun `getAllUsers should return 200 and list of users`() {
-        val users = listOf(
-            GetUserFixtures.getResponse(
-                authId = "keycloak-id-1",
-                username = "max_backend",
-                firstname = "Max",
-                lastname = "Backend",
-                workingArea = WorkingArea.BACKEND_DEV,
-            ),
-            GetUserFixtures.getResponse(
-                authId = "keycloak-id-2",
-                username = "anna_frontend",
-                firstname = "Anna",
-                lastname = "Frontend",
-                workingArea = WorkingArea.FRONTEND_DEV,
-            ),
+        val response2 = GetUserResponse(
+            id = UUID.randomUUID(),
+            authId = "auth-2",
+            username = "bob",
+            firstname = "Bob",
+            lastname = "Frontend",
+            workingArea = WorkingArea.FRONTEND_DEV,
         )
 
-        every {
-            userService.getAllUsers()
-        } returns users
+        every { userService.getAllUsers() } returns listOf(response1, response2)
 
         mockMvc.perform(get("/api/v1/users"))
             .andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.length()").value(2))
-            .andExpect(jsonPath("$[0].authId").value("keycloak-id-1"))
-            .andExpect(jsonPath("$[0].workingArea").value("BACKEND_DEV"))
-            .andExpect(jsonPath("$[1].authId").value("keycloak-id-2"))
-            .andExpect(jsonPath("$[1].workingArea").value("FRONTEND_DEV"))
 
-        verify(exactly = 1) {
-            userService.getAllUsers()
-        }
+        verify(exactly = 1) { userService.getAllUsers() }
     }
 
     @Test
-    fun `getUserByAuthId should return 200 and user`() {
-        val authId = "keycloak-id-1"
-        val user = GetUserFixtures.getResponse(
-            authId = authId,
-            username = "max_backend",
-            firstname = "Max",
-            lastname = "Backend",
+    fun `getUserById should return 200 and user`() {
+        val id = UUID.randomUUID()
+        val response = GetUserResponse(
+            id = id,
+            authId = "auth-1",
+            username = "alice",
+            firstname = "Alice",
+            lastname = "Developer",
             workingArea = WorkingArea.BACKEND_DEV,
         )
 
-        every {
-            userService.getUserByAuthId(authId)
-        } returns user
+        every { userService.getUserById(id) } returns response
 
-        mockMvc.perform(get("/api/v1/users/{authId}", authId))
+        mockMvc.perform(get("/api/v1/users/$id"))
             .andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.authId").value(authId))
-            .andExpect(jsonPath("$.username").value("max_backend"))
 
-        verify(exactly = 1) {
-            userService.getUserByAuthId(authId)
-        }
+        verify(exactly = 1) { userService.getUserById(id) }
     }
 
     @Test
-    fun `updateUserByAuthId should return 200 and updated user`() {
-        val authId = "keycloak-id-1"
-        val request = UpdateUserRequest(
-            username = "max_backend_updated",
-            firstname = "Max",
-            lastname = "Backend",
-            workingArea = WorkingArea.BACKEND_DEV,
-        )
+    fun `getUserById should return 404 when not found`() {
+        val id = UUID.randomUUID()
+
+        every { userService.getUserById(id) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc.perform(get("/api/v1/users/$id"))
+            .andExpect(status().isNotFound)
+
+        verify(exactly = 1) { userService.getUserById(id) }
+    }
+
+    @Test
+    fun `updateUserById should return 200 and updated user`() {
+        val id = UUID.randomUUID()
+        val request = UpdateUserRequest(workingArea = WorkingArea.BACKEND_DEV)
         val response = UpdateUserResponse(
-            id = UUID.randomUUID(),
-            authId = authId,
-            username = request.username,
-            firstname = request.firstname,
-            lastname = request.lastname,
-            workingArea = request.workingArea,
-        )
-
-        every {
-            userService.updateUserByAuthId(authId, request)
-        } returns response
-
-        mockMvc.perform(
-            put("/api/v1/users/{authId}", authId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)),
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.authId").value(authId))
-            .andExpect(jsonPath("$.username").value("max_backend_updated"))
-
-        verify(exactly = 1) {
-            userService.updateUserByAuthId(authId, request)
-        }
-    }
-
-    @Test
-    fun `patchUserByAuthId should return 200 and patched user`() {
-        val authId = "keycloak-id-1"
-        val request = PatchUserRequest(
-            username = "max_backend_updated",
-            firstname = "Max",
-        )
-        val response = PatchUserResponse(
-            id = UUID.randomUUID(),
-            authId = authId,
-            username = "max_backend_updated",
-            firstname = "Max",
-            lastname = "Backend",
+            id = id,
+            authId = "auth-1",
+            username = "alice",
+            firstname = "Alice",
+            lastname = "Developer",
             workingArea = WorkingArea.BACKEND_DEV,
         )
 
-        every {
-            userService.patchUserByAuthId(authId, request)
-        } returns response
+        every { userService.updateUserById(id, request) } returns response
 
         mockMvc.perform(
-            patch("/api/v1/users/{authId}", authId)
+            put("/api/v1/users/$id")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.authId").value(authId))
-            .andExpect(jsonPath("$.username").value("max_backend_updated"))
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
-        verify(exactly = 1) {
-            userService.patchUserByAuthId(authId, request)
-        }
+        verify(exactly = 1) { userService.updateUserById(id, request) }
     }
 
     @Test
-    fun `syncUser should return 200 and synced user`() {
-        val request = SyncUserRequest(
-            authId = "keycloak-id-1",
-            username = "max_backend",
-            firstname = "Max",
-            lastname = "Backend",
-        )
-        val response = GetUserFixtures.getResponse(
-            authId = request.authId,
-            username = request.username,
-            firstname = request.firstname,
-            lastname = request.lastname,
-            workingArea = WorkingArea.NO_WORKING_AREA,
-        )
+    fun `updateUserById should return 404 when not found`() {
+        val id = UUID.randomUUID()
+        val request = UpdateUserRequest(workingArea = WorkingArea.BACKEND_DEV)
 
-        every {
-            userService.syncUser(request)
-        } returns response
+        every { userService.updateUserById(id, request) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
 
         mockMvc.perform(
-            post("/api/v1/users/sync")
+            put("/api/v1/users/$id")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)),
+        )
+            .andExpect(status().isNotFound)
+
+        verify(exactly = 1) { userService.updateUserById(id, request) }
+    }
+
+    @Test
+    fun `patchUserById should return 200 and patched user`() {
+        val id = UUID.randomUUID()
+        val request = PatchUserRequest(workingArea = WorkingArea.FRONTEND_DEV)
+        val response = PatchUserResponse(
+            id = id,
+            authId = "auth-1",
+            username = "alice",
+            firstname = "Alice",
+            lastname = "Developer",
+            workingArea = WorkingArea.FRONTEND_DEV,
+        )
+
+        every { userService.patchUserById(id, request) } returns response
+
+        mockMvc.perform(
+            patch("/api/v1/users/$id")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.authId").value(request.authId))
-            .andExpect(jsonPath("$.workingArea").value("NO_WORKING_AREA"))
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
-        verify(exactly = 1) {
-            userService.syncUser(request)
-        }
+        verify(exactly = 1) { userService.patchUserById(id, request) }
     }
 
     @Test
-    fun `deleteUserByAuthId should return 204`() {
-        val authId = "keycloak-id-1"
+    fun `patchUserById should return 404 when not found`() {
+        val id = UUID.randomUUID()
+        val request = PatchUserRequest(workingArea = WorkingArea.FRONTEND_DEV)
 
-        every {
-            userService.deleteUserByAuthId(authId)
-        } just Runs
+        every { userService.patchUserById(id, request) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
 
-        mockMvc.perform(delete("/api/v1/users/{authId}", authId))
+        mockMvc.perform(
+            patch("/api/v1/users/$id")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)),
+        )
+            .andExpect(status().isNotFound)
+
+        verify(exactly = 1) { userService.patchUserById(id, request) }
+    }
+
+    @Test
+    fun `deleteUserById should return 204`() {
+        val id = UUID.randomUUID()
+
+        every { userService.deleteUserById(id) } just Runs
+
+        mockMvc.perform(delete("/api/v1/users/$id"))
             .andExpect(status().isNoContent)
-            .andExpect(content().string(""))
 
-        verify(exactly = 1) {
-            userService.deleteUserByAuthId(authId)
-        }
-    }
-}
-
-private object GetUserFixtures {
-    fun createResponse(
-        id: UUID,
-        authId: String,
-        username: String,
-        firstname: String,
-        lastname: String,
-        workingArea: WorkingArea,
-    ): GetUserResponse {
-        return GetUserResponse(
-            id = id,
-            authId = authId,
-            username = username,
-            firstname = firstname,
-            lastname = lastname,
-            workingArea = workingArea,
-        )
+        verify(exactly = 1) { userService.deleteUserById(id) }
     }
 
-    fun getResponse(
-        id: UUID = UUID.randomUUID(),
-        authId: String,
-        username: String,
-        firstname: String,
-        lastname: String,
-        workingArea: WorkingArea,
-    ): GetUserResponse {
-        return GetUserResponse(
-            id = id,
-            authId = authId,
-            username = username,
-            firstname = firstname,
-            lastname = lastname,
-            workingArea = workingArea,
-        )
+    @Test
+    fun `deleteUserById should return 404 when not found`() {
+        val id = UUID.randomUUID()
+
+        every { userService.deleteUserById(id) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc.perform(delete("/api/v1/users/$id"))
+            .andExpect(status().isNotFound)
+
+        verify(exactly = 1) { userService.deleteUserById(id) }
     }
 }
