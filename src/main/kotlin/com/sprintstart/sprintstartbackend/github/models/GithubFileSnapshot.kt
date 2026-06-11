@@ -1,18 +1,14 @@
 package com.sprintstart.sprintstartbackend.github.models
 
-import com.sprintstart.sprintstartbackend.github.models.client.Commit
 import jakarta.persistence.Column
 import jakarta.persistence.Embeddable
-import jakarta.persistence.Embedded
 import jakarta.persistence.EmbeddedId
 import jakarta.persistence.Entity
 import jakarta.persistence.FetchType
-import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.MapsId
 import jakarta.persistence.Table
-import kotlinx.serialization.Serializable
 import java.time.Instant
 import java.util.UUID
 

@@ -15,7 +15,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties(prefix = "sprintstart")
 data class ApplicationConfig(
     val ai: AiConfig,
-    val github: GithubConfig
+    val github: GithubConfig,
 )
 
 /**
@@ -34,12 +34,13 @@ data class AiConfig(
 
 /**
  * Contains the following application.yml config parameters
- * 
+ *
  * ´´´yml
  * sprintstart:
  *     github:
  *         base-url: ...
  *         token: ...
+ *         cron: ...
  * ´´´
  */
 data class GithubConfig(
@@ -47,4 +48,6 @@ data class GithubConfig(
     val baseUrl: String,
     @get:JsonProperty("token")
     val token: String,
+    @get:JsonProperty("cron")
+    val cron: String,
 )

@@ -2,12 +2,8 @@ package com.sprintstart.sprintstartbackend.github.external.events
 
 import java.util.UUID
 
-data class CommitsFetchedEvent(
+data class GithubCommitFetchedEvent(
     val transactionId: UUID,
-    val commits: List<CommitFetchedEvent>,
-)
-
-data class CommitFetchedEvent(
     val oid: String,
     val headline: String,
     val message: String,

@@ -14,7 +14,7 @@ data class GithubRepositoryConnection(
     var name: String,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var status: ConnectionStatus = ConnectionStatus.UPDATING,
+    var status: ConnectionStatus = ConnectionStatus.UP_TO_DATE,
     @OneToOne(mappedBy = "repository", fetch = FetchType.LAZY)
     var snapshot: GithubRepositorySnapshot? = null,
     @OneToMany(mappedBy = "repository", orphanRemoval = true)

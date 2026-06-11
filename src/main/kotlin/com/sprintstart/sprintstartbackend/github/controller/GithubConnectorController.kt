@@ -16,9 +16,16 @@ import org.springframework.web.bind.annotation.RestController
 internal class GithubConnectorController(
     val githubConnectorService: GithubConnectorService,
 ) {
-
     @PostMapping("/connect")
     suspend fun connectRepository(@RequestBody request: ConnectRepositoryRequest) {
         githubConnectorService.connectRepository(request.owner, request.name)
     }
+
+    // TODO: Check whole repo for updates
+
+    // TODO: Update whole repo
+
+    // TODO: Update specifics (commits, files, issues, pr's)
+
+    // TODO: Maybe: Unconnect repo?
 }
