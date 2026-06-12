@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -54,6 +55,7 @@ class UserController(
     )
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun getAllUsers(): List<GetUserResponse> {
         return userService.getAllUsers()
     }
@@ -71,6 +73,7 @@ class UserController(
     )
     @GetMapping("/me")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ROLE_USER')")
     fun getMe(@AuthenticationPrincipal jwt: Jwt): GetUserResponse {
         return userService.getMe(jwt.subject)
     }
@@ -89,6 +92,7 @@ class UserController(
     )
     @PatchMapping("/me")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ROLE_USER')")
     fun patchMe(
         @Valid @RequestBody request: PatchMeRequest,
         @AuthenticationPrincipal jwt: Jwt,
@@ -107,6 +111,7 @@ class UserController(
     )
     @GetMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun getUserById(@PathVariable id: UUID): GetUserResponse {
         return userService.getUserById(id)
     }
@@ -124,6 +129,7 @@ class UserController(
     )
     @PutMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun updateUserById(
         @PathVariable id: UUID,
         @Valid @RequestBody request: UpdateUserRequest,
@@ -144,6 +150,7 @@ class UserController(
     )
     @PatchMapping("/{id}")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun patchUserById(
         @PathVariable id: UUID,
         @RequestBody request: PatchUserRequest,
@@ -163,6 +170,7 @@ class UserController(
     )
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun deleteUserById(@PathVariable id: UUID) {
         userService.deleteUserById(id)
     }

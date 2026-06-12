@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -36,6 +37,7 @@ class UploadController(
     @PostMapping(
         consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
     )
+    @PreAuthorize("hasRole('ROLE_USER')")
     fun upload(
         @RequestPart("files")
         files: List<MultipartFile>,
@@ -51,6 +53,7 @@ class UploadController(
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ROLE_USER')")
     fun listUploads(
         @RequestParam uploaderId: UUID,
     ): ResponseEntity<List<UploadListItemResponse>> =
@@ -59,6 +62,7 @@ class UploadController(
         )
 
     @DeleteMapping("/{artifactId}")
+    @PreAuthorize("hasRole('ROLE_USER')")
     fun deleteUpload(
         @PathVariable artifactId: UUID,
     ): ResponseEntity<Void> {
