@@ -6,13 +6,16 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.step.CreateO
 import com.sprintstart.sprintstartbackend.onboarding.model.response.step.GetOnboardingStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.step.GetOnboardingStepsResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.step.UpdateOnboardingStepResponse
-import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingService
+import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingStepService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
+import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -44,8 +47,91 @@ import java.util.UUID
 @RequestMapping("/api/v1/onboarding")
 @Tag(name = "Onboarding - Steps", description = "Create, retrieve, update, and delete onboarding steps")
 class OnboardingStepController(
-    val onboardingService: OnboardingService,
+    val onboardingStepService: OnboardingStepService,
 ) {
+//  ========================== Endpoints for users (/me/...) ==========================
+
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/me/phases/{phaseId}/steps")
+    @PreAuthorize("hasRole('ROLE_USER')")
+    fun getOnboardingStepsForMe(
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable phaseId: UUID,
+    ): List<GetOnboardingStepsResponse> {
+        return onboardingStepService.getOnboardingStepsForMe(jwt.subject, phaseId)
+    }
+
+    @ResponseStatus(HttpStatus.CREATED)
+    @PostMapping("/me/phases/{phaseId}/steps")
+    @PreAuthorize("hasRole('ROLE_USER')")
+    fun createOnboardingStepForMe(
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable phaseId: UUID,
+        @RequestBody request: CreateOnboardingStepRequest,
+    ): CreateOnboardingStepResponse {
+        return onboardingStepService.createOnboardingStepForMe(jwt.subject, phaseId, request)
+    }
+
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("me/step/{stepId}")
+    @PreAuthorize("hasRole('ROLE_USER')")
+    fun getOnboardingStepForMe(
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable stepId: UUID,
+    ): GetOnboardingStepResponse {
+        return onboardingStepService.getOnboardingStepForMe(jwt.subject, stepId)
+    }
+
+    @ResponseStatus(HttpStatus.OK)
+    @PutMapping("/me/step/{stepId}")
+    @PreAuthorize("hasRole('ROLE_USER')")
+    fun updateOnboardingStepForMe(
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable stepId: UUID,
+        @RequestBody request: UpdateOnboardingStepRequest,
+    ): UpdateOnboardingStepResponse {
+        return onboardingStepService.updateOnboardingStepForMe(jwt.subject, stepId, request)
+    }
+
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @DeleteMapping("/me/step/{stepId}")
+    @PreAuthorize("hasRole('ROLE_USER')")
+    fun deleteOnboardingStepForMe(
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable stepId: UUID,
+    ) {
+        onboardingStepService.deleteOnboardingStepForMe(jwt.subject, stepId)
+    }
+
+//  ========================== Endpoints for admins (/users/{userId}/path/phases/...) ==========================
+
+    /**
+     * Returns all steps belonging to a specific phase, including their direct tasks and resources.
+     *
+     * Returns one level of nesting: each step includes its direct tasks and resources.
+     * Steps are ordered by their position within the phase.
+     *
+     * @param phaseId The UUID of the onboarding phase.
+     * @return An ordered list of steps with their direct tasks and resources.
+     */
+    @Operation(
+        summary = "Get steps by phase ID",
+        description = "Returns all onboarding steps belonging to the specified phase, ordered by position. " +
+            "Each step includes its direct tasks and resources (one level of nesting).",
+    )
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "Ordered list of steps with direct tasks and resources"),
+        ApiResponse(responseCode = "404", description = "No onboarding phase found with the given ID"),
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/phases/{phaseId}/steps")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    fun getOnboardingStepsForPhaseId(
+        @Parameter(description = "UUID of the onboarding phase") @PathVariable phaseId: UUID,
+    ): List<GetOnboardingStepResponse> {
+        return onboardingStepService.getOnboardingStepsByPhaseId(phaseId)
+    }
+
     /**
      * Creates a new step within the specified phase at the given position.
      *
@@ -70,55 +156,12 @@ class OnboardingStepController(
     )
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/phases/{phaseId}/steps")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun createOnboardingStep(
         @Parameter(description = "UUID of the onboarding phase") @PathVariable phaseId: UUID,
         @RequestBody request: CreateOnboardingStepRequest,
     ): CreateOnboardingStepResponse {
-        return onboardingService.createOnboardingStepForPhaseId(phaseId, request)
-    }
-
-    /**
-     * Returns all onboarding steps across all phases.
-     *
-     * This is a flat listing with no nested content. Tasks and resources within each
-     * step are not included. Intended for administrative use or bulk exports.
-     *
-     * @return A flat list of all onboarding steps.
-     */
-    @Operation(
-        summary = "Get all onboarding steps",
-        description = "Returns a flat list of all onboarding steps across all phases. " +
-            "No nested content is included. Intended for administrative overviews.",
-    )
-    @ApiResponse(responseCode = "200", description = "Flat list of all onboarding steps")
-    @GetMapping("/steps")
-    fun getOnboardingSteps(): List<GetOnboardingStepsResponse> {
-        return onboardingService.getOnboardingSteps()
-    }
-
-    /**
-     * Returns all steps belonging to a specific phase, including their direct tasks and resources.
-     *
-     * Returns one level of nesting: each step includes its direct tasks and resources.
-     * Steps are ordered by their position within the phase.
-     *
-     * @param phaseId The UUID of the onboarding phase.
-     * @return An ordered list of steps with their direct tasks and resources.
-     */
-    @Operation(
-        summary = "Get steps by phase ID",
-        description = "Returns all onboarding steps belonging to the specified phase, ordered by position. " +
-            "Each step includes its direct tasks and resources (one level of nesting).",
-    )
-    @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Ordered list of steps with direct tasks and resources"),
-        ApiResponse(responseCode = "404", description = "No onboarding phase found with the given ID"),
-    )
-    @GetMapping("/phases/{phaseId}/steps")
-    fun getOnboardingStepsForPhaseId(
-        @Parameter(description = "UUID of the onboarding phase") @PathVariable phaseId: UUID,
-    ): List<GetOnboardingStepResponse> {
-        return onboardingService.getOnboardingStepsByPhaseId(phaseId)
+        return onboardingStepService.createOnboardingStepForPhaseId(phaseId, request)
     }
 
     /**
@@ -138,11 +181,13 @@ class OnboardingStepController(
         ApiResponse(responseCode = "200", description = "Onboarding step with direct tasks and resources"),
         ApiResponse(responseCode = "404", description = "No onboarding step found with the given ID"),
     )
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/steps/{stepId}")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun getOnboardingStep(
         @Parameter(description = "UUID of the onboarding step") @PathVariable stepId: UUID,
     ): GetOnboardingStepResponse {
-        return onboardingService.getOnboardingStep(stepId)
+        return onboardingStepService.getOnboardingStepById(stepId)
     }
 
     /**
@@ -172,12 +217,14 @@ class OnboardingStepController(
         ApiResponse(responseCode = "200", description = "Step updated successfully"),
         ApiResponse(responseCode = "404", description = "No onboarding step found with the given ID"),
     )
+    @ResponseStatus(HttpStatus.OK)
     @PutMapping("/steps/{stepId}")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun updateOnboardingStep(
         @Parameter(description = "UUID of the onboarding step to update") @PathVariable stepId: UUID,
         @RequestBody request: UpdateOnboardingStepRequest,
     ): UpdateOnboardingStepResponse {
-        return onboardingService.updateOnboardingStep(stepId, request)
+        return onboardingStepService.updateOnboardingStepById(stepId, request)
     }
 
     /**
@@ -201,9 +248,10 @@ class OnboardingStepController(
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/steps/{stepId}")
-    fun deleteOnboardingStepForPhaseId(
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    fun deleteOnboardingStepById(
         @Parameter(description = "UUID of the onboarding step to delete") @PathVariable stepId: UUID,
     ) {
-        onboardingService.deleteOnboardingStep(stepId)
+        onboardingStepService.deleteOnboardingStepById(stepId)
     }
 }

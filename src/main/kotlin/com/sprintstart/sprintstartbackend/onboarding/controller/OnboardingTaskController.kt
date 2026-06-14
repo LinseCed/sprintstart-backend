@@ -6,13 +6,17 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.task.CreateO
 import com.sprintstart.sprintstartbackend.onboarding.model.response.task.GetOnboardingTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.task.GetOnboardingTasksResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.task.UpdateOnboardingTaskResponse
-import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingService
+import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingTaskService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
+import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -40,8 +44,91 @@ import java.util.UUID
 @RequestMapping("/api/v1/onboarding")
 @Tag(name = "Onboarding - Tasks", description = "Create, retrieve, update, and delete onboarding tasks")
 class OnboardingTaskController(
-    val onboardingService: OnboardingService,
+    val onboardingTaskService: OnboardingTaskService,
 ) {
+//  ========================== Endpoints for users (/me/...) ==========================
+
+    @ResponseStatus(value = HttpStatus.OK)
+    @GetMapping("/me/steps/{stepId}/tasks")
+    @PreAuthorize("hasRole('ROLE_USER')")
+    fun getOnboardingTasksForMe(
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable stepId: UUID,
+    ): List<GetOnboardingTasksResponse> {
+        return onboardingTaskService.getOnboardingTasksForMe(jwt.subject, stepId)
+    }
+
+    @ResponseStatus(HttpStatus.CREATED)
+    @PostMapping("/me/steps/{stepId}/tasks")
+    @PreAuthorize("hasRole('ROLE_USER')")
+    fun createOnboardingTaskForMe(
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable stepId: UUID,
+        @Valid @RequestBody request: CreateOnboardingTaskRequest,
+    ): CreateOnboardingTaskResponse {
+        return onboardingTaskService.createOnboardingTaskForMe(jwt.subject, stepId, request)
+    }
+
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/me/tasks/{taskId}")
+    @PreAuthorize("hasRole('ROLE_USER')")
+    fun getOnboardingTaskForMe(
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable taskId: UUID,
+    ): GetOnboardingTaskResponse {
+        return onboardingTaskService.getOnboardingTaskForMe(jwt.subject, taskId)
+    }
+
+    @ResponseStatus(HttpStatus.OK)
+    @PutMapping("/me/tasks/{taskId}")
+    @PreAuthorize("hasRole('ROLE_USER')")
+    fun updateOnboardingTaskForMe(
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable taskId: UUID,
+        @Valid @RequestBody request: UpdateOnboardingTaskRequest,
+    ): UpdateOnboardingTaskResponse {
+        return onboardingTaskService.updateOnboardingTaskForMe(jwt.subject, taskId, request)
+    }
+
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @DeleteMapping("/me/tasks/{taskId}")
+    @PreAuthorize("hasRole('ROLE_USER')")
+    fun deleteOnboardingTaskForMe(
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable taskId: UUID,
+    ) {
+        onboardingTaskService.deleteOnboardingTaskForMe(jwt.subject, taskId)
+    }
+
+//  ========================== Endpoints for admins ==========================
+
+    /**
+     * Returns all tasks belonging to a specific step.
+     *
+     * Tasks are leaf nodes with no children, so no nesting applies here. Tasks are
+     * ordered by their position within the step.
+     *
+     * @param stepId The UUID of the onboarding step.
+     * @return An ordered list of tasks for the given step.
+     */
+    @Operation(
+        summary = "Get tasks by step ID",
+        description = "Returns all onboarding tasks belonging to the specified step, ordered by position. " +
+            "Tasks are leaf nodes — no nested content exists.",
+    )
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "Ordered list of tasks for the step"),
+        ApiResponse(responseCode = "404", description = "No onboarding step found with the given ID"),
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/steps/{stepId}/tasks")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    fun getOnboardingTasksByStepId(
+        @Parameter(description = "UUID of the onboarding step") @PathVariable stepId: UUID,
+    ): List<GetOnboardingTaskResponse> {
+        return onboardingTaskService.getOnboardingTasksByStepId(stepId)
+    }
+
     /**
      * Creates a new task within the specified step at the given position.
      *
@@ -65,55 +152,12 @@ class OnboardingTaskController(
     )
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/steps/{stepId}/tasks")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun createOnboardingTask(
         @Parameter(description = "UUID of the onboarding step") @PathVariable stepId: UUID,
         @RequestBody request: CreateOnboardingTaskRequest,
     ): CreateOnboardingTaskResponse {
-        return onboardingService.createOnboardingTaskForStepId(stepId, request)
-    }
-
-    /**
-     * Returns all onboarding tasks across all steps.
-     *
-     * This is a flat listing with no nested content. Tasks are leaf nodes, so there
-     * is nothing to nest regardless. Intended for administrative use or bulk exports.
-     *
-     * @return A flat list of all onboarding tasks.
-     */
-    @Operation(
-        summary = "Get all onboarding tasks",
-        description = "Returns a flat list of all onboarding tasks across all steps." +
-            " Tasks are leaf nodes — no nested content exists.",
-    )
-    @ApiResponse(responseCode = "200", description = "Flat list of all onboarding tasks")
-    @GetMapping("/tasks")
-    fun getOnboardingTasks(): List<GetOnboardingTasksResponse> {
-        return onboardingService.getOnboardingTasks()
-    }
-
-    /**
-     * Returns all tasks belonging to a specific step.
-     *
-     * Tasks are leaf nodes with no children, so no nesting applies here. Tasks are
-     * ordered by their position within the step.
-     *
-     * @param stepId The UUID of the onboarding step.
-     * @return An ordered list of tasks for the given step.
-     */
-    @Operation(
-        summary = "Get tasks by step ID",
-        description = "Returns all onboarding tasks belonging to the specified step, ordered by position. " +
-            "Tasks are leaf nodes — no nested content exists.",
-    )
-    @ApiResponses(
-        ApiResponse(responseCode = "200", description = "Ordered list of tasks for the step"),
-        ApiResponse(responseCode = "404", description = "No onboarding step found with the given ID"),
-    )
-    @GetMapping("/steps/{stepId}/tasks")
-    fun getOnboardingTasksByStepId(
-        @Parameter(description = "UUID of the onboarding step") @PathVariable stepId: UUID,
-    ): List<GetOnboardingTaskResponse> {
-        return onboardingService.getOnboardingTasksByStepId(stepId)
+        return onboardingTaskService.createOnboardingTaskForStepId(stepId, request)
     }
 
     /**
@@ -133,11 +177,13 @@ class OnboardingTaskController(
         ApiResponse(responseCode = "200", description = "Onboarding task found"),
         ApiResponse(responseCode = "404", description = "No onboarding task found with the given ID"),
     )
+    @ResponseStatus(HttpStatus.OK)
     @GetMapping("/tasks/{taskId}")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun getOnboardingTask(
         @Parameter(description = "UUID of the onboarding task") @PathVariable taskId: UUID,
     ): GetOnboardingTaskResponse {
-        return onboardingService.getOnboardingTask(taskId)
+        return onboardingTaskService.getOnboardingTaskById(taskId)
     }
 
     /**
@@ -162,12 +208,14 @@ class OnboardingTaskController(
         ApiResponse(responseCode = "200", description = "Task updated successfully"),
         ApiResponse(responseCode = "404", description = "No onboarding task found with the given ID"),
     )
+    @ResponseStatus(HttpStatus.OK)
     @PutMapping("/tasks/{taskId}")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun updateOnboardingTask(
         @Parameter(description = "UUID of the onboarding task to update") @PathVariable taskId: UUID,
         @RequestBody request: UpdateOnboardingTaskRequest,
     ): UpdateOnboardingTaskResponse {
-        return onboardingService.updateOnboardingTask(taskId, request)
+        return onboardingTaskService.updateOnboardingTaskById(taskId, request)
     }
 
     /**
@@ -189,9 +237,12 @@ class OnboardingTaskController(
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/tasks/{taskId}")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun deleteOnboardingTaskForStepId(
         @Parameter(description = "UUID of the onboarding task to delete") @PathVariable taskId: UUID,
     ) {
-        onboardingService.deleteOnboardingTask(taskId)
+        onboardingTaskService.deleteOnboardingTaskById(taskId)
     }
 }
+
+// Todo: add doc
