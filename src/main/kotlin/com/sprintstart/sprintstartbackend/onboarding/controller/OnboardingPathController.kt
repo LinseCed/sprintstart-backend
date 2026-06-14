@@ -37,7 +37,7 @@ class OnboardingPathController(
     fun getPathForMe(
         @AuthenticationPrincipal jwt: Jwt,
     ): GetOnboardingPathForUserResponse {
-        return onboardingPathService.getOnboardingPathByAuthId(jwt.subject)
+        return onboardingPathService.getOnboardingPathForMe(jwt.subject)
     }
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -46,7 +46,7 @@ class OnboardingPathController(
     fun deletePathByUserId(
         @AuthenticationPrincipal jwt: Jwt,
     ) {
-        onboardingPathService.deleteOnboardingPathByAuthId(jwt.subject)
+        onboardingPathService.deleteOnboardingPathForMe(jwt.subject)
     }
 
 //  ========================== Endpoints for admins ==========================
@@ -54,10 +54,10 @@ class OnboardingPathController(
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/users/{userId}/path")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
-    fun getPath(
+    fun getOnboardingPathForUserId(
         @Parameter(description = "UUID of the onboarding path") @PathVariable userId: UUID,
     ): GetOnboardingPathResponse {
-        return onboardingPathService.getOnboardingPathOverviewByUserId(userId)
+        return onboardingPathService.getOnboardingPathByUserId(userId)
     }
 
     @ResponseStatus(HttpStatus.NO_CONTENT)

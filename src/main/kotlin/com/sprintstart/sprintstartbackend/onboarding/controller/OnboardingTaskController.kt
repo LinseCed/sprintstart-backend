@@ -37,7 +37,7 @@ import java.util.UUID
  *
  * Tasks are ordered within their parent step by a numeric position. Insertions, updates,
  * and deletions automatically shift sibling tasks to maintain a contiguous, gap-free ordering.
- * The `finished` flag can be toggled freely without any additional side-effects.
+ * The `finished` flag can be toggled freely without any additional side effects.
  *
  */
 @RestController
@@ -191,7 +191,7 @@ class OnboardingTaskController(
      *
      * All fields are replaced with the values from the request. If the position changes,
      * sibling tasks within the same step are shifted automatically to maintain contiguous
-     * ordering. The finished flag can be toggled freely without any side-effects beyond
+     * ordering. The finished flag can be toggled freely without any side effects beyond
      * the field update itself.
      *
      * @param taskId The UUID of the task to update.

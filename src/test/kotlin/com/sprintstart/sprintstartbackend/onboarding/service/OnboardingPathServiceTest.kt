@@ -15,10 +15,8 @@ import org.springframework.web.server.ResponseStatusException
 import java.util.Optional
 import java.util.UUID
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 class OnboardingPathServiceTest {
-
     private val onboardingPathRepository: OnboardingPathRepository = mockk()
     private val userApi: UserApi = mockk()
     private val service = OnboardingPathService(onboardingPathRepository, userApi)
@@ -31,46 +29,6 @@ class OnboardingPathServiceTest {
         OnboardingPath(id = id, userId = uid)
 
     @Nested
-    inner class CreateOnboardingPathForUser {
-        @Test
-        fun `creates path when user exists`() {
-            val path = makePath()
-            every { userApi.exists(userId) } returns true
-            every { onboardingPathRepository.save(any()) } returns path
-
-            val result = service.createOnboardingPathForUser(userId)
-
-            assertEquals(path.id, result.id)
-            assertEquals(userId, result.userId)
-            verify(exactly = 1) { onboardingPathRepository.save(any()) }
-        }
-
-        @Test
-        fun `throws 404 when user does not exist`() {
-            every { userApi.exists(userId) } returns false
-
-            assertThrows<ResponseStatusException> {
-                service.createOnboardingPathForUser(userId)
-            }.also { assertEquals(404, it.statusCode.value()) }
-
-            verify(exactly = 0) { onboardingPathRepository.save(any()) }
-        }
-    }
-
-    @Nested
-    inner class GetAllOnboardingPathOverviews {
-        @Test
-        fun `returns mapped list of all paths`() {
-            val paths = listOf(makePath(UUID.randomUUID()), makePath(UUID.randomUUID()))
-            every { onboardingPathRepository.findAll() } returns paths
-
-            val result = service.getAllOnboardingPathOverviews()
-
-            assertEquals(2, result.size)
-        }
-    }
-
-    @Nested
     inner class GetOnboardingPathOverviewByUserId {
         @Test
         fun `returns path when user and path exist`() {
@@ -78,7 +36,7 @@ class OnboardingPathServiceTest {
             every { userApi.exists(userId) } returns true
             every { onboardingPathRepository.findOnboardingPathByUserId(userId) } returns Optional.of(path)
 
-            val result = service.getOnboardingPathOverviewByUserId(userId)
+            val result = service.getOnboardingPathByUserId(userId)
 
             assertEquals(path.id, result.id)
         }
@@ -88,7 +46,7 @@ class OnboardingPathServiceTest {
             every { userApi.exists(userId) } returns false
 
             assertThrows<ResponseStatusException> {
-                service.getOnboardingPathOverviewByUserId(userId)
+                service.getOnboardingPathByUserId(userId)
             }.also { assertEquals(404, it.statusCode.value()) }
         }
 
@@ -98,7 +56,7 @@ class OnboardingPathServiceTest {
             every { onboardingPathRepository.findOnboardingPathByUserId(userId) } returns Optional.empty()
 
             assertThrows<ResponseStatusException> {
-                service.getOnboardingPathOverviewByUserId(userId)
+                service.getOnboardingPathByUserId(userId)
             }.also { assertEquals(404, it.statusCode.value()) }
         }
     }
@@ -111,7 +69,7 @@ class OnboardingPathServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { onboardingPathRepository.findOnboardingPathByUserId(userId) } returns Optional.of(path)
 
-            val result = service.getOnboardingPathByAuthId(authId)
+            val result = service.getOnboardingPathForMe(authId)
 
             assertEquals(path.id, result.id)
         }
@@ -121,7 +79,7 @@ class OnboardingPathServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.empty()
 
             assertThrows<ResponseStatusException> {
-                service.getOnboardingPathByAuthId(authId)
+                service.getOnboardingPathForMe(authId)
             }.also { assertEquals(404, it.statusCode.value()) }
         }
 
@@ -131,7 +89,7 @@ class OnboardingPathServiceTest {
             every { onboardingPathRepository.findOnboardingPathByUserId(userId) } returns Optional.empty()
 
             assertThrows<ResponseStatusException> {
-                service.getOnboardingPathByAuthId(authId)
+                service.getOnboardingPathForMe(authId)
             }.also { assertEquals(404, it.statusCode.value()) }
         }
     }
@@ -167,7 +125,7 @@ class OnboardingPathServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { onboardingPathRepository.deleteByUserId(userId) } just runs
 
-            service.deleteOnboardingPathByAuthId(authId)
+            service.deleteOnboardingPathForMe(authId)
 
             verify(exactly = 1) { onboardingPathRepository.deleteByUserId(userId) }
         }
@@ -177,20 +135,8 @@ class OnboardingPathServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.empty()
 
             assertThrows<ResponseStatusException> {
-                service.deleteOnboardingPathByAuthId(authId)
+                service.deleteOnboardingPathForMe(authId)
             }.also { assertEquals(404, it.statusCode.value()) }
-        }
-    }
-
-    @Nested
-    inner class DeleteOnboardingPathById {
-        @Test
-        fun `delegates deletion to repository`() {
-            every { onboardingPathRepository.deleteById(pathId) } just runs
-
-            service.deleteOnboardingPathById(pathId)
-
-            verify(exactly = 1) { onboardingPathRepository.deleteById(pathId) }
         }
     }
 }

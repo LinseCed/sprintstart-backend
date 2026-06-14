@@ -182,7 +182,7 @@ class OnboardingResourceController(
      * Updates an existing onboarding resource's title, description, and URL.
      *
      * All three fields are replaced with the values from the request. Resources have
-     * no position and no status, so there are no ordering side-effects to consider.
+     * no position and no status, so there are no ordering side effects to consider.
      *
      * @param resourceId The UUID of the resource to update.
      * @param request The resource update request.

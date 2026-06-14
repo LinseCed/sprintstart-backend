@@ -123,7 +123,6 @@ class OnboardingPhaseController(
     @PutMapping("/phases/{phaseId}")
     @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
     fun updateOnboardingPhaseForUser(
-        @PathVariable userId: UUID,
         @Parameter(description = "UUID of the onboarding phase to update") @PathVariable phaseId: UUID,
         @RequestBody request: UpdateOnboardingPhaseRequest,
     ): UpdateOnboardingPhaseResponse {

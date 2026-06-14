@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.request.step.CreateOnboardingStepRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.step.UpdateOnboardingStepRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.step.CreateOnboardingStepResponse
@@ -37,7 +38,7 @@ import java.util.UUID
  * Steps are ordered within their parent phase by a numeric position. Insertions, updates,
  * and deletions automatically shift sibling steps to maintain a contiguous, gap-free ordering.
  *
- * Steps carry a status field with the following transition side-effects:
+ * Steps carry a status field with the following transition side effects:
  * - `FINISHED` — records a completion timestamp
  * - `SKIPPED` — records a completion timestamp and a skip reason
  * - `WAITING` — clears both the completion timestamp and the skip reason
@@ -195,7 +196,7 @@ class OnboardingStepController(
      *
      * All fields are replaced with the values from the request. If the position changes,
      * sibling steps are shifted automatically to maintain contiguous ordering. Status
-     * transitions carry side-effects: transitioning to FINISHED records a completion
+     * transitions carry side effects: transitioning to FINISHED records a completion
      * timestamp; transitioning to SKIPPED records a completion timestamp and stores the
      * skip reason (defaults to "No reason given" if omitted); transitioning back to
      * WAITING clears both the completion timestamp and the skip reason.
