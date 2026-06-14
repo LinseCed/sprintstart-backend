@@ -48,6 +48,7 @@ class UserControllerTest(
             id = UUID.randomUUID(),
             authId = "auth-1",
             username = "alice",
+            email = "alice.dev@mail.de",
             firstname = "Alice",
             lastname = "Developer",
             workingArea = WorkingArea.BACKEND_DEV,
@@ -56,6 +57,7 @@ class UserControllerTest(
             id = UUID.randomUUID(),
             authId = "auth-2",
             username = "bob",
+            email = "bob.front@mail.de",
             firstname = "Bob",
             lastname = "Frontend",
             workingArea = WorkingArea.FRONTEND_DEV,
@@ -63,7 +65,8 @@ class UserControllerTest(
 
         every { userService.getAllUsers() } returns listOf(response1, response2)
 
-        mockMvc.perform(get("/api/v1/users"))
+        mockMvc
+            .perform(get("/api/v1/users"))
             .andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
@@ -77,6 +80,7 @@ class UserControllerTest(
             id = id,
             authId = "auth-1",
             username = "alice",
+            email = "alice.dev@mail.de",
             firstname = "Alice",
             lastname = "Developer",
             workingArea = WorkingArea.BACKEND_DEV,
@@ -111,6 +115,7 @@ class UserControllerTest(
             id = id,
             authId = "auth-1",
             username = "alice",
+            email = "alice.dev@mail.de",
             firstname = "Alice",
             lastname = "Developer",
             workingArea = WorkingArea.BACKEND_DEV,
@@ -154,6 +159,7 @@ class UserControllerTest(
             id = id,
             authId = "auth-1",
             username = "alice",
+            email = "alice.dev@mail.de",
             firstname = "Alice",
             lastname = "Developer",
             workingArea = WorkingArea.FRONTEND_DEV,

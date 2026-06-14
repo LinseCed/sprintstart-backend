@@ -203,6 +203,7 @@ class UserServiceTest {
     ) = User(
         authId = authId,
         username = username,
+        email = "first.last@mail.de",
         firstname = "First",
         lastname = "Last",
         workingArea = workingArea,
@@ -212,6 +213,7 @@ class UserServiceTest {
         assertThat(response.id).isEqualTo(user.id)
         assertThat(response.authId).isEqualTo(user.authId)
         assertThat(response.username).isEqualTo(user.username)
+        assertThat(response.email).isEqualTo(user.email)
         assertThat(response.firstname).isEqualTo(user.firstname)
         assertThat(response.lastname).isEqualTo(user.lastname)
         assertThat(response.workingArea).isEqualTo(user.workingArea)
