@@ -3,8 +3,7 @@ package com.sprintstart.sprintstartbackend.onboarding.controller
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnboardingPathForUserResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnboardingPathResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnboardingPathsResponse
-import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingService
+import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingPathService
 import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
@@ -14,138 +13,209 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
+import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.oauth2.jwt.JwtDecoder
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.delete
-import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 import java.util.UUID
 
 @WebMvcTest(OnboardingPathController::class)
-@AutoConfigureMockMvc(addFilters = false)
+@AutoConfigureMockMvc
 class OnboardingPathControllerTest(
     @Autowired private val mockMvc: MockMvc,
 ) {
     @MockkBean
-    private lateinit var onboardingService: OnboardingService
+    private lateinit var onboardingPathService: OnboardingPathService
 
-    private val pathId: UUID = UUID.fromString("11111111-1111-1111-1111-111111111111")
-    private val userId: UUID = UUID.fromString("22222222-2222-2222-2222-222222222222")
-    private val createdAt: Instant = Instant.parse("2026-06-01T10:00:00Z")
+    @MockkBean
+    private lateinit var jwtDecoder: JwtDecoder
 
-    @Test
-    fun `getAllPaths should return 200 and all paths`() {
-        val response = listOf(
-            GetOnboardingPathsResponse(
-                id = pathId,
-                userId = userId,
-                createdAt = createdAt,
-                phaseCount = 2,
-                stepCount = 5,
-                finishedStepCount = 1,
-            ),
-        )
+    private val authId = "test-auth-id"
+    private val userId = UUID.randomUUID()
+    private val pathId = UUID.randomUUID()
 
-        every { onboardingService.getAllOnboardingPaths() } returns response
-
-        mockMvc
-            .get("/api/v1/onboarding/paths")
-            .andExpect {
-                status { isOk() }
-                jsonPath("$[0].id") { value(pathId.toString()) }
-                jsonPath("$[0].userId") { value(userId.toString()) }
-                jsonPath("$[0].phaseCount") { value(2) }
-                jsonPath("$[0].stepCount") { value(5) }
-                jsonPath("$[0].finishedStepCount") { value(1) }
-            }
-
-        verify(exactly = 1) { onboardingService.getAllOnboardingPaths() }
-    }
+    // ========================== /me endpoints ==========================
 
     @Test
-    fun `getPath should return 200 and path`() {
-        val response = GetOnboardingPathResponse(
-            id = pathId,
-            userId = userId,
-            createdAt = createdAt,
-            phases = emptyList(),
-        )
-
-        every { onboardingService.getOnboardingPath(pathId) } returns response
-
-        mockMvc
-            .get("/api/v1/onboarding/paths/$pathId")
-            .andExpect {
-                status { isOk() }
-                jsonPath("$.id") { value(pathId.toString()) }
-                jsonPath("$.userId") { value(userId.toString()) }
-                jsonPath("$.phases.length()") { value(0) }
-            }
-
-        verify(exactly = 1) { onboardingService.getOnboardingPath(pathId) }
-    }
-
-    @Test
-    fun `getPath should return 404 if path not found`() {
-        every {
-            onboardingService.getOnboardingPath(pathId)
-        } throws ResponseStatusException(HttpStatus.NOT_FOUND, "No onboarding path found")
-
-        mockMvc
-            .get("/api/v1/onboarding/paths/$pathId")
-            .andExpect {
-                status { isNotFound() }
-            }
-
-        verify(exactly = 1) { onboardingService.getOnboardingPath(pathId) }
-    }
-
-    @Test
-    fun `getPathForUser should return 200 and path for user`() {
+    fun `getPathForMe should return 200 and path`() {
         val response = GetOnboardingPathForUserResponse(
             id = pathId,
             userId = userId,
-            createdAt = createdAt,
+            createdAt = Instant.now(),
             phases = emptyList(),
         )
 
-        every { onboardingService.getOnboardingPathByUserId(userId) } returns response
+        every { onboardingPathService.getOnboardingPathByAuthId(authId) } returns response
 
         mockMvc
-            .get("/api/v1/onboarding/$userId/path")
-            .andExpect {
-                status { isOk() }
-                jsonPath("$.id") { value(pathId.toString()) }
-                jsonPath("$.userId") { value(userId.toString()) }
-                jsonPath("$.phases.length()") { value(0) }
-            }
+            .perform(
+                get("/api/v1/onboarding/me/path")
+                    .with(jwt().jwt { it.subject(authId) }.authorities(SimpleGrantedAuthority("ROLE_USER"))),
+            ).andExpect(status().isOk)
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
-        verify(exactly = 1) { onboardingService.getOnboardingPathByUserId(userId) }
+        verify(exactly = 1) { onboardingPathService.getOnboardingPathByAuthId(authId) }
     }
 
     @Test
-    fun `deletePath should return 204`() {
-        every { onboardingService.deleteOnboardingPathById(pathId) } just Runs
+    fun `getPathForMe should return 401 when not authenticated`() {
+        mockMvc
+            .perform(get("/api/v1/onboarding/me/path"))
+            .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `getPathForMe should return 403 when authenticated with wrong role`() {
+        mockMvc
+            .perform(
+                get("/api/v1/onboarding/me/path")
+                    .with(jwt().authorities(SimpleGrantedAuthority("ROLE_ADMIN"))),
+            ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `getPathForMe should return 404 when not found`() {
+        every { onboardingPathService.getOnboardingPathByAuthId(authId) } throws
+            ResponseStatusException(HttpStatus.NOT_FOUND)
 
         mockMvc
-            .delete("/api/v1/onboarding/paths/$pathId")
-            .andExpect {
-                status { isNoContent() }
-            }
+            .perform(
+                get("/api/v1/onboarding/me/path")
+                    .with(jwt().jwt { it.subject(authId) }.authorities(SimpleGrantedAuthority("ROLE_USER"))),
+            ).andExpect(status().isNotFound)
 
-        verify(exactly = 1) { onboardingService.deleteOnboardingPathById(pathId) }
+        verify(exactly = 1) { onboardingPathService.getOnboardingPathByAuthId(authId) }
+    }
+
+    @Test
+    fun `deletePathForMe should return 204`() {
+        every { onboardingPathService.deleteOnboardingPathByAuthId(authId) } just Runs
+
+        mockMvc
+            .perform(
+                delete("/api/v1/onboarding/me/path")
+                    .with(jwt().jwt { it.subject(authId) }.authorities(SimpleGrantedAuthority("ROLE_USER"))),
+            ).andExpect(status().isNoContent)
+
+        verify(exactly = 1) { onboardingPathService.deleteOnboardingPathByAuthId(authId) }
+    }
+
+    @Test
+    fun `deletePathForMe should return 401 when not authenticated`() {
+        mockMvc
+            .perform(delete("/api/v1/onboarding/me/path"))
+            .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `deletePathForMe should return 403 when authenticated with wrong role`() {
+        mockMvc
+            .perform(
+                delete("/api/v1/onboarding/me/path")
+                    .with(jwt().authorities(SimpleGrantedAuthority("ROLE_ADMIN"))),
+            ).andExpect(status().isForbidden)
+    }
+
+    // ========================== Admin endpoints ==========================
+
+    @Test
+    fun `getPath should return 200 and path overview`() {
+        val response = GetOnboardingPathResponse(
+            id = pathId,
+            userId = userId,
+            createdAt = Instant.now(),
+            phases = emptyList(),
+        )
+
+        every { onboardingPathService.getOnboardingPathOverviewByUserId(userId) } returns response
+
+        mockMvc
+            .perform(
+                get("/api/v1/onboarding/users/$userId/path")
+                    .with(jwt().authorities(SimpleGrantedAuthority("ROLE_ADMIN"))),
+            ).andExpect(status().isOk)
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+
+        verify(exactly = 1) { onboardingPathService.getOnboardingPathOverviewByUserId(userId) }
+    }
+
+    @Test
+    fun `getPath should return 401 when not authenticated`() {
+        mockMvc
+            .perform(get("/api/v1/onboarding/users/$userId/path"))
+            .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `getPath should return 403 when authenticated with wrong role`() {
+        mockMvc
+            .perform(
+                get("/api/v1/onboarding/users/$userId/path")
+                    .with(jwt().authorities(SimpleGrantedAuthority("ROLE_USER"))),
+            ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `getPath should return 404 when not found`() {
+        every { onboardingPathService.getOnboardingPathOverviewByUserId(userId) } throws
+            ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(
+                get("/api/v1/onboarding/users/$userId/path")
+                    .with(jwt().authorities(SimpleGrantedAuthority("ROLE_ADMIN"))),
+            ).andExpect(status().isNotFound)
+
+        verify(exactly = 1) { onboardingPathService.getOnboardingPathOverviewByUserId(userId) }
     }
 
     @Test
     fun `deletePathByUserId should return 204`() {
-        every { onboardingService.deleteOnboardingPathByUserId(userId) } just Runs
+        every { onboardingPathService.deleteOnboardingPathByUserId(userId) } just Runs
 
         mockMvc
-            .delete("/api/v1/onboarding/$userId/path")
-            .andExpect {
-                status { isNoContent() }
-            }
+            .perform(
+                delete("/api/v1/onboarding/users/$userId/path")
+                    .with(jwt().authorities(SimpleGrantedAuthority("ROLE_ADMIN"))),
+            ).andExpect(status().isNoContent)
 
-        verify(exactly = 1) { onboardingService.deleteOnboardingPathByUserId(userId) }
+        verify(exactly = 1) { onboardingPathService.deleteOnboardingPathByUserId(userId) }
+    }
+
+    @Test
+    fun `deletePathByUserId should return 401 when not authenticated`() {
+        mockMvc
+            .perform(delete("/api/v1/onboarding/users/$userId/path"))
+            .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `deletePathByUserId should return 403 when authenticated with wrong role`() {
+        mockMvc
+            .perform(
+                delete("/api/v1/onboarding/users/$userId/path")
+                    .with(jwt().authorities(SimpleGrantedAuthority("ROLE_USER"))),
+            ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `deletePathByUserId should return 404 when not found`() {
+        every { onboardingPathService.deleteOnboardingPathByUserId(userId) } throws
+            ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(
+                delete("/api/v1/onboarding/users/$userId/path")
+                    .with(jwt().authorities(SimpleGrantedAuthority("ROLE_ADMIN"))),
+            ).andExpect(status().isNotFound)
+
+        verify(exactly = 1) { onboardingPathService.deleteOnboardingPathByUserId(userId) }
     }
 }
