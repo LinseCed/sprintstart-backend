@@ -24,6 +24,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.ranges.contains
 
+@Suppress("TooManyFunctions")
 @Service
 class OnboardingStepService(
     private val onboardingPhaseRepository: OnboardingPhaseRepository,

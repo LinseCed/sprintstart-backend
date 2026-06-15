@@ -23,6 +23,7 @@ import java.util.UUID
 import kotlin.collections.forEach
 import kotlin.ranges.contains
 
+@Suppress("TooManyFunctions")
 @Service
 class OnboardingTaskService(
     private val onboardingTaskRepository: OnboardingTaskRepository,

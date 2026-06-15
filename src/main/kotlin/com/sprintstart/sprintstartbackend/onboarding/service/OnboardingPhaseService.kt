@@ -22,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 import kotlin.collections.forEach
 
+@Suppress("TooManyFunctions")
 @Service
 class OnboardingPhaseService(
     private val onboardingPathRepository: OnboardingPathRepository,
