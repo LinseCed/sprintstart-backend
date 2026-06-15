@@ -41,7 +41,7 @@ class OnboardingResourceController(
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/me/steps/{stepId}/resources")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun getOnboardingResourcesForMe(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable stepId: UUID,
@@ -51,7 +51,7 @@ class OnboardingResourceController(
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/me/steps/{stepId}/resources")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun createOnboardingResourceForMe(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable stepId: UUID,
@@ -62,7 +62,7 @@ class OnboardingResourceController(
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/me/resources/{resourceId}")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun getOnboardingResourceForMe(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable resourceId: UUID,
@@ -72,7 +72,7 @@ class OnboardingResourceController(
 
     @ResponseStatus(HttpStatus.OK)
     @PutMapping("/me/resources/{resourceId}")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun updateOnboardingResourceForMe(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable resourceId: UUID,
@@ -83,7 +83,7 @@ class OnboardingResourceController(
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/me/resources/{resourceId}")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun deleteOnboardingResourceForMe(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable resourceId: UUID,
@@ -113,7 +113,7 @@ class OnboardingResourceController(
     )
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/steps/{stepId}/resources")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun getOnboardingResourcesByStepId(
         @Parameter(description = "UUID of the onboarding step") @PathVariable stepId: UUID,
     ): List<GetOnboardingResourcesResponse> {
@@ -143,7 +143,7 @@ class OnboardingResourceController(
     )
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/steps/{stepId}/resources")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun createOnboardingResourceForStepId(
         @Parameter(description = "UUID of the onboarding step") @PathVariable stepId: UUID,
         @RequestBody request: CreateOnboardingResourceRequest,
@@ -171,7 +171,7 @@ class OnboardingResourceController(
     )
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/resources/{resourceId}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun getOnboardingResourceById(
         @Parameter(description = "UUID of the onboarding resource") @PathVariable resourceId: UUID,
     ): GetOnboardingResourceResponse {
@@ -199,7 +199,7 @@ class OnboardingResourceController(
     )
     @ResponseStatus(HttpStatus.OK)
     @PutMapping("/resources/{resourceId}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun updateOnboardingResourceById(
         @Parameter(description = "UUID of the onboarding resource to update") @PathVariable resourceId: UUID,
         @RequestBody request: UpdateOnboardingResourceRequest,
@@ -226,7 +226,7 @@ class OnboardingResourceController(
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/resources/{resourceId}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun deleteOnboardingResourceById(
         @Parameter(description = "UUID of the onboarding resource to delete") @PathVariable resourceId: UUID,
     ) {

@@ -41,7 +41,7 @@ class OnboardingPhaseController(
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/me/path/phases")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun getOnboardingPhasesForMe(
         @AuthenticationPrincipal jwt: Jwt,
     ): List<GetOnboardingPhasesResponse> {
@@ -50,7 +50,7 @@ class OnboardingPhaseController(
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/me/path/phases")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun createOnboardingPhaseForUser(
         @AuthenticationPrincipal jwt: Jwt,
         @Valid @RequestBody request: CreateOnboardingPhaseRequest,
@@ -60,7 +60,7 @@ class OnboardingPhaseController(
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/me/path/phases/{phaseId}")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun getOnboardingPhaseForMe(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable phaseId: UUID,
@@ -70,7 +70,7 @@ class OnboardingPhaseController(
 
     @ResponseStatus(HttpStatus.OK)
     @PutMapping("/me/path/phases/{phaseId}")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun updateOnboardingPhaseForUser(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable phaseId: UUID,
@@ -81,7 +81,7 @@ class OnboardingPhaseController(
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/me/path/phases/{phaseId}")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun deleteOnboardingPhaseForMe(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable phaseId: UUID,
@@ -93,7 +93,7 @@ class OnboardingPhaseController(
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/users/{userId}/path/phases")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun getAllOnboardingPhasesForUser(
         @PathVariable userId: UUID,
     ): List<GetOnboardingPhasesResponse> {
@@ -102,7 +102,7 @@ class OnboardingPhaseController(
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/users/{userId}/path/phases")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun createOnboardingPhaseForUser(
         @PathVariable userId: UUID,
         @RequestBody request: CreateOnboardingPhaseRequest,
@@ -112,7 +112,7 @@ class OnboardingPhaseController(
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/phases/{phaseId}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun getOnboardingPhaseForUser(
         @Parameter(description = "UUID of the onboarding phase") @PathVariable phaseId: UUID,
     ): GetOnboardingPhaseResponse {
@@ -121,7 +121,7 @@ class OnboardingPhaseController(
 
     @ResponseStatus(HttpStatus.OK)
     @PutMapping("/phases/{phaseId}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun updateOnboardingPhaseForUser(
         @Parameter(description = "UUID of the onboarding phase to update") @PathVariable phaseId: UUID,
         @RequestBody request: UpdateOnboardingPhaseRequest,
@@ -150,7 +150,7 @@ class OnboardingPhaseController(
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/phases/{phaseId}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun deleteOnboardingPhaseForUser(
         @Parameter(description = "UUID of the onboarding phase to delete") @PathVariable phaseId: UUID,
     ) {

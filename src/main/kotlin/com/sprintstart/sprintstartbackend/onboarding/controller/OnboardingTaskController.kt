@@ -50,7 +50,7 @@ class OnboardingTaskController(
 
     @ResponseStatus(value = HttpStatus.OK)
     @GetMapping("/me/steps/{stepId}/tasks")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun getOnboardingTasksForMe(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable stepId: UUID,
@@ -60,7 +60,7 @@ class OnboardingTaskController(
 
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/me/steps/{stepId}/tasks")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun createOnboardingTaskForMe(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable stepId: UUID,
@@ -71,7 +71,7 @@ class OnboardingTaskController(
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/me/tasks/{taskId}")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun getOnboardingTaskForMe(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable taskId: UUID,
@@ -81,7 +81,7 @@ class OnboardingTaskController(
 
     @ResponseStatus(HttpStatus.OK)
     @PutMapping("/me/tasks/{taskId}")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun updateOnboardingTaskForMe(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable taskId: UUID,
@@ -92,7 +92,7 @@ class OnboardingTaskController(
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/me/tasks/{taskId}")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun deleteOnboardingTaskForMe(
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable taskId: UUID,
@@ -122,7 +122,7 @@ class OnboardingTaskController(
     )
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/steps/{stepId}/tasks")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun getOnboardingTasksByStepId(
         @Parameter(description = "UUID of the onboarding step") @PathVariable stepId: UUID,
     ): List<GetOnboardingTaskResponse> {
@@ -152,7 +152,7 @@ class OnboardingTaskController(
     )
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/steps/{stepId}/tasks")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun createOnboardingTask(
         @Parameter(description = "UUID of the onboarding step") @PathVariable stepId: UUID,
         @RequestBody request: CreateOnboardingTaskRequest,
@@ -179,7 +179,7 @@ class OnboardingTaskController(
     )
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/tasks/{taskId}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun getOnboardingTask(
         @Parameter(description = "UUID of the onboarding task") @PathVariable taskId: UUID,
     ): GetOnboardingTaskResponse {
@@ -210,7 +210,7 @@ class OnboardingTaskController(
     )
     @ResponseStatus(HttpStatus.OK)
     @PutMapping("/tasks/{taskId}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun updateOnboardingTask(
         @Parameter(description = "UUID of the onboarding task to update") @PathVariable taskId: UUID,
         @RequestBody request: UpdateOnboardingTaskRequest,
@@ -237,7 +237,7 @@ class OnboardingTaskController(
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/tasks/{taskId}")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun deleteOnboardingTaskForStepId(
         @Parameter(description = "UUID of the onboarding task to delete") @PathVariable taskId: UUID,
     ) {

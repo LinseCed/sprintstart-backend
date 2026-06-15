@@ -37,7 +37,7 @@ class UploadController(
     @PostMapping(
         consumes = [MediaType.MULTIPART_FORM_DATA_VALUE],
     )
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun upload(
         @RequestPart("files")
         files: List<MultipartFile>,
@@ -53,7 +53,7 @@ class UploadController(
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun listUploads(
         @RequestParam uploaderId: UUID,
     ): ResponseEntity<List<UploadListItemResponse>> =
@@ -62,7 +62,7 @@ class UploadController(
         )
 
     @DeleteMapping("/{artifactId}")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun deleteUpload(
         @PathVariable artifactId: UUID,
     ): ResponseEntity<Void> {

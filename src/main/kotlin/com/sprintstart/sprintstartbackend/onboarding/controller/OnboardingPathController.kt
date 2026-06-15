@@ -33,7 +33,7 @@ class OnboardingPathController(
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/me/path")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun getPathForMe(
         @AuthenticationPrincipal jwt: Jwt,
     ): GetOnboardingPathForUserResponse {
@@ -42,7 +42,7 @@ class OnboardingPathController(
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/me/path")
-    @PreAuthorize("hasRole('ROLE_USER')")
+    @PreAuthorize("hasRole('USER')")
     fun deletePathByUserId(
         @AuthenticationPrincipal jwt: Jwt,
     ) {
@@ -53,7 +53,7 @@ class OnboardingPathController(
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/users/{userId}/path")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun getOnboardingPathForUserId(
         @Parameter(description = "UUID of the onboarding path") @PathVariable userId: UUID,
     ): GetOnboardingPathResponse {
@@ -62,7 +62,7 @@ class OnboardingPathController(
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @DeleteMapping("/users/{userId}/path")
-    @PreAuthorize("hasAnyRole('ROLE_ADMIN', 'ROLE_PM', 'ROLE_HR')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun deletePathByUserId(
         @Parameter(description = "UUID of the user whose onboarding path should be deleted") @PathVariable userId: UUID,
     ) {
