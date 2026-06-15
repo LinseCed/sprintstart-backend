@@ -68,8 +68,11 @@ class GithubCommitsService(
     @Suppress("DestructuringDeclarationWithTooManyEntries", "MagicNumber")
     private fun parseCommit(raw: String): Commit {
         val parts = raw.split(" - ")
-        require(parts.size == 4) { "Invalid commit format: $raw" }
-        val (dateStr, sha, author, msg) = parts
+        require(parts.size >= 4) { "Invalid commit format: $raw" }
+        val dateStr = parts[0]
+        val sha = parts[1]
+        val author = parts[2]
+        val msg = parts.drop(3).joinToString("")
         val date = Instant.parse(dateStr)
 
         return Commit(

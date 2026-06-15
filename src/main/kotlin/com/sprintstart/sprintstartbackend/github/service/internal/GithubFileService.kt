@@ -83,13 +83,16 @@ class GithubFileService(
      * (if not already existing, at last the clone will be triggered here) by starting
      * the fetch and ingest actions for this repository into the AI system.
      *
-     * @param githubRepository The GitHub repository to initialize.
+     * @param githubRepositoryId The GitHub repository id to initialize.
      * @param transactionId The UUID of the overall transaction, this fetch/ingest is a part of.
      */
     suspend fun fetchAndIngestAllFiles(
-        githubRepository: GithubRepositoryConnection,
+        githubRepositoryId: UUID,
         transactionId: UUID,
     ) {
+        val githubRepository = withContext(Dispatchers.IO) {
+            repoConnectionRepository.findById(githubRepositoryId).orElseThrow()
+        }
         try {
             val path = customCache.getLocalRepositoryPath(githubRepository.owner, githubRepository.name)
             streamFilesFromDiskAndIngest(githubRepository, path, transactionId)

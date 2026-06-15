@@ -51,8 +51,8 @@ class GithubClientTest {
         queryLoader = mockk {
             every { load("github/graphql/100-issues.graphql") } returns "{ issuesQuery }"
             every { load("github/graphql/issues-since.graphql") } returns "{ issuesSinceQuery }"
-            every { load("github/graphql/pr-list-search.graphql") } returns "{ prListQuery }"
-            every { load("github/graphql/single-pr-details.graphql") } returns "{ prDetailsQuery }"
+            every { load("github/graphql/pullrequests-since.graphql") } returns "{ prListQuery }"
+            every { load("github/graphql/100-pullrequests-deep.graphql") } returns "{ prDetailsQuery }"
         }
 
         val httpClient = HttpClient

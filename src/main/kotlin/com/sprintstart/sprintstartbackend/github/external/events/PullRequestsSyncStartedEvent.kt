@@ -11,9 +11,9 @@ import java.util.UUID
  * numbers involved.
  *
  * @property transactionId A unique identifier for the transaction associated with this synchronization event.
- * @property numbers A list of pull request numbers that are included in the synchronization process.
+ * @property prNumbers A list of pull request numbers that are included in the synchronization process.
  */
 class PullRequestsSyncStartedEvent(
     val transactionId: UUID,
-    val numbers: List<Int>,
+    val prNumbers: List<Int>,
 )

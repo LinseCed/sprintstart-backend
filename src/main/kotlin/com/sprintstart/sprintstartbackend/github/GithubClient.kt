@@ -148,7 +148,7 @@ class GithubClient(
      * @throws kotlinx.serialization.SerializationException if the response data cannot be deserialized.
      */
     suspend fun fetchAllPullRequests(owner: String, name: String, sinceTimestamp: String? = null): List<PullRequest> {
-        val listQuery = queryLoader.load("github/graphql/pr-list-search.graphql")
+        val listQuery = queryLoader.load("github/graphql/pullrequests-since.graphql")
 
         val searchQueryString = buildString {
             append("repo:$owner/$name is:pr")
@@ -161,7 +161,7 @@ class GithubClient(
             mapOf("searchQuery" to searchQueryString, "cursor" to cursor)
         }.map { it.number }
 
-        val detailsQuery = queryLoader.load("github/graphql/single-pr-details.graphql")
+        val detailsQuery = queryLoader.load("github/graphql/100-pullrequests-deep.graphql")
 
         val pullRequests = mutableListOf<PullRequest>()
 

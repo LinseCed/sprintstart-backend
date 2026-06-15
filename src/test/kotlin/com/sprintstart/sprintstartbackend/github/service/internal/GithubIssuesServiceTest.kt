@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.github.models.client.graphql.GithubAct
 import com.sprintstart.sprintstartbackend.github.models.client.graphql.Issue
 import com.sprintstart.sprintstartbackend.github.models.client.graphql.LabelNode
 import com.sprintstart.sprintstartbackend.github.models.client.graphql.LabelsConnection
+import com.sprintstart.sprintstartbackend.github.repository.GithubRepositoryConnectionRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk
@@ -23,9 +24,11 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.context.ApplicationEventPublisher
 import java.time.Instant
+import java.util.Optional
 import java.util.UUID
 
 class GithubIssuesServiceTest {
+    private val repoConnectionRepository = mockk<GithubRepositoryConnectionRepository>()
     private val githubClient = mockk<GithubClient>()
     private val eventPublisher = mockk<ApplicationEventPublisher>(relaxed = true)
 
@@ -37,6 +40,7 @@ class GithubIssuesServiceTest {
     @BeforeEach
     fun setUp() {
         service = GithubIssuesService(
+            repoConnectionRepository = repoConnectionRepository,
             githubClient = githubClient,
             eventPublisher = eventPublisher,
         )
@@ -46,9 +50,10 @@ class GithubIssuesServiceTest {
     inner class FetchRouting {
         @Test
         fun `passes null sinceTimestamp to client when since is null`() = runTest {
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", null) } returns emptyList()
 
-            service.fetchAndIngestAllIssues(repo, transactionId, since = null)
+            service.fetchAndIngestAllIssues(repo.id, transactionId, since = null)
 
             coVerify { githubClient.fetchIssues("owner", "repo", null) }
         }
@@ -56,9 +61,10 @@ class GithubIssuesServiceTest {
         @Test
         fun `passes formatted sinceTimestamp to client when since is provided`() = runTest {
             val since = Instant.parse("2024-01-01T00:00:00Z")
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", since.toString()) } returns emptyList()
 
-            service.fetchAndIngestAllIssues(repo, transactionId, since = since)
+            service.fetchAndIngestAllIssues(repo.id, transactionId, since = since)
 
             coVerify { githubClient.fetchIssues("owner", "repo", since.toString()) }
         }
@@ -68,13 +74,14 @@ class GithubIssuesServiceTest {
     inner class EventPublishing {
         @Test
         fun `publishes one event per issue plus summary`() = runTest {
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", null) } returns listOf(
                 issue(number = 1),
                 issue(number = 2),
                 issue(number = 3),
             )
 
-            service.fetchAndIngestAllIssues(repo, transactionId)
+            service.fetchAndIngestAllIssues(repo.id, transactionId)
 
             verify(exactly = 4) {
                 eventPublisher.publishEvent(any<GithubIssueFetchedEvent>())
@@ -83,9 +90,10 @@ class GithubIssuesServiceTest {
 
         @Test
         fun `publishes no events when there are no issues`() = runTest {
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", null) } returns emptyList()
 
-            service.fetchAndIngestAllIssues(repo, transactionId)
+            service.fetchAndIngestAllIssues(repo.id, transactionId)
 
             verify(exactly = 0) { eventPublisher.publishEvent(any()) }
         }
@@ -95,6 +103,7 @@ class GithubIssuesServiceTest {
     inner class EventFieldMapping {
         @Test
         fun `maps issue fields to event correctly`() = runTest {
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", null) } returns listOf(
                 issue(
                     number = 42,
@@ -108,7 +117,7 @@ class GithubIssuesServiceTest {
                 ),
             )
 
-            service.fetchAndIngestAllIssues(repo, transactionId)
+            service.fetchAndIngestAllIssues(repo.id, transactionId)
 
             val eventSlot = slot<GithubIssueFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -128,11 +137,12 @@ class GithubIssuesServiceTest {
 
         @Test
         fun `maps null author to null in event`() = runTest {
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", null) } returns listOf(
                 issue(authorLogin = null),
             )
 
-            service.fetchAndIngestAllIssues(repo, transactionId)
+            service.fetchAndIngestAllIssues(repo.id, transactionId)
 
             val eventSlot = slot<GithubIssueFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -142,11 +152,12 @@ class GithubIssuesServiceTest {
 
         @Test
         fun `maps labels to list of name strings`() = runTest {
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", null) } returns listOf(
                 issue(labels = listOf("bug", "help wanted")),
             )
 
-            service.fetchAndIngestAllIssues(repo, transactionId)
+            service.fetchAndIngestAllIssues(repo.id, transactionId)
 
             val eventSlot = slot<GithubIssueFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -156,11 +167,12 @@ class GithubIssuesServiceTest {
 
         @Test
         fun `maps null labels to empty list`() = runTest {
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", null) } returns listOf(
                 issue(labels = null),
             )
 
-            service.fetchAndIngestAllIssues(repo, transactionId)
+            service.fetchAndIngestAllIssues(repo.id, transactionId)
 
             val eventSlot = slot<GithubIssueFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -170,11 +182,12 @@ class GithubIssuesServiceTest {
 
         @Test
         fun `maps assignees to list of login strings`() = runTest {
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", null) } returns listOf(
                 issue(assignees = listOf("alice", "bob")),
             )
 
-            service.fetchAndIngestAllIssues(repo, transactionId)
+            service.fetchAndIngestAllIssues(repo.id, transactionId)
 
             val eventSlot = slot<GithubIssueFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -184,11 +197,12 @@ class GithubIssuesServiceTest {
 
         @Test
         fun `maps null assignees to empty list`() = runTest {
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", null) } returns listOf(
                 issue(assignees = null),
             )
 
-            service.fetchAndIngestAllIssues(repo, transactionId)
+            service.fetchAndIngestAllIssues(repo.id, transactionId)
 
             val eventSlot = slot<GithubIssueFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -209,9 +223,10 @@ class GithubIssuesServiceTest {
                     ),
                 ),
             )
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", null) } returns listOf(issueWithComments)
 
-            service.fetchAndIngestAllIssues(repo, transactionId)
+            service.fetchAndIngestAllIssues(repo.id, transactionId)
 
             val eventSlot = slot<GithubIssueFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -227,11 +242,12 @@ class GithubIssuesServiceTest {
 
         @Test
         fun `maps null comments to empty list`() = runTest {
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", null) } returns listOf(
                 issue().copy(comments = null),
             )
 
-            service.fetchAndIngestAllIssues(repo, transactionId)
+            service.fetchAndIngestAllIssues(repo.id, transactionId)
 
             val eventSlot = slot<GithubIssueFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -248,9 +264,10 @@ class GithubIssuesServiceTest {
                     ),
                 ),
             )
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchIssues("owner", "repo", null) } returns listOf(issueWithAnonymousComment)
 
-            service.fetchAndIngestAllIssues(repo, transactionId)
+            service.fetchAndIngestAllIssues(repo.id, transactionId)
 
             val eventSlot = slot<GithubIssueFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }

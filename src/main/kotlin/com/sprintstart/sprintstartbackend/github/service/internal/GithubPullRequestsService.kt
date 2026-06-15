@@ -7,7 +7,9 @@ import com.sprintstart.sprintstartbackend.github.external.events.GithubPullReque
 import com.sprintstart.sprintstartbackend.github.external.events.GithubPullRequestReviewThread
 import com.sprintstart.sprintstartbackend.github.external.events.GithubPullRequestReviewThreadComment
 import com.sprintstart.sprintstartbackend.github.external.events.PullRequestsSyncStartedEvent
-import com.sprintstart.sprintstartbackend.github.models.GithubRepositoryConnection
+import com.sprintstart.sprintstartbackend.github.repository.GithubRepositoryConnectionRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import java.time.Instant
@@ -15,6 +17,7 @@ import java.util.UUID
 
 @Service
 class GithubPullRequestsService(
+    private val repoConnectionRepository: GithubRepositoryConnectionRepository,
     private val githubClient: GithubClient,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
@@ -26,14 +29,17 @@ class GithubPullRequestsService(
      *
      * @see GithubPullRequestFetchedEvent
      *
-     * @param githubRepository The GitHub repository (as handled internally) this resource belongs to.
+     * @param githubRepositoryId The GitHub repository id (as handled internally) this resource belongs to.
      * @param transactionId The UUID of the overall transaction, this fetch/ingest is a part of.
      */
     suspend fun fetchAndIngestAllPullRequests(
-        githubRepository: GithubRepositoryConnection,
+        githubRepositoryId: UUID,
         transactionId: UUID,
         since: Instant? = null,
     ) {
+        val githubRepository = withContext(Dispatchers.IO) {
+            repoConnectionRepository.findById(githubRepositoryId).orElseThrow()
+        }
         val pullRequests = if (since == null) {
             githubClient.fetchAllPullRequests(githubRepository.owner, githubRepository.name)
         } else {
@@ -42,7 +48,7 @@ class GithubPullRequestsService(
 
         val jobStartedEvent = PullRequestsSyncStartedEvent(
             transactionId = transactionId,
-            numbers = pullRequests.map { it.number },
+            prNumbers = pullRequests.map { it.number },
         )
         eventPublisher.publishEvent(jobStartedEvent)
 

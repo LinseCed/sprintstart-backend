@@ -13,7 +13,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "gh_repository_snapshots")
-data class GithubRepositorySnapshot(
+class GithubRepositorySnapshot(
     @Id
     var id: UUID = UUID.randomUUID(),
     @Column(name = "last_commits_sync_at", nullable = false)

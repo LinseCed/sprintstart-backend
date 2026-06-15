@@ -4,7 +4,9 @@ import com.sprintstart.sprintstartbackend.github.GithubClient
 import com.sprintstart.sprintstartbackend.github.external.events.GithubIssueComment
 import com.sprintstart.sprintstartbackend.github.external.events.GithubIssueFetchedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.IssuesSyncJobStartedEvent
-import com.sprintstart.sprintstartbackend.github.models.GithubRepositoryConnection
+import com.sprintstart.sprintstartbackend.github.repository.GithubRepositoryConnectionRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import java.time.Instant
@@ -12,6 +14,7 @@ import java.util.UUID
 
 @Service
 class GithubIssuesService(
+    private val repoConnectionRepository: GithubRepositoryConnectionRepository,
     private val githubClient: GithubClient,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
@@ -23,14 +26,17 @@ class GithubIssuesService(
      *
      * @see GithubIssueFetchedEvent
      *
-     * @param githubRepository The GitHub repository (as handled internally) this resource belongs to.
+     * @param githubRepositoryId The GitHub repository id (as handled internally) this resource belongs to.
      * @param transactionId The UUID of the overall transaction, this fetch/ingest is a part of.
      */
     suspend fun fetchAndIngestAllIssues(
-        githubRepository: GithubRepositoryConnection,
+        githubRepositoryId: UUID,
         transactionId: UUID,
         since: Instant? = null,
     ) {
+        val githubRepository = withContext(Dispatchers.IO) {
+            repoConnectionRepository.findById(githubRepositoryId).orElseThrow()
+        }
         val issues = if (since == null) {
             githubClient.fetchIssues(githubRepository.owner, githubRepository.name)
         } else {
@@ -39,7 +45,7 @@ class GithubIssuesService(
 
         val jobStartedEvent = IssuesSyncJobStartedEvent(
             transactionId = transactionId,
-            numbers = issues.map { it.number },
+            issueNumbers = issues.map { it.number },
         )
         eventPublisher.publishEvent(jobStartedEvent)
 

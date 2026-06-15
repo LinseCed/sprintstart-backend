@@ -14,7 +14,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "gh_repository_connections")
-data class GithubRepositoryConnection(
+class GithubRepositoryConnection(
     @Id
     var id: UUID = UUID.randomUUID(),
     @Column(nullable = false)

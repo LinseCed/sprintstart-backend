@@ -12,9 +12,9 @@ import java.util.UUID
  * synchronized.
  *
  * @property transactionId A unique identifier for the transaction associated with this synchronization event.
- * @property numbers A list of issue numbers included in the synchronization process.
+ * @property issueNumbers A list of issue numbers included in the synchronization process.
  */
 class IssuesSyncJobStartedEvent(
     val transactionId: UUID,
-    val numbers: List<Int>,
+    val issueNumbers: List<Int>,
 )

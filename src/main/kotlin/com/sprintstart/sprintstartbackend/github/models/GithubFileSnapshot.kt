@@ -14,7 +14,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "gh_file_snapshots")
-data class GithubFileSnapshot(
+class GithubFileSnapshot(
     @EmbeddedId
     var id: GithubFileSnapshotSharedId = GithubFileSnapshotSharedId(),
     @Column(nullable = false)

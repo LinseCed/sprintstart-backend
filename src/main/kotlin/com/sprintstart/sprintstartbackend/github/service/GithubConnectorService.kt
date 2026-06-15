@@ -123,10 +123,10 @@ class GithubConnectorService(
 
         applicationScope.launch { fileService.fetchAndIngestFileUpdatesIncremental(githubRepository, transactionId) }
         applicationScope.launch { commitsService.fetchAndIngestLatestCommits(latestSnapshot, transactionId) }
-        applicationScope.launch { issuesService.fetchAndIngestAllIssues(githubRepository, transactionId) }
+        applicationScope.launch { issuesService.fetchAndIngestAllIssues(githubRepository.id, transactionId) }
         applicationScope.launch {
             pullRequestsService.fetchAndIngestAllPullRequests(
-                githubRepository,
+                githubRepository.id,
                 transactionId,
                 latestSnapshot.lastPullRequestsSyncAt,
             )
@@ -158,10 +158,10 @@ class GithubConnectorService(
         repoConnectionRepository.save(repoConnection)
 
         // Launch data collectors/processors
-        applicationScope.launch { fileService.fetchAndIngestAllFiles(repoConnection, transactionId) }
+        applicationScope.launch { fileService.fetchAndIngestAllFiles(repoConnection.id, transactionId) }
         applicationScope.launch { commitsService.fetchAndIngestLatestCommits(repoSnapshot, transactionId, true) }
-        applicationScope.launch { issuesService.fetchAndIngestAllIssues(repoConnection, transactionId) }
-        applicationScope.launch { pullRequestsService.fetchAndIngestAllPullRequests(repoConnection, transactionId) }
+        applicationScope.launch { issuesService.fetchAndIngestAllIssues(repoConnection.id, transactionId) }
+        applicationScope.launch { pullRequestsService.fetchAndIngestAllPullRequests(repoConnection.id, transactionId) }
 
         return transactionId
     }

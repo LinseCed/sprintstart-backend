@@ -24,6 +24,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.springframework.context.ApplicationEventPublisher
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.Optional
 import java.util.UUID
 import kotlin.io.path.writeText
 
@@ -53,8 +54,6 @@ class GithubFileServiceTest {
         every { repoConnectionRepository.save(any()) } answers { firstArg() }
         every { fileSnapshotRepository.save(any()) } answers { firstArg() }
     }
-
-    // ── fetchAndIngestFileUpdatesIncremental ──────────────────────────────────
 
     @Nested
     inner class FetchAndIngestFileUpdatesIncremental {
@@ -175,19 +174,18 @@ class GithubFileServiceTest {
         }
     }
 
-    // ── fetchAndIngestAllFiles ────────────────────────────────────────────────
-
     @Nested
     inner class FetchAndIngestAllFiles {
         @Test
         fun `sets status to FAILED when exception is thrown`() = runTest {
             val repo = repoConnection()
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery {
                 customCache.getLocalRepositoryPath("owner", "repo")
             } throws RuntimeException("disk error")
 
             try {
-                service.fetchAndIngestAllFiles(repo, transactionId)
+                service.fetchAndIngestAllFiles(repo.id, transactionId)
             } catch (@Suppress("SwallowedException") e: RuntimeException) {
                 // expected
             }
@@ -198,17 +196,18 @@ class GithubFileServiceTest {
         @Test
         fun `always saves repository in finally block even on exception`() = runTest {
             val repo = repoConnection()
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
             coEvery {
                 customCache.getLocalRepositoryPath("owner", "repo")
             } throws RuntimeException("disk error")
 
             try {
-                service.fetchAndIngestAllFiles(repo, transactionId)
+                service.fetchAndIngestAllFiles(repo.id, transactionId)
             } catch (@Suppress("SwallowedException") e: RuntimeException) {
                 // expected
             }
 
-            verify { repoConnectionRepository.save(repo) }
+            verify { repoConnectionRepository.save(any()) }
         }
 
         @Test
@@ -217,17 +216,16 @@ class GithubFileServiceTest {
 
             // Use a real temp dir with no files so streamFilesFromDiskAndIngest finishes immediately
             val emptyDir = Files.createTempDirectory("empty-repo")
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
             coEvery { customCache.getLocalRepositoryPath("owner", "repo") } returns emptyDir
             every { gitRunner.exec(emptyDir, match { it.command().contains("rev-parse") }) } returns "abc123\n"
 
-            service.fetchAndIngestAllFiles(repo, transactionId)
+            service.fetchAndIngestAllFiles(repo.id, transactionId)
 
             assertThat(repo.lastSha).isEqualTo("abc123")
             Files.delete(emptyDir)
         }
     }
-
-    // ── streamFilesFromDiskAndIngest — needs real filesystem ─────────────────
 
     @Nested
     inner class StreamFilesFromDiskAndIngest {
@@ -239,10 +237,11 @@ class GithubFileServiceTest {
             repoDir.resolve("file1.kt").writeText("content 1")
             repoDir.resolve("file2.kt").writeText("content 2")
 
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
             coEvery { customCache.getLocalRepositoryPath("owner", "repo") } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection(), transactionId)
+            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
             verify(exactly = 2) { eventPublisher.publishEvent(any<GithubFileFetchedEvent>()) }
         }
@@ -252,10 +251,11 @@ class GithubFileServiceTest {
             repoDir.resolve("image.png").writeText("fake binary")
             repoDir.resolve("code.kt").writeText("real code")
 
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
             coEvery { customCache.getLocalRepositoryPath("owner", "repo") } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection(), transactionId)
+            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
             verify(exactly = 1) { eventPublisher.publishEvent(any<GithubFileFetchedEvent>()) }
         }
@@ -266,10 +266,11 @@ class GithubFileServiceTest {
             gitDir.resolve("config").writeText("git internals")
             repoDir.resolve("code.kt").writeText("content")
 
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
             coEvery { customCache.getLocalRepositoryPath("owner", "repo") } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection(), transactionId)
+            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
             val eventSlot = slot<GithubFileFetchedEvent>()
             verify(exactly = 1) { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -281,10 +282,11 @@ class GithubFileServiceTest {
             val srcDir = repoDir.resolve("src").also { Files.createDirectories(it) }
             srcDir.resolve("Main.kt").writeText("content")
 
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
             coEvery { customCache.getLocalRepositoryPath("owner", "repo") } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection(), transactionId)
+            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
             val eventSlot = slot<GithubFileFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -297,10 +299,11 @@ class GithubFileServiceTest {
         fun `publishes correct file content`() = runTest {
             repoDir.resolve("code.kt").writeText("fun main() {}")
 
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
             coEvery { customCache.getLocalRepositoryPath("owner", "repo") } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection(), transactionId)
+            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
             val eventSlot = slot<GithubFileFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -312,10 +315,11 @@ class GithubFileServiceTest {
         fun `saves file snapshot for each ingested file`() = runTest {
             repoDir.resolve("code.kt").writeText("content")
 
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
             coEvery { customCache.getLocalRepositoryPath("owner", "repo") } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection(), transactionId)
+            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
             verify { fileSnapshotRepository.save(any()) }
         }
