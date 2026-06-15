@@ -78,7 +78,7 @@ class UserControllerTest(
         )
         val response2 = GetUserResponse(
             id = UUID.randomUUID(),
-            authId = "TEST_AUTH_ID_2",
+            authId = TEST_AUTH_ID_2,
             username = "bob",
             email = "bob.front@mail.de",
             firstname = "Bob",
