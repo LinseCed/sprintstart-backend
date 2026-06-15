@@ -188,7 +188,7 @@ class GithubFileServiceTest {
 
             try {
                 service.fetchAndIngestAllFiles(repo, transactionId)
-            } catch (e: RuntimeException) {
+            } catch (@Suppress("SwallowedException") e: RuntimeException) {
                 // expected
             }
 
@@ -204,7 +204,7 @@ class GithubFileServiceTest {
 
             try {
                 service.fetchAndIngestAllFiles(repo, transactionId)
-            } catch (e: RuntimeException) {
+            } catch (@Suppress("SwallowedException") e: RuntimeException) {
                 // expected
             }
 

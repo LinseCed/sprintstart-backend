@@ -4,7 +4,6 @@ import com.sprintstart.sprintstartbackend.github.GithubClient
 import com.sprintstart.sprintstartbackend.github.external.events.GithubPullRequestComment
 import com.sprintstart.sprintstartbackend.github.external.events.GithubPullRequestFetchedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.GithubPullRequestReview
-import com.sprintstart.sprintstartbackend.github.external.events.GithubPullRequestReviewThread
 import com.sprintstart.sprintstartbackend.github.external.events.GithubPullRequestReviewThreadComment
 import com.sprintstart.sprintstartbackend.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.github.models.client.graphql.CommentNode

@@ -25,7 +25,8 @@ class GithubCommitsService(
      *
      * @param latestSnapshot The snapshot of the GitHub repository, which includes synchronization metadata.
      * @param transactionId The unique identifier for the transaction associated with this synchronization.
-     * @param doSyncAll Indicates whether to fetch all commits from the repository (`true`) or only those after the last synchronization timestamp (`false`).
+     * @param doSyncAll Indicates whether to fetch all commits from the repository (`true`) or only those
+     * after the last synchronization timestamp (`false`).
      */
     suspend fun fetchAndIngestLatestCommits(
         latestSnapshot: GithubRepositorySnapshot,

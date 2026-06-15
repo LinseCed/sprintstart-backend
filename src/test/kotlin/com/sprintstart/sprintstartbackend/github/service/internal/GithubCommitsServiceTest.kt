@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.github.service.internal
 
-import com.sprintstart.sprintstartbackend.github.external.events.FilesSyncStartedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.GithubCommitFetchedEvent
 import com.sprintstart.sprintstartbackend.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.github.models.GithubRepositorySnapshot
