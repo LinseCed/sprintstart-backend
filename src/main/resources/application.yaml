@@ -1,5 +1,5 @@
 sprintstart:
-  internal-event-secret: ${SPRINTSTART_KEYCLOAK_SHARED_SECRET}
+  internal-event-secret: ${SPRINTSTART_KEYCLOAK_SHARED_SECRET:test-secret}
   ai:
     base-url: ${SPRINTSTART_AI_BASE_URL:http://host.docker.internal:8000}
     
