@@ -36,6 +36,9 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
+private const val TEST_AUTH_ID_1 = "testAuthId1"
+private const val TEST_AUTH_ID_2 = "testAuthId2"
+
 @WebMvcTest(UserController::class)
 @Import(SecurityConfig::class)
 @AutoConfigureMockMvc
@@ -66,7 +69,7 @@ class UserControllerTest(
     fun `getAllUsers should return 200 and all users`() {
         val response1 = GetUserResponse(
             id = UUID.randomUUID(),
-            authId = "auth-1",
+            authId = TEST_AUTH_ID_1,
             username = "alice",
             email = "alice.dev@mail.de",
             firstname = "Alice",
@@ -75,7 +78,7 @@ class UserControllerTest(
         )
         val response2 = GetUserResponse(
             id = UUID.randomUUID(),
-            authId = "auth-2",
+            authId = "TEST_AUTH_ID_2",
             username = "bob",
             email = "bob.front@mail.de",
             firstname = "Bob",
@@ -119,7 +122,7 @@ class UserControllerTest(
     fun `getMe should return 200 and current user`() {
         val response = GetUserResponse(
             id = UUID.randomUUID(),
-            authId = "auth-1",
+            authId = TEST_AUTH_ID_1,
             username = "alice",
             email = "alice.dev@mail.de",
             firstname = "Alice",
@@ -164,7 +167,7 @@ class UserControllerTest(
         val request = PatchMeRequest(workingArea = WorkingArea.FRONTEND_DEV)
         val response = GetUserResponse(
             id = UUID.randomUUID(),
-            authId = "auth-1",
+            authId = TEST_AUTH_ID_1,
             username = "alice",
             email = "alice.dev@mail.de",
             firstname = "Alice",
@@ -220,7 +223,7 @@ class UserControllerTest(
         val id = UUID.randomUUID()
         val response = GetUserResponse(
             id = id,
-            authId = "auth-1",
+            authId = TEST_AUTH_ID_1,
             username = "alice",
             email = "alice.dev@mail.de",
             firstname = "Alice",
@@ -285,7 +288,7 @@ class UserControllerTest(
         val request = UpdateUserRequest(workingArea = WorkingArea.BACKEND_DEV)
         val response = UpdateUserResponse(
             id = id,
-            authId = "auth-1",
+            authId = TEST_AUTH_ID_1,
             username = "alice",
             email = "alice.dev@mail.de",
             firstname = "Alice",
@@ -362,7 +365,7 @@ class UserControllerTest(
         val request = PatchUserRequest(workingArea = WorkingArea.FRONTEND_DEV)
         val response = PatchUserResponse(
             id = id,
-            authId = "auth-1",
+            authId = TEST_AUTH_ID_1,
             username = "alice",
             email = "alice.dev@mail.de",
             firstname = "Alice",
