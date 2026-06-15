@@ -10,11 +10,24 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 
+/**
+ * Synchronizes user data in response to Keycloak events.
+ *
+ * The service translates Keycloak webhook payloads into user module updates such as
+ * user creation, profile changes, deletion, and role synchronization.
+ */
 @Suppress("ThrowsCount")
 @Service
 class KeycloakEventService(
     private val userRepository: UserRepository,
 ) {
+    /**
+     * Dispatches an incoming Keycloak event to the matching user synchronization flow.
+     *
+     * Unsupported event types are ignored after being logged to standard output.
+     *
+     * @param request Incoming Keycloak event payload.
+     */
     @Transactional
     fun handleEvent(request: KeycloakEventRequest) {
         if (request.resourceType == "USER") {
@@ -54,6 +67,15 @@ class KeycloakEventService(
         }
     }
 
+    /**
+     * Creates a new user from a Keycloak registration event.
+     *
+     * The user starts with [WorkingArea.NO_WORKING_AREA] and receives the subset of
+     * realm roles that map to roles known by this module.
+     *
+     * @param request Registration event payload.
+     * @throws ResponseStatusException When required user fields are missing.
+     */
     fun registerUser(request: KeycloakEventRequest) {
         val newUser = User(
             authId = request.authId,
@@ -72,6 +94,14 @@ class KeycloakEventService(
         userRepository.save(newUser)
     }
 
+    /**
+     * Updates an existing user from a Keycloak profile or admin update event.
+     *
+     * Only fields present in the payload are changed.
+     *
+     * @param request Update event payload.
+     * @throws ResponseStatusException When no user exists for the given auth ID.
+     */
     fun updateUser(request: KeycloakEventRequest) {
         val user = userRepository
             .findByAuthId(request.authId)
@@ -85,6 +115,12 @@ class KeycloakEventService(
         userRepository.save(user)
     }
 
+    /**
+     * Deletes the user identified by the Keycloak auth ID.
+     *
+     * @param request Delete event payload.
+     * @throws ResponseStatusException When no user exists for the given auth ID.
+     */
     fun deleteUser(request: KeycloakEventRequest) {
         val user = userRepository
             .findByAuthId(request.authId)
@@ -93,6 +129,14 @@ class KeycloakEventService(
         userRepository.delete(user)
     }
 
+    /**
+     * Adds mapped Keycloak realm roles to the existing user.
+     *
+     * Roles not recognized by this module are ignored.
+     *
+     * @param request Role mapping event payload.
+     * @throws ResponseStatusException When no user exists for the given auth ID.
+     */
     fun updateUserRoles(request: KeycloakEventRequest) {
         val user = userRepository
             .findByAuthId(request.authId)
@@ -101,6 +145,14 @@ class KeycloakEventService(
         user.roles.addAll(filteredMappedRoles(request.realmRoles))
     }
 
+    /**
+     * Maps Keycloak realm role names to roles known by the user module.
+     *
+     * Unknown realm roles are ignored.
+     *
+     * @param realmRoles Raw role names from Keycloak.
+     * @return The subset of mapped roles recognized by this service.
+     */
     fun filteredMappedRoles(realmRoles: Set<String>): Set<Role> {
         val roles = mutableSetOf<Role>()
 
@@ -116,5 +168,3 @@ class KeycloakEventService(
         return roles
     }
 }
-
-// TODO: add doc

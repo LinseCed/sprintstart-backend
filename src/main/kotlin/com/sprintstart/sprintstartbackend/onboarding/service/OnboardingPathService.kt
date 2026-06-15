@@ -12,6 +12,12 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
+/**
+ * Provides onboarding path read and delete operations.
+ *
+ * User-scoped operations resolve the current user through [UserApi] before accessing
+ * the owning onboarding path. Admin-scoped operations address a user directly by UUID.
+ */
 @Service
 class OnboardingPathService(
     private val onboardingPathRepository: OnboardingPathRepository,
@@ -19,6 +25,15 @@ class OnboardingPathService(
 ) {
 //  ========================== Methods for users ==========================
 
+    /**
+     * Returns the onboarding path for the authenticated user.
+     *
+     * The user is resolved from the external auth ID before the path lookup is performed.
+     *
+     * @param authId External authentication identifier.
+     * @return The authenticated user's onboarding path.
+     * @throws ResponseStatusException When the user or onboarding path does not exist.
+     */
     @Transactional(readOnly = true)
     fun getOnboardingPathForMe(authId: String): GetOnboardingPathForUserResponse {
         val userId = userApi
@@ -31,6 +46,12 @@ class OnboardingPathService(
             .toGetForUserResponse()
     }
 
+    /**
+     * Deletes the onboarding path owned by the authenticated user.
+     *
+     * @param authId External authentication identifier.
+     * @throws ResponseStatusException When the user does not exist.
+     */
     fun deleteOnboardingPathForMe(authId: String) {
         val userId = userApi
             .getUserIdByAuthId(authId)
@@ -41,6 +62,15 @@ class OnboardingPathService(
 
 //  ========================== Methods for admins ==========================
 
+    /**
+     * Returns the onboarding path for a specific user.
+     *
+     * The target user must exist before the path lookup is attempted.
+     *
+     * @param userId Identifier of the user whose path should be loaded.
+     * @return The user's onboarding path.
+     * @throws ResponseStatusException When the user or onboarding path does not exist.
+     */
     fun getOnboardingPathByUserId(userId: UUID): GetOnboardingPathResponse {
         if (!userApi.exists(userId)) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with id: $userId")
@@ -65,5 +95,3 @@ class OnboardingPathService(
         onboardingPathRepository.deleteByUserId(userId)
     }
 }
-
-// TODO: add doc

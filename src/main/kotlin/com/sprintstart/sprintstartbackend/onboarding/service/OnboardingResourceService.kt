@@ -20,6 +20,12 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
+/**
+ * Manages onboarding resources attached to steps.
+ *
+ * Resources are unordered reference items, so create and update operations only mutate
+ * the targeted resource and do not trigger sibling reordering.
+ */
 @Service
 class OnboardingResourceService(
     private val onboardingResourceRepository: OnboardingResourceRepository,
@@ -28,6 +34,14 @@ class OnboardingResourceService(
 ) {
 //  ========================== Methods for users ==========================
 
+    /**
+     * Returns all resources for one step in the authenticated user's onboarding path.
+     *
+     * @param authId External authentication identifier.
+     * @param stepId Identifier of the parent step.
+     * @return Resources attached to the step.
+     * @throws ResponseStatusException When the user does not exist.
+     */
     @Transactional(readOnly = true)
     fun getOnboardingResourcesForMe(authId: String, stepId: UUID): List<GetOnboardingResourcesResponse> {
         val userId = userApi
@@ -39,6 +53,17 @@ class OnboardingResourceService(
             .map { it.toGetAllResponse() }
     }
 
+    /**
+     * Creates a resource for one step in the authenticated user's onboarding path.
+     *
+     * Resources are not position-ordered and are attached directly to the target step.
+     *
+     * @param authId External authentication identifier.
+     * @param stepId Identifier of the parent step.
+     * @param request Resource creation payload.
+     * @return The created resource.
+     * @throws ResponseStatusException When the user or step does not exist.
+     */
     @Transactional
     fun createOnboardingResourceForMe(
         authId: String,
@@ -63,6 +88,14 @@ class OnboardingResourceService(
         return onboardingResourceRepository.save(resource).toCreateResponse()
     }
 
+    /**
+     * Returns one resource from the authenticated user's onboarding path.
+     *
+     * @param authId External authentication identifier.
+     * @param resourceId Identifier of the resource to load.
+     * @return The requested resource.
+     * @throws ResponseStatusException When the user or resource does not exist.
+     */
     @Transactional(readOnly = true)
     fun getOnboardingResourceForMe(authId: String, resourceId: UUID): GetOnboardingResourceResponse {
         val userId = userApi
@@ -75,6 +108,15 @@ class OnboardingResourceService(
             .toGetResponse()
     }
 
+    /**
+     * Updates a resource in the authenticated user's onboarding path.
+     *
+     * @param authId External authentication identifier.
+     * @param resourceId Identifier of the resource to update.
+     * @param request Resource update payload.
+     * @return The updated resource.
+     * @throws ResponseStatusException When the user or resource does not exist.
+     */
     @Transactional
     fun updateOnboardingResourceForMe(
         authId: String,
@@ -96,6 +138,13 @@ class OnboardingResourceService(
         return onboardingResourceRepository.save(resource).toUpdateResponse()
     }
 
+    /**
+     * Deletes a resource from the authenticated user's onboarding path.
+     *
+     * @param authId External authentication identifier.
+     * @param resourceId Identifier of the resource to delete.
+     * @throws ResponseStatusException When the user or resource does not exist.
+     */
     @Transactional
     fun deleteOnboardingResourceForMe(
         authId: String,
@@ -210,5 +259,3 @@ class OnboardingResourceService(
         onboardingResourceRepository.delete(resource)
     }
 }
-
-// Todo: add doc

@@ -23,6 +23,12 @@ import java.util.UUID
 import kotlin.collections.forEach
 import kotlin.ranges.contains
 
+/**
+ * Manages onboarding tasks within a step.
+ *
+ * Tasks are ordered siblings under a step. Create, update, and delete operations
+ * maintain contiguous positions by shifting neighboring tasks when necessary.
+ */
 @Suppress("TooManyFunctions")
 @Service
 class OnboardingTaskService(
@@ -32,6 +38,14 @@ class OnboardingTaskService(
 ) {
 //  ========================== Methods for users ==========================
 
+    /**
+     * Returns all tasks for one step in the authenticated user's onboarding path.
+     *
+     * @param authId External authentication identifier.
+     * @param stepId Identifier of the parent step.
+     * @return Ordered tasks for the step.
+     * @throws ResponseStatusException When the user does not exist.
+     */
     @Transactional
     fun getOnboardingTasksForMe(authId: String, stepId: UUID): List<GetOnboardingTasksResponse> {
         val userId = userApi
@@ -43,6 +57,17 @@ class OnboardingTaskService(
             .map { it.toGetAllResponse() }
     }
 
+    /**
+     * Creates a task in one step of the authenticated user's onboarding path.
+     *
+     * Existing tasks at or after the requested position are shifted right to make room.
+     *
+     * @param authId External authentication identifier.
+     * @param stepId Identifier of the parent step.
+     * @param request Task creation payload.
+     * @return The created task.
+     * @throws ResponseStatusException When the user, step, or requested position is invalid.
+     */
     @Transactional
     fun createOnboardingTaskForMe(
         authId: String,
@@ -52,7 +77,6 @@ class OnboardingTaskService(
         val userId = userApi
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User not found") }
-// Todo: think about replacing this with HttpStatus.CONFLICT
 
         val step = onboardingStepRepository
             .findByIdAndPhasePathUserId(stepId, userId)
@@ -70,6 +94,14 @@ class OnboardingTaskService(
         return onboardingTaskRepository.save(onboardingTask).toCreateResponse()
     }
 
+    /**
+     * Returns one task from the authenticated user's onboarding path.
+     *
+     * @param authId External authentication identifier.
+     * @param taskId Identifier of the task to load.
+     * @return The requested task.
+     * @throws ResponseStatusException When the user or task does not exist.
+     */
     @Transactional
     fun getOnboardingTaskForMe(authId: String, taskId: UUID): GetOnboardingTaskResponse {
         val userId = userApi
@@ -82,6 +114,18 @@ class OnboardingTaskService(
             .toGetResponse()
     }
 
+    /**
+     * Updates a task in the authenticated user's onboarding path.
+     *
+     * If the position changes, sibling tasks between the old and new position are shifted
+     * to preserve contiguous ordering.
+     *
+     * @param authId External authentication identifier.
+     * @param taskId Identifier of the task to update.
+     * @param request Task update payload.
+     * @return The updated task.
+     * @throws ResponseStatusException When the user, task, or requested position is invalid.
+     */
     @Transactional
     fun updateOnboardingTaskForMe(
         authId: String,
@@ -106,6 +150,13 @@ class OnboardingTaskService(
         return task.toUpdateResponse()
     }
 
+    /**
+     * Deletes a task from the authenticated user's onboarding path.
+     *
+     * @param authId External authentication identifier.
+     * @param taskId Identifier of the task to delete.
+     * @throws ResponseStatusException When the user or task does not exist.
+     */
     @Transactional
     fun deleteOnboardingTaskForMe(authId: String, taskId: UUID) {
         val userId = userApi
@@ -287,5 +338,3 @@ class OnboardingTaskService(
         }
     }
 }
-
-// TODO: Add doc

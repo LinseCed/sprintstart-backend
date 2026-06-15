@@ -22,6 +22,12 @@ import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 import kotlin.collections.forEach
 
+/**
+ * Manages onboarding phases within a user's onboarding path.
+ *
+ * Phases are ordered siblings under a path. Create, update, and delete operations
+ * keep positions contiguous by shifting neighboring phases when needed.
+ */
 @Suppress("TooManyFunctions")
 @Service
 class OnboardingPhaseService(
@@ -31,6 +37,13 @@ class OnboardingPhaseService(
 ) {
 //  ========================== Methods for users ==========================
 
+    /**
+     * Returns all phases for the authenticated user's onboarding path.
+     *
+     * @param authId External authentication identifier.
+     * @return Ordered phases for the current user.
+     * @throws ResponseStatusException When the user or onboarding path does not exist.
+     */
     @Transactional
     fun getOnboardingPhasesForMe(authId: String): List<GetOnboardingPhasesResponse> {
         val userId = userApi
@@ -46,6 +59,14 @@ class OnboardingPhaseService(
             .map { it.toGetAllResponse() }
     }
 
+    /**
+     * Returns one phase from the authenticated user's onboarding path.
+     *
+     * @param authId External authentication identifier.
+     * @param phaseId Identifier of the phase to load.
+     * @return The requested phase.
+     * @throws ResponseStatusException When the user or phase does not exist.
+     */
     @Transactional
     fun getOnboardingPhaseForMe(authId: String, phaseId: UUID): GetOnboardingPhaseResponse {
         val userId = userApi
@@ -58,6 +79,16 @@ class OnboardingPhaseService(
             .toGetResponse()
     }
 
+    /**
+     * Creates a phase in the authenticated user's onboarding path.
+     *
+     * Existing phases at or after the requested position are shifted right to make room.
+     *
+     * @param authId External authentication identifier.
+     * @param request Phase creation payload.
+     * @return The created phase.
+     * @throws ResponseStatusException When the user, path, or requested position is invalid.
+     */
     @Transactional
     fun createOnboardingPhaseForMe(
         authId: String,
@@ -84,6 +115,18 @@ class OnboardingPhaseService(
         return onboardingPhaseRepository.save(onboardingPhase).toCreateResponse()
     }
 
+    /**
+     * Updates a phase in the authenticated user's onboarding path.
+     *
+     * If the position changes, sibling phases between the old and new position are shifted
+     * to preserve contiguous ordering.
+     *
+     * @param authId External authentication identifier.
+     * @param phaseId Identifier of the phase to update.
+     * @param request Phase update payload.
+     * @return The updated phase.
+     * @throws ResponseStatusException When the user, phase, or requested position is invalid.
+     */
     @Transactional
     fun updateOnboardingPhaseForMe(
         authId: String,
@@ -107,6 +150,15 @@ class OnboardingPhaseService(
         return phase.toUpdateResponse()
     }
 
+    /**
+     * Deletes a phase from the authenticated user's onboarding path.
+     *
+     * Phases positioned after the deleted phase are shifted left by one.
+     *
+     * @param authId External authentication identifier.
+     * @param phaseId Identifier of the phase to delete.
+     * @throws ResponseStatusException When the user or phase does not exist.
+     */
     @Transactional
     fun deleteOnboardingPhaseForMe(
         authId: String,
@@ -131,11 +183,27 @@ class OnboardingPhaseService(
 
 //  ========================== Methods for admins ==========================
 
+    /**
+     * Returns all phases for the given user.
+     *
+     * @param userId Identifier of the user whose phases should be loaded.
+     * @return Ordered phases for the user's path.
+     */
     @Transactional(readOnly = true)
     fun getOnboardingPhasesForUser(userId: UUID): List<GetOnboardingPhasesResponse> {
         return onboardingPhaseRepository.findAllByPathUserId(userId).map { it.toGetAllResponse() }
     }
 
+    /**
+     * Creates a phase in the specified user's onboarding path.
+     *
+     * Existing phases at or after the requested position are shifted right to make room.
+     *
+     * @param userId Identifier of the path owner.
+     * @param request Phase creation payload.
+     * @return The created phase.
+     * @throws ResponseStatusException When the path or requested position does not exist.
+     */
     @Transactional
     fun createOnboardingPhaseForUserId(
         userId: UUID,
@@ -158,6 +226,13 @@ class OnboardingPhaseService(
         return onboardingPhaseRepository.save(onboardingPhase).toCreateResponse()
     }
 
+    /**
+     * Returns one phase by ID.
+     *
+     * @param phaseId Identifier of the phase to load.
+     * @return The requested phase.
+     * @throws ResponseStatusException When the phase does not exist.
+     */
     @Transactional(readOnly = true)
     fun getOnboardingPhaseById(phaseId: UUID): GetOnboardingPhaseResponse {
         return onboardingPhaseRepository
@@ -166,6 +241,17 @@ class OnboardingPhaseService(
             .toGetResponse()
     }
 
+    /**
+     * Updates a phase by ID.
+     *
+     * If the position changes, sibling phases between the old and new position are shifted
+     * to preserve contiguous ordering.
+     *
+     * @param phaseId Identifier of the phase to update.
+     * @param request Phase update payload.
+     * @return The updated phase.
+     * @throws ResponseStatusException When the phase does not exist or the position is invalid.
+     */
     @Transactional
     fun updateOnboardingPhaseById(
         phaseId: UUID,
@@ -267,5 +353,3 @@ class OnboardingPhaseService(
         }
     }
 }
-
-// TODO: add doc
