@@ -66,7 +66,7 @@ class SeedingService(
      *
      * @param userId The unique identifier of the user for whom onboarding data should be created.
      */
-    @Suppress("LongMethod")
+    @Suppress("LongMethod", "CyclomaticComplexMethod")
     @Transactional
     fun seed(userId: UUID, workingArea: WorkingArea) {
         if (workingArea == WorkingArea.NO_WORKING_AREA ||
