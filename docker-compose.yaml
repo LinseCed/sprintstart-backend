@@ -20,6 +20,7 @@ services:
       POSTGRES_PASSWORD: ${KEYCLOAK_POSTGRES_PASSWORD}
     volumes:
       - sprintstart-keycloak-db-data:/var/lib/postgresql/data
+      - github-cache:/repos
 
   keycloak:
     build:
@@ -80,3 +81,4 @@ services:
 volumes:
   sprintstart-db-data:
   sprintstart-keycloak-db-data:
+  github-cache:
