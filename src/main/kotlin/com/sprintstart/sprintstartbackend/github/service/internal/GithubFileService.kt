@@ -21,6 +21,7 @@ import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import java.nio.file.Files
+import java.nio.charset.MalformedInputException
 import java.nio.file.Path
 import java.security.MessageDigest
 import java.util.UUID
@@ -95,9 +96,11 @@ class GithubFileService(
         }
         try {
             val path = customCache.getLocalRepositoryPath(githubRepository.owner, githubRepository.name)
-            streamFilesFromDiskAndIngest(githubRepository, path, transactionId)
-            val latestSha = gitRunner.exec(path, onDiskOperations.gitRevParse()).trim()
-            githubRepository.lastSha = latestSha
+            val currentRevision = resolveCurrentRevision(path)
+            streamFilesFromDiskAndIngest(githubRepository, path, currentRevision, transactionId)
+            if (currentRevision != null) {
+                githubRepository.lastSha = currentRevision
+            }
         } catch (e: Exception) {
             githubRepository.status = ConnectionStatus.FAILED
             throw e
@@ -177,7 +180,7 @@ class GithubFileService(
         eventPublisher.publishEvent(jobStartedEvent)
 
         changedFiles.forEach { filePath ->
-            val sourceUrl = "$ghUrl/blob/main/$filePath"
+            val sourceUrl = "$ghUrl/blob/$latestSha/$filePath"
             when (val changedFile = fetchFileUpdate(localFsPath, filePath)) {
                 is ModifiedFile -> {
                     ingestFile(changedFile.relativePath, changedFile.content, sourceUrl, transactionId)
@@ -208,7 +211,7 @@ class GithubFileService(
         return when {
             absolutePath.isBinary() -> null
             !absolutePath.exists() -> DeletedFile(relativeFilePath)
-            else -> ModifiedFile(relativeFilePath, absolutePath.readText())
+            else -> readTextSafely(absolutePath)?.let { ModifiedFile(relativeFilePath, it) }
         }
     }
 
@@ -232,6 +235,7 @@ class GithubFileService(
     private suspend fun streamFilesFromDiskAndIngest(
         githubRepository: GithubRepositoryConnection,
         repositoryPath: Path,
+        revision: String?,
         transactionId: UUID,
     ) = withContext(Dispatchers.IO) {
         Files.walk(repositoryPath).use { stream ->
@@ -241,7 +245,7 @@ class GithubFileService(
                 .filter { !it.isBinary() }
                 .forEach { filePath ->
                     val relativePath = repositoryPath.relativize(filePath).toString()
-                    val content = Files.readString(filePath)
+                    val content = readTextSafely(filePath) ?: return@forEach
 
                     val fileSnapshotId = GithubFileSnapshotSharedId(
                         repositoryId = githubRepository.id,
@@ -254,8 +258,9 @@ class GithubFileService(
                     )
                     fileSnapshotRepository.save(fileSnapshot)
 
+                    val revisionSegment = revision ?: return@forEach
                     val sourceUrl =
-                        "https://github.com/${githubRepository.owner}/${githubRepository.name}/blob/main/$relativePath"
+                        "https://github.com/${githubRepository.owner}/${githubRepository.name}/blob/$revisionSegment/$relativePath"
                     ingestFile(relativePath, content, sourceUrl, transactionId)
                 }
         }
@@ -344,6 +349,22 @@ class GithubFileService(
      * Attaches a custom binary check function to [Path].
      */
     private fun Path.isBinary() = extension.lowercase() in binaryExtensions
+
+    private fun readTextSafely(path: Path): String? {
+        return try {
+            Files.readString(path)
+        } catch (@Suppress("SwallowedException") e: MalformedInputException) {
+            null
+        }
+    }
+
+    private fun resolveCurrentRevision(localFsPath: Path): String? {
+        return try {
+            gitRunner.exec(localFsPath, onDiskOperations.gitRevParse()).trim()
+        } catch (@Suppress("SwallowedException") e: RuntimeException) {
+            null
+        }
+    }
 
     /**
      * Calculates the SHA-256 hash of a string.

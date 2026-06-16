@@ -51,6 +51,14 @@ class OnDiskOperations {
      */
     fun gitRevParse() = ProcessBuilder("git", "rev-parse", "HEAD")
 
+    /** Lists remote-tracking branches so callers can repair a clone with an invalid local HEAD. */
+    fun gitRemoteBranches() =
+        ProcessBuilder("git", "for-each-ref", "refs/remotes/origin", "--format=%(refname:short)")
+
+    /** Checks out [branch] from the corresponding `origin/[branch]` remote-tracking ref. */
+    fun gitCheckoutRemoteBranch(branch: String) =
+        ProcessBuilder("git", "checkout", "-B", branch, "refs/remotes/origin/$branch")
+
     /**
      * Lists the names of files that changed between [previousSha] and [currentSha].
      *

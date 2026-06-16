@@ -85,8 +85,8 @@ class CustomOnDiskCacheTest {
                 Files.createDirectories(it)
             }
 
-            // git status succeeds → cache hit
             every { gitRunner.exec(repoDir, match { it.command().contains("status") }) } returns ""
+            every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "abc123\n"
 
             val result = runBlocking { cache.getLocalRepositoryPath("owner", "repo") }
 
@@ -112,11 +112,51 @@ class CustomOnDiskCacheTest {
             every {
                 gitRunner.exec(any(), match { it.command().contains("clone") })
             } returns ""
+            every {
+                gitRunner.exec(any(), match { it.command().contains("rev-parse") })
+            } returns "abc123\n"
 
             runBlocking { cache.getLocalRepositoryPath("owner", "repo") }
 
             verify {
                 gitRunner.exec(any(), match { pb -> pb.command().contains("clone") })
+            }
+        }
+
+        @Test
+        fun `repairs cached clone when git status succeeds but HEAD is invalid`() {
+            val repoDir = tempDir.resolve("owner/repo").also {
+                Files.createDirectories(it)
+            }
+
+            every { gitRunner.exec(repoDir, match { it.command().contains("status") }) } returns ""
+            every {
+                gitRunner.exec(repoDir, match { it.command() == listOf("git", "rev-parse", "HEAD") })
+            } throws RuntimeException("git rev-parse HEAD failed (exit 128)") andThen "fixed-sha\n"
+            every {
+                gitRunner.exec(
+                    repoDir,
+                    match { it.command() == listOf("git", "for-each-ref", "refs/remotes/origin", "--format=%(refname:short)") },
+                )
+            } returns "origin/trunk\n"
+            every {
+                gitRunner.exec(
+                    repoDir,
+                    match { it.command() == listOf("git", "checkout", "-B", "trunk", "refs/remotes/origin/trunk") },
+                )
+            } returns ""
+
+            val result = runBlocking { cache.getLocalRepositoryPath("owner", "repo") }
+
+            assertThat(result).isEqualTo(repoDir)
+            verify(exactly = 0) {
+                gitRunner.exec(any(), match { pb -> pb.command().contains("clone") })
+            }
+            verify {
+                gitRunner.exec(
+                    repoDir,
+                    match { it.command() == listOf("git", "checkout", "-B", "trunk", "refs/remotes/origin/trunk") },
+                )
             }
         }
     }

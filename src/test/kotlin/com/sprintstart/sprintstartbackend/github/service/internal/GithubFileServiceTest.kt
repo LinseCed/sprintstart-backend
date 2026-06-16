@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.context.ApplicationEventPublisher
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Optional
@@ -216,13 +217,31 @@ class GithubFileServiceTest {
 
             // Use a real temp dir with no files so streamFilesFromDiskAndIngest finishes immediately
             val emptyDir = Files.createTempDirectory("empty-repo")
-            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { customCache.getLocalRepositoryPath("owner", "repo") } returns emptyDir
             every { gitRunner.exec(emptyDir, match { it.command().contains("rev-parse") }) } returns "abc123\n"
 
             service.fetchAndIngestAllFiles(repo.id, transactionId)
 
             assertThat(repo.lastSha).isEqualTo("abc123")
+            Files.delete(emptyDir)
+        }
+
+        @Test
+        fun `does not fail when repository has no resolvable HEAD yet`() = runTest {
+            val repo = repoConnection(lastSha = "")
+            val emptyDir = Files.createTempDirectory("empty-repo-no-head")
+
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
+            coEvery { customCache.getLocalRepositoryPath("owner", "repo") } returns emptyDir
+            every {
+                gitRunner.exec(emptyDir, match { it.command().contains("rev-parse") })
+            } throws RuntimeException("git rev-parse HEAD failed (exit 128)")
+
+            service.fetchAndIngestAllFiles(repo.id, transactionId)
+
+            assertThat(repo.status).isNotEqualTo(ConnectionStatus.FAILED)
+            assertThat(repo.lastSha).isBlank()
             Files.delete(emptyDir)
         }
     }
@@ -292,7 +311,7 @@ class GithubFileServiceTest {
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
 
             assertThat(eventSlot.captured.sourceUrl)
-                .isEqualTo("https://github.com/owner/repo/blob/main/src/Main.kt")
+                .isEqualTo("https://github.com/owner/repo/blob/sha/src/Main.kt")
         }
 
         @Test
@@ -322,6 +341,20 @@ class GithubFileServiceTest {
             service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
             verify { fileSnapshotRepository.save(any()) }
+        }
+
+        @Test
+        fun `skips files that are not valid UTF-8`() = runTest {
+            Files.write(repoDir.resolve("notes.txt"), byteArrayOf(0xC3.toByte(), 0x28))
+            repoDir.resolve("code.kt").writeText("content", StandardCharsets.UTF_8)
+
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
+            coEvery { customCache.getLocalRepositoryPath("owner", "repo") } returns repoDir
+            every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
+
+            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
+
+            verify(exactly = 1) { eventPublisher.publishEvent(any<GithubFileFetchedEvent>()) }
         }
     }
 

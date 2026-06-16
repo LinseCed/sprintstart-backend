@@ -104,6 +104,7 @@ class CustomOnDiskCache(
         return withContext(Dispatchers.IO) {
             try {
                 gitRunner.exec(path, onDiskOperations.gitStatus())
+                ensureRepositoryCheckout(path)
                 true
             } catch (@Suppress("SwallowedException") e: RuntimeException) {
                 false
@@ -129,6 +130,40 @@ class CustomOnDiskCache(
             localFsPath.toFile().mkdirs()
 
             gitRunner.exec(localFsPath, onDiskOperations.gitClone(remoteUri, localFsPath.absolutePathString()))
+            ensureRepositoryCheckout(localFsPath)
         }
+    }
+
+    /**
+     * Repairs clones whose remote default branch is invalid by checking out the first available remote branch.
+     *
+     * Some repositories are non-empty but advertise a stale remote `HEAD`, which leaves the clone
+     * without a resolvable local `HEAD`. In that state `git status` still succeeds, so cache validation
+     * must do a stronger check than repository presence alone.
+     *
+     * Empty repositories are treated as valid even though `HEAD` cannot be resolved yet.
+     */
+    private fun ensureRepositoryCheckout(localFsPath: Path) {
+        try {
+            gitRunner.exec(localFsPath, onDiskOperations.gitRevParse())
+            return
+        } catch (@Suppress("SwallowedException") e: RuntimeException) {
+            val remoteBranch = findFirstRemoteBranch(localFsPath) ?: return
+            logger.info("Repairing cached clone by checking out origin/{}", remoteBranch)
+            gitRunner.exec(localFsPath, onDiskOperations.gitCheckoutRemoteBranch(remoteBranch))
+            gitRunner.exec(localFsPath, onDiskOperations.gitRevParse())
+        }
+    }
+
+    private fun findFirstRemoteBranch(localFsPath: Path): String? {
+        val branches = gitRunner.exec(localFsPath, onDiskOperations.gitRemoteBranches())
+            .lineSequence()
+            .map(String::trim)
+            .filter { it.isNotBlank() }
+            .filter { it != "origin/HEAD" }
+            .map { it.removePrefix("origin/") }
+            .toList()
+
+        return branches.firstOrNull()
     }
 }
