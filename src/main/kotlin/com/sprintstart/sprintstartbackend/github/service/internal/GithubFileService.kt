@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.github.service.internal
 
+import com.sprintstart.sprintstartbackend.github.GithubClient
 import com.sprintstart.sprintstartbackend.github.external.events.FilesSyncStartedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.GithubFileDeletedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.GithubFileFetchedEvent
@@ -7,6 +8,7 @@ import com.sprintstart.sprintstartbackend.github.models.ConnectionStatus
 import com.sprintstart.sprintstartbackend.github.models.GithubFileSnapshot
 import com.sprintstart.sprintstartbackend.github.models.GithubFileSnapshotSharedId
 import com.sprintstart.sprintstartbackend.github.models.GithubRepositoryConnection
+import com.sprintstart.sprintstartbackend.github.models.client.AiIngestRequest
 import com.sprintstart.sprintstartbackend.github.models.client.dto.ChangedFile
 import com.sprintstart.sprintstartbackend.github.models.client.dto.DeletedFile
 import com.sprintstart.sprintstartbackend.github.models.client.dto.ModifiedFile
@@ -75,6 +77,7 @@ class GithubFileService(
     private val eventPublisher: ApplicationEventPublisher,
     private val customCache: CustomOnDiskCache,
     private val gitRunner: GitOperationRunner,
+    private val githubClient: GithubClient,
 ) {
     /**
      * Streams the initial connection and ingestion of a GitHub repository's files.
@@ -234,31 +237,33 @@ class GithubFileService(
         repositoryPath: Path,
         transactionId: UUID,
     ) = withContext(Dispatchers.IO) {
-        Files.walk(repositoryPath).use { stream ->
-            stream
-                .filter { Files.isRegularFile(it) }
-                .filter { !it.startsWith(repositoryPath.resolve(".git")) }
-                .filter { !it.isBinary() }
-                .forEach { filePath ->
-                    val relativePath = repositoryPath.relativize(filePath).toString()
-                    val content = Files.readString(filePath)
+        Files
+            .walk(repositoryPath)
+            .use { stream ->
+                stream
+                    .filter { Files.isRegularFile(it) }
+                    .filter { !it.startsWith(repositoryPath.resolve(".git")) }
+                    .filter { !it.isBinary() }
+                    .toList()
+            }.forEach { filePath ->
+                val relativePath = repositoryPath.relativize(filePath).toString()
+                val content = Files.readString(filePath)
 
-                    val fileSnapshotId = GithubFileSnapshotSharedId(
-                        repositoryId = githubRepository.id,
-                        path = filePath.toString(),
-                    )
-                    val fileSnapshot = GithubFileSnapshot(
-                        id = fileSnapshotId,
-                        sha = content.sha256(),
-                        repository = githubRepository,
-                    )
-                    fileSnapshotRepository.save(fileSnapshot)
+                val fileSnapshotId = GithubFileSnapshotSharedId(
+                    repositoryId = githubRepository.id,
+                    path = filePath.toString(),
+                )
+                val fileSnapshot = GithubFileSnapshot(
+                    id = fileSnapshotId,
+                    sha = content.sha256(),
+                    repository = githubRepository,
+                )
+                fileSnapshotRepository.save(fileSnapshot)
 
-                    val sourceUrl =
-                        "https://github.com/${githubRepository.owner}/${githubRepository.name}/blob/main/$relativePath"
-                    ingestFile(relativePath, content, sourceUrl, transactionId)
-                }
-        }
+                val sourceUrl =
+                    "https://github.com/${githubRepository.owner}/${githubRepository.name}/blob/main/$relativePath"
+                ingestFile(relativePath, content, sourceUrl, transactionId)
+            }
     }
 
     /**
@@ -273,7 +278,7 @@ class GithubFileService(
      * @param content The actual content of the resource.
      * @param transactionId The UUID of the overall transaction, this fetch/ingest is a part of.
      */
-    private fun ingestFile(path: String, content: String, sourceUrl: String, transactionId: UUID) {
+    private suspend fun ingestFile(path: String, content: String, sourceUrl: String, transactionId: UUID) {
         val event = GithubFileFetchedEvent(
             transactionId = transactionId,
             path = path,
@@ -281,6 +286,14 @@ class GithubFileService(
             sourceUrl = sourceUrl,
         )
         eventPublisher.publishEvent(event)
+
+        githubClient.ingest(
+            AiIngestRequest(
+                id = path,
+                name = sourceUrl,
+                content = content,
+            ),
+        )
     }
 
     /**
