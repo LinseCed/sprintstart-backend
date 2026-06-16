@@ -159,7 +159,7 @@ class OnboardingStepController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping("me/step/{stepId}")
+    @GetMapping("me/steps/{stepId}")
     @PreAuthorize("hasRole('USER')")
     fun getOnboardingStepForMe(
         @Parameter(hidden = true)
@@ -199,7 +199,7 @@ class OnboardingStepController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @PutMapping("/me/step/{stepId}")
+    @PutMapping("/me/steps/{stepId}")
     @PreAuthorize("hasRole('USER')")
     fun updateOnboardingStepForMe(
         @Parameter(hidden = true)
@@ -237,7 +237,7 @@ class OnboardingStepController(
         ],
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @DeleteMapping("/me/step/{stepId}")
+    @DeleteMapping("/me/steps/{stepId}")
     @PreAuthorize("hasRole('USER')")
     fun deleteOnboardingStepForMe(
         @Parameter(hidden = true)

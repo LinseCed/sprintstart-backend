@@ -224,7 +224,7 @@ class OnboardingStepControllerTest(
         every { onboardingStepService.getOnboardingStepForMe(authId, stepId) } returns buildGetStepResponse()
 
         mockMvc
-            .perform(get("/api/v1/onboarding/me/step/$stepId").with(userJwt))
+            .perform(get("/api/v1/onboarding/me/steps/$stepId").with(userJwt))
             .andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
@@ -234,14 +234,14 @@ class OnboardingStepControllerTest(
     @Test
     fun `getOnboardingStepForMe should return 401 when not authenticated`() {
         mockMvc
-            .perform(get("/api/v1/onboarding/me/step/$stepId"))
+            .perform(get("/api/v1/onboarding/me/steps/$stepId"))
             .andExpect(status().isUnauthorized)
     }
 
     @Test
     fun `getOnboardingStepForMe should return 403 when authenticated with wrong role`() {
         mockMvc
-            .perform(get("/api/v1/onboarding/me/step/$stepId").with(noUserRoleJwt))
+            .perform(get("/api/v1/onboarding/me/steps/$stepId").with(noUserRoleJwt))
             .andExpect(status().isForbidden)
     }
 
@@ -251,7 +251,7 @@ class OnboardingStepControllerTest(
             ResponseStatusException(HttpStatus.NOT_FOUND)
 
         mockMvc
-            .perform(get("/api/v1/onboarding/me/step/$stepId").with(userJwt))
+            .perform(get("/api/v1/onboarding/me/steps/$stepId").with(userJwt))
             .andExpect(status().isNotFound)
 
         verify(exactly = 1) { onboardingStepService.getOnboardingStepForMe(authId, stepId) }
@@ -265,7 +265,7 @@ class OnboardingStepControllerTest(
 
         mockMvc
             .perform(
-                put("/api/v1/onboarding/me/step/$stepId")
+                put("/api/v1/onboarding/me/steps/$stepId")
                     .with(userJwt)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)),
@@ -279,7 +279,7 @@ class OnboardingStepControllerTest(
     fun `updateOnboardingStepForMe should return 401 when not authenticated`() {
         mockMvc
             .perform(
-                put("/api/v1/onboarding/me/step/$stepId")
+                put("/api/v1/onboarding/me/steps/$stepId")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(buildUpdateRequest())),
             ).andExpect(status().isUnauthorized)
@@ -289,7 +289,7 @@ class OnboardingStepControllerTest(
     fun `updateOnboardingStepForMe should return 403 when authenticated with wrong role`() {
         mockMvc
             .perform(
-                put("/api/v1/onboarding/me/step/$stepId")
+                put("/api/v1/onboarding/me/steps/$stepId")
                     .with(noUserRoleJwt)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(buildUpdateRequest())),
@@ -301,7 +301,7 @@ class OnboardingStepControllerTest(
         every { onboardingStepService.deleteOnboardingStepForMe(authId, stepId) } just Runs
 
         mockMvc
-            .perform(delete("/api/v1/onboarding/me/step/$stepId").with(userJwt))
+            .perform(delete("/api/v1/onboarding/me/steps/$stepId").with(userJwt))
             .andExpect(status().isNoContent)
 
         verify(exactly = 1) { onboardingStepService.deleteOnboardingStepForMe(authId, stepId) }
@@ -310,14 +310,14 @@ class OnboardingStepControllerTest(
     @Test
     fun `deleteOnboardingStepForMe should return 401 when not authenticated`() {
         mockMvc
-            .perform(delete("/api/v1/onboarding/me/step/$stepId"))
+            .perform(delete("/api/v1/onboarding/me/steps/$stepId"))
             .andExpect(status().isUnauthorized)
     }
 
     @Test
     fun `deleteOnboardingStepForMe should return 403 when authenticated with wrong role`() {
         mockMvc
-            .perform(delete("/api/v1/onboarding/me/step/$stepId").with(noUserRoleJwt))
+            .perform(delete("/api/v1/onboarding/me/steps/$stepId").with(noUserRoleJwt))
             .andExpect(status().isForbidden)
     }
 
