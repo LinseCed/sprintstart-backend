@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.github.util
 
 import com.sprintstart.sprintstartbackend.github.util.OnDiskOperations.Companion.exec
 import org.springframework.stereotype.Service
+import java.net.URI
 import java.nio.file.Path
 import java.time.Instant
 
@@ -100,9 +101,31 @@ class OnDiskOperations {
 
             val output = process.inputStream.bufferedReader().readText()
             val exitCode = process.waitFor()
-            if (exitCode != 0) throw RuntimeException("${op.command().joinToString(" ")} failed (exit $exitCode)")
+            if (exitCode != 0) {
+                val command = op.command().joinToString(" ") { sanitizeCommandPart(it) }
+                val details = output.trim()
+                val suffix = if (details.isBlank()) "" else ": $details"
+                throw RuntimeException("$command failed (exit $exitCode)$suffix")
+            }
 
             return output
         }
+
+        private fun sanitizeCommandPart(value: String): String =
+            runCatching {
+                val uri = URI(value)
+                val userInfo = uri.userInfo ?: return value
+                val username = userInfo.substringBefore(':')
+                val sanitizedUserInfo = if (username.isBlank()) "***" else "$username:***"
+                URI(
+                    uri.scheme,
+                    sanitizedUserInfo,
+                    uri.host,
+                    uri.port,
+                    uri.path,
+                    uri.query,
+                    uri.fragment,
+                ).toASCIIString()
+            }.getOrDefault(value)
     }
 }

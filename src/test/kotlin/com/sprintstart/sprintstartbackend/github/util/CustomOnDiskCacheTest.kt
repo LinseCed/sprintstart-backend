@@ -6,6 +6,8 @@ import com.sprintstart.sprintstartbackend.GithubConfig
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
@@ -74,6 +76,34 @@ class CustomOnDiskCacheTest {
             val result = runBlocking { cache.getLocalRepositoryPath("owner", "repo") }
 
             assertThat(result).isEqualTo(Path.of(tempDir.toString(), "owner", "repo"))
+        }
+
+        @Test
+        fun `concurrent requests clone repository only once`() {
+            every {
+                gitRunner.exec(any(), match { it.command().contains("clone") })
+            } answers {
+                Thread.sleep(100)
+                ""
+            }
+            every {
+                gitRunner.exec(any(), match { it.command().contains("status") })
+            } returns ""
+            every {
+                gitRunner.exec(any(), match { it.command().contains("rev-parse") })
+            } returns "abc123\n"
+
+            val results = runBlocking {
+                awaitAll(
+                    async { cache.getLocalRepositoryPath("owner", "repo") },
+                    async { cache.getLocalRepositoryPath("owner", "repo") },
+                )
+            }
+
+            assertThat(results).allMatch { it == Path.of(tempDir.toString(), "owner", "repo") }
+            verify(exactly = 1) {
+                gitRunner.exec(any(), match { pb -> pb.command().contains("clone") })
+            }
         }
     }
 
@@ -179,10 +209,10 @@ class CustomOnDiskCacheTest {
             runBlocking { cache.getLocalRepositoryPath("owner", "repo") }
 
             // The real URI with the token should be in the clone command
-            assertThat(cloneUris).anyMatch { it.contains("test-token") }
+            assertThat(cloneUris).anyMatch { it.contains("x-access-token:test-token") }
             // But it should never appear in log output — we can't assert logs directly,
             // so we verify the safe URI does NOT contain the token
-            assertThat("https://***@github.com/owner/repo.git").doesNotContain("test-token")
+            assertThat("https://x-access-token:***@github.com/owner/repo.git").doesNotContain("test-token")
         }
     }
 

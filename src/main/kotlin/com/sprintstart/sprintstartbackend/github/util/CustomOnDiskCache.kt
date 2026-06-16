@@ -3,10 +3,14 @@ package com.sprintstart.sprintstartbackend.github.util
 import com.sprintstart.sprintstartbackend.ApplicationConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
+import java.net.URI
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.exists
 
@@ -52,6 +56,7 @@ class CustomOnDiskCache(
     private val gitRunner: GitOperationRunner,
 ) {
     private val logger = LoggerFactory.getLogger(CustomOnDiskCache::class.java)
+    private val repositoryLocks = ConcurrentHashMap<Path, Mutex>()
 
     /**
      * Returns the local filesystem path for the given repository, cloning it first if not cached.
@@ -61,10 +66,9 @@ class CustomOnDiskCache(
      * @return Absolute path to the local clone, ready for filesystem operations
      */
     suspend fun getLocalRepositoryPath(owner: String, name: String): Path {
-        val token = applicationConfig.github.token
         val localFsPath = Path.of(cacheBasePath, owner, name)
-        val remoteUri = "https://$token@github.com/$owner/$name.git"
-        val safeUri = "https://***@github.com/$owner/$name.git"
+        val remoteUri = buildRemoteUri(owner, name, applicationConfig.github.token)
+        val safeUri = buildRemoteUri(owner, name, "***")
 
         return getLocalRepositoryPath(localFsPath, remoteUri, safeUri)
     }
@@ -80,11 +84,15 @@ class CustomOnDiskCache(
      * @param safeUri The remote uri, but safe for printing, e.g. without credentials.
      */
     private suspend fun getLocalRepositoryPath(localFsPath: Path, remoteUri: String, safeUri: String): Path {
-        if (!isCached(localFsPath)) {
-            logger.info("Cache miss for $safeUri — cloning")
-            cloneRepository(localFsPath, remoteUri)
-        } else {
-            logger.info("Cache hit for $safeUri")
+        val repositoryLock = repositoryLocks.computeIfAbsent(localFsPath.normalize()) { Mutex() }
+
+        repositoryLock.withLock {
+            if (!isCached(localFsPath)) {
+                logger.info("Cache miss for $safeUri — cloning")
+                cloneRepository(localFsPath, remoteUri)
+            } else {
+                logger.info("Cache hit for $safeUri")
+            }
         }
 
         return localFsPath
@@ -166,4 +174,15 @@ class CustomOnDiskCache(
 
         return branches.firstOrNull()
     }
+
+    private fun buildRemoteUri(owner: String, name: String, token: String): String =
+        URI(
+            "https",
+            "x-access-token:$token",
+            "github.com",
+            -1,
+            "/$owner/$name.git",
+            null,
+            null,
+        ).toASCIIString()
 }

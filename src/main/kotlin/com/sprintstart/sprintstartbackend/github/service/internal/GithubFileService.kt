@@ -2,7 +2,6 @@ package com.sprintstart.sprintstartbackend.github.service.internal
 
 import com.sprintstart.sprintstartbackend.github.external.events.FilesSyncStartedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.GithubFileDeletedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.GithubFileFetchedEvent
 import com.sprintstart.sprintstartbackend.github.models.ConnectionStatus
 import com.sprintstart.sprintstartbackend.github.models.GithubFileSnapshot
 import com.sprintstart.sprintstartbackend.github.models.GithubFileSnapshotSharedId
@@ -16,6 +15,7 @@ import com.sprintstart.sprintstartbackend.github.repository.GithubRepositoryConn
 import com.sprintstart.sprintstartbackend.github.util.CustomOnDiskCache
 import com.sprintstart.sprintstartbackend.github.util.GitOperationRunner
 import com.sprintstart.sprintstartbackend.github.util.OnDiskOperations
+import com.sprintstart.sprintstartbackend.upload.external.UploadIngestionApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
@@ -28,6 +28,7 @@ import java.util.UUID
 import kotlin.io.path.exists
 import kotlin.io.path.extension
 import kotlin.io.path.readText
+import kotlin.sequences.asSequence
 
 private val binaryExtensions = setOf(
     // images
@@ -76,6 +77,7 @@ class GithubFileService(
     private val eventPublisher: ApplicationEventPublisher,
     private val customCache: CustomOnDiskCache,
     private val gitRunner: GitOperationRunner,
+    private val uploadIngestionApi: UploadIngestionApi,
 ) {
     /**
      * Streams the initial connection and ingestion of a GitHub repository's files.
@@ -97,7 +99,7 @@ class GithubFileService(
         try {
             val path = customCache.getLocalRepositoryPath(githubRepository.owner, githubRepository.name)
             val currentRevision = resolveCurrentRevision(path)
-            streamFilesFromDiskAndIngest(githubRepository, path, currentRevision, transactionId)
+            streamFilesFromDiskAndIngest(githubRepository, path, currentRevision)
             if (currentRevision != null) {
                 githubRepository.lastSha = currentRevision
             }
@@ -183,7 +185,7 @@ class GithubFileService(
             val sourceUrl = "$ghUrl/blob/$latestSha/$filePath"
             when (val changedFile = fetchFileUpdate(localFsPath, filePath)) {
                 is ModifiedFile -> {
-                    ingestFile(changedFile.relativePath, changedFile.content, sourceUrl, transactionId)
+                    ingestFile(changedFile.relativePath, changedFile.content, sourceUrl)
                 }
 
                 is DeletedFile -> {
@@ -230,62 +232,63 @@ class GithubFileService(
      *
      * @param githubRepository The GitHub repository to ingest.
      * @param repositoryPath The path to the GitHub repository, locally.
-     * @param transactionId The UUID of the overall transaction, this action is a part of.
      */
     private suspend fun streamFilesFromDiskAndIngest(
         githubRepository: GithubRepositoryConnection,
         repositoryPath: Path,
         revision: String?,
-        transactionId: UUID,
-    ) = withContext(Dispatchers.IO) {
-        Files.walk(repositoryPath).use { stream ->
-            stream
-                .filter { Files.isRegularFile(it) }
-                .filter { !it.startsWith(repositoryPath.resolve(".git")) }
-                .filter { !it.isBinary() }
-                .forEach { filePath ->
-                    val relativePath = repositoryPath.relativize(filePath).toString()
-                    val content = readTextSafely(filePath) ?: return@forEach
+    ) {
+        val filesToIngest: List<GithubFilePayload> = withContext(Dispatchers.IO) {
+            Files.walk(repositoryPath).use { stream ->
+                stream.iterator().asSequence()
+                    .filter { Files.isRegularFile(it) }
+                    .filter { !it.startsWith(repositoryPath.resolve(".git")) }
+                    .filter { !it.isBinary() }
+                    .mapNotNull { filePath: Path ->
+                        val relativePath = repositoryPath.relativize(filePath).toString()
+                        val content = readTextSafely(filePath) ?: return@mapNotNull null
 
-                    val fileSnapshotId = GithubFileSnapshotSharedId(
-                        repositoryId = githubRepository.id,
-                        path = filePath.toString(),
-                    )
-                    val fileSnapshot = GithubFileSnapshot(
-                        id = fileSnapshotId,
-                        sha = content.sha256(),
-                        repository = githubRepository,
-                    )
-                    fileSnapshotRepository.save(fileSnapshot)
+                        val fileSnapshotId = GithubFileSnapshotSharedId(
+                            repositoryId = githubRepository.id,
+                            path = filePath.toString(),
+                        )
+                        val fileSnapshot = GithubFileSnapshot(
+                            id = fileSnapshotId,
+                            sha = content.sha256(),
+                            repository = githubRepository,
+                        )
+                        fileSnapshotRepository.save(fileSnapshot)
 
-                    val revisionSegment = revision ?: return@forEach
-                    val sourceUrl =
-                        "https://github.com/${githubRepository.owner}/${githubRepository.name}/blob/$revisionSegment/$relativePath"
-                    ingestFile(relativePath, content, sourceUrl, transactionId)
-                }
+                        val revisionSegment = revision ?: return@mapNotNull null
+                        val sourceUrl =
+                            "https://github.com/${githubRepository.owner}/${githubRepository.name}/blob/$revisionSegment/$relativePath"
+
+                        GithubFilePayload(
+                            path = relativePath,
+                            content = content,
+                            sourceUrl = sourceUrl,
+                        )
+                    }.toList()
+            }
+        }
+
+        for (file in filesToIngest) {
+            ingestFile(file.path, file.content, file.sourceUrl)
         }
     }
 
     /**
-     * Publishes a spring event to ingest the given resource into the AI system.
+     * Ingests the given repository file content through the upload module API.
      *
-     * This function publishes a [GithubFileFetchedEvent], that a handler in the upload/ingestion
-     * module waits for, picks up, and then handles the ingestion of.
-     *
-     * @see GithubFileFetchedEvent
+     * File contents can be much larger than Spring Modulith's persistent event publication table
+     * comfortably supports. Using the upload module API keeps the boundary explicit without
+     * serializing whole documents into `event_publication`.
      *
      * @param path The relative path to the file to ingest.
      * @param content The actual content of the resource.
-     * @param transactionId The UUID of the overall transaction, this fetch/ingest is a part of.
      */
-    private fun ingestFile(path: String, content: String, sourceUrl: String, transactionId: UUID) {
-        val event = GithubFileFetchedEvent(
-            transactionId = transactionId,
-            path = path,
-            content = content,
-            sourceUrl = sourceUrl,
-        )
-        eventPublisher.publishEvent(event)
+    private suspend fun ingestFile(path: String, content: String, sourceUrl: String) {
+        uploadIngestionApi.ingestGithubFile(path, content, sourceUrl)
     }
 
     /**
@@ -376,4 +379,10 @@ class GithubFileService(
             .joinToString("") {
                 "%02x".format(it)
             }
+
+    private data class GithubFilePayload(
+        val path: String,
+        val content: String,
+        val sourceUrl: String,
+    )
 }

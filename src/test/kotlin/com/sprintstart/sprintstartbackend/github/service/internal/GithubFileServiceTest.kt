@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.github.service.internal
 
 import com.sprintstart.sprintstartbackend.github.external.events.GithubFileDeletedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.GithubFileFetchedEvent
 import com.sprintstart.sprintstartbackend.github.models.ConnectionStatus
 import com.sprintstart.sprintstartbackend.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotInitializedException
@@ -10,7 +9,9 @@ import com.sprintstart.sprintstartbackend.github.repository.GithubRepositoryConn
 import com.sprintstart.sprintstartbackend.github.util.CustomOnDiskCache
 import com.sprintstart.sprintstartbackend.github.util.GitOperationRunner
 import com.sprintstart.sprintstartbackend.github.util.OnDiskOperations
+import com.sprintstart.sprintstartbackend.upload.external.UploadIngestionApi
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -36,6 +37,7 @@ class GithubFileServiceTest {
     private val eventPublisher = mockk<ApplicationEventPublisher>(relaxed = true)
     private val customCache = mockk<CustomOnDiskCache>()
     private val gitRunner = mockk<GitOperationRunner>()
+    private val uploadIngestionApi = mockk<UploadIngestionApi>(relaxed = true)
 
     private lateinit var service: GithubFileService
 
@@ -51,6 +53,7 @@ class GithubFileServiceTest {
             eventPublisher = eventPublisher,
             customCache = customCache,
             gitRunner = gitRunner,
+            uploadIngestionApi = uploadIngestionApi,
         )
         every { repoConnectionRepository.save(any()) } answers { firstArg() }
         every { fileSnapshotRepository.save(any()) } answers { firstArg() }
@@ -90,7 +93,7 @@ class GithubFileServiceTest {
         }
 
         @Test
-        fun `publishes GithubFileFetchedEvent for modified file`() = runTest {
+        fun `ingests modified file through upload module api`() = runTest {
             val repo = repoConnection(lastSha = "old-sha")
 
             coEvery { customCache.getLocalRepositoryPath("owner", "repo") } returns repoPath
@@ -113,12 +116,13 @@ class GithubFileServiceTest {
 
             service.fetchAndIngestFileUpdatesIncremental(repo, transactionId)
 
-            val eventSlot = slot<GithubFileFetchedEvent>()
-            verify { eventPublisher.publishEvent(capture(eventSlot)) }
-
-            assertThat(eventSlot.captured.path).isEqualTo(fileName)
-            assertThat(eventSlot.captured.content).isEqualTo("fun main() {}")
-            assertThat(eventSlot.captured.transactionId).isEqualTo(transactionId)
+            coVerify {
+                uploadIngestionApi.ingestGithubFile(
+                    fileName,
+                    "fun main() {}",
+                    "https://github.com/owner/repo/blob/new-sha/$fileName",
+                )
+            }
 
             Files.delete(tempFile)
         }
@@ -156,6 +160,7 @@ class GithubFileServiceTest {
 
             service.fetchAndIngestFileUpdatesIncremental(repo, transactionId)
 
+            coVerify(exactly = 0) { uploadIngestionApi.ingestGithubFile(any(), any(), any()) }
             verify(exactly = 0) { eventPublisher.publishEvent(any()) }
         }
 
@@ -252,7 +257,7 @@ class GithubFileServiceTest {
         lateinit var repoDir: Path
 
         @Test
-        fun `publishes one event per text file`() = runTest {
+        fun `ingests one file per text file`() = runTest {
             repoDir.resolve("file1.kt").writeText("content 1")
             repoDir.resolve("file2.kt").writeText("content 2")
 
@@ -262,7 +267,7 @@ class GithubFileServiceTest {
 
             service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
-            verify(exactly = 2) { eventPublisher.publishEvent(any<GithubFileFetchedEvent>()) }
+            coVerify(exactly = 2) { uploadIngestionApi.ingestGithubFile(any(), any(), any()) }
         }
 
         @Test
@@ -276,7 +281,7 @@ class GithubFileServiceTest {
 
             service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
-            verify(exactly = 1) { eventPublisher.publishEvent(any<GithubFileFetchedEvent>()) }
+            coVerify(exactly = 1) { uploadIngestionApi.ingestGithubFile(any(), any(), any()) }
         }
 
         @Test
@@ -291,9 +296,13 @@ class GithubFileServiceTest {
 
             service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
-            val eventSlot = slot<GithubFileFetchedEvent>()
-            verify(exactly = 1) { eventPublisher.publishEvent(capture(eventSlot)) }
-            assertThat(eventSlot.captured.path).doesNotContain(".git")
+            coVerify(exactly = 1) {
+                uploadIngestionApi.ingestGithubFile(
+                    match { !it.contains(".git") },
+                    any(),
+                    any(),
+                )
+            }
         }
 
         @Test
@@ -307,11 +316,13 @@ class GithubFileServiceTest {
 
             service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
-            val eventSlot = slot<GithubFileFetchedEvent>()
-            verify { eventPublisher.publishEvent(capture(eventSlot)) }
-
-            assertThat(eventSlot.captured.sourceUrl)
-                .isEqualTo("https://github.com/owner/repo/blob/sha/src/Main.kt")
+            coVerify {
+                uploadIngestionApi.ingestGithubFile(
+                    "src/Main.kt",
+                    "content",
+                    "https://github.com/owner/repo/blob/sha/src/Main.kt",
+                )
+            }
         }
 
         @Test
@@ -324,10 +335,13 @@ class GithubFileServiceTest {
 
             service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
-            val eventSlot = slot<GithubFileFetchedEvent>()
-            verify { eventPublisher.publishEvent(capture(eventSlot)) }
-
-            assertThat(eventSlot.captured.content).isEqualTo("fun main() {}")
+            coVerify {
+                uploadIngestionApi.ingestGithubFile(
+                    "code.kt",
+                    "fun main() {}",
+                    "https://github.com/owner/repo/blob/sha/code.kt",
+                )
+            }
         }
 
         @Test
@@ -354,7 +368,7 @@ class GithubFileServiceTest {
 
             service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
 
-            verify(exactly = 1) { eventPublisher.publishEvent(any<GithubFileFetchedEvent>()) }
+            coVerify(exactly = 1) { uploadIngestionApi.ingestGithubFile(any(), any(), any()) }
         }
     }
 
