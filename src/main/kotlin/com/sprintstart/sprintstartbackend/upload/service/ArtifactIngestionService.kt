@@ -30,7 +30,7 @@ class ArtifactIngestionService(
     override suspend fun ingestGithubFile(path: String, content: String, sourceUrl: String) {
         ingest(
             artifactId = githubArtifactId(sourceUrl),
-            filename = path,
+            filename = githubFilename(path),
             content = content,
         )
     }
@@ -47,4 +47,7 @@ class ArtifactIngestionService(
 
     private fun githubArtifactId(sourceUrl: String): String =
         UUID.nameUUIDFromBytes(sourceUrl.toByteArray(StandardCharsets.UTF_8)).toString()
+
+    private fun githubFilename(path: String): String =
+        path.substringAfterLast('/').substringAfterLast('\\')
 }

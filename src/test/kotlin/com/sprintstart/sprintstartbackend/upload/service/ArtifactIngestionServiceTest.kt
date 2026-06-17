@@ -59,8 +59,28 @@ class ArtifactIngestionServiceTest {
             ingestionAiClient.ingest(
                 AiIngestRequest(
                     artifactId = expectedArtifactId,
-                    filename = "docs/guide.md",
+                    filename = "guide.md",
                     content = "# Guide",
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `keeps plain github filename unchanged`() = runTest {
+        val sourceUrl = "https://github.com/acme/repo/blob/sha/README.md"
+        val expectedArtifactId =
+            UUID.nameUUIDFromBytes(sourceUrl.toByteArray(StandardCharsets.UTF_8)).toString()
+        coEvery { ingestionAiClient.ingest(any()) } returns mockk()
+
+        service.ingestGithubFile("README.md", "# Readme", sourceUrl)
+
+        coVerify {
+            ingestionAiClient.ingest(
+                AiIngestRequest(
+                    artifactId = expectedArtifactId,
+                    filename = "README.md",
+                    content = "# Readme",
                 ),
             )
         }
