@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.github.external.events.GithubPullReque
 import com.sprintstart.sprintstartbackend.github.external.events.GithubPullRequestReview
 import com.sprintstart.sprintstartbackend.github.external.events.GithubPullRequestReviewThreadComment
 import com.sprintstart.sprintstartbackend.github.models.GithubRepositoryConnection
+import com.sprintstart.sprintstartbackend.github.models.client.AiIngestResponse
 import com.sprintstart.sprintstartbackend.github.models.client.graphql.CommentNode
 import com.sprintstart.sprintstartbackend.github.models.client.graphql.CommentsConnection
 import com.sprintstart.sprintstartbackend.github.models.client.graphql.GithubActor
@@ -81,6 +82,7 @@ class GithubPullRequestsServiceTest {
     inner class EventPublishing {
         @Test
         fun `publishes one event per pull request plus summary`() = runTest {
+            coEvery { githubClient.ingest(any()) } returns AiIngestResponse("", 0)
             coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchAllPullRequests("owner", "repo") } returns listOf(
                 pullRequest(number = 1),
@@ -109,6 +111,7 @@ class GithubPullRequestsServiceTest {
     inner class EventFieldMapping {
         @Test
         fun `maps pull request fields to event correctly`() = runTest {
+            coEvery { githubClient.ingest(any()) } returns AiIngestResponse("", 0)
             coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchAllPullRequests("owner", "repo") } returns listOf(
                 pullRequest(
@@ -145,6 +148,7 @@ class GithubPullRequestsServiceTest {
 
         @Test
         fun `maps null author to null in event`() = runTest {
+            coEvery { githubClient.ingest(any()) } returns AiIngestResponse("", 0)
             coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchAllPullRequests("owner", "repo") } returns listOf(
                 pullRequest(authorLogin = null),
@@ -159,6 +163,7 @@ class GithubPullRequestsServiceTest {
 
         @Test
         fun `maps labels to list of name strings`() = runTest {
+            coEvery { githubClient.ingest(any()) } returns AiIngestResponse("", 0)
             coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchAllPullRequests("owner", "repo") } returns listOf(
                 pullRequest(labels = listOf("bug", "enhancement")),
@@ -174,6 +179,7 @@ class GithubPullRequestsServiceTest {
         @Test
         fun `maps null labels to null in event`() = runTest {
             coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
+            coEvery { githubClient.ingest(any()) } returns AiIngestResponse("", 0)
             coEvery { githubClient.fetchAllPullRequests("owner", "repo") } returns listOf(
                 pullRequest(labels = null),
             )
@@ -194,6 +200,7 @@ class GithubPullRequestsServiceTest {
                     ),
                 ),
             )
+            coEvery { githubClient.ingest(any()) } returns AiIngestResponse("", 0)
             coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchAllPullRequests("owner", "repo") } returns listOf(pr)
 
@@ -219,6 +226,7 @@ class GithubPullRequestsServiceTest {
                     ),
                 ),
             )
+            coEvery { githubClient.ingest(any()) } returns AiIngestResponse("", 0)
             coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchAllPullRequests("owner", "repo") } returns listOf(pr)
 
@@ -250,6 +258,7 @@ class GithubPullRequestsServiceTest {
                     ),
                 ),
             )
+            coEvery { githubClient.ingest(any()) } returns AiIngestResponse("", 0)
             coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchAllPullRequests("owner", "repo") } returns listOf(pr)
 
@@ -270,6 +279,7 @@ class GithubPullRequestsServiceTest {
                     nodes = listOf(ReviewThreadNode(comments = null)),
                 ),
             )
+            coEvery { githubClient.ingest(any()) } returns AiIngestResponse("", 0)
             coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { githubClient.fetchAllPullRequests("owner", "repo") } returns listOf(pr)
 

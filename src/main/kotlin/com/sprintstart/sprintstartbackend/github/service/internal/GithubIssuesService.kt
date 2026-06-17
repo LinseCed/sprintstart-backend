@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.github.GithubClient
 import com.sprintstart.sprintstartbackend.github.external.events.GithubIssueComment
 import com.sprintstart.sprintstartbackend.github.external.events.GithubIssueFetchedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.IssuesSyncJobStartedEvent
+import com.sprintstart.sprintstartbackend.github.models.client.AiIngestRequest
 import com.sprintstart.sprintstartbackend.github.repository.GithubRepositoryConnectionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -71,6 +72,14 @@ class GithubIssuesService(
                 } ?: emptyList(),
             )
             eventPublisher.publishEvent(event)
+
+            githubClient.ingest(
+                AiIngestRequest(
+                    id = issue.number.toString(),
+                    name = issue.title,
+                    content = issue.body,
+                ),
+            )
         }
     }
 }
