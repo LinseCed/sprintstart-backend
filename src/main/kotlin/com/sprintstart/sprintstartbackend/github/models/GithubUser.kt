@@ -6,6 +6,7 @@ import jakarta.persistence.Convert
 import jakarta.persistence.Embeddable
 import jakarta.persistence.EmbeddedId
 import jakarta.persistence.Entity
+import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import java.io.Serializable
 import java.time.Instant
@@ -22,6 +23,8 @@ class GithubUser(
     var createdAt: Instant = Instant.now(),
     @Column(name = "last_used_at", nullable = false)
     var lastUsedAt: Instant = Instant.now(),
+    @OneToMany(mappedBy = "user")
+    var repositories: MutableList<GithubRepositoryConnection> = mutableListOf(),
 )
 
 @Embeddable

@@ -38,9 +38,9 @@ class GithubIssuesService(
             repoConnectionRepository.findById(githubRepositoryId).orElseThrow()
         }
         val issues = if (since == null) {
-            githubClient.fetchIssues(githubRepository.owner, githubRepository.name)
+            githubClient.fetchIssues(githubRepository)
         } else {
-            githubClient.fetchIssues(githubRepository.owner, githubRepository.name, since.toString())
+            githubClient.fetchIssues(githubRepository, since.toString())
         }
 
         val jobStartedEvent = IssuesSyncJobStartedEvent(

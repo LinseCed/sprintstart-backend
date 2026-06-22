@@ -9,14 +9,26 @@ import com.sprintstart.sprintstartbackend.github.models.api.requests.UpdatePatNa
 import com.sprintstart.sprintstartbackend.github.models.api.requests.UpdatePatRequest
 import com.sprintstart.sprintstartbackend.github.models.exceptions.GithubUserPatNameAlreadyExistsException
 import com.sprintstart.sprintstartbackend.github.models.exceptions.GithubUserPatNotFoundException
+import com.sprintstart.sprintstartbackend.github.models.exceptions.GithubUserPatStillInUseException
+import com.sprintstart.sprintstartbackend.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.github.repository.GithubUserRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
+/**
+ * Service responsible for managing GitHub user data.
+ * Handles operations such as retrieving, adding, updating,
+ * and removing personal access tokens (PATs) for GitHub users.
+ *
+ * @constructor Creates an instance of GithubUserService with the specified repositories.
+ * @param githubUserRepository Repository for interacting with GitHub user data.
+ * @param githubRepositoryConnectionRepository Repository for handling connections to GitHub repositories.
+ */
 @Service
 class GithubUserService(
     private val githubUserRepository: GithubUserRepository,
+    private val githubRepositoryConnectionRepository: GithubRepositoryConnectionRepository,
 ) {
     /**
      * Retrieves all personal access tokens (PATs) associated with the given authentication ID.
@@ -115,6 +127,12 @@ class GithubUserService(
                 authId,
             )
         }
-        githubUserRepository.delete(userPat)
+
+        // Delete only if not still in use
+        if (githubRepositoryConnectionRepository.findByUser(userPat).isEmpty()) {
+            githubUserRepository.delete(userPat)
+        } else {
+            throw GithubUserPatStillInUseException(userPat.id.name)
+        }
     }
 }

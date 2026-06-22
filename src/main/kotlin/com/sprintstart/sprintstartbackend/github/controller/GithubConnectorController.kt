@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.github.controller
 
-import com.sprintstart.sprintstartbackend.github.models.api.requests.AddPatRequest
 import com.sprintstart.sprintstartbackend.github.models.api.requests.ConnectRepositoryRequest
 import com.sprintstart.sprintstartbackend.github.models.api.requests.UpdateRepositoryRequest
 import com.sprintstart.sprintstartbackend.github.models.api.responses.ConnectRepositoryResponse
@@ -76,10 +75,16 @@ internal class GithubConnectorController(
     )
     @PostMapping("/connect")
     @ResponseStatus(HttpStatus.ACCEPTED)
+    @PreAuthorize("hasRole('USER')")
     suspend fun connectRepository(
-        @Valid @RequestBody request: ConnectRepositoryRequest,
+        @Parameter(hidden = true)
+        @AuthenticationPrincipal
+        jwt: Jwt,
+        @Valid
+        @RequestBody
+        request: ConnectRepositoryRequest,
     ): ResponseEntity<ConnectRepositoryResponse> {
-        val transactionId = githubConnectorService.connectRepositoryIfExists(request)
+        val transactionId = githubConnectorService.connectRepositoryIfExists(jwt.subject, request)
         return ResponseEntity.accepted().body(ConnectRepositoryResponse(transactionId))
     }
 
@@ -107,6 +112,7 @@ internal class GithubConnectorController(
     )
     @PostMapping("/update-all")
     @ResponseStatus(HttpStatus.ACCEPTED)
+    @PreAuthorize("hasRole('USER')")
     suspend fun updateAllRepositories(): ResponseEntity<UpdateAllRepositoriesResponse> {
         val transactionId = githubConnectorService.updateAllRepositories()
         return ResponseEntity.accepted().body(UpdateAllRepositoriesResponse(transactionId))
@@ -134,6 +140,7 @@ internal class GithubConnectorController(
     )
     @PostMapping("/update")
     @ResponseStatus(HttpStatus.ACCEPTED)
+    @PreAuthorize("hasRole('USER')")
     suspend fun updateRepository(
         @Valid @RequestBody request: UpdateRepositoryRequest,
     ): ResponseEntity<UpdateRepositoryResponse> {

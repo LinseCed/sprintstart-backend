@@ -1,5 +1,8 @@
 package com.sprintstart.sprintstartbackend.github.models.exceptions
 
+/**
+ * Exception thrown when a GitHub user pat with the same name already exists.
+ */
 class GithubUserPatNameAlreadyExistsException(
     val name: String,
 ) : RuntimeException(

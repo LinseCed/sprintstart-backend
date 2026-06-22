@@ -41,9 +41,9 @@ class GithubPullRequestsService(
             repoConnectionRepository.findById(githubRepositoryId).orElseThrow()
         }
         val pullRequests = if (since == null) {
-            githubClient.fetchAllPullRequests(githubRepository.owner, githubRepository.name)
+            githubClient.fetchAllPullRequests(githubRepository)
         } else {
-            githubClient.fetchAllPullRequests(githubRepository.owner, githubRepository.name, since.toString())
+            githubClient.fetchAllPullRequests(githubRepository, since.toString())
         }
 
         val jobStartedEvent = PullRequestsSyncStartedEvent(

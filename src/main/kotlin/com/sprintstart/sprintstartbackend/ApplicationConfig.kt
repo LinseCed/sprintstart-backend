@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 /**
  * Contains the following application.yml config parameters
  *
- * ```yml
+ * ```yaml
  * sprintstart:
  *     ai: ...
  *     github: ...
@@ -22,7 +22,7 @@ data class ApplicationConfig(
 /**
  * Contains the following application.yml config parameters
  *
- * ```yml
+ * ```yaml
  * sprintstart:
  *     ai:
  *         base-url: ...
@@ -36,11 +36,11 @@ data class AiConfig(
 /**
  * Contains the following application.yml config parameters
  *
- * ´´´yml
+ * ´´´yaml
  * sprintstart:
  *     github:
  *         base-url: ...
- *         token: ...
+ *         repo-base-url: ...
  *         cron: ...
  * ´´´
  */
@@ -49,12 +49,20 @@ data class GithubConfig(
     val baseUrl: String,
     @get:JsonProperty("repo-base-url")
     val repoBaseUrl: String,
-    @get:JsonProperty("token")
-    val token: String,
     @get:JsonProperty("cron")
     val cron: String,
 )
 
+/**
+ * Configuration class representing cryptographic parameters.
+ *
+ * ```yaml
+ * sprintstart:
+ *     crypto:
+ *         master-key: ...
+ *         salt: ...
+ * ```
+ */
 data class CryptoConfig(
     @get:JsonProperty("master-key")
     val masterKey: String,

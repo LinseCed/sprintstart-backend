@@ -9,8 +9,8 @@ sprintstart:
     token: ${GITHUB_PAT}
     cron: "0 2 * * 1" # Every Monday night at 2:00 am
   crypto:
-    master-key: "local-dev-master-key-do-not-use-in-prod-123"
-    salt: "6c6f63616c2d6465762d746573742d73616c74"
+    master-key: ${CRYPTO_MASTER_KEY}
+    salt: ${CRYPTO_SALT}
 
 spring:
   config:

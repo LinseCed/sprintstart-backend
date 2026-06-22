@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.github.controller
 
 import com.sprintstart.sprintstartbackend.github.models.exceptions.GithubUserPatNameAlreadyExistsException
 import com.sprintstart.sprintstartbackend.github.models.exceptions.GithubUserPatNotFoundException
+import com.sprintstart.sprintstartbackend.github.models.exceptions.GithubUserPatStillInUseException
 import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotInitializedException
@@ -77,10 +78,34 @@ class ExceptionHandler {
             .status(HttpStatus.NOT_FOUND)
             .body(ErrorResponse(ex.message))
 
+    /**
+     * Handles exceptions of type [GithubUserPatNameAlreadyExistsException] and converts them
+     * into a standardized error response with a 400 BAD REQUEST HTTP status code.
+     *
+     * @param ex The exception containing details about the GitHub personal access token (PAT) name
+     *           that already exists.
+     * @return A [ResponseEntity] containing the [ErrorResponse] with the exception's message
+     *         and an HTTP status of 400 (BAD REQUEST).
+     */
     @ExceptionHandler(GithubUserPatNameAlreadyExistsException::class)
     fun handleGithubUserPatNameAlreadyExists(
         ex: GithubUserPatNameAlreadyExistsException,
     ): ResponseEntity<ErrorResponse> =
+        ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(ErrorResponse(ex.message))
+
+    /**
+     * Handles exceptions of type [GithubUserPatStillInUseException] and converts them into
+     * a standardized error response with a 400 BAD REQUEST HTTP status code.
+     *
+     * @param ex The exception containing details about the GitHub personal access token (PAT)
+     *           that is still in use, including the name of the PAT.
+     * @return A [ResponseEntity] containing the [ErrorResponse] with the exception's message
+     *         and an HTTP status of 400 (BAD REQUEST).
+     */
+    @ExceptionHandler(GithubUserPatStillInUseException::class)
+    fun handleGithubUserPatStillInUse(ex: GithubUserPatStillInUseException) =
         ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
             .body(ErrorResponse(ex.message))
