@@ -22,7 +22,7 @@ class OnboardingSkip(
     var step: OnboardingStep,
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-    var status: SkipStatus = SkipStatus.WAITING,
+    var status: SkipStatus = SkipStatus.PENDING,
     @Column(nullable = false)
     var reason: String,
     @Column(nullable = true)

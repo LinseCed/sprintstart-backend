@@ -211,6 +211,18 @@ class OnboardingStepController(
         return onboardingStepService.updateOnboardingStepForMe(jwt.subject, stepId, request)
     }
 
+    @ResponseStatus(HttpStatus.OK)
+    @PutMapping("/me/steps/{stepId}/complete")
+    @PreAuthorize("hasRole('USER')")
+    fun completeOnboardingStepForMe(
+        @Parameter(hidden = true)
+        @AuthenticationPrincipal jwt: Jwt,
+        @Parameter(description = "UUID of the onboarding step to update")
+        @PathVariable stepId: UUID,
+    ): UpdateOnboardingStepResponse {
+        return onboardingStepService.completeOnboardingStepForMe(jwt.subject, stepId)
+    }
+
     /**
      * Deletes one step from the authenticated user's onboarding path.
      *

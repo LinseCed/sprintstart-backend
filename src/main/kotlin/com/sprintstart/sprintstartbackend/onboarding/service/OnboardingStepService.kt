@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.SkipStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhase
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingStep
@@ -156,9 +157,36 @@ class OnboardingStepService(
         step.estimatedMinutes = request.estimatedMinutes
         step.expectedOutcome = request.expectedOutcome
 
-        updateStatus(step, request)
+//        updateStatus(step, request)
+//
+//        step.status = request.status
 
-        step.status = request.status
+        return step.toUpdateResponse()
+    }
+
+    @Transactional
+    fun completeOnboardingStepForMe(
+        authId: String,
+        stepId: UUID,
+    ): UpdateOnboardingStepResponse {
+        val userId = userApi
+            .getUserIdByAuthId(authId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User not found") }
+
+        val step = onboardingStepRepository
+            .findByIdAndPhasePathUserId(stepId, userId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No step found with id: $stepId") }
+
+        if (step.status != StepStatus.WAITING) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "A step that is finished can't be completed")
+        }
+
+        step.completedAt = Instant.now()
+        if (step.skips.isNotEmpty() && step.skips.last().status == SkipStatus.PENDING) {
+            step.skips.removeLast()
+        }
+
+        step.status = StepStatus.FINISHED
 
         return step.toUpdateResponse()
     }
@@ -282,9 +310,9 @@ class OnboardingStepService(
         step.estimatedMinutes = request.estimatedMinutes
         step.expectedOutcome = request.expectedOutcome
 
-        updateStatus(step, request)
-
-        step.status = request.status
+//        updateStatus(step, request)
+//
+//        step.status = request.status
 
         return step.toUpdateResponse()
     }
@@ -392,14 +420,14 @@ class OnboardingStepService(
         }
     }
 
-    /**
+    /*
      * Updates completion metadata when the step status changes.
      *
      * Finished and skipped steps receive the current timestamp as their completion
      * time. Skipped steps also store the provided skip reason, or a default reason
      * if none was provided. Waiting steps are treated as incomplete and therefore
      * have their completion metadata cleared.
-     */
+
     private fun updateStatus(
         step: OnboardingStep,
         request: UpdateOnboardingStepRequest,
@@ -408,19 +436,25 @@ class OnboardingStepService(
             when (request.status) {
                 StepStatus.FINISHED -> {
                     step.completedAt = Instant.now()
-                    step.skipReason = null
+                    if (step.skips.isNotEmpty() && step.skips.last().status == SkipStatus.PENDING) {
+                        step.skips.removeLast()
+                    }
                 }
 
                 StepStatus.SKIPPED -> {
                     step.completedAt = Instant.now()
-                    step.skipReason = request.skipReason ?: "No reason given"
+                    if (step.skips.isNotEmpty() && step.skips.last().status == SkipStatus.PENDING) {
+                        step.skips.removeLast()
+                    }
                 }
 
                 StepStatus.WAITING -> {
                     step.completedAt = null
-                    step.skipReason = ""
+                    if (step.skips.isNotEmpty() && step.skips.last().status == SkipStatus.PENDING) {
+                        step.skips.removeLast()
+                    }
                 }
             }
         }
-    }
+    }*/
 }
