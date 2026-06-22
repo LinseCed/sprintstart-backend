@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.model.response.step
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingSkip
+import com.sprintstart.sprintstartbackend.onboarding.model.response.skip.GetOnboardingSkipResponse
 import java.time.Instant
 import java.util.UUID
 
@@ -15,5 +16,5 @@ data class UpdateOnboardingStepResponse(
     val expectedOutcome: String,
     val status: StepStatus,
     val completedAt: Instant?,
-    val skip: OnboardingSkip?,
+    val skip: GetOnboardingSkipResponse?,
 )

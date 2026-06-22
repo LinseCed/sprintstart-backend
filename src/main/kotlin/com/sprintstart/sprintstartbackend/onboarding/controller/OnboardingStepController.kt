@@ -39,10 +39,6 @@ import java.util.UUID
  * Steps are ordered within their parent phase by a numeric position. Insertions, updates,
  * and deletions automatically shift sibling steps to maintain a contiguous, gap-free ordering.
  *
- * Steps carry a status field with the following transition side effects:
- * - `FINISHED` — records a completion timestamp
- * - `SKIPPED` — records a completion timestamp and a skip reason
- * - `WAITING` — clears both the completion timestamp and the skip reason
  *
  */
 @RestController
@@ -211,6 +207,9 @@ class OnboardingStepController(
         return onboardingStepService.updateOnboardingStepForMe(jwt.subject, stepId, request)
     }
 
+    /**
+     * TODO: Add doc
+     */
     @ResponseStatus(HttpStatus.OK)
     @PutMapping("/me/steps/{stepId}/complete")
     @PreAuthorize("hasRole('USER')")
@@ -298,8 +297,7 @@ class OnboardingStepController(
      *
      * Steps are ordered within a phase by a numeric position. If the requested position
      * is already occupied, all steps at or after that position are shifted forward by one.
-     * The new step is always initialized with status [StepStatus.WAITING] regardless of
-     * what is passed in the request.
+     * The new step is always initialized with status [StepStatus.WAITING].
      *
      * @param phaseId The UUID of the phase to add the step to.
      * @param request The step creation request.
@@ -309,7 +307,7 @@ class OnboardingStepController(
         summary = "Create onboarding step",
         description = "Creates a new step within the specified phase at the given position. " +
             "Existing steps at or after the requested position are shifted forward by one. " +
-            "The new step is always initialized with status WAITING regardless of request content.",
+            "The new step is always initialized with status WAITING.",
     )
     @ApiResponses(
         ApiResponse(responseCode = "201", description = "Step created successfully"),
@@ -361,11 +359,7 @@ class OnboardingStepController(
      * Updates an existing onboarding step, including its status and position.
      *
      * All fields are replaced with the values from the request. If the position changes,
-     * sibling steps are shifted automatically to maintain contiguous ordering. Status
-     * transitions carry side effects: transitioning to FINISHED records a completion
-     * timestamp; transitioning to SKIPPED records a completion timestamp and stores the
-     * skip reason (defaults to "No reason given" if omitted); transitioning back to
-     * WAITING clears both the completion timestamp and the skip reason.
+     * sibling steps are shifted automatically to maintain contiguous ordering.
      *
      * @param stepId The UUID of the step to update.
      * @param request The step update request.

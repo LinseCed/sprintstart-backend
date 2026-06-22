@@ -28,8 +28,7 @@ import kotlin.ranges.contains
 /**
  * Manages onboarding steps within a phase.
  *
- * Steps are ordered siblings under a phase. Position changes trigger sibling reordering,
- * and status updates also maintain completion metadata such as `completedAt` and `skipReason`.
+ * Steps are ordered siblings under a phase. Position changes trigger sibling reordering.
  */
 @Suppress("TooManyFunctions")
 @Service
@@ -125,8 +124,7 @@ class OnboardingStepService(
     /**
      * Updates a step in the authenticated user's onboarding path.
      *
-     * Position changes reorder sibling steps. Status changes also update completion metadata:
-     * finished and skipped steps receive a completion timestamp, while waiting steps clear it.
+     * Position changes reorder sibling steps.
      *
      * @param authId External authentication identifier.
      * @param stepId Identifier of the step to update.
@@ -266,7 +264,7 @@ class OnboardingStepService(
             status = StepStatus.WAITING,
         )
 
-        return onboardingStep.toCreateResponse()
+        return onboardingStepRepository.save(onboardingStep).toCreateResponse()
     }
 
     /**
@@ -287,8 +285,7 @@ class OnboardingStepService(
     /**
      * Updates a step by ID.
      *
-     * Position changes reorder sibling steps. Status changes also update completion metadata:
-     * finished and skipped steps receive a completion timestamp, while waiting steps clear it.
+     * Position changes reorder sibling steps.
      *
      * @param stepId Identifier of the step to update.
      * @param request Step update payload.
