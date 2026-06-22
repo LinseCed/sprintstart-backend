@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.skip.GetAllO
 import com.sprintstart.sprintstartbackend.onboarding.model.response.skip.GetOnboardingSkipResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.skip.ReviewOnboardingSkipResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.step.UpdateOnboardingStepResponse
+import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingSkipService
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
@@ -26,13 +27,18 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1")
-class OnboardingSkipController {
+class OnboardingSkipController(
+    private val onboardingSkipService: OnboardingSkipService,
+) {
 //  ========================== Endpoints for users (/me/...) ==========================
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/onboarding/me/skips")
     @PreAuthorize("hasRole('USER')")
-    fun getAllSkipsForMe(): List<GetOnboardingSkipResponse> {
+    fun getAllSkipsForMe(
+        @AuthenticationPrincipal jwt: Jwt,
+    ): List<GetOnboardingSkipResponse> {
+        return onboardingSkipService.getAllSkipsForMe(jwt.subject)
     }
 
     @ResponseStatus(HttpStatus.OK)
@@ -42,6 +48,7 @@ class OnboardingSkipController {
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable stepId: UUID,
     ): List<GetOnboardingSkipResponse> {
+        return onboardingSkipService.getSkipsByStepIdForMe(jwt.subject, stepId)
     }
 
     @ResponseStatus(HttpStatus.OK)
@@ -51,6 +58,7 @@ class OnboardingSkipController {
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable skipId: UUID,
     ): GetOnboardingSkipResponse {
+        return onboardingSkipService.getSkipByIdForMe(jwt.subject, skipId)
     }
 
     @ResponseStatus(HttpStatus.CREATED)
@@ -61,6 +69,7 @@ class OnboardingSkipController {
         @PathVariable stepId: UUID,
         @Valid @RequestBody request: CreateOnboardingSkipRequest,
     ): CreateOnboardingSkipResponse {
+        return onboardingSkipService.createOnboardingSkipForMe(jwt.subject, stepId, request)
     }
 
     @ResponseStatus(HttpStatus.OK)
@@ -71,6 +80,7 @@ class OnboardingSkipController {
         @PathVariable skipId: UUID,
         @Valid @RequestBody request: UpdateOnboardingSkipRequest,
     ): UpdateOnboardingStepResponse {
+        return onboardingSkipService.updateOnboardingSkipForMe(jwt.subject, skipId, request)
     }
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -80,6 +90,7 @@ class OnboardingSkipController {
         @AuthenticationPrincipal jwt: Jwt,
         @PathVariable skipId: UUID,
     ) {
+        onboardingSkipService.deleteSkipByIdForMe(jwt.subject, skipId)
     }
 
 //  ========================== Endpoints for admins ==========================
@@ -88,22 +99,25 @@ class OnboardingSkipController {
     @GetMapping("/admin/onboarding/skips")
     @PreAuthorize("hasRole('ADMIN')")
     fun getAllSkips(): List<GetAllOnboardingSkipsResponse> {
+        return onboardingSkipService.getAllSkips()
     }
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/admin/onboarding/users/{usersId}/skips")
     @PreAuthorize("hasRole('ADMIN')")
-    fun getAllSkips(
+    fun getAllSkipsByUserId(
         @PathVariable usersId: UUID,
     ): List<GetOnboardingSkipResponse> {
+        return onboardingSkipService.getAllSkipsByUserId(usersId)
     }
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/admin/onboarding/steps/{stepId}/skips")
     @PreAuthorize("hasRole('ADMIN')")
-    fun getSkipsForStepId(
+    fun getSkipsByStepId(
         @PathVariable stepId: UUID,
     ): List<GetOnboardingSkipResponse> {
+        return onboardingSkipService.getAllSkipsByStepId(stepId)
     }
 
     @ResponseStatus(HttpStatus.OK)
@@ -112,6 +126,7 @@ class OnboardingSkipController {
     fun getSkipById(
         @PathVariable skipId: UUID,
     ): GetOnboardingSkipResponse {
+        return onboardingSkipService.getSkipById(skipId)
     }
 
     @ResponseStatus(HttpStatus.OK)
@@ -121,6 +136,7 @@ class OnboardingSkipController {
         @PathVariable skipId: UUID,
         @Valid @RequestBody request: ReviewOnboardingSkipRequest,
     ): ReviewOnboardingSkipResponse {
+        return onboardingSkipService.acceptSkipById(skipId, request)
     }
 
     @ResponseStatus(HttpStatus.OK)
@@ -130,6 +146,7 @@ class OnboardingSkipController {
         @PathVariable skipId: UUID,
         @Valid @RequestBody request: ReviewOnboardingSkipRequest,
     ): ReviewOnboardingSkipResponse {
+        return onboardingSkipService.denySkipById(skipId, request)
     }
 
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -138,5 +155,6 @@ class OnboardingSkipController {
     fun deleteSkipById(
         @PathVariable skipId: UUID,
     ) {
+        onboardingSkipService.deleteSkipById(skipId)
     }
 }

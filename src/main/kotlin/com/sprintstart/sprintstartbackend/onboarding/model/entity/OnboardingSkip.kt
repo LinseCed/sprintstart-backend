@@ -30,5 +30,5 @@ class OnboardingSkip(
     @Column(nullable = false)
     val createdAt: Instant = Instant.now(),
     @Column(nullable = true)
-    var resolvedAt: Instant,
+    var resolvedAt: Instant? = null,
 )
