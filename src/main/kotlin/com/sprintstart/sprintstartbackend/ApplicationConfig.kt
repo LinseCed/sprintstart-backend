@@ -16,6 +16,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 data class ApplicationConfig(
     val ai: AiConfig,
     val github: GithubConfig,
+    val crypto: CryptoConfig,
 )
 
 /**
@@ -52,4 +53,11 @@ data class GithubConfig(
     val token: String,
     @get:JsonProperty("cron")
     val cron: String,
+)
+
+data class CryptoConfig(
+    @get:JsonProperty("master-key")
+    val masterKey: String,
+    @get:JsonProperty("salt")
+    val salt: String,
 )

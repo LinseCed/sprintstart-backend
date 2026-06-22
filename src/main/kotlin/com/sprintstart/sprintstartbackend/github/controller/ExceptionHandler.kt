@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.github.controller
 
+import com.sprintstart.sprintstartbackend.github.models.exceptions.GithubUserPatNotFoundException
 import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotInitializedException
@@ -58,6 +59,21 @@ class ExceptionHandler {
     fun handleRepositorySnapshotNotFound(ex: RepositoryNotConnectedException): ResponseEntity<ErrorResponse> =
         ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
+            .body(ErrorResponse(ex.message))
+
+    /**
+     * Handles exceptions of type [GithubUserPatNotFoundException] and returns a standardized
+     * error response with a 404 NOT FOUND HTTP status code.
+     *
+     * @param ex The exception containing details about the GitHub personal access token (PAT)
+     *           that could not be found, including the name of the PAT and the associated user ID.
+     * @return A [ResponseEntity] containing the [ErrorResponse] with the exception's message
+     *         and an HTTP status of 404 (NOT FOUND).
+     */
+    @ExceptionHandler(GithubUserPatNotFoundException::class)
+    fun handleGithubUserPatNotFound(ex: GithubUserPatNotFoundException): ResponseEntity<ErrorResponse> =
+        ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
             .body(ErrorResponse(ex.message))
 }
 
