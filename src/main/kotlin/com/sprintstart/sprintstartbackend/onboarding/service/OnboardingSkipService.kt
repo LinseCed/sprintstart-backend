@@ -33,6 +33,12 @@ import java.util.UUID
  * A pending skip request does not complete the step on its own. The step remains
  * waiting until an admin accepts or denies the request. Accepted skips mark the
  * step as skipped and completed; denied skips return it to waiting.
+ *
+ * The service enforces ownership checks for user-facing methods by resolving the
+ * authenticated user through [UserApi] and then restricting step or skip lookups
+ * to that user's onboarding path. Skip deletion is handled through orphan removal
+ * on the owning [OnboardingStep.skips] collection rather than an explicit repository
+ * delete call.
  */
 @Service
 class OnboardingSkipService(
@@ -42,6 +48,13 @@ class OnboardingSkipService(
 ) {
 //  ========================== Methods for users ==========================
 
+    /**
+     * Returns every skip request belonging to the authenticated user.
+     *
+     * @param authId External authentication identifier.
+     * @return All skips on the user's onboarding path ordered by creation time.
+     * @throws ResponseStatusException with [HttpStatus.NOT_FOUND] if the user does not exist.
+     */
     @Transactional(readOnly = true)
     fun getAllSkipsForMe(authId: String): List<GetOnboardingSkipResponse> {
         val userId = getUserId(authId)
@@ -51,6 +64,14 @@ class OnboardingSkipService(
             .map { it.toGetResponse() }
     }
 
+    /**
+     * Returns all skip requests for one step on the authenticated user's onboarding path.
+     *
+     * @param authId External authentication identifier.
+     * @param stepId Identifier of the step whose skips should be loaded.
+     * @return All skips for the requested step ordered by creation time.
+     * @throws ResponseStatusException with [HttpStatus.NOT_FOUND] if the user or step does not exist.
+     */
     @Transactional(readOnly = true)
     fun getSkipsByStepIdForMe(authId: String, stepId: UUID): List<GetOnboardingSkipResponse> {
         val userId = getUserId(authId)
@@ -61,6 +82,14 @@ class OnboardingSkipService(
             .map { it.toGetResponse() }
     }
 
+    /**
+     * Returns one skip request belonging to the authenticated user.
+     *
+     * @param authId External authentication identifier.
+     * @param skipId Identifier of the skip to return.
+     * @return The requested skip.
+     * @throws ResponseStatusException with [HttpStatus.NOT_FOUND] if the user or skip does not exist.
+     */
     @Transactional(readOnly = true)
     fun getSkipByIdForMe(authId: String, skipId: UUID): GetOnboardingSkipResponse {
         val userId = getUserId(authId)
@@ -71,6 +100,19 @@ class OnboardingSkipService(
             .toGetResponse()
     }
 
+    /**
+     * Creates a new pending skip request for one step on the authenticated user's onboarding path.
+     *
+     * The step must still be waiting, and only one pending skip request may exist for the
+     * current step at a time.
+     *
+     * @param authId External authentication identifier.
+     * @param stepId Identifier of the step to attach the skip to.
+     * @param request Skip creation payload.
+     * @return The created skip request.
+     * @throws ResponseStatusException with [HttpStatus.NOT_FOUND] if the user or step does not exist.
+     * @throws ResponseStatusException with [HttpStatus.BAD_REQUEST] if the step is not waiting or already has a pending skip.
+     */
     @Transactional
     fun createOnboardingSkipForMe(
         authId: String,
@@ -91,6 +133,16 @@ class OnboardingSkipService(
         return onboardingSkipRepository.save(onboardingSkip).toCreateResponse()
     }
 
+    /**
+     * Updates the reason of a pending skip request belonging to the authenticated user.
+     *
+     * @param authId External authentication identifier.
+     * @param skipId Identifier of the skip to update.
+     * @param request Skip update payload.
+     * @return The updated parent step response including the latest skip state.
+     * @throws ResponseStatusException with [HttpStatus.NOT_FOUND] if the user or skip does not exist.
+     * @throws ResponseStatusException with [HttpStatus.BAD_REQUEST] if the skip is no longer pending.
+     */
     @Transactional
     fun updateOnboardingSkipForMe(
         authId: String,
@@ -109,6 +161,16 @@ class OnboardingSkipService(
         return skip.step.toUpdateResponse()
     }
 
+    /**
+     * Deletes one skip request belonging to the authenticated user.
+     *
+     * The skip is removed from the owning step's collection and is expected to be
+     * deleted by JPA orphan removal when the transaction is flushed.
+     *
+     * @param authId External authentication identifier.
+     * @param skipId Identifier of the skip to delete.
+     * @throws ResponseStatusException with [HttpStatus.NOT_FOUND] if the user or skip does not exist.
+     */
     @Transactional
     fun deleteSkipByIdForMe(authId: String, skipId: UUID) {
         val userId = getUserId(authId)
@@ -121,11 +183,23 @@ class OnboardingSkipService(
 
 //  ========================== Methods for admins ==========================
 
+    /**
+     * Returns every skip request in the system.
+     *
+     * @return All skips ordered by creation time.
+     */
     @Transactional(readOnly = true)
     fun getAllSkips(): List<GetAllOnboardingSkipsResponse> {
         return onboardingSkipRepository.findAllByOrderByCreatedAtAsc().map { it.toGetAllResponse() }
     }
 
+    /**
+     * Returns every skip request belonging to one user.
+     *
+     * @param userId Identifier of the user whose skips should be loaded.
+     * @return All skips on the user's onboarding path ordered by creation time.
+     * @throws ResponseStatusException with [HttpStatus.NOT_FOUND] if the user does not exist.
+     */
     @Transactional(readOnly = true)
     fun getAllSkipsByUserId(userId: UUID): List<GetOnboardingSkipResponse> {
         if (!userApi.exists(userId)) {
@@ -137,6 +211,13 @@ class OnboardingSkipService(
             .map { it.toGetResponse() }
     }
 
+    /**
+     * Returns every skip request attached to one step.
+     *
+     * @param stepId Identifier of the step whose skips should be loaded.
+     * @return All skips for the requested step ordered by creation time.
+     * @throws ResponseStatusException with [HttpStatus.NOT_FOUND] if the step does not exist.
+     */
     @Transactional(readOnly = true)
     fun getAllSkipsByStepId(stepId: UUID): List<GetOnboardingSkipResponse> {
         if (!onboardingStepRepository.existsById(stepId)) {
@@ -148,6 +229,13 @@ class OnboardingSkipService(
             .map { it.toGetResponse() }
     }
 
+    /**
+     * Returns one skip request by ID.
+     *
+     * @param skipId Identifier of the skip to return.
+     * @return The requested skip.
+     * @throws ResponseStatusException with [HttpStatus.NOT_FOUND] if the skip does not exist.
+     */
     @Transactional(readOnly = true)
     fun getSkipById(skipId: UUID): GetOnboardingSkipResponse {
         return onboardingSkipRepository
@@ -156,6 +244,18 @@ class OnboardingSkipService(
             .toGetResponse()
     }
 
+    /**
+     * Accepts one pending skip request and marks the parent step as skipped.
+     *
+     * Accepting a skip resolves the skip request, stores the admin review comment,
+     * sets the step status to [StepStatus.SKIPPED], and records the completion timestamp.
+     *
+     * @param skipId Identifier of the skip to accept.
+     * @param request Admin review payload.
+     * @return The resolved skip review response.
+     * @throws ResponseStatusException with [HttpStatus.NOT_FOUND] if the skip does not exist.
+     * @throws ResponseStatusException with [HttpStatus.BAD_REQUEST] if the skip is no longer pending.
+     */
     @Transactional
     fun acceptSkipById(skipId: UUID, request: ReviewOnboardingSkipRequest): ReviewOnboardingSkipResponse {
         val skip = onboardingSkipRepository
@@ -174,6 +274,19 @@ class OnboardingSkipService(
         return skip.toReviewResponse()
     }
 
+    /**
+     * Denies one pending skip request and keeps the parent step waiting.
+     *
+     * Denying a skip resolves the skip request, stores the admin review comment,
+     * clears the parent step completion timestamp, and leaves the step in
+     * [StepStatus.WAITING].
+     *
+     * @param skipId Identifier of the skip to deny.
+     * @param request Admin review payload.
+     * @return The resolved skip review response.
+     * @throws ResponseStatusException with [HttpStatus.NOT_FOUND] if the skip does not exist.
+     * @throws ResponseStatusException with [HttpStatus.BAD_REQUEST] if the skip is no longer pending.
+     */
     @Transactional
     fun denySkipById(skipId: UUID, request: ReviewOnboardingSkipRequest): ReviewOnboardingSkipResponse {
         val skip = onboardingSkipRepository
@@ -192,6 +305,15 @@ class OnboardingSkipService(
         return skip.toReviewResponse()
     }
 
+    /**
+     * Deletes one skip request by ID.
+     *
+     * The skip is removed from the owning step's collection and is expected to be
+     * deleted by JPA orphan removal when the transaction is flushed.
+     *
+     * @param skipId Identifier of the skip to delete.
+     * @throws ResponseStatusException with [HttpStatus.NOT_FOUND] if the skip does not exist.
+     */
     @Transactional
     fun deleteSkipById(skipId: UUID) {
         val skip = onboardingSkipRepository
