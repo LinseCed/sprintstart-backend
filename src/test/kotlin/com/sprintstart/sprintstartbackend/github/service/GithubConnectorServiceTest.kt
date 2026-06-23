@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.github.models.api.requests.ConnectRepositoryRequest
 import com.sprintstart.sprintstartbackend.github.models.api.requests.UpdateRepositoryRequest
+import com.sprintstart.sprintstartbackend.github.models.exceptions.GithubUserPatNotFoundException
 import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotInitializedException
@@ -67,6 +68,16 @@ class GithubConnectorServiceTest {
 
     @Nested
     inner class ConnectRepositoryIfExists {
+        @Test
+        fun `connectRepositoryIfExists throws GithubUserPatNotFoundException when PAT not found`() =
+            runTest {
+                every { githubUserRepository.findById(any()) } returns Optional.empty()
+
+                assertFailsWith<GithubUserPatNotFoundException> {
+                    service.connectRepositoryIfExists("mock-id", connectRequest())
+                }
+            }
+
         @Test
         fun `connectRepositoryIfExists throws RepositoryNotFoundException when repo does not exist on GitHub`() =
             runTest {
