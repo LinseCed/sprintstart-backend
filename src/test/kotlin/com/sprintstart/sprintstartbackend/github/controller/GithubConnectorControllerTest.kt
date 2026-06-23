@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.github.controller
 
 import com.ninjasquad.springmockk.MockkBean
+import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.github.models.api.requests.ConnectRepositoryRequest
@@ -19,6 +20,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
+import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.oauth2.jwt.JwtDecoder
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -30,8 +34,8 @@ import java.util.Optional
 import java.util.UUID
 
 @WebMvcTest(controllers = [GithubConnectorController::class])
-@AutoConfigureMockMvc(addFilters = false)
-@Import(ExceptionHandler::class)
+@AutoConfigureMockMvc
+@Import(ExceptionHandler::class, SecurityConfig::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GithubConnectorControllerTest {
     @Autowired
@@ -43,7 +47,15 @@ class GithubConnectorControllerTest {
     @MockkBean
     private lateinit var githubUserRepository: GithubUserRepository
 
+    @MockkBean
+    private lateinit var jwtDecoder: JwtDecoder
+
     private val objectMapper = jacksonObjectMapper()
+
+    private val userJwt = jwt().jwt { it.subject("mockId") }
+        .authorities(SimpleGrantedAuthority("ROLE_USER"))
+
+    private val validTokenName = "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
 
     @Nested
     inner class ConnectRepository {
@@ -52,7 +64,7 @@ class GithubConnectorControllerTest {
             val request = ConnectRepositoryRequest(
                 owner = "spring-projects",
                 name = "spring-modulith",
-                tokenName = "test-token",
+                tokenName = validTokenName,
             )
             val expectedTransactionId = UUID.randomUUID()
 
@@ -67,7 +79,8 @@ class GithubConnectorControllerTest {
                 .perform(
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)),
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(userJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -81,7 +94,7 @@ class GithubConnectorControllerTest {
         fun `should return 404 Not Found when repository does not exist`() {
             val owner = "unknown-owner"
             val name = "unknown-repo"
-            val request = ConnectRepositoryRequest(owner = owner, name = name, tokenName = "test-token")
+            val request = ConnectRepositoryRequest(owner = owner, name = name, tokenName = validTokenName)
 
             coEvery {
                 githubUserRepository.findById(any())
@@ -98,37 +111,45 @@ class GithubConnectorControllerTest {
                 githubConnectorService.connectRepositoryIfExists(any(), any())
             } throws RepositoryNotFoundException(owner, name)
 
-            mockMvc
+            val asyncResult = mockMvc
                 .perform(
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)),
-                ).andExpect(status().isNotFound)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(userJwt),
+                ).andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
+                .andExpect(status().isNotFound)
                 .andExpect(jsonPath("$.message").value("Repository $owner/$name not found"))
         }
 
         // Validation failures are NOT async - they fail before the coroutine starts
         @Test
         fun `should return 400 Bad Request when owner is blank`() {
-            val request = ConnectRepositoryRequest(owner = "", name = "spring-modulith", tokenName = "test-token")
+            val request = ConnectRepositoryRequest(owner = "", name = "spring-modulith", tokenName = validTokenName)
 
             mockMvc
                 .perform(
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)),
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(userJwt),
                 ).andExpect(status().isBadRequest)
         }
 
         @Test
         fun `should return 400 Bad Request when name is blank`() {
-            val request = ConnectRepositoryRequest(owner = "spring-projects", name = "", tokenName = "test-token")
+            val request = ConnectRepositoryRequest(owner = "spring-projects", name = "", tokenName = validTokenName)
 
             mockMvc
                 .perform(
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)),
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(userJwt),
                 ).andExpect(status().isBadRequest)
         }
     }
@@ -144,7 +165,8 @@ class GithubConnectorControllerTest {
 
             val asyncResult = mockMvc
                 .perform(
-                    post("/api/v1/github/update-all"),
+                    post("/api/v1/github/update-all")
+                        .with(userJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -161,7 +183,8 @@ class GithubConnectorControllerTest {
 
             val asyncResult = mockMvc
                 .perform(
-                    post("/api/v1/github/update-all"),
+                    post("/api/v1/github/update-all")
+                        .with(userJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -186,7 +209,8 @@ class GithubConnectorControllerTest {
                 .perform(
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)),
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(userJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -208,7 +232,8 @@ class GithubConnectorControllerTest {
                 .perform(
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)),
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(userJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -228,7 +253,8 @@ class GithubConnectorControllerTest {
                 .perform(
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)),
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(userJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -246,7 +272,8 @@ class GithubConnectorControllerTest {
                 .perform(
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)),
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(userJwt),
                 ).andExpect(status().isBadRequest)
         }
 
@@ -258,7 +285,8 @@ class GithubConnectorControllerTest {
                 .perform(
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)),
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(userJwt),
                 ).andExpect(status().isBadRequest)
         }
     }

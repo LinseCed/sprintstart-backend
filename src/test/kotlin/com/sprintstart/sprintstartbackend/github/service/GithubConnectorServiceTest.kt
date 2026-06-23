@@ -31,6 +31,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.util.Optional
 import java.util.UUID
 import kotlin.test.assertFailsWith
 
@@ -69,12 +70,12 @@ class GithubConnectorServiceTest {
         @Test
         fun `connectRepositoryIfExists throws RepositoryNotFoundException when repo does not exist on GitHub`() =
             runTest {
-                val repository = GithubRepositoryConnection(
-                    owner = "owner",
-                    name = "repo",
-                    user = GithubUser(id = GithubUserPat("some-id", "test-pat"), token = "test-token"),
+                every {
+                    githubUserRepository.findById(any())
+                } returns Optional.of(
+                    GithubUser(GithubUserPat("some-id", "test-pat"), token = "test-token"),
                 )
-                coEvery { githubClient.repositoryExists(repository) } returns false
+                coEvery { githubClient.repositoryExists(any()) } returns false
 
                 assertFailsWith<RepositoryNotFoundException> {
                     service.connectRepositoryIfExists("mock-id", connectRequest())
@@ -83,12 +84,6 @@ class GithubConnectorServiceTest {
 
         @Test
         fun `connectRepositoryIfExists returns a transactionId when repo exists`() = testScope.runTest {
-            val repository = GithubRepositoryConnection(
-                owner = "owner",
-                name = "repo",
-                user = GithubUser(id = GithubUserPat("some-id", "test-pat"), token = "test-token"),
-            )
-            coEvery { githubClient.repositoryExists(repository) } returns true
             stubSuccessfulConnect()
 
             val transactionId = service.connectRepositoryIfExists("auth-id", connectRequest())
@@ -99,12 +94,6 @@ class GithubConnectorServiceTest {
 
         @Test
         fun `connectRepositoryIfExists saves repository connection`() = testScope.runTest {
-            val repository = GithubRepositoryConnection(
-                owner = "owner",
-                name = "repo",
-                user = GithubUser(id = GithubUserPat("some-id", "test-pat"), token = "test-token"),
-            )
-            coEvery { githubClient.repositoryExists(repository) } returns true
             stubSuccessfulConnect()
 
             service.connectRepositoryIfExists("auth-id", connectRequest())
@@ -114,16 +103,10 @@ class GithubConnectorServiceTest {
 
         @Test
         fun `connectRepositoryIfExists launches all background ingestion jobs`() = testScope.runTest {
-            val repository = GithubRepositoryConnection(
-                owner = "owner",
-                name = "repo",
-                user = GithubUser(id = GithubUserPat("some-id", "test-pat"), token = "test-token"),
-            )
-            coEvery { githubClient.repositoryExists(repository) } returns true
             stubSuccessfulConnect()
 
             service.connectRepositoryIfExists("auth-id", connectRequest())
-            advanceUntilIdle() // wait for all launched coroutines
+            advanceUntilIdle()
 
             coVerify { fileService.fetchAndIngestAllFiles(any(), any()) }
             coVerify { commitsService.fetchAndIngestLatestCommits(any(), any(), true) }
@@ -133,12 +116,6 @@ class GithubConnectorServiceTest {
 
         @Test
         fun `connectRepositoryIfExists passes same transactionId to all background jobs`() = testScope.runTest {
-            val repository = GithubRepositoryConnection(
-                owner = "owner",
-                name = "repo",
-                user = GithubUser(id = GithubUserPat("some-id", "test-pat"), token = "test-token"),
-            )
-            coEvery { githubClient.repositoryExists(repository) } returns true
             stubSuccessfulConnect()
 
             service.connectRepositoryIfExists("auth-id", connectRequest())
@@ -262,7 +239,7 @@ class GithubConnectorServiceTest {
     private fun connectRequest() = ConnectRepositoryRequest(
         owner = "owner",
         name = "repo",
-        tokenName = "test-token",
+        tokenName = "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
     )
 
     private fun updateRequest() = UpdateRepositoryRequest(owner = "owner", name = "repo")
@@ -278,6 +255,12 @@ class GithubConnectorServiceTest {
     )
 
     private fun stubSuccessfulConnect() {
+        every {
+            githubUserRepository.findById(any())
+        } returns Optional.of(
+            GithubUser(GithubUserPat("some-id", "test-pat"), token = "test-token"),
+        )
+        coEvery { githubClient.repositoryExists(any()) } returns true
         every { repoConnectionRepository.save(any()) } answers { firstArg() }
         coJustRun { fileService.fetchAndIngestAllFiles(any(), any()) }
         coJustRun { commitsService.fetchAndIngestLatestCommits(any(), any(), any()) }

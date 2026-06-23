@@ -204,7 +204,7 @@ class GithubFileServiceTest {
         @Test
         fun `always saves repository in finally block even on exception`() = runTest {
             val repo = repoConnection()
-            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery {
                 customCache.getLocalRepositoryPath(repo)
             } throws RuntimeException("disk error")
@@ -264,11 +264,11 @@ class GithubFileServiceTest {
             repoDir.resolve("file1.kt").writeText("content 1")
             repoDir.resolve("file2.kt").writeText("content 2")
 
-            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { customCache.getLocalRepositoryPath(repo) } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
+            service.fetchAndIngestAllFiles(repo.id, transactionId)
 
             coVerify(exactly = 2) { uploadIngestionApi.ingestGithubFile(any(), any(), any()) }
         }
@@ -279,11 +279,11 @@ class GithubFileServiceTest {
             repoDir.resolve("image.png").writeText("fake binary")
             repoDir.resolve("code.kt").writeText("real code")
 
-            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { customCache.getLocalRepositoryPath(repo) } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
+            service.fetchAndIngestAllFiles(repo.id, transactionId)
 
             coVerify(exactly = 1) { uploadIngestionApi.ingestGithubFile(any(), any(), any()) }
         }
@@ -295,11 +295,11 @@ class GithubFileServiceTest {
             gitDir.resolve("config").writeText("git internals")
             repoDir.resolve("code.kt").writeText("content")
 
-            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { customCache.getLocalRepositoryPath(repo) } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
+            service.fetchAndIngestAllFiles(repo.id, transactionId)
 
             coVerify(exactly = 1) {
                 uploadIngestionApi.ingestGithubFile(
@@ -316,11 +316,11 @@ class GithubFileServiceTest {
             val srcDir = repoDir.resolve("src").also { Files.createDirectories(it) }
             srcDir.resolve("Main.kt").writeText("content")
 
-            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { customCache.getLocalRepositoryPath(repo) } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
+            service.fetchAndIngestAllFiles(repo.id, transactionId)
 
             coVerify {
                 uploadIngestionApi.ingestGithubFile(
@@ -336,11 +336,11 @@ class GithubFileServiceTest {
             val repo = repoConnection(lastSha = "")
             repoDir.resolve("code.kt").writeText("fun main() {}")
 
-            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { customCache.getLocalRepositoryPath(repo) } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
+            service.fetchAndIngestAllFiles(repo.id, transactionId)
 
             coVerify {
                 uploadIngestionApi.ingestGithubFile(
@@ -356,11 +356,11 @@ class GithubFileServiceTest {
             val repo = repoConnection(lastSha = "")
             repoDir.resolve("code.kt").writeText("content")
 
-            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { customCache.getLocalRepositoryPath(repo) } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
+            service.fetchAndIngestAllFiles(repo.id, transactionId)
 
             verify { fileSnapshotRepository.save(any()) }
         }
@@ -371,11 +371,11 @@ class GithubFileServiceTest {
             Files.write(repoDir.resolve("notes.txt"), byteArrayOf(0xC3.toByte(), 0x28))
             repoDir.resolve("code.kt").writeText("content", StandardCharsets.UTF_8)
 
-            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repoConnection())
+            coEvery { repoConnectionRepository.findById(any()) } returns Optional.of(repo)
             coEvery { customCache.getLocalRepositoryPath(repo) } returns repoDir
             every { gitRunner.exec(repoDir, match { it.command().contains("rev-parse") }) } returns "sha\n"
 
-            service.fetchAndIngestAllFiles(repoConnection().id, transactionId)
+            service.fetchAndIngestAllFiles(repo.id, transactionId)
 
             coVerify(exactly = 1) { uploadIngestionApi.ingestGithubFile(any(), any(), any()) }
         }

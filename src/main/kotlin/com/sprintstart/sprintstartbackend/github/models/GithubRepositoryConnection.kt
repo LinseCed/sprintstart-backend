@@ -9,6 +9,7 @@ import jakarta.persistence.FetchType
 import jakarta.persistence.ForeignKey
 import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
+import jakarta.persistence.JoinColumns
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.OneToMany
 import jakarta.persistence.OneToOne
@@ -25,10 +26,9 @@ class GithubRepositoryConnection(
     @Column(nullable = false)
     var name: String,
     @ManyToOne
-    @JoinColumn(
-        name = "user_id",
-        referencedColumnName = "id",
-        nullable = false,
+    @JoinColumns(
+        JoinColumn(name = "user_auth_id", referencedColumnName = "auth_id", nullable = false),
+        JoinColumn(name = "user_pat_name", referencedColumnName = "name", nullable = false),
     )
     var user: GithubUser,
     @Enumerated(EnumType.STRING)
