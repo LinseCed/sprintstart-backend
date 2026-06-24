@@ -6,7 +6,6 @@ bin/
 .env
 *.env
 *.local.env
-.env.k8s*
 .notes
 
 uploads/
