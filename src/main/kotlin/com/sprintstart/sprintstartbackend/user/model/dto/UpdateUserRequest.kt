@@ -1,7 +1,10 @@
 package com.sprintstart.sprintstartbackend.user.model.dto
 
-import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
+data class UpdateUserEnabledRequest(
+    val enabled: Boolean,
+)
 
-data class UpdateUserRequest(
-    val workingArea: WorkingArea,
+data class DeleteUserResponse(
+    val id: java.util.UUID,
+    val deleted: Boolean = true,
 )

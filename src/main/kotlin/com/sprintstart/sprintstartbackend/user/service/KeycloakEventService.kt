@@ -56,8 +56,12 @@ class KeycloakEventService(
 
         if (request.resourceType == "REALM_ROLE_MAPPING") {
             when (request.eventType) {
-                "CREATE", "DELETE" -> {
-                    updateUserRoles(request)
+                "CREATE" -> {
+                    addPermissionGroups(request)
+                }
+
+                "DELETE" -> {
+                    removePermissionGroups(request)
                 }
 
                 else -> {
@@ -86,6 +90,7 @@ class KeycloakEventService(
                 ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "firstName must not be null"),
             lastname = request.lastName
                 ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "lastName must not be null"),
+            enabled = request.enabled ?: true,
             workingArea = WorkingArea.NO_WORKING_AREA,
         )
 
@@ -111,6 +116,7 @@ class KeycloakEventService(
         request.email?.let { user.email = it }
         request.firstName?.let { user.firstname = it }
         request.lastName?.let { user.lastname = it }
+        request.enabled?.let { user.enabled = it }
 
         userRepository.save(user)
     }
@@ -137,12 +143,28 @@ class KeycloakEventService(
      * @param request Role mapping event payload.
      * @throws ResponseStatusException When no user exists for the given auth ID.
      */
-    fun updateUserRoles(request: KeycloakEventRequest) {
+    fun addPermissionGroups(request: KeycloakEventRequest) {
         val user = userRepository
             .findByAuthId(request.authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "username not found") }
 
         user.roles.addAll(filteredMappedRoles(request.realmRoles))
+    }
+
+    /**
+     * Removes mapped Keycloak realm roles from the existing user.
+     *
+     * Roles not recognized by this module are ignored.
+     *
+     * @param request Role mapping event payload.
+     * @throws ResponseStatusException When no user exists for the given auth ID.
+     */
+    fun removePermissionGroups(request: KeycloakEventRequest) {
+        val user = userRepository
+            .findByAuthId(request.authId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "username not found") }
+
+        user.roles.removeAll(filteredMappedRoles(request.realmRoles))
     }
 
     /**
