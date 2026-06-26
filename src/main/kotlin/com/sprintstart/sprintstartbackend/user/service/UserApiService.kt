@@ -38,4 +38,114 @@ class UserApiService(
     override fun getUserIdByAuthId(authId: String): Optional<UUID> {
         return userRepository.findIdByAuthId(authId)
     }
+
+    @Transactional(readOnly = true)
+    override fun searchUsers(
+        search: String?,
+        roleIds: List<UUID>?,
+        projectIds: List<UUID>?,
+        pageable: org.springframework.data.domain.Pageable,
+    ): org.springframework.data.domain.Page<com.sprintstart.sprintstartbackend.user.external.dto.UserDto> {
+        val spec = org.springframework.data.jpa.domain.Specification<
+            com.sprintstart.sprintstartbackend.user.model.entity.User,
+        > { root, query, cb ->
+            val predicates = mutableListOf<jakarta.persistence.criteria.Predicate>()
+
+            if (!search.isNullOrBlank()) {
+                val searchPattern = "%${search.lowercase()}%"
+                val usernameMatch = cb.like(cb.lower(root.get("username")), searchPattern)
+                val firstnameMatch = cb.like(cb.lower(root.get("firstname")), searchPattern)
+                val lastnameMatch = cb.like(cb.lower(root.get("lastname")), searchPattern)
+                predicates.add(cb.or(usernameMatch, firstnameMatch, lastnameMatch))
+            }
+
+            if (!roleIds.isNullOrEmpty()) {
+                val projectRolesJoin = root.join<
+                    com.sprintstart.sprintstartbackend.user.model.entity.User,
+                    com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole,
+                >("projectRoles", jakarta.persistence.criteria.JoinType.INNER)
+                predicates.add(projectRolesJoin.get<UUID>("id").`in`(roleIds))
+            }
+
+            if (!projectIds.isNullOrEmpty()) {
+                val projectJoin = root.join<
+                    com.sprintstart.sprintstartbackend.user.model.entity.User,
+                    com.sprintstart.sprintstartbackend.user.model.entity.Project,
+                >("project", jakarta.persistence.criteria.JoinType.INNER)
+                predicates.add(projectJoin.get<UUID>("id").`in`(projectIds))
+            }
+
+            // query.distinct(true) because join might return multiple rows for the same user
+            query.distinct(true)
+
+            if (predicates.isEmpty()) null else cb.and(*predicates.toTypedArray())
+        }
+
+        return userRepository.findAll(spec, pageable).map { user ->
+            com.sprintstart.sprintstartbackend.user.external.dto.UserDto(
+                id = user.id,
+                username = user.username,
+                firstname = user.firstname,
+                lastname = user.lastname,
+                avatarUrl = user.avatarUrl,
+                workingArea = user.workingArea.name,
+                project = user.project?.let {
+                    com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto(
+                        projectId = it.id,
+                        name = it.name,
+                        description = it.description,
+                    )
+                },
+                skills = user.skillAssessments.map { assessment ->
+                    com.sprintstart.sprintstartbackend.user.external.dto.UserSkillDto(
+                        skillId = assessment.skill.id,
+                        name = assessment.skill.name,
+                        level = assessment.level.name,
+                    )
+                },
+                projectRoles = user.projectRoles.map { role ->
+                    com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto(
+                        roleId = role.id,
+                        name = role.name,
+                        description = role.description,
+                    )
+                },
+            )
+        }
+    }
+
+    @Transactional(readOnly = true)
+    override fun getUsersByIds(ids: List<UUID>): List<com.sprintstart.sprintstartbackend.user.external.dto.UserDto> {
+        return userRepository.findAllById(ids).map { user ->
+            com.sprintstart.sprintstartbackend.user.external.dto.UserDto(
+                id = user.id,
+                username = user.username,
+                firstname = user.firstname,
+                lastname = user.lastname,
+                avatarUrl = user.avatarUrl,
+                workingArea = user.workingArea.name,
+                project = user.project?.let {
+                    com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto(
+                        projectId = it.id,
+                        name = it.name,
+                        description = it.description,
+                    )
+                },
+                skills = user.skillAssessments.map { assessment ->
+                    com.sprintstart.sprintstartbackend.user.external.dto.UserSkillDto(
+                        skillId = assessment.skill.id,
+                        name = assessment.skill.name,
+                        level = assessment.level.name,
+                    )
+                },
+                projectRoles = user.projectRoles.map { role ->
+                    com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto(
+                        roleId = role.id,
+                        name = role.name,
+                        description = role.description,
+                    )
+                },
+            )
+        }
+    }
 }

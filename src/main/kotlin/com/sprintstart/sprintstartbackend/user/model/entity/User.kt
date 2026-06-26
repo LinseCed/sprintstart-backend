@@ -40,4 +40,24 @@ class User(
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     var workingArea: WorkingArea,
+    @Column(nullable = true)
+    var avatarUrl: String? = null,
+    @jakarta.persistence.ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @jakarta.persistence.JoinColumn(name = "project_id")
+    var project: Project? = null,
+    @jakarta.persistence.ManyToMany(fetch = jakarta.persistence.FetchType.LAZY)
+    @jakarta.persistence.JoinTable(
+        name = "user_project_roles",
+        joinColumns = [jakarta.persistence.JoinColumn(name = "user_id")],
+        inverseJoinColumns = [jakarta.persistence.JoinColumn(name = "role_id")],
+    )
+    @org.hibernate.annotations.BatchSize(size = 50)
+    var projectRoles: MutableSet<ProjectRole> = mutableSetOf(),
+    @jakarta.persistence.OneToMany(
+        mappedBy = "user",
+        cascade = [jakarta.persistence.CascadeType.ALL],
+        orphanRemoval = true,
+    )
+    @org.hibernate.annotations.BatchSize(size = 50)
+    var skillAssessments: MutableSet<UserSkillAssessment> = mutableSetOf(),
 )

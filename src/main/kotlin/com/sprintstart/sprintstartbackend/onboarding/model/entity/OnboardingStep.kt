@@ -57,4 +57,9 @@ class OnboardingStep(
     var completedAt: Instant? = null,
     @Column(nullable = true)
     var skipReason: String? = null,
+    @Column(nullable = true)
+    var startedAt: Instant? = null,
+    @jakarta.persistence.OneToOne(cascade = [CascadeType.ALL], orphanRemoval = true)
+    @jakarta.persistence.JoinColumn(name = "skip_request_id")
+    var skipRequest: SkipRequest? = null,
 )

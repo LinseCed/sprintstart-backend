@@ -45,6 +45,7 @@ import java.util.UUID
  * - `WAITING` — clears both the completion timestamp and the skip reason
  *
  */
+@Suppress("TooManyFunctions")
 @RestController
 @RequestMapping("/api/v1/onboarding")
 @Tag(
@@ -54,6 +55,7 @@ import java.util.UUID
 )
 class OnboardingStepController(
     val onboardingStepService: OnboardingStepService,
+    val onboardingPathService: com.sprintstart.sprintstartbackend.onboarding.service.OnboardingPathService,
 ) {
 //  ========================== Endpoints for users (/me/...) ==========================
 
@@ -413,5 +415,43 @@ class OnboardingStepController(
         @Parameter(description = "UUID of the onboarding step to delete") @PathVariable stepId: UUID,
     ) {
         onboardingStepService.deleteOnboardingStepById(stepId)
+    }
+
+    @Operation(summary = "Review skip request")
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "Skip request reviewed"),
+        ApiResponse(responseCode = "401", description = "Authentication required"),
+        ApiResponse(responseCode = "403", description = "Insufficient role"),
+        ApiResponse(responseCode = "404", description = "Step or skip request not found"),
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PutMapping("/steps/{stepId}/review-skip")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
+    fun reviewSkipRequest(
+        @PathVariable stepId: UUID,
+        @RequestBody request: com.sprintstart.sprintstartbackend.onboarding.model.request.step.ReviewSkipRequest,
+    ) {
+        onboardingStepService.reviewSkipRequest(stepId, request.approved, request.reviewComment)
+    }
+
+    @Operation(summary = "Get team overview")
+    @ApiResponses(
+        ApiResponse(responseCode = "200", description = "Team overview returned successfully"),
+        ApiResponse(responseCode = "401", description = "Authentication required"),
+        ApiResponse(responseCode = "403", description = "Insufficient role"),
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/team-overview")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
+    fun getTeamOverview(
+        @org.springframework.web.bind.annotation.RequestParam(required = false) search: String?,
+        @org.springframework.web.bind.annotation.RequestParam(required = false) roleIds: List<UUID>?,
+        @org.springframework.web.bind.annotation.RequestParam(required = false) projectIds: List<UUID>?,
+        @org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "LONGEST_STEP") sortBy: String,
+        pageable: org.springframework.data.domain.Pageable,
+    ): org.springframework.data.domain.Page<
+        com.sprintstart.sprintstartbackend.onboarding.model.response.path.TeamOverviewUserDto,
+    > {
+        return onboardingPathService.getTeamOverview(search, roleIds, projectIds, sortBy, pageable)
     }
 }

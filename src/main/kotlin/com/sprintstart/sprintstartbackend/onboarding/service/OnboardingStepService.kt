@@ -36,6 +36,7 @@ class OnboardingStepService(
     private val onboardingPhaseRepository: OnboardingPhaseRepository,
     private val onboardingStepRepository: OnboardingStepRepository,
     private val userApi: UserApi,
+    private val eventPublisher: org.springframework.context.ApplicationEventPublisher,
 ) {
 //  ========================== Methods for users ==========================
 
@@ -109,16 +110,22 @@ class OnboardingStepService(
      * @return The requested step.
      * @throws ResponseStatusException When the user or step does not exist.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     fun getOnboardingStepForMe(authId: String, stepId: UUID): GetOnboardingStepResponse {
         val userId = userApi
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User not found") }
 
-        return onboardingStepRepository
+        val step = onboardingStepRepository
             .findByIdAndPhasePathUserId(stepId, userId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No step found with id: $stepId") }
-            .toGetResponse()
+
+        if (step.startedAt == null) {
+            step.startedAt = Instant.now()
+            onboardingStepRepository.save(step)
+        }
+
+        return step.toGetResponse()
     }
 
     /**
@@ -158,7 +165,9 @@ class OnboardingStepService(
 
         updateStatus(step, request)
 
-        step.status = request.status
+        if (request.status != StepStatus.SKIPPED) {
+            step.status = request.status
+        }
 
         return step.toUpdateResponse()
     }
@@ -311,6 +320,38 @@ class OnboardingStepService(
 
 //  ========================== Helper Methods ==========================
 
+    @Transactional
+    fun reviewSkipRequest(stepId: UUID, approved: Boolean, reviewComment: String?) {
+        val step = onboardingStepRepository
+            .findById(stepId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No step found with id: $stepId") }
+
+        val skipRequest = step.skipRequest
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No skip request found for step: $stepId")
+
+        if (approved) {
+            skipRequest.status =
+                com.sprintstart.sprintstartbackend.onboarding.external.enums.SkipRequestStatus.APPROVED
+            skipRequest.reviewComment = reviewComment
+            skipRequest.reviewedAt = Instant.now()
+
+            // Dispatch event to complete step
+            eventPublisher.publishEvent(
+                com.sprintstart.sprintstartbackend.onboarding.external.event.SkipRequestApprovedEvent(
+                    stepId = stepId,
+                    skipReason = skipRequest.reason,
+                ),
+            )
+        } else {
+            skipRequest.status =
+                com.sprintstart.sprintstartbackend.onboarding.external.enums.SkipRequestStatus.REJECTED
+            skipRequest.reviewComment = reviewComment
+            skipRequest.reviewedAt = Instant.now()
+        }
+
+        onboardingStepRepository.save(step)
+    }
+
     /**
      * Makes room for a new step at the requested position by shifting all existing
      * steps at that position or after it one position to the right.
@@ -412,8 +453,17 @@ class OnboardingStepService(
                 }
 
                 StepStatus.SKIPPED -> {
-                    step.completedAt = Instant.now()
-                    step.skipReason = request.skipReason ?: "No reason given"
+                    val isRejected = step.skipRequest?.status ==
+                        com.sprintstart.sprintstartbackend.onboarding.external.enums.SkipRequestStatus.REJECTED
+                    if (step.skipRequest == null || isRejected) {
+                        val skipRequest = com.sprintstart.sprintstartbackend.onboarding.model.entity.SkipRequest(
+                            stepId = step.id,
+                            reason = request.skipReason ?: "No reason given",
+                            status =
+                                com.sprintstart.sprintstartbackend.onboarding.external.enums.SkipRequestStatus.PENDING,
+                        )
+                        step.skipRequest = skipRequest
+                    }
                 }
 
                 StepStatus.WAITING -> {
@@ -422,5 +472,16 @@ class OnboardingStepService(
                 }
             }
         }
+    }
+
+    @org.springframework.modulith.events.ApplicationModuleListener
+    fun onSkipRequestApproved(
+        event: com.sprintstart.sprintstartbackend.onboarding.external.event.SkipRequestApprovedEvent,
+    ) {
+        val step = onboardingStepRepository.findById(event.stepId).orElseThrow()
+        step.status = StepStatus.SKIPPED
+        step.completedAt = Instant.now()
+        step.skipReason = event.skipReason
+        onboardingStepRepository.save(step)
     }
 }

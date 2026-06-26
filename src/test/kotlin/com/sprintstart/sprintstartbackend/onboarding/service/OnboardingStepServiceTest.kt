@@ -29,7 +29,8 @@ class OnboardingStepServiceTest {
     private val onboardingPhaseRepository: OnboardingPhaseRepository = mockk()
     private val onboardingStepRepository: OnboardingStepRepository = mockk()
     private val userApi: UserApi = mockk()
-    private val service = OnboardingStepService(onboardingPhaseRepository, onboardingStepRepository, userApi)
+    private val eventPublisher: org.springframework.context.ApplicationEventPublisher = mockk(relaxed = true)
+    private val service = OnboardingStepService(onboardingPhaseRepository, onboardingStepRepository, userApi, eventPublisher)
 
     private val userId = UUID.randomUUID()
     private val phaseId = UUID.randomUUID()
@@ -149,6 +150,7 @@ class OnboardingStepServiceTest {
             val step = makeStep()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { onboardingStepRepository.findByIdAndPhasePathUserId(stepId, userId) } returns Optional.of(step)
+            every { onboardingStepRepository.save(any()) } returns step
 
             val result = service.getOnboardingStepForMe(authId, stepId)
 
@@ -215,7 +217,8 @@ class OnboardingStepServiceTest {
 
             val result = service.updateOnboardingStepForMe(authId, stepId, request)
 
-            assertEquals("Not relevant", result.skipReason)
+            assertEquals(null, result.skipReason) // It is now stored in SkipRequest until approved
+            assertEquals(StepStatus.WAITING, result.status) // Status stays waiting until approved
         }
     }
 
