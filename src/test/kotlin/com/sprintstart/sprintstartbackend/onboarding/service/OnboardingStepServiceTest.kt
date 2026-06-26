@@ -231,7 +231,7 @@ class OnboardingStepServiceTest {
 
             assertThrows<ResponseStatusException> {
                 service.completeOnboardingStepForMe(authId, stepId)
-            }.also { assertEquals(403, it.statusCode.value()) }
+            }.also { assertEquals(400, it.statusCode.value()) }
         }
     }
 

@@ -229,8 +229,8 @@ class OnboardingStepController(
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "200", description = "Step completed successfully"),
+            ApiResponse(responseCode = "400", description = "Step cannot be completed in its current status"),
             ApiResponse(responseCode = "401", description = "Authentication required"),
-            ApiResponse(responseCode = "403", description = "Step cannot be completed in its current status"),
             ApiResponse(
                 responseCode = "404",
                 description = "No user or onboarding step found for the authenticated user",

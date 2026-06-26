@@ -39,17 +39,14 @@ import java.util.UUID
  * returns the step to waiting.
  */
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/api/v1/onboarding/me")
 @Tag(
-    name = "Onboarding - Skips",
+    name = "Onboarding - User controls for skips",
     description = "Create, retrieve, review, and delete onboarding skip requests",
 )
-@Suppress("TooManyFunctions")
 class OnboardingSkipController(
     private val onboardingSkipService: OnboardingSkipService,
 ) {
-//  ========================== Endpoints for users (/me/...) ==========================
-
     /**
      * Returns every skip request belonging to the authenticated user.
      *
@@ -70,7 +67,7 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/onboarding/me/skips")
+    @GetMapping("/skips")
     @PreAuthorize("hasRole('USER')")
     fun getAllSkipsForMe(
         @Parameter(hidden = true)
@@ -102,7 +99,7 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/onboarding/me/steps/{stepId}/skips")
+    @GetMapping("/steps/{stepId}/skips")
     @PreAuthorize("hasRole('USER')")
     fun getSkipsByStepIdForMe(
         @Parameter(hidden = true)
@@ -136,7 +133,7 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/onboarding/me/skips/{skipId}")
+    @GetMapping("/skips/{skipId}")
     @PreAuthorize("hasRole('USER')")
     fun getSkipByIdForMe(
         @Parameter(hidden = true)
@@ -174,7 +171,7 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.CREATED)
-    @PostMapping("/onboarding/me/steps/{stepId}/skips")
+    @PostMapping("/steps/{stepId}/skips")
     @PreAuthorize("hasRole('USER')")
     fun createSkipAtStepForMe(
         @Parameter(hidden = true)
@@ -211,7 +208,7 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @PutMapping("/onboarding/me/skips/{skipId}")
+    @PutMapping("/skips/{skipId}")
     @PreAuthorize("hasRole('USER')")
     fun updateSkipByIdForMe(
         @Parameter(hidden = true)
@@ -248,7 +245,7 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @DeleteMapping("/onboarding/me/skips/{skipId}")
+    @DeleteMapping("/skips/{skipId}")
     @PreAuthorize("hasRole('USER')")
     fun deleteSkipByIdForMe(
         @Parameter(hidden = true)
@@ -258,9 +255,17 @@ class OnboardingSkipController(
     ) {
         onboardingSkipService.deleteSkipByIdForMe(jwt.subject, skipId)
     }
+}
 
-//  ========================== Endpoints for admins ==========================
-
+@RestController
+@RequestMapping("/api/v1/admin/onboarding")
+@Tag(
+    name = "Onboarding - Admin controls for skips",
+    description = "Create, retrieve, review, and delete onboarding skip requests",
+)
+class OnboardingSkipAdminController(
+    private val onboardingSkipService: OnboardingSkipService,
+) {
     /**
      * Returns every onboarding skip request in the system.
      *
@@ -278,7 +283,7 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/admin/onboarding/skips")
+    @GetMapping("/skips")
     @PreAuthorize("hasRole('ADMIN')")
     fun getAllSkips(): List<GetAllOnboardingSkipsResponse> {
         return onboardingSkipService.getAllSkips()
@@ -287,7 +292,7 @@ class OnboardingSkipController(
     /**
      * Returns every onboarding skip request belonging to one user.
      *
-     * @param usersId Identifier of the user whose skips should be returned.
+     * @param userId Identifier of the user whose skips should be returned.
      * @return All skip requests on the requested user's onboarding path.
      */
     @Operation(
@@ -303,13 +308,13 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/admin/onboarding/users/{usersId}/skips")
+    @GetMapping("/users/{userId}/skips")
     @PreAuthorize("hasRole('ADMIN')")
     fun getAllSkipsByUserId(
         @Parameter(description = "UUID of the user")
-        @PathVariable usersId: UUID,
+        @PathVariable userId: UUID,
     ): List<GetOnboardingSkipResponse> {
-        return onboardingSkipService.getAllSkipsByUserId(usersId)
+        return onboardingSkipService.getAllSkipsByUserId(userId)
     }
 
     /**
@@ -331,7 +336,7 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/admin/onboarding/steps/{stepId}/skips")
+    @GetMapping("/steps/{stepId}/skips")
     @PreAuthorize("hasRole('ADMIN')")
     fun getSkipsByStepId(
         @Parameter(description = "UUID of the onboarding step")
@@ -359,7 +364,7 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/admin/onboarding/skips/{skipId}")
+    @GetMapping("/skips/{skipId}")
     @PreAuthorize("hasRole('ADMIN')")
     fun getSkipById(
         @Parameter(description = "UUID of the onboarding skip")
@@ -391,7 +396,7 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @PostMapping("/admin/onboarding/skips/{skipId}/accept")
+    @PostMapping("/skips/{skipId}/accept")
     @PreAuthorize("hasRole('ADMIN')")
     fun acceptSkipById(
         @Parameter(description = "UUID of the onboarding skip to accept")
@@ -424,7 +429,7 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @PostMapping("/admin/onboarding/skips/{skipId}/deny")
+    @PostMapping("/skips/{skipId}/deny")
     @PreAuthorize("hasRole('ADMIN')")
     fun denySkipById(
         @Parameter(description = "UUID of the onboarding skip to deny")
@@ -455,7 +460,7 @@ class OnboardingSkipController(
         ],
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @DeleteMapping("/admin/onboarding/skips/{skipId}")
+    @DeleteMapping("/skips/{skipId}")
     @PreAuthorize("hasRole('ADMIN')")
     fun deleteSkipById(
         @Parameter(description = "UUID of the onboarding skip to delete")

@@ -156,10 +156,6 @@ class OnboardingStepService(
         step.estimatedMinutes = request.estimatedMinutes
         step.expectedOutcome = request.expectedOutcome
 
-//        updateStatus(step, request)
-//
-//        step.status = request.status
-
         return step.toUpdateResponse()
     }
 
@@ -177,7 +173,7 @@ class OnboardingStepService(
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No step found with id: $stepId") }
 
         if (step.status != StepStatus.WAITING) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "A step that is finished can't be completed")
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "A step that is finished can't be completed")
         }
 
         step.completedAt = Instant.now()
@@ -309,10 +305,6 @@ class OnboardingStepService(
         step.estimatedMinutes = request.estimatedMinutes
         step.expectedOutcome = request.expectedOutcome
 
-//        updateStatus(step, request)
-//
-//        step.status = request.status
-
         return step.toUpdateResponse()
     }
 
@@ -418,42 +410,4 @@ class OnboardingStepService(
             stepsToShift.forEach { it.position += 1 }
         }
     }
-
-    /*
-     * Updates completion metadata when the step status changes.
-     *
-     * Finished and skipped steps receive the current timestamp as their completion
-     * time. Skipped steps also store the provided skip reason, or a default reason
-     * if none was provided. Waiting steps are treated as incomplete and therefore
-     * have their completion metadata cleared.
-
-    private fun updateStatus(
-        step: OnboardingStep,
-        request: UpdateOnboardingStepRequest,
-    ) {
-        if (step.status != request.status) {
-            when (request.status) {
-                StepStatus.FINISHED -> {
-                    step.completedAt = Instant.now()
-                    if (step.skips.isNotEmpty() && step.skips.last().status == SkipStatus.PENDING) {
-                        step.skips.removeLast()
-                    }
-                }
-
-                StepStatus.SKIPPED -> {
-                    step.completedAt = Instant.now()
-                    if (step.skips.isNotEmpty() && step.skips.last().status == SkipStatus.PENDING) {
-                        step.skips.removeLast()
-                    }
-                }
-
-                StepStatus.WAITING -> {
-                    step.completedAt = null
-                    if (step.skips.isNotEmpty() && step.skips.last().status == SkipStatus.PENDING) {
-                        step.skips.removeLast()
-                    }
-                }
-            }
-        }
-    }*/
 }

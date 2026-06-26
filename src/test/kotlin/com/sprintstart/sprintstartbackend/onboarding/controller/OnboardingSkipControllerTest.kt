@@ -40,7 +40,10 @@ import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 import java.util.UUID
 
-@WebMvcTest(OnboardingSkipController::class)
+@WebMvcTest(
+    OnboardingSkipController::class,
+    OnboardingSkipAdminController::class,
+)
 @Import(
     SecurityConfig::class,
 )

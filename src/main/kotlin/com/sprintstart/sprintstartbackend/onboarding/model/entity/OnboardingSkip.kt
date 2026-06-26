@@ -25,10 +25,8 @@ class OnboardingSkip(
     var status: SkipStatus = SkipStatus.PENDING,
     @Column(nullable = false)
     var reason: String,
-    @Column(nullable = true)
     var reviewComment: String? = null,
     @Column(nullable = false)
     val createdAt: Instant = Instant.now(),
-    @Column(nullable = true)
     var resolvedAt: Instant? = null,
 )
