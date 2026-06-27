@@ -45,6 +45,19 @@ class UserServiceTest {
     }
 
     @Test
+    fun `getAllUsers returns local projections without Keycloak calls`() {
+        val keycloakUser = user(authId = "auth-1", username = "alice", workingArea = WorkingArea.BACKEND_DEV)
+        keycloakUser.roles.add(Role.USER)
+        every { userRepository.findAll() } returns listOf(keycloakUser)
+
+        val result = userService.getAllUsers()
+
+        assertThat(result).hasSize(1)
+        assertThat(result.single().authId).isEqualTo("auth-1")
+        verify(exactly = 0) { keycloakAdminClient.getPermissionGroups(any()) }
+    }
+
+    @Test
     fun `patchMe forwards identity fields to Keycloak and updates local projection`() {
         val user = user(authId = "auth-1", username = "alice", workingArea = WorkingArea.BACKEND_DEV)
         val request = PatchMeRequest(

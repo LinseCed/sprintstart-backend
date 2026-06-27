@@ -17,7 +17,7 @@ class KeycloakEventServiceTest {
     private val service = KeycloakEventService(userRepository)
 
     @Test
-    fun `realm role delete removes mapped local permission group`() {
+    fun `realm role mapping event replaces local permission groups with event role snapshot`() {
         val user = User(
             authId = "auth-1",
             username = "alice",
@@ -27,7 +27,7 @@ class KeycloakEventServiceTest {
             workingArea = WorkingArea.BACKEND_DEV,
         )
         user.roles.addAll(setOf(Role.USER, Role.ADMIN))
-        every { userRepository.findByAuthId("auth-1") } returns Optional.of(user)
+        every { userRepository.findLockedByAuthId("auth-1") } returns Optional.of(user)
 
         service.handleEvent(
             KeycloakEventRequest(
@@ -40,10 +40,43 @@ class KeycloakEventServiceTest {
                 email = null,
                 firstName = null,
                 lastName = null,
-                realmRoles = setOf("admin"),
+                realmRoles = setOf("user", "project-manager"),
             ),
         )
 
-        assertThat(user.roles).containsExactly(Role.USER)
+        assertThat(user.roles).containsExactlyInAnyOrder(Role.USER, Role.PM)
+    }
+
+    @Test
+    fun `user update event synchronizes role snapshot idempotently`() {
+        val user = User(
+            authId = "auth-1",
+            username = "alice",
+            email = "alice@mail.de",
+            firstname = "Alice",
+            lastname = "Developer",
+            workingArea = WorkingArea.BACKEND_DEV,
+        )
+        user.roles.addAll(setOf(Role.USER, Role.ADMIN))
+        every { userRepository.findLockedByAuthId("auth-1") } returns Optional.of(user)
+        every { userRepository.save(user) } returns user
+
+        service.handleEvent(
+            KeycloakEventRequest(
+                source = "keycloak",
+                resourceType = "USER",
+                eventType = "UPDATE",
+                realmId = "sprintstart",
+                authId = "auth-1",
+                username = "alice2",
+                email = null,
+                firstName = null,
+                lastName = null,
+                realmRoles = setOf("user", "admin"),
+            ),
+        )
+
+        assertThat(user.username).isEqualTo("alice2")
+        assertThat(user.roles).containsExactlyInAnyOrder(Role.USER, Role.ADMIN)
     }
 }

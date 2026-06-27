@@ -27,6 +27,8 @@ interface KeycloakAdminClient {
 
     fun setPermissionGroup(authId: String, permissionGroup: Role)
 
+    fun getPermissionGroups(authId: String): Set<Role>
+
     fun deleteUser(authId: String)
 }
 
@@ -76,6 +78,23 @@ class HttpKeycloakAdminClient(
         )
     }
 
+    override fun getPermissionGroups(authId: String): Set<Role> {
+        val token = accessToken()
+        val roleMappings = try {
+            getCompositeRealmRoleMappings(authId, token)
+        } catch (error: ResponseStatusException) {
+            if (error.statusCode != HttpStatus.NOT_FOUND) {
+                throw error
+            }
+
+            getRealmRoleMappings(authId, token)
+        }
+
+        return KeycloakRoleMapper.mapRealmRoles(
+            roleMappings.mapNotNull { it["name"]?.asText() },
+        )
+    }
+
     override fun deleteUser(authId: String) {
         send(
             method = "DELETE",
@@ -106,6 +125,15 @@ class HttpKeycloakAdminClient(
         val body = send(
             method = "GET",
             uri = adminUri("/users/$authId/role-mappings/realm"),
+            token = token,
+        )
+        return objectMapper.readTree(body).toList()
+    }
+
+    private fun getCompositeRealmRoleMappings(authId: String, token: String): List<JsonNode> {
+        val body = send(
+            method = "GET",
+            uri = adminUri("/users/$authId/role-mappings/realm/composite"),
             token = token,
         )
         return objectMapper.readTree(body).toList()
