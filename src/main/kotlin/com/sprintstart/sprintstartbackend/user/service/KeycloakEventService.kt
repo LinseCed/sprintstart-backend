@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
 import com.sprintstart.sprintstartbackend.user.model.dto.KeycloakEventRequest
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -22,10 +23,12 @@ import org.springframework.web.server.ResponseStatusException
 class KeycloakEventService(
     private val userRepository: UserRepository,
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
+
     /**
      * Dispatches an incoming Keycloak event to the matching user synchronization flow.
      *
-     * Unsupported event types are ignored after being logged to standard output.
+     * Unsupported event types are ignored after being logged through the application logger.
      *
      * @param request Incoming Keycloak event payload.
      */
@@ -50,7 +53,7 @@ class KeycloakEventService(
                 }
 
                 else -> {
-                    println("Unknown event type: ${request.eventType}")
+                    logger.warn("Unknown Keycloak USER event type: {}", request.eventType)
                 }
             }
         }
@@ -66,7 +69,7 @@ class KeycloakEventService(
                 }
 
                 else -> {
-                    println("Unknown event type: ${request.eventType}")
+                    logger.warn("Unknown Keycloak REALM_ROLE_MAPPING event type: {}", request.eventType)
                 }
             }
         }

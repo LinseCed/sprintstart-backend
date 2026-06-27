@@ -82,6 +82,19 @@ class UserService(
         return userRepository.save(user).toGetResponse()
     }
 
+    /**
+     * Partially updates an administrator-selected user.
+     *
+     * Profile fields and permission group changes are first forwarded to Keycloak.
+     * The local projection is then updated for fields owned by this backend. Permission
+     * groups are not mutated locally here because Keycloak role events synchronize the
+     * local role snapshot asynchronously.
+     *
+     * @param id Identifier of the user to update.
+     * @param request Partial administrative update payload.
+     * @return The updated user projection, including the requested permission group when changed.
+     * @throws ResponseStatusException When no user exists for the given ID.
+     */
     @Transactional
     fun patchAdminUserById(id: UUID, request: PatchUserRequest): GetUserResponse {
         val user = findById(id)
@@ -114,6 +127,14 @@ class UserService(
     fun getUserById(id: UUID): GetUserResponse =
         findById(id).toGetResponse()
 
+    /**
+     * Enables or disables a user account through Keycloak and mirrors the result locally.
+     *
+     * @param id Identifier of the user whose enabled state should change.
+     * @param request Target enabled state.
+     * @return The updated user projection.
+     * @throws ResponseStatusException When no user exists for the given ID.
+     */
     @Transactional
     fun updateUserEnabledById(id: UUID, request: UpdateUserEnabledRequest): GetUserResponse {
         val user = findById(id)
@@ -139,6 +160,16 @@ class UserService(
         userRepository.deleteProjectionById(id)
     }
 
+    /**
+     * Deletes a user and returns the API response used by the admin controller.
+     *
+     * The deletion itself is handled by [deleteUserById] so the Keycloak deletion and
+     * local projection cleanup stay in one place.
+     *
+     * @param id Identifier of the user to delete.
+     * @return Confirmation DTO for the deleted user.
+     * @throws ResponseStatusException When no user exists for the given ID.
+     */
     @Transactional
     fun deleteAdminUserById(id: UUID): DeleteUserResponse {
         deleteUserById(id)
