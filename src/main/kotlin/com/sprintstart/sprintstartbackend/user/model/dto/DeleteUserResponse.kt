@@ -1,10 +1,8 @@
 package com.sprintstart.sprintstartbackend.user.model.dto
 
-data class UpdateUserEnabledRequest(
-    val enabled: Boolean,
-)
+import java.util.UUID
 
 data class DeleteUserResponse(
-    val id: java.util.UUID,
+    val id: UUID,
     val deleted: Boolean = true,
 )
