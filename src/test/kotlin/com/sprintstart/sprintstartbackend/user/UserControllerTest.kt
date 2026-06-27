@@ -130,7 +130,7 @@ class UserControllerTest(
             workingArea = WorkingArea.BACKEND_DEV,
         )
 
-        every { userService.getMe("user") } returns response
+        every { userService.getMe(any()) } returns response
 
         mockMvc
             .perform(
@@ -139,7 +139,7 @@ class UserControllerTest(
             ).andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
-        verify(exactly = 1) { userService.getMe("user") }
+        verify(exactly = 1) { userService.getMe(any()) }
     }
 
     @Test

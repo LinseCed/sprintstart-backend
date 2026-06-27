@@ -21,6 +21,7 @@ class UserSkillAssessment(
     val user: User,
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "skill_id", nullable = false)
+    @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.CASCADE)
     val skill: Skill,
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)

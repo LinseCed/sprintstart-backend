@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.controller
 
+import com.sprintstart.sprintstartbackend.user.model.dto.SkillAssessmentDto
+import com.sprintstart.sprintstartbackend.user.model.dto.SkillDto
 import com.sprintstart.sprintstartbackend.user.model.entity.Skill
 import com.sprintstart.sprintstartbackend.user.model.entity.SkillLevel
 import com.sprintstart.sprintstartbackend.user.model.entity.UserSkillAssessment
@@ -41,20 +43,31 @@ class SkillController(
     @GetMapping("/skills")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR', 'USER')")
-    fun getAllSkills(): List<Skill> {
-        return skillRepository.findAll()
+    fun getAllSkills(): List<SkillDto> {
+        return skillRepository.findAll().map { skill ->
+            SkillDto(
+                id = skill.id,
+                name = skill.name,
+                roleId = skill.projectRole.id,
+            )
+        }
     }
 
     @PostMapping("/skills")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
-    fun createSkill(@RequestBody request: CreateSkillRequest): Skill {
+    fun createSkill(@RequestBody request: CreateSkillRequest): SkillDto {
         val role = projectRoleRepository.findById(request.roleId).orElseThrow()
         val skill = Skill(
             name = request.name,
             projectRole = role,
         )
-        return skillRepository.save(skill)
+        val savedSkill = skillRepository.save(skill)
+        return SkillDto(
+            id = savedSkill.id,
+            name = savedSkill.name,
+            roleId = savedSkill.projectRole.id,
+        )
     }
 
     @DeleteMapping("/skills/{skillId}")
@@ -67,14 +80,20 @@ class SkillController(
     @GetMapping("/users/{userId}/skill-assessments/completed")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR', 'USER')")
-    fun getUserSkillAssessments(@PathVariable userId: UUID): List<UserSkillAssessment> {
-        return userSkillAssessmentRepository.findByUserId(userId)
+    fun getUserSkillAssessments(@PathVariable userId: UUID): List<SkillAssessmentDto> {
+        return userSkillAssessmentRepository.findByUserId(userId).map { assessment ->
+            SkillAssessmentDto(
+                userId = assessment.user.id,
+                skillId = assessment.skill.id,
+                level = assessment.level,
+            )
+        }
     }
 
     @PostMapping("/skill-assessments")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR', 'USER')")
-    fun assessSkill(@RequestBody request: CreateSkillAssessmentRequest): UserSkillAssessment {
+    fun assessSkill(@RequestBody request: CreateSkillAssessmentRequest): SkillAssessmentDto {
         val user = userRepository.findById(request.userId).orElseThrow()
         val skill = skillRepository.findById(request.skillId).orElseThrow()
 
@@ -90,7 +109,12 @@ class SkillController(
         user.skillAssessments.add(assessment)
         userRepository.save(user)
 
-        // After saving user, return the assessment
-        return user.skillAssessments.first { it.skill.id == skill.id }
+        // After saving user, return the assessment DTO
+        val savedAssessment = user.skillAssessments.first { it.skill.id == skill.id }
+        return SkillAssessmentDto(
+            userId = savedAssessment.user.id,
+            skillId = savedAssessment.skill.id,
+            level = savedAssessment.level,
+        )
     }
 }

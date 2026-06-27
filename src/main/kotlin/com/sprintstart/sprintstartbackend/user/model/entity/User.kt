@@ -48,8 +48,25 @@ class User(
     @jakarta.persistence.ManyToMany(fetch = jakarta.persistence.FetchType.LAZY)
     @jakarta.persistence.JoinTable(
         name = "user_project_roles",
-        joinColumns = [jakarta.persistence.JoinColumn(name = "user_id")],
-        inverseJoinColumns = [jakarta.persistence.JoinColumn(name = "role_id")],
+        joinColumns = [
+            jakarta.persistence.JoinColumn(
+                name = "user_id",
+                foreignKey = jakarta.persistence.ForeignKey(
+                    name = "fk_upr_user_id",
+                    foreignKeyDefinition = "FOREIGN KEY (user_id) REFERENCES sprintstart_users ON DELETE CASCADE",
+                ),
+            ),
+        ],
+        inverseJoinColumns = [
+            jakarta.persistence.JoinColumn(
+                name = "role_id",
+                foreignKey = jakarta.persistence.ForeignKey(
+                    name = "fk_upr_role_id",
+                    foreignKeyDefinition = "FOREIGN KEY (role_id) REFERENCES " +
+                        "sprintstart_project_roles ON DELETE CASCADE",
+                ),
+            ),
+        ],
     )
     @org.hibernate.annotations.BatchSize(size = 50)
     var projectRoles: MutableSet<ProjectRole> = mutableSetOf(),

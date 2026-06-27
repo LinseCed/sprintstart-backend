@@ -93,7 +93,7 @@ class UserController(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
     ): GetUserResponse {
-        return userService.getMe(jwt.subject)
+        return userService.getMe(jwt)
     }
 
     /**
