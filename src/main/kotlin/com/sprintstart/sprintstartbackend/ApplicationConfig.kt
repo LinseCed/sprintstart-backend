@@ -10,6 +10,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
  * sprintstart:
  *     ai: ...
  *     github: ...
+ *     keycloak: ...
  * ```
  */
 @ConfigurationProperties(prefix = "sprintstart")
@@ -61,7 +62,7 @@ data class KeycloakConfig(
 
 data class KeycloakAdminConfig(
     @get:JsonProperty("base-url")
-    val baseUrl: String = "http://localhost:8081/auth",
+    val baseUrl: String? = null,
     val realm: String = "sprintstart",
     @get:JsonProperty("token-realm")
     val tokenRealm: String = "master",

@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.user.service
 import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.config.KeycloakRoleMapper
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
@@ -36,6 +37,14 @@ interface KeycloakAdminClient {
 class HttpKeycloakAdminClient(
     private val httpClient: HttpClient,
     private val applicationConfig: ApplicationConfig,
+    @Value("\${spring.security.oauth2.resourceserver.jwt.jwk-set-uri:}")
+    private val jwtJwkSetUri: String = "",
+    @Value("\${spring.security.oauth2.resourceserver.jwt.issuer-uri:}")
+    private val jwtIssuerUri: String = "",
+    @Value("\${KEYCLOAK_ADMIN:}")
+    private val keycloakAdminUsername: String = "",
+    @Value("\${KEYCLOAK_ADMIN_PASSWORD:}")
+    private val keycloakAdminPassword: String = "",
 ) : KeycloakAdminClient {
     private val objectMapper = jacksonObjectMapper()
     private val adminConfig get() = applicationConfig.keycloak.admin
@@ -166,8 +175,8 @@ class HttpKeycloakAdminClient(
 
     private fun tokenFormBody(): String {
         val clientSecret = adminConfig.clientSecret
-        val username = adminConfig.username
-        val password = adminConfig.password
+        val username = adminConfig.username.takeUnlessBlank() ?: keycloakAdminUsername.takeUnlessBlank()
+        val password = adminConfig.password.takeUnlessBlank() ?: keycloakAdminPassword.takeUnlessBlank()
 
         val pairs = if (!clientSecret.isNullOrBlank()) {
             listOf(
@@ -216,14 +225,31 @@ class HttpKeycloakAdminClient(
         return response.body()
     }
 
-    private fun realmUri(path: String): URI =
-        URI.create("${adminConfig.baseUrl.trimEnd('/')}/realms/${encodePath(adminConfig.realm)}$path")
-
     private fun tokenRealmUri(path: String): URI =
-        URI.create("${adminConfig.baseUrl.trimEnd('/')}/realms/${encodePath(adminConfig.tokenRealm)}$path")
+        URI.create("${keycloakBaseUrl()}/realms/${encodePath(adminConfig.tokenRealm)}$path")
 
     private fun adminUri(path: String): URI =
-        URI.create("${adminConfig.baseUrl.trimEnd('/')}/admin/realms/${encodePath(adminConfig.realm)}$path")
+        URI.create("${keycloakBaseUrl()}/admin/realms/${encodePath(adminConfig.realm)}$path")
+
+    private fun keycloakBaseUrl(): String =
+        adminConfig.baseUrl.takeUnlessBlank()?.trimEnd('/')
+            ?: keycloakBaseUrlFromRealmUri(jwtJwkSetUri)
+            ?: keycloakBaseUrlFromRealmUri(jwtIssuerUri)
+            ?: throw ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                "Keycloak admin base URL could not be derived from JWT configuration",
+            )
+
+    private fun keycloakBaseUrlFromRealmUri(value: String): String? {
+        val normalized = value.trim().trimEnd('/')
+        val realmPathIndex = normalized.indexOf("/realms/")
+
+        return if (normalized.isNotBlank() && realmPathIndex > 0) {
+            normalized.substring(0, realmPathIndex)
+        } else {
+            null
+        }
+    }
 
     private fun urlEncode(value: String): String =
         URLEncoder.encode(value, StandardCharsets.UTF_8)
@@ -233,6 +259,9 @@ class HttpKeycloakAdminClient(
 
     private fun String.safeErrorBody(): String =
         take(MAX_ERROR_BODY_LENGTH).ifBlank { "empty response body" }
+
+    private fun String?.takeUnlessBlank(): String? =
+        this?.trim()?.takeIf { it.isNotBlank() }
 
     private companion object {
         const val MAX_ERROR_BODY_LENGTH = 500
