@@ -7,4 +7,6 @@ interface UserApi {
     fun exists(id: UUID): Boolean
 
     fun getUserIdByAuthId(authId: String): Optional<UUID>
+
+    fun getOnboardingProfileByAuthId(authId: String): Optional<UserOnboardingProfile>
 }

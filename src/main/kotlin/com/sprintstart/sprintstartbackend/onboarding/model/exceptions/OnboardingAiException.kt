@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.external.exceptions
+package com.sprintstart.sprintstartbackend.onboarding.model.exceptions
 
 class OnboardingAiException(
     val statusCode: Int,

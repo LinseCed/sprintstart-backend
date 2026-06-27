@@ -4,7 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class OnboardingPathRequest(
+data class GenerateOnboardingPathRequest(
     @SerialName("working_area")
     val workingArea: String,
     val experience: String? = null,

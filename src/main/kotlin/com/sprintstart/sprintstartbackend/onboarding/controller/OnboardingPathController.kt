@@ -125,6 +125,7 @@ class OnboardingPathController(
             ApiResponse(responseCode = "401", description = "Authentication required"),
         ],
     )
+    @ResponseStatus(HttpStatus.OK)
     @PostMapping("/me/path/personalize")
     @PreAuthorize("hasRole('USER')")
     fun personalizePath(
