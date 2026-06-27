@@ -33,7 +33,8 @@ class OnboardingPersonalizationService(
      */
     @Transactional
     fun personalize(authId: String): Flow<OnboardingSseEvent> {
-        val profile = userApi.getOnboardingProfileByAuthId(authId)
+        val profile = userApi
+            .getOnboardingProfileByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with authId: $authId not found") }
 
         val workingArea = profile.workingArea.toAiScope()
