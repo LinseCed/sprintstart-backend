@@ -17,7 +17,7 @@ import java.time.Instant
 private const val GITHUB_COMMIT_MESSAGE_LENGTH = 72
 
 /**
- * Translates GitHub domain events into ingestion artifact commands.
+ * Translates GitHub domain events into canonical artifact commands.
  *
  * The mapper normalizes source-specific identifiers, derives stable hashes where the ingestion
  * service uses change detection, and enriches file artifacts with lightweight metadata such as
@@ -26,7 +26,7 @@ private const val GITHUB_COMMIT_MESSAGE_LENGTH = 72
 @Component
 class GithubArtifactMapper {
     /**
-     * Maps a fetched commit into the ingestion command shape.
+     * Maps a fetched commit into the canonical command shape.
      *
      * The commit title is intentionally shortened to keep list views compact while preserving the
      * full message in `bodyText`.
@@ -48,6 +48,7 @@ class GithubArtifactMapper {
                 sha = event.sha,
             ),
             repositoryId = event.repositoryId,
+            repositoryFullName = event.repositoryOwner + event.repositoryName,
             artifactType = ArtifactType.COMMIT,
             title = event.msg.take(GITHUB_COMMIT_MESSAGE_LENGTH),
             bodyText = event.msg,
@@ -86,6 +87,7 @@ class GithubArtifactMapper {
             ),
             sourceUrl = event.sourceUrl,
             repositoryId = event.repositoryId,
+            repositoryFullName = event.repositoryOwner + event.repositoryName,
             artifactType = ArtifactType.FILE,
             title = title,
             bodyText = event.content,
@@ -122,6 +124,7 @@ class GithubArtifactMapper {
                 unique = event.number.toString(),
             ),
             sourceUrl = event.url,
+            repositoryFullName = "${event.repositoryOwner}/${event.repositoryName}}",
             repositoryId = event.repositoryId,
             artifactType = ArtifactType.ISSUE,
             title = "Issue #${event.number} " + event.title,
@@ -153,6 +156,7 @@ class GithubArtifactMapper {
             ),
             sourceUrl = event.url,
             repositoryId = event.repositoryId,
+            repositoryFullName = event.repositoryOwner + event.repositoryName,
             artifactType = ArtifactType.PULL_REQUEST,
             title = "PR #${event.number} " + event.title,
             bodyText = event.body,

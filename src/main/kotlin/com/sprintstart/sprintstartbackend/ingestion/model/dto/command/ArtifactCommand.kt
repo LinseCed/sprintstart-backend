@@ -11,6 +11,7 @@ data class ArtifactCommand(
     val sourceId: String,
     val sourceUrl: String?,
     val repositoryId: UUID,
+    val repositoryFullName: String,
     val artifactType: ArtifactType,
     val title: String?,
     val bodyText: String?,

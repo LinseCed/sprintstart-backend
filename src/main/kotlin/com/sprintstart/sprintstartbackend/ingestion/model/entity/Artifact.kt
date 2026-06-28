@@ -26,6 +26,8 @@ class Artifact(
     val sourceUrl: String?,
     @Column(nullable = false)
     val repositoryId: UUID,
+    @Column(nullable = false)
+    val repositoryFullName: String,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     val artifactType: ArtifactType,
