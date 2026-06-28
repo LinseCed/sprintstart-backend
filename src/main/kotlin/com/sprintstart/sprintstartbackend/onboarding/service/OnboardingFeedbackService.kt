@@ -59,9 +59,17 @@ class OnboardingFeedbackService(
             helpful = request.helpful,
             message = request.message,
         )
-        step?.feedback?.add(feedback)
 
-        return onboardingFeedbackRepository.save(feedback).toGetResponse()
+        // Persist exactly once: via the owning step's cascade when a step is set,
+        // otherwise directly. Doing both (collection add + save) attaches two
+        // instances with the same assigned UUID and throws NonUniqueObjectException.
+        if (step != null) {
+            step.feedback.add(feedback)
+        } else {
+            onboardingFeedbackRepository.save(feedback)
+        }
+
+        return feedback.toGetResponse()
     }
 
 //  ========================== Methods for admins ==========================

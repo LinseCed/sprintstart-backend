@@ -132,7 +132,7 @@ class OnboardingSkipService(
         )
         step.skips += onboardingSkip
 
-        return onboardingSkipRepository.save(onboardingSkip).toCreateResponse()
+        return onboardingSkip.toCreateResponse()
     }
 
     /**
