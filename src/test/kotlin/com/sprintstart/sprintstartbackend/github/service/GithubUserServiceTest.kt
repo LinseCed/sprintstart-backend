@@ -3,7 +3,6 @@ package com.sprintstart.sprintstartbackend.github.service
 import com.sprintstart.sprintstartbackend.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.github.models.api.requests.AddPatRequest
-import com.sprintstart.sprintstartbackend.github.models.api.requests.GetPatRequest
 import com.sprintstart.sprintstartbackend.github.models.api.requests.RemovePatRequest
 import com.sprintstart.sprintstartbackend.github.models.api.requests.UpdatePatNameRequest
 import com.sprintstart.sprintstartbackend.github.models.api.requests.UpdatePatRequest
@@ -38,7 +37,7 @@ class GithubUserServiceTest {
         fun `returns list of tokens for the given authId`() {
             every { githubUserRepository.findAllByAuthId(authId) } returns listOf(token)
 
-            val result = service.getAllPATs(authId)
+            val result = service.getAllPATNames(authId)
 
             assertThat(result).containsExactly(token)
         }
@@ -47,32 +46,9 @@ class GithubUserServiceTest {
         fun `returns empty list when user has no PATs`() {
             every { githubUserRepository.findAllByAuthId(authId) } returns emptyList()
 
-            val result = service.getAllPATs(authId)
+            val result = service.getAllPATNames(authId)
 
             assertThat(result).isEmpty()
-        }
-    }
-
-    @Nested
-    inner class GetPAT {
-        @Test
-        fun `returns token when PAT exists`() {
-            val request = GetPatRequest(patName)
-            every { githubUserRepository.findById(userPat) } returns Optional.of(githubUser)
-
-            val result = service.getPAT(authId, request)
-
-            assertThat(result).isEqualTo(token)
-        }
-
-        @Test
-        fun `throws GithubUserPatNotFoundException when PAT does not exist`() {
-            val request = GetPatRequest(patName)
-            every { githubUserRepository.findById(userPat) } returns Optional.empty()
-
-            assertFailsWith<GithubUserPatNotFoundException> {
-                service.getPAT(authId, request)
-            }
         }
     }
 

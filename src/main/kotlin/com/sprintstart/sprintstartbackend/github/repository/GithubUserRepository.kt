@@ -11,6 +11,6 @@ interface GithubUserRepository : JpaRepository<GithubUser, GithubUserPat> {
     @Query("UPDATE GithubUser u SET u.id.name = :newName WHERE u.id.authId = :authId AND u.id.name = :oldName")
     fun updatePatName(authId: String, oldName: String, newName: String): Int
 
-    @Query("SELECT u.token FROM GithubUser u WHERE u.id.authId = :authId")
+    @Query("SELECT u.id.name FROM GithubUser u WHERE u.id.authId = :authId")
     fun findAllByAuthId(authId: String): List<String>
 }

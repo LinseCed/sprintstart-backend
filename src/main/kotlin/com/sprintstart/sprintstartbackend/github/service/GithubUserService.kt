@@ -3,7 +3,6 @@ package com.sprintstart.sprintstartbackend.github.service
 import com.sprintstart.sprintstartbackend.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.github.models.api.requests.AddPatRequest
-import com.sprintstart.sprintstartbackend.github.models.api.requests.GetPatRequest
 import com.sprintstart.sprintstartbackend.github.models.api.requests.RemovePatRequest
 import com.sprintstart.sprintstartbackend.github.models.api.requests.UpdatePatNameRequest
 import com.sprintstart.sprintstartbackend.github.models.api.requests.UpdatePatRequest
@@ -31,33 +30,15 @@ class GithubUserService(
     private val githubRepositoryConnectionRepository: GithubRepositoryConnectionRepository,
 ) {
     /**
-     * Retrieves all personal access tokens (PATs) associated with the given authentication ID.
+     * Retrieves the names of all personal access tokens (PATs) associated with the given authentication ID.
      *
      * @param authId The authentication ID of the user whose PATs are to be retrieved.
      * @return A list of personal access tokens (PATs) associated with the specified authentication ID.
      */
     @Tracked("Retrieving all GitHub PATs")
     @Transactional(readOnly = true)
-    fun getAllPATs(authId: String): List<String> =
+    fun getAllPATNames(authId: String): List<String> =
         githubUserRepository.findAllByAuthId(authId)
-
-    /**
-     * Retrieves the personal access token (PAT) associated with the given GitHub user credentials.
-     *
-     * @param authId The authentication ID of the user whose PAT is being requested.
-     * @param request The request object containing the name of the GitHub entity for which the PAT is required.
-     * @return The personal access token (PAT) if found.
-     * @throws GithubUserPatNotFoundException If no PAT is found for the given user and name.
-     */
-    @Tracked("Retrieving GitHub PAT")
-    @Transactional(readOnly = true)
-    fun getPAT(authId: String, request: GetPatRequest): String {
-        return githubUserRepository
-            .findById(GithubUserPat(authId = authId, name = request.name))
-            .orElseThrow {
-                GithubUserPatNotFoundException(request.name, authId)
-            }.token
-    }
 
     /**
      * Adds a new personal access token (PAT) for a GitHub user.

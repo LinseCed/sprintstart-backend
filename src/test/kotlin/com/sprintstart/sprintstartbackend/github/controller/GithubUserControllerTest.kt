@@ -60,7 +60,7 @@ class GithubUserControllerTest {
     inner class GetAllPats {
         @Test
         fun `should return 200 and list of PATs`() {
-            every { githubUserService.getAllPATs(authId) } returns listOf(validTokenName)
+            every { githubUserService.getAllPATNames(authId) } returns listOf(validTokenName)
 
             mockMvc
                 .perform(
@@ -69,12 +69,12 @@ class GithubUserControllerTest {
                 ).andExpect(status().isOk)
                 .andExpect(content().json("[\"$validTokenName\"]"))
 
-            verify(exactly = 1) { githubUserService.getAllPATs(authId) }
+            verify(exactly = 1) { githubUserService.getAllPATNames(authId) }
         }
 
         @Test
         fun `should return 200 with empty list when no PATs`() {
-            every { githubUserService.getAllPATs(authId) } returns emptyList()
+            every { githubUserService.getAllPATNames(authId) } returns emptyList()
 
             mockMvc
                 .perform(
@@ -96,52 +96,6 @@ class GithubUserControllerTest {
             mockMvc
                 .perform(
                     get("/api/v1/github/pat")
-                        .with(noUserRoleJwt),
-                ).andExpect(status().isForbidden)
-        }
-    }
-
-    @Nested
-    inner class GetPat {
-        @Test
-        fun `should return 200 and the PAT value`() {
-            every {
-                githubUserService.getPAT(authId, match { it.name == validTokenName })
-            } returns validTokenName
-
-            mockMvc
-                .perform(
-                    get("/api/v1/github/pat/$validTokenName")
-                        .with(userJwt),
-                ).andExpect(status().isOk)
-                .andExpect(content().string(validTokenName))
-        }
-
-        @Test
-        fun `should return 404 when PAT not found`() {
-            every {
-                githubUserService.getPAT(authId, match { it.name == validTokenName })
-            } throws GithubUserPatNotFoundException(validTokenName, authId)
-
-            mockMvc
-                .perform(
-                    get("/api/v1/github/pat/$validTokenName")
-                        .with(userJwt),
-                ).andExpect(status().isNotFound)
-        }
-
-        @Test
-        fun `should return 401 when not authenticated`() {
-            mockMvc
-                .perform(get("/api/v1/github/pat/$validTokenName"))
-                .andExpect(status().isUnauthorized)
-        }
-
-        @Test
-        fun `should return 403 when authenticated without USER role`() {
-            mockMvc
-                .perform(
-                    get("/api/v1/github/pat/$validTokenName")
                         .with(noUserRoleJwt),
                 ).andExpect(status().isForbidden)
         }
