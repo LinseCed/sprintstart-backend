@@ -18,7 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
-import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.JwtDecoder
@@ -29,7 +28,6 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @WebMvcTest(SkillController::class)
@@ -63,9 +61,8 @@ class SkillControllerTest(
         mockMvc
             .perform(
                 get("/api/v1/skills")
-                    .with(userJwt) // userJwt has ROLE_USER, which is allowed for this endpoint
-            )
-            .andExpect(status().isOk)
+                    .with(userJwt), // userJwt has ROLE_USER, which is allowed for this endpoint
+            ).andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
         verify(exactly = 1) { skillService.getAllSkills() }
@@ -82,9 +79,8 @@ class SkillControllerTest(
                 post("/api/v1/skills")
                     .with(adminJwt)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-            )
-            .andExpect(status().isCreated)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isCreated)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
         verify(exactly = 1) { skillService.createSkill(request) }
@@ -99,9 +95,8 @@ class SkillControllerTest(
                 post("/api/v1/skills")
                     .with(userJwt)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-            )
-            .andExpect(status().isForbidden)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isForbidden)
 
         verify(exactly = 0) { skillService.createSkill(any()) }
     }
@@ -114,9 +109,8 @@ class SkillControllerTest(
         mockMvc
             .perform(
                 delete("/api/v1/skills/$skillId")
-                    .with(adminJwt)
-            )
-            .andExpect(status().isNoContent)
+                    .with(adminJwt),
+            ).andExpect(status().isNoContent)
 
         verify(exactly = 1) { skillService.deleteSkill(skillId) }
     }
@@ -130,9 +124,8 @@ class SkillControllerTest(
         mockMvc
             .perform(
                 get("/api/v1/users/$userId/skill-assessments/completed")
-                    .with(userJwt)
-            )
-            .andExpect(status().isOk)
+                    .with(userJwt),
+            ).andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
         verify(exactly = 1) { skillService.getUserSkillAssessments(userId) }
@@ -141,7 +134,8 @@ class SkillControllerTest(
     @Test
     fun `assessSkill should return 200`() {
         val request = CreateSkillAssessmentRequest(skillId = UUID.randomUUID(), level = SkillLevel.EXPERT)
-        val assessment = SkillAssessmentDto(userId = UUID.randomUUID(), skillId = request.skillId, level = request.level)
+        val assessment =
+            SkillAssessmentDto(userId = UUID.randomUUID(), skillId = request.skillId, level = request.level)
         every { skillService.assessSkillForMe(any(), request) } returns assessment
 
         mockMvc
@@ -149,9 +143,8 @@ class SkillControllerTest(
                 post("/api/v1/skill-assessments")
                     .with(userJwt)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-            )
-            .andExpect(status().isOk)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
         verify(exactly = 1) { skillService.assessSkillForMe(any(), request) }

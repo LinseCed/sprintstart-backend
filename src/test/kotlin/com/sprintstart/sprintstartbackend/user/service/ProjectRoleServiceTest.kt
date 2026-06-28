@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.user.service
 
+import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.entity.User
-import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
 import com.sprintstart.sprintstartbackend.user.model.request.CreateProjectRoleRequest
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRoleRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
@@ -72,13 +72,13 @@ class ProjectRoleServiceTest {
         val userId = UUID.randomUUID()
         val roleId = UUID.randomUUID()
         val user = User(
-            id = userId, 
+            id = userId,
             authId = "auth1",
             username = "alice",
             firstname = "Alice",
             lastname = "Test",
             workingArea = WorkingArea.BACKEND_DEV,
-            email = null
+            email = null,
         )
         val role = ProjectRole(id = roleId, name = "Dev", description = "Test")
 
@@ -109,13 +109,13 @@ class ProjectRoleServiceTest {
         val userId = UUID.randomUUID()
         val roleId = UUID.randomUUID()
         val user = User(
-            id = userId, 
+            id = userId,
             authId = "auth1",
             username = "alice",
             firstname = "Alice",
             lastname = "Test",
             workingArea = WorkingArea.BACKEND_DEV,
-            email = null
+            email = null,
         )
 
         every { userRepository.findById(userId) } returns Optional.of(user)
@@ -132,13 +132,13 @@ class ProjectRoleServiceTest {
         val roleId = UUID.randomUUID()
         val role = ProjectRole(id = roleId, name = "Dev", description = "Test")
         val user = User(
-            id = userId, 
+            id = userId,
             authId = "auth1",
             username = "alice",
             firstname = "Alice",
             lastname = "Test",
             workingArea = WorkingArea.BACKEND_DEV,
-            email = null
+            email = null,
         )
         user.projectRoles.add(role)
 

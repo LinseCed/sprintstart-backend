@@ -36,15 +36,21 @@ class SkillService(
 
     @Transactional
     fun createSkill(request: CreateSkillRequest): SkillDto {
-        val role = projectRoleRepository.findById(request.roleId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Project role with id ${request.roleId} not found") }
-        
+        val role = projectRoleRepository
+            .findById(request.roleId)
+            .orElseThrow {
+                ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Project role with id ${request.roleId} not found",
+                )
+            }
+
         val skill = Skill(
             name = request.name,
             projectRole = role,
         )
         val savedSkill = skillRepository.save(skill)
-        
+
         return SkillDto(
             id = savedSkill.id,
             name = savedSkill.name,
@@ -76,10 +82,12 @@ class SkillService(
 
     @Transactional
     fun assessSkillForMe(authId: String, request: CreateSkillAssessmentRequest): SkillAssessmentDto {
-        val user = userRepository.findByAuthId(authId)
+        val user = userRepository
+            .findByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with authId $authId not found") }
-        
-        val skill = skillRepository.findById(request.skillId)
+
+        val skill = skillRepository
+            .findById(request.skillId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Skill with id ${request.skillId} not found") }
 
         // Remove existing assessment for this skill

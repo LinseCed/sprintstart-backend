@@ -106,7 +106,10 @@ class SkillController(
      * @param userId The UUID of the user.
      * @return List of the user's skill assessments.
      */
-    @Operation(summary = "Get user skill assessments", description = "Retrieves all completed skill assessments for a specific user.")
+    @Operation(
+        summary = "Get user skill assessments",
+        description = "Retrieves all completed skill assessments for a specific user.",
+    )
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "200", description = "Skill assessments returned successfully"),
@@ -131,7 +134,10 @@ class SkillController(
      * @param request The request containing the skill assessment details.
      * @return The created or updated skill assessment.
      */
-    @Operation(summary = "Assess skill for current user", description = "Assesses a skill for the currently authenticated user.")
+    @Operation(
+        summary = "Assess skill for current user",
+        description = "Assesses a skill for the currently authenticated user.",
+    )
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "200", description = "Skill assessed successfully"),

@@ -16,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
-import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.JwtDecoder
@@ -27,7 +26,6 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @WebMvcTest(ProjectRoleController::class)
@@ -64,9 +62,8 @@ class ProjectRoleControllerTest(
         mockMvc
             .perform(
                 get("/api/v1/projectRoles")
-                    .with(adminJwt)
-            )
-            .andExpect(status().isOk)
+                    .with(adminJwt),
+            ).andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
         verify(exactly = 1) { projectRoleService.getAllRoles() }
@@ -86,9 +83,8 @@ class ProjectRoleControllerTest(
         mockMvc
             .perform(
                 get("/api/v1/projectRoles")
-                    .with(userJwt) // userJwt only has ROLE_USER, but we need ADMIN, PM, or HR
-            )
-            .andExpect(status().isForbidden)
+                    .with(userJwt), // userJwt only has ROLE_USER, but we need ADMIN, PM, or HR
+            ).andExpect(status().isForbidden)
 
         verify(exactly = 0) { projectRoleService.getAllRoles() }
     }
@@ -104,9 +100,8 @@ class ProjectRoleControllerTest(
                 post("/api/v1/projectRoles")
                     .with(adminJwt)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-            )
-            .andExpect(status().isCreated)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isCreated)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
         verify(exactly = 1) { projectRoleService.createRole(request) }
@@ -120,9 +115,8 @@ class ProjectRoleControllerTest(
         mockMvc
             .perform(
                 delete("/api/v1/projectRoles/$roleId")
-                    .with(adminJwt)
-            )
-            .andExpect(status().isNoContent)
+                    .with(adminJwt),
+            ).andExpect(status().isNoContent)
 
         verify(exactly = 1) { projectRoleService.deleteRole(roleId) }
     }
@@ -138,9 +132,8 @@ class ProjectRoleControllerTest(
                 post("/api/v1/users/$userId/project-roles")
                     .with(adminJwt)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-            )
-            .andExpect(status().isOk)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isOk)
 
         verify(exactly = 1) { projectRoleService.assignRoleToUser(userId, request.roleId) }
     }
@@ -154,9 +147,8 @@ class ProjectRoleControllerTest(
         mockMvc
             .perform(
                 delete("/api/v1/users/$userId/project-roles/$roleId")
-                    .with(adminJwt)
-            )
-            .andExpect(status().isNoContent)
+                    .with(adminJwt),
+            ).andExpect(status().isNoContent)
 
         verify(exactly = 1) { projectRoleService.unassignRoleFromUser(userId, roleId) }
     }

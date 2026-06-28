@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.service
 
-import com.sprintstart.sprintstartbackend.user.model.dto.SkillDto
+import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.entity.Skill
 import com.sprintstart.sprintstartbackend.user.model.entity.SkillLevel
@@ -8,7 +8,6 @@ import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.model.entity.UserSkillAssessment
 import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillAssessmentRequest
 import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillRequest
-import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRoleRepository
 import com.sprintstart.sprintstartbackend.user.repository.SkillRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
@@ -20,7 +19,6 @@ import io.mockk.runs
 import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.server.ResponseStatusException
 import java.util.Optional
 import java.util.UUID
@@ -31,7 +29,8 @@ class SkillServiceTest {
     private val projectRoleRepository: ProjectRoleRepository = mockk()
     private val userRepository: UserRepository = mockk()
     private val userSkillAssessmentRepository: UserSkillAssessmentRepository = mockk()
-    private val service = SkillService(skillRepository, projectRoleRepository, userRepository, userSkillAssessmentRepository)
+    private val service =
+        SkillService(skillRepository, projectRoleRepository, userRepository, userSkillAssessmentRepository)
 
     @Test
     fun `getAllSkills returns list of mapped skills`() {
@@ -51,7 +50,7 @@ class SkillServiceTest {
         val roleId = UUID.randomUUID()
         val role = ProjectRole(id = roleId, name = "Dev", description = "Test")
         val request = CreateSkillRequest(name = "Kotlin", roleId = roleId)
-        
+
         every { projectRoleRepository.findById(roleId) } returns Optional.of(role)
         every { skillRepository.save(any()) } answers { firstArg() }
 
@@ -66,7 +65,7 @@ class SkillServiceTest {
     fun `createSkill throws 404 if role not found`() {
         val roleId = UUID.randomUUID()
         val request = CreateSkillRequest(name = "Kotlin", roleId = roleId)
-        
+
         every { projectRoleRepository.findById(roleId) } returns Optional.empty()
 
         assertThrows<ResponseStatusException> {
@@ -99,20 +98,26 @@ class SkillServiceTest {
     fun `assessSkillForMe removes old assessment and saves new one`() {
         val userId = UUID.randomUUID()
         val user = User(
-            id = userId, 
+            id = userId,
             authId = "auth1",
             username = "alice",
             firstname = "Alice",
             lastname = "Test",
             workingArea = WorkingArea.BACKEND_DEV,
-            email = null
+            email = null,
         )
         val skillId = UUID.randomUUID()
-        val skill = Skill(id = skillId, name = "Kotlin", projectRole = ProjectRole(id = UUID.randomUUID(), name = "Dev", description = "Test"))
-        
-        val oldAssessment = UserSkillAssessment(id = UUID.randomUUID(), user = user, skill = skill, level = SkillLevel.BEGINNER)
+        val skill =
+            Skill(
+                id = skillId,
+                name = "Kotlin",
+                projectRole = ProjectRole(id = UUID.randomUUID(), name = "Dev", description = "Test"),
+            )
+
+        val oldAssessment =
+            UserSkillAssessment(id = UUID.randomUUID(), user = user, skill = skill, level = SkillLevel.BEGINNER)
         user.skillAssessments.add(oldAssessment)
-        
+
         val request = CreateSkillAssessmentRequest(skillId = skillId, level = SkillLevel.EXPERT)
 
         every { userRepository.findByAuthId("auth1") } returns Optional.of(user)
@@ -131,17 +136,23 @@ class SkillServiceTest {
     fun `getUserSkillAssessments returns mapped assessments`() {
         val userId = UUID.randomUUID()
         val user = User(
-            id = userId, 
+            id = userId,
             authId = "auth1",
             username = "alice",
             firstname = "Alice",
             lastname = "Test",
             workingArea = WorkingArea.BACKEND_DEV,
-            email = null
+            email = null,
         )
         val skillId = UUID.randomUUID()
-        val skill = Skill(id = skillId, name = "Kotlin", projectRole = ProjectRole(id = UUID.randomUUID(), name = "Dev", description = "Test"))
-        val assessment = UserSkillAssessment(id = UUID.randomUUID(), user = user, skill = skill, level = SkillLevel.EXPERT)
+        val skill =
+            Skill(
+                id = skillId,
+                name = "Kotlin",
+                projectRole = ProjectRole(id = UUID.randomUUID(), name = "Dev", description = "Test"),
+            )
+        val assessment =
+            UserSkillAssessment(id = UUID.randomUUID(), user = user, skill = skill, level = SkillLevel.EXPERT)
         user.skillAssessments.add(assessment)
 
         every { userRepository.existsById(userId) } returns true

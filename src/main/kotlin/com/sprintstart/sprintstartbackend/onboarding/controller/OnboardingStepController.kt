@@ -3,11 +3,11 @@ package com.sprintstart.sprintstartbackend.onboarding.controller
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.request.step.CreateOnboardingStepRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.step.UpdateOnboardingStepRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.response.path.TeamOverviewUserDto
 import com.sprintstart.sprintstartbackend.onboarding.model.response.step.CreateOnboardingStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.step.GetOnboardingStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.step.GetOnboardingStepsResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.step.UpdateOnboardingStepResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.TeamOverviewUserDto
 import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingPathService
 import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingStepService
 import io.swagger.v3.oas.annotations.Operation
@@ -478,8 +478,10 @@ class OnboardingStepController(
      */
     @Operation(
         summary = "Get team overview",
-        description = "Returns a paginated overview of the team's onboarding paths, including overall progress and current steps. " +
-            "Supports filtering by search query, project roles, and projects.",
+        description =
+            "Returns a paginated overview of the team's onboarding paths, including overall progress " +
+                "and current steps. " +
+                "Supports filtering by search query, project roles, and projects.",
     )
     @ApiResponses(
         value = [

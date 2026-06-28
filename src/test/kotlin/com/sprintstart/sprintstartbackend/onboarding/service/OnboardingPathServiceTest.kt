@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
+import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -11,14 +12,10 @@ import io.mockk.verify
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.springframework.web.server.ResponseStatusException
-import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
-import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
-import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
-import com.sprintstart.sprintstartbackend.user.external.dto.UserSkillDto
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
+import org.springframework.web.server.ResponseStatusException
 import java.util.Optional
 import java.util.UUID
 import kotlin.test.assertEquals
@@ -165,16 +162,17 @@ class OnboardingPathServiceTest {
         fun `sorts users by highest progress`() {
             val user1Id = UUID.randomUUID()
             val user2Id = UUID.randomUUID()
-            
+
             val user1 = UserDto(user1Id, "u1", "f1", "l1", null, "DEV", null, emptyList(), emptyList())
             val user2 = UserDto(user2Id, "u2", "f2", "l2", null, "DEV", null, emptyList(), emptyList())
-            
+
             every { userApi.searchUsers(null, null, null, Pageable.unpaged()) } returns PageImpl(listOf(user1, user2))
             every { onboardingPathRepository.findByUserIdIn(listOf(user1Id, user2Id)) } returns listOf(
                 // Empty path for user1 (0% progress)
                 OnboardingPath(userId = user1Id),
-                // User 2 has higher progress (but we just test that it falls back to 0 without phases and sorts by name if both are 0)
-                OnboardingPath(userId = user2Id)
+                // User 2 has higher progress (but we just test that it falls back to 0 without phases
+                // and sorts by name if both are 0)
+                OnboardingPath(userId = user2Id),
             )
 
             val result = service.getTeamOverview(null, null, null, "HIGHEST_PROGRESS", pageable)

@@ -39,9 +39,11 @@ class ProjectRoleService(
 
     @Transactional
     fun assignRoleToUser(userId: UUID, roleId: UUID) {
-        val user = userRepository.findById(userId)
+        val user = userRepository
+            .findById(userId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with id $userId not found") }
-        val role = projectRoleRepository.findById(roleId)
+        val role = projectRoleRepository
+            .findById(roleId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Project role with id $roleId not found") }
 
         user.projectRoles.add(role)
@@ -50,7 +52,8 @@ class ProjectRoleService(
 
     @Transactional
     fun unassignRoleFromUser(userId: UUID, roleId: UUID) {
-        val user = userRepository.findById(userId)
+        val user = userRepository
+            .findById(userId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with id $userId not found") }
         user.projectRoles.removeIf { it.id == roleId }
         userRepository.save(user)
