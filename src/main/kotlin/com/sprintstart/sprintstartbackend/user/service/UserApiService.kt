@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.user.external.UserApi
+import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
@@ -152,4 +153,19 @@ class UserApiService(
             )
         }
     }
+
+    /**
+     * Returns the onboarding-relevant profile for a user identified by auth ID.
+     *
+     * @param authId External authentication identifier.
+     * @return The user's onboarding profile when present.
+     */
+    @Transactional(readOnly = true)
+    override fun getOnboardingProfileByAuthId(authId: String): Optional<UserOnboardingProfile> =
+        userRepository.findByAuthId(authId).map { user ->
+            UserOnboardingProfile(
+                id = user.id,
+                workingArea = user.workingArea,
+            )
+        }
 }

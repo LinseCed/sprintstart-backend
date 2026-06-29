@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.external
 
+import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -37,4 +38,12 @@ interface UserApi {
     ): Page<UserDto>
 
     fun getUsersByIds(ids: List<UUID>): List<UserDto>
+
+    /**
+     * Returns the onboarding-relevant profile for a user identified by auth ID.
+     *
+     * @param authId External authentication identifier.
+     * @return The user's onboarding profile when present.
+     */
+    fun getOnboardingProfileByAuthId(authId: String): Optional<UserOnboardingProfile>
 }

@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
+import com.sprintstart.sprintstartbackend.user.external.events.UserCreatedEvent
 import com.sprintstart.sprintstartbackend.user.external.events.UserWorkingAreaUpdatedEvent
 import com.sprintstart.sprintstartbackend.user.model.dto.DeleteUserResponse
 import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
@@ -60,7 +61,9 @@ class UserService(
                 workingArea = com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea.NO_WORKING_AREA,
                 roles = mutableSetOf(com.sprintstart.sprintstartbackend.user.external.enums.Role.USER),
             )
-            userRepository.save(newUser)
+            val savedUser = userRepository.save(newUser)
+            eventPublisher.publishEvent(UserCreatedEvent(savedUser.id))
+            savedUser
         }
         return user.toGetResponse()
     }

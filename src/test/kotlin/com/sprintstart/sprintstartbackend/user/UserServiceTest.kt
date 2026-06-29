@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.user
 
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.external.enums.WorkingArea
+import com.sprintstart.sprintstartbackend.user.external.events.UserCreatedEvent
 import com.sprintstart.sprintstartbackend.user.external.events.UserWorkingAreaUpdatedEvent
 import com.sprintstart.sprintstartbackend.user.model.dto.PatchMeRequest
 import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserRequest
@@ -59,6 +60,7 @@ class UserServiceTest {
 
         every { userRepository.findByAuthId("missing") } returns Optional.empty()
         every { userRepository.save(any<User>()) } answers { firstArg() }
+        every { eventPublisher.publishEvent(any<UserCreatedEvent>()) } just runs
 
         val result = userService.getMe(jwt)
 
@@ -66,6 +68,7 @@ class UserServiceTest {
         assertThat(result.username).isEqualTo("missingUser")
         assertThat(result.workingArea).isEqualTo(WorkingArea.NO_WORKING_AREA)
         verify(exactly = 1) { userRepository.save(any<User>()) }
+        verify(exactly = 1) { eventPublisher.publishEvent(any<UserCreatedEvent>()) }
     }
 
     @Test
