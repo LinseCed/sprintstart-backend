@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.canonical.service
 import com.sprintstart.sprintstartbackend.canonical.model.entity.FinishedTypes
 import com.sprintstart.sprintstartbackend.canonical.model.entity.IngestionRunStatus
 import com.sprintstart.sprintstartbackend.canonical.repository.IngestionRunRepository
+import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.UUID
@@ -32,6 +33,7 @@ class GithubFetchingCompletionTracker(
      *
      * @throws NoSuchElementException when the run id does not exist
      */
+    @Transactional
     fun markFetchPhaseFinished(runId: UUID, finishedType: FinishedTypes) {
         val run = ingestionRunRepository
             .findById(runId)

@@ -33,4 +33,5 @@ class IngestionRun(
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var status: IngestionRunStatus,
+    var failureReason: String? = null
 )

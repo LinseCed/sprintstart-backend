@@ -10,6 +10,7 @@ import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFil
 import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileFetchedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFilesFetchCompletedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFilesFetchFailedEvent
+import org.springframework.context.event.EventListener
 import org.springframework.modulith.events.ApplicationModuleListener
 import org.springframework.stereotype.Component
 
@@ -20,14 +21,14 @@ internal class GithubFileListener(
     private val githubArtifactMapper: GithubArtifactMapper,
     private val githubArtifactFailedMapper: GithubArtifactFailedMapper,
 ) {
-    @ApplicationModuleListener
+    @EventListener
     fun on(
         event: GithubFileFetchedEvent,
     ) {
         artifactIngestionService.ingest(githubArtifactMapper.toCommand(event))
     }
 
-    @ApplicationModuleListener
+    @EventListener
     fun on(
         event: GithubFilesFetchCompletedEvent,
     ) {
@@ -37,14 +38,14 @@ internal class GithubFileListener(
         )
     }
 
-    @ApplicationModuleListener
+    @EventListener
     fun on(
         event: GithubFileFetchFailedEvent,
     ) {
         artifactIngestionService.addFailedArtifact(githubArtifactFailedMapper.toCommand(event))
     }
 
-    @ApplicationModuleListener
+    @EventListener
     fun on(
         event: GithubFilesFetchFailedEvent,
     ) {
@@ -54,7 +55,7 @@ internal class GithubFileListener(
         )
     }
 
-    @ApplicationModuleListener
+    @EventListener
     fun on(
         event: GithubFileDeletedEvent,
     ) {

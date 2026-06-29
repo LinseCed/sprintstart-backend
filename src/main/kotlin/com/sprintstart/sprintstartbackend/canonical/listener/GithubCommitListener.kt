@@ -9,6 +9,7 @@ import com.sprintstart.sprintstartbackend.github.external.events.commits.GithubC
 import com.sprintstart.sprintstartbackend.github.external.events.commits.GithubCommitFetchedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.commits.GithubCommitsFetchCompletedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.commits.GithubCommitsFetchFailedEvent
+import org.springframework.context.event.EventListener
 import org.springframework.modulith.events.ApplicationModuleListener
 import org.springframework.stereotype.Component
 
@@ -19,14 +20,14 @@ internal class GithubCommitListener(
     private val githubArtifactMapper: GithubArtifactMapper,
     private val githubArtifactFailedMapper: GithubArtifactFailedMapper,
 ) {
-    @ApplicationModuleListener
+    @EventListener
     fun on(
         event: GithubCommitFetchedEvent,
     ) {
         artifactIngestionService.ingest(githubArtifactMapper.toCommand(event))
     }
 
-    @ApplicationModuleListener
+    @EventListener
     fun on(
         event: GithubCommitsFetchCompletedEvent,
     ) {
@@ -36,14 +37,14 @@ internal class GithubCommitListener(
         )
     }
 
-    @ApplicationModuleListener
+    @EventListener
     fun on(
         event: GithubCommitFetchFailedEvent,
     ) {
         artifactIngestionService.addFailedArtifact(githubArtifactFailedMapper.toCommand(event))
     }
 
-    @ApplicationModuleListener
+    @EventListener
     fun on(
         event: GithubCommitsFetchFailedEvent,
     ) {

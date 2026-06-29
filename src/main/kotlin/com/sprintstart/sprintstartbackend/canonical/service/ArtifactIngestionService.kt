@@ -16,6 +16,7 @@ import jakarta.transaction.Transactional
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import java.util.UUID
+import kotlin.jvm.optionals.getOrNull
 
 /**
  * Owns writes to the canonical artifact store and the mutable parts of `IngestionRun`.
@@ -122,13 +123,21 @@ class ArtifactIngestionService(
      * connection setup, active fetching, and immediate startup failures.
      */
     @Transactional
-    fun startRun(transactionId: UUID, sourceSystem: SourceSystem, status: IngestionRunStatus) {
-        val ingestionRun = IngestionRun(
-            id = transactionId,
-            sourceSystem = sourceSystem,
-            status = status,
-        )
-        ingestionRunRepository.save(ingestionRun)
+    fun startRun(transactionId: UUID, sourceSystem: SourceSystem, status: IngestionRunStatus, failureReason: String? = null) {
+        val ingestionRun = ingestionRunRepository.findByIdOrNull(transactionId)
+        if(ingestionRun == null) {
+            val ingestionRun = IngestionRun(
+                id = transactionId,
+                sourceSystem = sourceSystem,
+                status = status,
+                failureReason = failureReason
+            )
+            ingestionRunRepository.save(ingestionRun)
+        }else{
+            ingestionRun.status = status
+            ingestionRun.failureReason = failureReason
+        }
+
     }
 
     /**

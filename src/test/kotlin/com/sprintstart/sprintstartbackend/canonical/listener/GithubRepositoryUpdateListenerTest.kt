@@ -3,8 +3,8 @@ package com.sprintstart.sprintstartbackend.canonical.listener
 import com.sprintstart.sprintstartbackend.canonical.model.entity.IngestionRunStatus
 import com.sprintstart.sprintstartbackend.canonical.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.canonical.service.ArtifactIngestionService
-import com.sprintstart.sprintstartbackend.github.external.events.initial.GithubRepositoryConnectionInitiatedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.initial.GithubRepositoryConnectionInitiationFailedEvent
+import com.sprintstart.sprintstartbackend.github.external.events.update.GithubRepositoryUpdateFailedEvent
+import com.sprintstart.sprintstartbackend.github.external.events.update.GithubRepositoryUpdateStartedEvent
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -13,17 +13,17 @@ import io.mockk.verify
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
-class GithubRepositoryConnectionListenerTest {
+class GithubRepositoryUpdateListenerTest {
     private val artifactIngestionService = mockk<ArtifactIngestionService>()
-    private val listener = GithubRepositoryConnectionListener(artifactIngestionService)
+    private val listener = GithubRepositoryUpdateListener(artifactIngestionService)
 
     @Test
-    fun `initiated event starts connected github run`() {
+    fun `update started event starts connected github run`() {
         val runId = UUID.randomUUID()
         every { artifactIngestionService.startRun(any(), any(), any(), any()) } just runs
 
         listener.on(
-            GithubRepositoryConnectionInitiatedEvent(
+            GithubRepositoryUpdateStartedEvent(
                 transactionId = runId,
                 owner = "owner",
                 name = "repo",
@@ -41,16 +41,16 @@ class GithubRepositoryConnectionListenerTest {
     }
 
     @Test
-    fun `failed initiation event starts failed github run`() {
+    fun `update failed event starts failed github run with failure reason`() {
         val runId = UUID.randomUUID()
         every { artifactIngestionService.startRun(any(), any(), any(), any()) } just runs
 
         listener.on(
-            GithubRepositoryConnectionInitiationFailedEvent(
+            GithubRepositoryUpdateFailedEvent(
                 transactionId = runId,
                 owner = "owner",
                 name = "repo",
-                reason = "Token rejected",
+                reason = "Snapshot missing",
             ),
         )
 
@@ -59,7 +59,7 @@ class GithubRepositoryConnectionListenerTest {
                 transactionId = runId,
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.FAILED,
-                failureReason = "Token rejected",
+                failureReason = "Snapshot missing",
             )
         }
     }

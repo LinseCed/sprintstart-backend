@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.canonical.service.GithubFetchingComple
 import com.sprintstart.sprintstartbackend.github.external.events.issues.GithubIssueFetchedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.issues.GithubIssuesFetchCompletedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.issues.GithubIssuesFetchFailedEvent
+import org.springframework.context.event.EventListener
 import org.springframework.modulith.events.ApplicationModuleListener
 import org.springframework.stereotype.Component
 
@@ -16,14 +17,14 @@ internal class GithubIssueListener(
     private val gitHubFetchingCompletionTracker: GithubFetchingCompletionTracker,
     private val githubArtifactMapper: GithubArtifactMapper,
 ) {
-    @ApplicationModuleListener
+    @EventListener
     fun on(
         event: GithubIssueFetchedEvent,
     ) {
         artifactIngestionService.ingest(githubArtifactMapper.toCommand(event))
     }
 
-    @ApplicationModuleListener
+    @EventListener
     fun on(
         event: GithubIssuesFetchCompletedEvent,
     ) {
@@ -33,7 +34,7 @@ internal class GithubIssueListener(
         )
     }
 
-    @ApplicationModuleListener
+    @EventListener
     fun on(
         event: GithubIssuesFetchFailedEvent,
     ) {
