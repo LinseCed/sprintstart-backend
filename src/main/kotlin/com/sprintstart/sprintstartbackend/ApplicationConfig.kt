@@ -71,6 +71,8 @@ data class KeycloakAdminConfig(
     val clientSecret: String? = null,
     val username: String? = null,
     val password: String? = null,
+)
+
 /**
  * Configuration class representing cryptographic parameters.
  *
