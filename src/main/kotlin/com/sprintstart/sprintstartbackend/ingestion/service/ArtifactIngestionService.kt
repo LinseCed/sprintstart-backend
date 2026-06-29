@@ -44,7 +44,8 @@ class ArtifactIngestionService(
      * - `ingestedCount` increments only when a new artifact row is created
      * - `updatedCount` increments only when an existing artifact is changed
      *
-     * @throws IllegalArgumentException when the referenced ingestion run does not exist
+     * @param command [ArtifactCommand] the command containing all data needed for ingestion.
+     * @throws IllegalArgumentException when the referenced ingestion run does not exist.
      */
     @Transactional
     fun ingest(command: ArtifactCommand) {
@@ -125,6 +126,9 @@ class ArtifactIngestionService(
      * connection setup, active fetching, and immediate startup failures. If the run already
      * exists, the mutable lifecycle fields are updated instead of creating a duplicate row.
      *
+     * @param transactionId The id of the transaction to start.
+     * @param sourceSystem [SourceSystem] The source of the new run.
+     * @param status [IngestionRunStatus] The status of the ingestion run.
      * @param failureReason Optional run-level failure reason for lifecycle failures.
      */
     @Transactional
@@ -153,6 +157,8 @@ class ArtifactIngestionService(
      * Updates the run status inside a transaction so listener-triggered state transitions are
      * persisted even when they only mutate the managed entity.
      *
+     * @param transactionId The id of the transaction to update the status of.
+     * @param status [IngestionRunStatus] The new status.
      * @throws IllegalArgumentException when the run id is unknown
      */
     @Transactional
@@ -170,6 +176,7 @@ class ArtifactIngestionService(
      * The individual failed item is preserved for status/history views that need artifact-level
      * error details without scanning connector logs.
      *
+     * @param command [ArtifactFailedCommand] The command for a failed artifact containing all data needed.
      * @throws IllegalArgumentException when the run id is unknown
      */
     @Transactional
@@ -193,6 +200,8 @@ class ArtifactIngestionService(
      *
      * This does not affect historic run counters; it only removes the current file artifact row
      * addressed by the ingestion GitHub `sourceId`.
+     *
+     * @param event [GithubFileDeletedEvent] The event, emitted by the GitHub module, indicating a file deletion.
      */
     @Transactional
     fun unIngestFileArtifact(event: GithubFileDeletedEvent) {
