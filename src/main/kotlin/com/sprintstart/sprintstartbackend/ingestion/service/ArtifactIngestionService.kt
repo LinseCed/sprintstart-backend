@@ -60,6 +60,7 @@ class ArtifactIngestionService(
                     return
                 }
             }
+
             ArtifactType.FILE,
             -> {
                 artifact = artifactRepository.findBySourceId(command.sourceId)
@@ -72,6 +73,7 @@ class ArtifactIngestionService(
                     return
                 }
             }
+
             ArtifactType.ISSUE,
             -> {
                 artifact = artifactRepository.findBySourceId(command.sourceId)
@@ -84,6 +86,7 @@ class ArtifactIngestionService(
                     return
                 }
             }
+
             ArtifactType.PULL_REQUEST,
             -> {
                 artifact = artifactRepository.findBySourceId(command.sourceId)

@@ -26,6 +26,7 @@ class Artifact(
     @Column(nullable = false)
     val artifactType: ArtifactType,
     var title: String?,
+    @Column(columnDefinition = "TEXT")
     var bodyText: String?,
     val mime: String?,
     val language: String?,
