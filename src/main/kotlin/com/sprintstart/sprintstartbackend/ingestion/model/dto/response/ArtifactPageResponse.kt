@@ -4,5 +4,5 @@ import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactR
 
 data class ArtifactPageResponse(
     val items: List<ArtifactResponse>,
-    val page: PageMetadata
+    val page: PageMetadata,
 )

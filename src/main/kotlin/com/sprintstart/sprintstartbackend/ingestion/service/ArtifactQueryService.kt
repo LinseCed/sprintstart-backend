@@ -38,7 +38,7 @@ class ArtifactQueryService(
         )
     }
 
-    /*fun getProjectArtifacts(page: Int, size: Int, filter: String?, projectId: String) : ArtifactPageResponse{
+    fun getProjectArtifacts(page: Int, size: Int, filter: String?, projectId: String) : ArtifactPageResponse{
 
-    }*/
+    }
 }
