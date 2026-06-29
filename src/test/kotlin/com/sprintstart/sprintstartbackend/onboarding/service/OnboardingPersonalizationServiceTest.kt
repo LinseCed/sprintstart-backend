@@ -73,7 +73,7 @@ class OnboardingPersonalizationServiceTest {
             coEvery { blueprintService.ensureScopesExist(listOf("global", "area:backend")) } just runs
             every { blueprintRepository.findByScopeAndStatus(any(), BlueprintStatus.ACTIVE) } returns null
             every { onboardingPathRepository.deleteByUserId(userId) } just runs
-            every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
+            every { onboardingAiClient.generatePath(any(), any(), any(), any()) } returns flowOf(
                 OnboardingAiPathEvent(type = "done"),
             )
 
@@ -88,7 +88,7 @@ class OnboardingPersonalizationServiceTest {
             coEvery { blueprintService.ensureScopesExist(any()) } just runs
             every { blueprintRepository.findByScopeAndStatus(any(), BlueprintStatus.ACTIVE) } returns null
             every { onboardingPathRepository.deleteByUserId(userId) } just runs
-            every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
+            every { onboardingAiClient.generatePath(any(), any(), any(), any()) } returns flowOf(
                 OnboardingAiPathEvent(type = "done"),
             )
 
@@ -115,7 +115,7 @@ class OnboardingPersonalizationServiceTest {
             } returns null
             every { onboardingPathRepository.deleteByUserId(userId) } just runs
             every {
-                onboardingAiClient.generatePath(any(), any(), capture(blueprintSlot))
+                onboardingAiClient.generatePath(any(), any(), any(), capture(blueprintSlot))
             } returns flowOf(OnboardingAiPathEvent(type = "done"))
 
             service.personalize(authId).toList()
@@ -130,7 +130,7 @@ class OnboardingPersonalizationServiceTest {
             coEvery { blueprintService.ensureScopesExist(any()) } just runs
             every { blueprintRepository.findByScopeAndStatus(any(), BlueprintStatus.ACTIVE) } returns null
             every { onboardingPathRepository.deleteByUserId(userId) } just runs
-            every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
+            every { onboardingAiClient.generatePath(any(), any(), any(), any()) } returns flowOf(
                 OnboardingAiPathEvent(type = "stage", name = "retrieve", detail = "Retrieving documents"),
                 OnboardingAiPathEvent(type = "done"),
             )
@@ -150,7 +150,7 @@ class OnboardingPersonalizationServiceTest {
             coEvery { blueprintService.ensureScopesExist(any()) } just runs
             every { blueprintRepository.findByScopeAndStatus(any(), BlueprintStatus.ACTIVE) } returns null
             every { onboardingPathRepository.deleteByUserId(userId) } just runs
-            every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
+            every { onboardingAiClient.generatePath(any(), any(), any(), any()) } returns flowOf(
                 OnboardingAiPathEvent(type = "error", message = "LLM unavailable"),
             )
 
@@ -168,7 +168,7 @@ class OnboardingPersonalizationServiceTest {
             coEvery { blueprintService.ensureScopesExist(any()) } just runs
             every { blueprintRepository.findByScopeAndStatus(any(), BlueprintStatus.ACTIVE) } returns null
             every { onboardingPathRepository.deleteByUserId(userId) } just runs
-            every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
+            every { onboardingAiClient.generatePath(any(), any(), any(), any()) } returns flowOf(
                 OnboardingAiPathEvent(type = "path", path = path),
             )
             every { onboardingPathRepository.save(any()) } answers { firstArg() }
@@ -187,7 +187,7 @@ class OnboardingPersonalizationServiceTest {
             coEvery { blueprintService.ensureScopesExist(any()) } just runs
             every { blueprintRepository.findByScopeAndStatus(any(), BlueprintStatus.ACTIVE) } returns null
             every { onboardingPathRepository.deleteByUserId(userId) } just runs
-            every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
+            every { onboardingAiClient.generatePath(any(), any(), any(), any()) } returns flowOf(
                 OnboardingAiPathEvent(type = "done"),
             )
 

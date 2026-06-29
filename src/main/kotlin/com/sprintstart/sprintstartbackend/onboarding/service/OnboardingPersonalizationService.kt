@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingAiPathEvent
+import com.sprintstart.sprintstartbackend.onboarding.external.model.SkillAssessmentSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toEntities
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toGetForUserResponse
@@ -66,6 +67,11 @@ class OnboardingPersonalizationService(
 
         val workingArea = profile.workingArea.toAiScope()
         val experience = profile.experience
+        // The user's leveled skill assessments are what let proficiency drive AI
+        // personalization. They are not part of the onboarding profile yet (they land
+        // with the user-skills feature), so send an empty list until then — the wire
+        // contract already carries {name, level}, so populating this is a one-liner.
+        val skills = emptyList<SkillAssessmentSchema>()
         val requiredScopes = listOf("global", "area:$workingArea")
 
         return flow {
@@ -84,7 +90,7 @@ class OnboardingPersonalizationService(
 
             emitAll(
                 onboardingAiClient
-                    .generatePath(workingArea, experience, blueprints)
+                    .generatePath(workingArea, experience, skills, blueprints)
                     .map { event -> event.toSseEvent(profile.id) },
             )
         }.catch { e ->

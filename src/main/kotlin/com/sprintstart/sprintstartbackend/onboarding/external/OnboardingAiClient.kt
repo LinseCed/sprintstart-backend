@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlue
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateOnboardingPathRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingAiPathEvent
+import com.sprintstart.sprintstartbackend.onboarding.external.model.SkillAssessmentSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
@@ -30,12 +31,14 @@ class OnboardingAiClient(
      *
      * @param workingArea The user's working area scope (e.g. `backend`).
      * @param experience The user's self-reported experience level, or `null` if unknown.
+     * @param skills The user's leveled skill assessments; lets proficiency drive personalization.
      * @param blueprints The active blueprints the AI should personalize; empty yields a generic path.
      * @return A cold [Flow] of [OnboardingAiPathEvent]s emitted as generation progresses.
      */
     fun generatePath(
         workingArea: String,
         experience: String?,
+        skills: List<SkillAssessmentSchema> = emptyList(),
         blueprints: List<BlueprintSchema> = emptyList(),
     ): Flow<OnboardingAiPathEvent> =
         webClient
@@ -45,6 +48,7 @@ class OnboardingAiClient(
                 GenerateOnboardingPathRequest(
                     workingArea = workingArea,
                     experience = experience,
+                    skills = skills,
                     blueprints = blueprints,
                 ),
             ).stream()

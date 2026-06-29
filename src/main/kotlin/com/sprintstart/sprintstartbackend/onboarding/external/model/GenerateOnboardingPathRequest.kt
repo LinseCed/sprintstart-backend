@@ -35,12 +35,26 @@ data class BlueprintSchema(
     val provenance: BlueprintProvenanceSchema? = null,
 )
 
+/**
+ * A user's assessed skill with a proficiency [level], mirroring the AI service's
+ * `SkillAssessmentSchema` and the frontend `UserSkillAssessment`. Carrying the
+ * level (instead of a bare tag) lets proficiency drive AI personalization.
+ *
+ * [level] is one of `beginner`, `intermediate`, `advanced`, `expert`
+ * (case-insensitive; unknown values are handled gracefully by the AI service).
+ */
+@Serializable
+data class SkillAssessmentSchema(
+    val name: String,
+    val level: String = "beginner",
+)
+
 @Serializable
 data class GenerateOnboardingPathRequest(
     @SerialName("working_area")
     val workingArea: String,
     val experience: String? = null,
-    val skills: List<String> = emptyList(),
+    val skills: List<SkillAssessmentSchema> = emptyList(),
     val tags: List<String> = emptyList(),
     val blueprints: List<BlueprintSchema> = emptyList(),
 )
