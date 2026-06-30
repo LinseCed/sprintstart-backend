@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFil
 import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileFetchedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFilesFetchCompletedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFilesFetchFailedEvent
+import com.sprintstart.sprintstartbackend.ingestion.listener.github.GithubFileListener
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
@@ -39,11 +40,11 @@ class GithubFileListenerTest {
         val event = fileFetchedEvent()
         val command = artifactCommand(event.transactionId)
         every { artifactMapper.toCommand(event) } returns command
-        every { artifactIngestionService.ingest(command) } just runs
+        every { artifactIngestionService.persistArtifact(command) } just runs
 
         listener.on(event)
 
-        verify(exactly = 1) { artifactIngestionService.ingest(command) }
+        verify(exactly = 1) { artifactIngestionService.persistArtifact(command) }
     }
 
     @Test
@@ -117,11 +118,11 @@ class GithubFileListenerTest {
             repositoryName = "repo",
             path = "src/main/App.kt",
         )
-        every { artifactIngestionService.unIngestFileArtifact(event) } just runs
+        every { artifactIngestionService.deleteFileArtifact(event) } just runs
 
         listener.on(event)
 
-        verify(exactly = 1) { artifactIngestionService.unIngestFileArtifact(event) }
+        verify(exactly = 1) { artifactIngestionService.deleteFileArtifact(event) }
     }
 
     private fun fileFetchedEvent() = GithubFileFetchedEvent(

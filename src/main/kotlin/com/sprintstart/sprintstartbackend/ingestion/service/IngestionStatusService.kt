@@ -1,11 +1,14 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
+import com.sprintstart.sprintstartbackend.ingestion.events.RunFinishedEvent
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.SourceIngestionStatusResponse
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.FinishedTypes
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
+import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import jakarta.transaction.Transactional
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.UUID
@@ -20,6 +23,7 @@ import java.util.UUID
 @Service
 class IngestionStatusService(
     private val ingestionRunRepository: IngestionRunRepository,
+    private val publisher: ApplicationEventPublisher,
 ) {
     /**
      * Returns the latest status row for each source currently exposed by the API.
@@ -57,13 +61,13 @@ class IngestionStatusService(
      *
      * @param runId The unique identifier of the ingestion run whose phase has finished.
      * @param finishedType The GitHub fetch phase that reached a terminal state.
-     * @throws NoSuchElementException when the run id does not exist
+     * @throws IngestionRunNotFoundException when the run id does not exist
      */
     @Transactional
     fun markFetchPhaseFinished(runId: UUID, finishedType: FinishedTypes) {
         val run = ingestionRunRepository
             .findById(runId)
-            .orElseThrow { NoSuchElementException("Run with id $runId not found") }
+            .orElseThrow { IngestionRunNotFoundException(runId) }
         run.finishedTypes.add(finishedType)
         if (run.finishedTypes.containsAll(FinishedTypes.entries)) {
             if (run.failedCount > 0) {
@@ -77,5 +81,8 @@ class IngestionStatusService(
             }
         }
         run.finishedAt = Instant.now()
+        if (run.status in setOf(IngestionRunStatus.COMPLETED, IngestionRunStatus.PARTIAL)) {
+            publisher.publishEvent(RunFinishedEvent(run.id))
+        }
     }
 }

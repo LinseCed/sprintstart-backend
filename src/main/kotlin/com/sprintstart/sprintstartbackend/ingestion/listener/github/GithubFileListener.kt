@@ -1,9 +1,10 @@
-package com.sprintstart.sprintstartbackend.ingestion.listener
+package com.sprintstart.sprintstartbackend.ingestion.listener.github
 
-import com.sprintstart.sprintstartbackend.github.external.events.commits.GithubCommitFetchFailedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.commits.GithubCommitFetchedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.commits.GithubCommitsFetchCompletedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.commits.GithubCommitsFetchFailedEvent
+import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileDeletedEvent
+import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileFetchFailedEvent
+import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileFetchedEvent
+import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFilesFetchCompletedEvent
+import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFilesFetchFailedEvent
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.FinishedTypes
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.GithubArtifactFailedMapper
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.GithubArtifactMapper
@@ -13,7 +14,7 @@ import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
 
 @Component
-internal class GithubCommitListener(
+internal class GithubFileListener(
     private val artifactIngestionService: ArtifactIngestionService,
     private val githubArtifactMapper: GithubArtifactMapper,
     private val githubArtifactFailedMapper: GithubArtifactFailedMapper,
@@ -21,35 +22,42 @@ internal class GithubCommitListener(
 ) {
     @EventListener
     fun on(
-        event: GithubCommitFetchedEvent,
+        event: GithubFileFetchedEvent,
     ) {
-        artifactIngestionService.ingest(githubArtifactMapper.toCommand(event))
+        artifactIngestionService.persistArtifact(githubArtifactMapper.toCommand(event))
     }
 
     @EventListener
     fun on(
-        event: GithubCommitsFetchCompletedEvent,
+        event: GithubFilesFetchCompletedEvent,
     ) {
         ingestionStatusService.markFetchPhaseFinished(
             event.transactionId,
-            finishedType = FinishedTypes.COMMITS,
+            finishedType = FinishedTypes.FILES,
         )
     }
 
     @EventListener
     fun on(
-        event: GithubCommitFetchFailedEvent,
+        event: GithubFileFetchFailedEvent,
     ) {
         artifactIngestionService.addFailedArtifact(githubArtifactFailedMapper.toCommand(event))
     }
 
     @EventListener
     fun on(
-        event: GithubCommitsFetchFailedEvent,
+        event: GithubFilesFetchFailedEvent,
     ) {
         ingestionStatusService.markFetchPhaseFinished(
             event.transactionId,
-            finishedType = FinishedTypes.COMMITS,
+            finishedType = FinishedTypes.FILES,
         )
+    }
+
+    @EventListener
+    fun on(
+        event: GithubFileDeletedEvent,
+    ) {
+        artifactIngestionService.deleteFileArtifact(event)
     }
 }

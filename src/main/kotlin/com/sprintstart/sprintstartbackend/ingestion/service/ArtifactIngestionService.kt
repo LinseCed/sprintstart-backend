@@ -9,7 +9,9 @@ import com.sprintstart.sprintstartbackend.ingestion.model.entity.FailedArtifact
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
+import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.SourceIdFactory.buildSourceId
+import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ingestion.ArtifactAiMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import jakarta.transaction.Transactional
@@ -31,6 +33,7 @@ import java.util.UUID
 class ArtifactIngestionService(
     private val ingestionRunRepository: IngestionRunRepository,
     private val artifactRepository: ArtifactRepository,
+    private val artifactAiMapper: ArtifactAiMapper,
 ) {
     /**
      * Persists or updates an ingestion artifact for the active ingestion run.
@@ -46,14 +49,14 @@ class ArtifactIngestionService(
      * - `updatedCount` increments only when an existing artifact is changed
      *
      * @param command [ArtifactCommand] the command containing all data needed for ingestion.
-     * @throws IllegalArgumentException when the referenced ingestion run does not exist.
+     * @throws IngestionRunNotFoundException when the referenced ingestion run does not exist.
      */
     @Transactional
-    fun ingest(command: ArtifactCommand) {
+    fun persistArtifact(command: ArtifactCommand) {
         var artifact: Artifact?
         val ingestionRun = ingestionRunRepository
             .findByIdOrNull(command.ingestionRunId)
-            ?: throw IllegalArgumentException("Run with id ${command.ingestionRunId} not found")
+            ?: throw IngestionRunNotFoundException(command.ingestionRunId)
         when (command.artifactType) {
             ArtifactType.COMMIT,
             -> {
@@ -162,13 +165,13 @@ class ArtifactIngestionService(
      *
      * @param transactionId The id of the transaction to update the status of.
      * @param status [IngestionRunStatus] The new status.
-     * @throws IllegalArgumentException when the run id is unknown
+     * @throws IngestionRunNotFoundException when the run id is unknown
      */
     @Transactional
     fun updateRunStatus(transactionId: UUID, status: IngestionRunStatus) {
         val run = ingestionRunRepository
             .findByIdOrNull(transactionId)
-            ?: throw IllegalArgumentException("Run with id $transactionId not found")
+            ?: throw IngestionRunNotFoundException(transactionId)
         run.status = status
     }
 
@@ -180,13 +183,13 @@ class ArtifactIngestionService(
      * error details without scanning connector logs.
      *
      * @param command [ArtifactFailedCommand] The command for a failed artifact containing all data needed.
-     * @throws IllegalArgumentException when the run id is unknown
+     * @throws IngestionRunNotFoundException when the run id is unknown
      */
     @Transactional
     fun addFailedArtifact(command: ArtifactFailedCommand) {
         val run = ingestionRunRepository
             .findByIdOrNull(command.transactionId)
-            ?: throw IllegalArgumentException("Run with id ${command.transactionId} not found")
+            ?: throw IngestionRunNotFoundException(command.transactionId)
         run.failedItems.add(
             FailedArtifact(
                 sourceId = command.sourceId,
@@ -199,22 +202,30 @@ class ArtifactIngestionService(
     }
 
     /**
-     * Removes an ingestion file artifact when GitHub reports that the source file was deleted.
+     * Removes an ingestion file artifact when GitHub reports that the source file was deleted and
+     * records its id for AI deindexing at the end of the run.
      *
-     * This does not affect historic run counters; it only removes the current file artifact row
-     * addressed by the ingestion GitHub `sourceId`.
+     * This does not affect historic run counters. If no stored artifact exists for the deleted
+     * source file, the method leaves the run unchanged.
      *
      * @param event [GithubFileDeletedEvent] The event, emitted by the GitHub module, indicating a file deletion.
+     * @throws IngestionRunNotFoundException when the run id is unknown.
      */
     @Transactional
-    fun unIngestFileArtifact(event: GithubFileDeletedEvent) {
-        artifactRepository.deleteBySourceId(
-            buildSourceId(
-                repositoryOwner = event.repositoryOwner,
-                repositoryName = event.repositoryName,
-                type = ArtifactType.FILE,
-                unique = event.path,
-            ),
+    fun deleteFileArtifact(event: GithubFileDeletedEvent) {
+        val run = ingestionRunRepository.findByIdOrNull(event.transactionId)
+            ?: throw IngestionRunNotFoundException(event.transactionId)
+
+        val sourceId = buildSourceId(
+            repositoryOwner = event.repositoryOwner,
+            repositoryName = event.repositoryName,
+            type = ArtifactType.FILE,
+            unique = event.path,
         )
+        val artifact = artifactRepository.findBySourceId(sourceId) ?: return
+
+        artifactRepository.deleteById(artifact.id)
+
+        run.artifactIdsToDeindex.add(artifact.id.toString())
     }
 }
