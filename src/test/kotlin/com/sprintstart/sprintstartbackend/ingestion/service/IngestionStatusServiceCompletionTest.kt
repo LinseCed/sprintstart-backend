@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
+import com.sprintstart.sprintstartbackend.ingestion.events.RunFinishedEvent
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.FinishedTypes
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
@@ -8,15 +9,18 @@ import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRu
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.springframework.context.ApplicationEventPublisher
 import java.util.Optional
 import java.util.UUID
 
 class IngestionStatusServiceCompletionTest {
     private val ingestionRunRepository = mockk<IngestionRunRepository>()
-    private val service = IngestionStatusService(ingestionRunRepository)
+    private val publisher = mockk<ApplicationEventPublisher>(relaxed = true)
+    private val service = IngestionStatusService(ingestionRunRepository, publisher)
 
     @Test
     fun `markFetchPhaseFinished keeps run running until all phases complete`() {
@@ -28,6 +32,7 @@ class IngestionStatusServiceCompletionTest {
         assertThat(run.finishedTypes).containsExactly(FinishedTypes.FILES)
         assertThat(run.status).isEqualTo(IngestionRunStatus.RUNNING)
         assertThat(run.finishedAt).isNotNull()
+        verify(exactly = 0) { publisher.publishEvent(any()) }
     }
 
     @Test
@@ -46,6 +51,7 @@ class IngestionStatusServiceCompletionTest {
         assertThat(run.status).isEqualTo(IngestionRunStatus.COMPLETED)
         assertThat(run.finishedTypes).containsAll(FinishedTypes.entries)
         assertThat(run.finishedAt).isNotNull()
+        verify(exactly = 1) { publisher.publishEvent(RunFinishedEvent(run.id)) }
     }
 
     @Test
@@ -64,6 +70,7 @@ class IngestionStatusServiceCompletionTest {
         service.markFetchPhaseFinished(run.id, FinishedTypes.PULL_REQUESTS)
 
         assertThat(run.status).isEqualTo(IngestionRunStatus.PARTIAL)
+        verify(exactly = 1) { publisher.publishEvent(RunFinishedEvent(run.id)) }
     }
 
     @Test
@@ -81,6 +88,7 @@ class IngestionStatusServiceCompletionTest {
         service.markFetchPhaseFinished(run.id, FinishedTypes.PULL_REQUESTS)
 
         assertThat(run.status).isEqualTo(IngestionRunStatus.FAILED)
+        verify(exactly = 0) { publisher.publishEvent(any()) }
     }
 
     @Test

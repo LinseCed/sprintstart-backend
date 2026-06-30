@@ -6,8 +6,8 @@ import org.springframework.stereotype.Component
 
 @Component
 class ArtifactAiMapper {
-    fun toRequest(artifact: Artifact) = ArtifactAiIngestRequest(
-        id = artifact.id.toString(),
+    fun toIngestRequest(artifact: Artifact) = ArtifactAiIngestRequest(
+        artifactId = artifact.id.toString(),
         sourceSystem = artifact.sourceSystem,
         sourceId = artifact.sourceId,
         sourceUrl = artifact.sourceUrl,

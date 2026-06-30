@@ -118,11 +118,11 @@ class GithubFileListenerTest {
             repositoryName = "repo",
             path = "src/main/App.kt",
         )
-        every { artifactIngestionService.unIngestFileArtifact(event) } just runs
+        every { artifactIngestionService.deleteFileArtifact(event) } just runs
 
         listener.on(event)
 
-        verify(exactly = 1) { artifactIngestionService.unIngestFileArtifact(event) }
+        verify(exactly = 1) { artifactIngestionService.deleteFileArtifact(event) }
     }
 
     private fun fileFetchedEvent() = GithubFileFetchedEvent(

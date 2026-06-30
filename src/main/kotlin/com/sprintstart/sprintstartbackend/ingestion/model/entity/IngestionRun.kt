@@ -28,6 +28,8 @@ class IngestionRun(
     @Column(nullable = false)
     val failedItems: MutableList<FailedArtifact> = mutableListOf(),
     @Column(nullable = false)
+    val artifactIdsToDeindex: MutableList<String> = mutableListOf(),
+    @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     val finishedTypes: MutableSet<FinishedTypes> = mutableSetOf(),
     @Enumerated(EnumType.STRING)

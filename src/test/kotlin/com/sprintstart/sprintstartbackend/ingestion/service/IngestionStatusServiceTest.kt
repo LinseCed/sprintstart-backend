@@ -10,12 +10,14 @@ import io.mockk.every
 import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.springframework.context.ApplicationEventPublisher
 import java.time.Instant
 import java.util.UUID
 
 class IngestionStatusServiceTest {
     private val ingestionRunRepository = mockk<IngestionRunRepository>()
-    private val service = IngestionStatusService(ingestionRunRepository)
+    private val publisher = mockk<ApplicationEventPublisher>(relaxed = true)
+    private val service = IngestionStatusService(ingestionRunRepository, publisher)
 
     @Test
     fun `getIngestionStatusPerSource returns empty github state when no runs exist`() {

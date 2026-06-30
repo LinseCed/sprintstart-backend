@@ -58,6 +58,6 @@ internal class GithubFileListener(
     fun on(
         event: GithubFileDeletedEvent,
     ) {
-        artifactIngestionService.unIngestFileArtifact(event)
+        artifactIngestionService.deleteFileArtifact(event)
     }
 }

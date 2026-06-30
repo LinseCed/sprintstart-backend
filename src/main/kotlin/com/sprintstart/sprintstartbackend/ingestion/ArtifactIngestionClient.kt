@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion
 
 import com.sprintstart.sprintstartbackend.ApplicationConfig
-import com.sprintstart.sprintstartbackend.ingestion.model.dto.request.RunArtifactsIngestRequest
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.request.RunArtifactsAiSyncRequest
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.RunArtifactsIngestResponse
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
@@ -10,14 +10,11 @@ import org.springframework.stereotype.Component
 import java.net.URI
 
 /**
- * AI upload module HTTP wrapper.
- *
- * This is the *only* class in the `upload` module that knows about HTTP or URIs.
- * Everything above this layer works purely with domain types.
+ * HTTP wrapper for the AI artifact ingestion endpoint.
  *
  * Responsibilities:
  * - Build URIs from the configured base URL
- * - Map domain types onto [WebClient] calls
+ * - Send the batched ingest/deindex request to AI
  *
  * Not responsible for:
  * - Any HTTP mechanics (that's [WebClient])
@@ -29,7 +26,7 @@ class ArtifactIngestionClient(
     private val applicationConfig: ApplicationConfig,
 ) {
     suspend fun ingest(
-        body: RunArtifactsIngestRequest,
+        body: RunArtifactsAiSyncRequest,
     ): RunArtifactsIngestResponse =
         try {
             webClient

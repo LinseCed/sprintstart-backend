@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
+import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileDeletedEvent
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
@@ -8,10 +9,13 @@ import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
+import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ingestion.ArtifactAiMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.runs
 import io.mockk.slot
 import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
@@ -24,7 +28,8 @@ import java.util.UUID
 class ArtifactIngestionServiceTest {
     private val ingestionRunRepository = mockk<IngestionRunRepository>()
     private val artifactRepository = mockk<ArtifactRepository>()
-    private val service = ArtifactIngestionService(ingestionRunRepository, artifactRepository)
+    private val artifactAiMapper = mockk<ArtifactAiMapper>(relaxed = true)
+    private val service = ArtifactIngestionService(ingestionRunRepository, artifactRepository, artifactAiMapper)
 
     private val runId = UUID.randomUUID()
 
@@ -146,6 +151,32 @@ class ArtifactIngestionServiceTest {
         assertThat(failedItem.reason).isEqualTo("Not found")
     }
 
+    @Test
+    fun `deleteFileArtifact deletes stored file artifact and records id for ai deindex`() {
+        val run = ingestionRun()
+        val artifact = artifact(hash = "hash-1")
+        every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
+        every { artifactRepository.findBySourceId("github:owner/repo:FILE:src/main/App.kt") } returns artifact
+        every { artifactRepository.deleteById(artifact.id) } just runs
+
+        service.deleteFileArtifact(fileDeletedEvent())
+
+        assertThat(run.artifactIdsToDeindex).containsExactly(artifact.id.toString())
+        verify(exactly = 1) { artifactRepository.deleteById(artifact.id) }
+    }
+
+    @Test
+    fun `deleteFileArtifact does nothing when file artifact is unknown`() {
+        val run = ingestionRun()
+        every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
+        every { artifactRepository.findBySourceId("github:owner/repo:FILE:src/main/App.kt") } returns null
+
+        service.deleteFileArtifact(fileDeletedEvent())
+
+        assertThat(run.artifactIdsToDeindex).isEmpty()
+        verify(exactly = 0) { artifactRepository.deleteById(any()) }
+    }
+
     private fun artifactCommand(
         sourceId: String = "github:owner/repo:FILE:src/main/App.kt",
         artifactType: ArtifactType = ArtifactType.FILE,
@@ -164,6 +195,13 @@ class ArtifactIngestionServiceTest {
         createdAtSource = null,
         updatedAtSource = null,
         hash = hash,
+    )
+
+    private fun fileDeletedEvent() = GithubFileDeletedEvent(
+        transactionId = runId,
+        repositoryOwner = "owner",
+        repositoryName = "repo",
+        path = "src/main/App.kt",
     )
 
     private fun ingestionRun() = IngestionRun(

@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class ArtifactAiIngestRequest(
-    val id: String,
+    val artifactId: String,
     val sourceSystem: SourceSystem,
     val sourceId: String,
     val sourceUrl: String?,
