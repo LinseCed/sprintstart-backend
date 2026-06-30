@@ -31,7 +31,7 @@ class ArtifactIngestionClient(
         try {
             webClient
                 .post()
-                .uri(uri("/api/v1/ingest"))
+                .uri(uri("/api/v1/ingest/sync"))
                 .body(body)
                 .sync()
                 .perform<RunArtifactsIngestResponse>()
