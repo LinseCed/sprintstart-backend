@@ -53,6 +53,9 @@ class GithubConnectorService(
     private val githubClient: GithubClient,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
+    fun getAllSources(): List<GithubRepositoryConnection> =
+        repoConnectionRepository.findAll()
+
     /**
      * Connect a new repository.
      *
