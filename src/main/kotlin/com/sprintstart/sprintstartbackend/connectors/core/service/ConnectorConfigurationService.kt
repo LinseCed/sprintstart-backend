@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.connectors.core.service
 
 import com.sprintstart.sprintstartbackend.connectors.core.models.IConnector
 import com.sprintstart.sprintstartbackend.connectors.core.models.api.request.ConfigureConnectorRequest
+import com.sprintstart.sprintstartbackend.connectors.core.models.api.request.PatchSourcesRequest
 import com.sprintstart.sprintstartbackend.connectors.core.models.api.response.ConfigureConnectorResponse
 import com.sprintstart.sprintstartbackend.connectors.core.models.api.response.GetSourcesOfConnectorResponse
 import com.sprintstart.sprintstartbackend.connectors.core.models.api.response.toConfigureConnectorResponse
@@ -37,5 +38,15 @@ class ConnectorConfigurationService(
         )
     }
 
-    fun patchSourcesOfConnector(connectionId: String) {}
+    fun patchSourcesOfConnector(connectionId: String, request: PatchSourcesRequest) {
+        val connector = connectors.find { it.id == connectionId }
+            ?: throw ConnectorNotFoundException("Unable to find connector with id $connectionId")
+
+        connector
+            .getSources()
+            .stream()
+            .filter { source ->
+                request.sources.map { it.sourceId }.contains(source.id)
+            }.forEach { source -> }
+    }
 }

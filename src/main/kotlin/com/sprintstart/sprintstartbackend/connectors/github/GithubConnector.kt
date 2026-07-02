@@ -8,7 +8,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 
 @Component
-@ConditionalOnProperty(prefix = "sprintstart.github", name = ["token"])
 class GithubConnector(
     private val service: GithubConnectorService,
 ) : IConnector {
