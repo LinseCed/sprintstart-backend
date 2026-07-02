@@ -1,4 +1,10 @@
+# Related issue
+
+\[Link the backend issue here\]
+
 # Short summary
+
+\[Short summary of what changed\]
 
 # Checks
 
@@ -9,3 +15,5 @@
 * [ ] The new functionality is tested manually
 
 # Additional notes
+
+\[Whatever needs to be said\]
