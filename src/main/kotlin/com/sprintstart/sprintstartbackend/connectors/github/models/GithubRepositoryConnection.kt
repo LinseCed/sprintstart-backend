@@ -33,9 +33,8 @@ class GithubRepositoryConnection(
     @Enumerated(EnumType.STRING)
     @Column(name = "connection_state", nullable = false)
     var connectionState: ConnectionState = ConnectionState.UP_TO_DATE,
-    @Enumerated(EnumType.STRING)
-    @Column(name = "source_state", nullable = false)
-    var sourceStatus: SourceStatus = SourceStatus.EXCLUDED,
+    @Column(name = "source_enabled", nullable = false)
+    var sourceEnabled: Boolean = false,
     @Column(name = "last_sha", nullable = false)
     var lastSha: String = "",
     @OneToOne(mappedBy = "repository", fetch = FetchType.LAZY, cascade = [CascadeType.ALL], orphanRemoval = true)

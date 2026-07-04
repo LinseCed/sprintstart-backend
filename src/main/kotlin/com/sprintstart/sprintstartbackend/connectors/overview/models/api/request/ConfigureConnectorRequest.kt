@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.connectors.core.models.api.request
+package com.sprintstart.sprintstartbackend.connectors.overview.models.api.request
 
 /**
  * Request for enabling/disabling a connector

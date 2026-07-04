@@ -1,6 +1,6 @@
-package com.sprintstart.sprintstartbackend.connectors.core.models.api.response
+package com.sprintstart.sprintstartbackend.connectors.overview.models.api.response
 
-import com.sprintstart.sprintstartbackend.connectors.core.models.ConnectorSource
+import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorSource
 
 /**
  * Response for retrieving all sources of a connector.

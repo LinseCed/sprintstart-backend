@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.connectors.core.models.exceptions
+package com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions
 
 class ConnectorConfigurationNotFoundException(
     msg: String,

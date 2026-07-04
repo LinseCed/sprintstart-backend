@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.connectors.core.models
+package com.sprintstart.sprintstartbackend.connectors.overview.models
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

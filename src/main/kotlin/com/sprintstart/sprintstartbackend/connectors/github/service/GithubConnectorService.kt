@@ -25,6 +25,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.service.internal.Git
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubFileService
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubIssuesService
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubPullRequestsService
+import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorSource
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import jakarta.transaction.Transactional
 import kotlinx.coroutines.CoroutineScope
@@ -55,6 +56,12 @@ class GithubConnectorService(
 ) {
     fun getAllSources(): List<GithubRepositoryConnection> =
         repoConnectionRepository.findAll()
+
+    fun patchSource(source: ConnectorSource, newStatus: Boolean) {
+        val source = getAllSources().find { "${it.owner}/${it.name}" == source.id } ?: throw RuntimeException("")
+        source.sourceEnabled = newStatus
+        repoConnectionRepository.save(source)
+    }
 
     /**
      * Connect a new repository.

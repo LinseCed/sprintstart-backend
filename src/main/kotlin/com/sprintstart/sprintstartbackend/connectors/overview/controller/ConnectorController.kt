@@ -1,13 +1,14 @@
-package com.sprintstart.sprintstartbackend.connectors.api
+package com.sprintstart.sprintstartbackend.connectors.overview.controller
 
-import com.sprintstart.sprintstartbackend.connectors.core.models.IConnector
-import com.sprintstart.sprintstartbackend.connectors.core.models.api.request.ConfigureConnectorRequest
-import com.sprintstart.sprintstartbackend.connectors.core.models.api.request.PatchSourcesRequest
-import com.sprintstart.sprintstartbackend.connectors.core.models.api.response.ConfigureConnectorResponse
-import com.sprintstart.sprintstartbackend.connectors.core.models.api.response.ConnectorConfigurationDto
-import com.sprintstart.sprintstartbackend.connectors.core.models.api.response.GetSourcesOfConnectorResponse
-import com.sprintstart.sprintstartbackend.connectors.core.models.api.response.toDto
 import com.sprintstart.sprintstartbackend.connectors.core.service.ConnectorConfigurationService
+import com.sprintstart.sprintstartbackend.connectors.overview.models.IConnector
+import com.sprintstart.sprintstartbackend.connectors.overview.models.api.request.ConfigureConnectorRequest
+import com.sprintstart.sprintstartbackend.connectors.overview.models.api.request.PatchSourcesRequest
+import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.ConfigureConnectorResponse
+import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.ConnectorConfigurationDto
+import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.GetSourcesOfConnectorResponse
+import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.toDto
+import com.sprintstart.sprintstartbackend.connectors.overview.service.ConnectorConfigurationService
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Pattern
 import org.springframework.http.ResponseEntity
@@ -52,10 +53,10 @@ class ConnectorController(
         ResponseEntity.ok(connectorConfigurationService.getSourcesOfConnector(id))
 
     @PatchMapping("/{id}/sources/status")
-    fun patchSourcesOfConnector(
+    suspend fun patchSourcesOfConnector(
         @Pattern(regexp = ID_PATTERN) @PathVariable id: String,
         @Valid @RequestBody request: PatchSourcesRequest,
     ): ResponseEntity<Unit> {
-        return ResponseEntity.ok(connectorConfigurationService.patchSourcesOfConnector(id, request))
+        return ResponseEntity.ok(connectorConfigurationService.patchSourcesIfExists(id, request))
     }
 }

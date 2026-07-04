@@ -1,10 +1,8 @@
 package com.sprintstart.sprintstartbackend.connectors.github
 
-import com.sprintstart.sprintstartbackend.connectors.core.models.ConnectorSource
-import com.sprintstart.sprintstartbackend.connectors.core.models.IConnector
-import com.sprintstart.sprintstartbackend.connectors.github.models.parse
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorSource
+import com.sprintstart.sprintstartbackend.connectors.overview.models.IConnector
 import org.springframework.stereotype.Component
 
 @Component
@@ -19,10 +17,14 @@ class GithubConnector(
     override fun getSources(): List<ConnectorSource> =
         service.getAllSources().map {
             ConnectorSource(
-                id = "${it.owner}/${it.name}}",
+                id = "${it.owner}/${it.name}",
                 name = it.name,
                 url = "https://github.com/${it.owner}/${it.name}",
-                status = it.sourceStatus.parse(),
+                enabled = it.sourceEnabled,
             )
         }
+
+    override fun patchSource(source: ConnectorSource, newStatus: Boolean) =
+        service.patchSource(source, newStatus)
 }
+

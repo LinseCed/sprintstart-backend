@@ -1,7 +1,6 @@
-package com.sprintstart.sprintstartbackend.connectors.core.models.api.response
+package com.sprintstart.sprintstartbackend.connectors.overview.models.api.response
 
-import com.sprintstart.sprintstartbackend.connectors.core.models.ConnectorConfiguration
-import com.sprintstart.sprintstartbackend.connectors.core.models.api.request.ConfigureConnectorRequest
+import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorConfiguration
 
 /**
  * The response for [ConfigureConnectorRequest].

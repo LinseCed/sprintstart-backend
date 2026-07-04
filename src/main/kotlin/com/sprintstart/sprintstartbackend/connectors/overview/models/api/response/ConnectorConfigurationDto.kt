@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.connectors.core.models.api.response
+package com.sprintstart.sprintstartbackend.connectors.overview.models.api.response
 
 import com.sprintstart.sprintstartbackend.connectors.core.models.IConnector
 import java.time.Instant

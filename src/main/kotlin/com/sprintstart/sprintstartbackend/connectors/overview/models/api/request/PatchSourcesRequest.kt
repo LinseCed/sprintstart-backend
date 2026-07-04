@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.connectors.core.models.api.request
+package com.sprintstart.sprintstartbackend.connectors.overview.models.api.request
 
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
@@ -12,6 +12,5 @@ data class PatchSourcesRequest(
 data class PatchSourceRequest(
     @NotBlank
     val sourceId: String,
-    @Pattern(regexp = "included|excluded")
-    val status: String,
+    val enabled: Boolean
 )
