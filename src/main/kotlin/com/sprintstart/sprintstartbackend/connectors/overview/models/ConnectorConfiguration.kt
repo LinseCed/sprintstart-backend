@@ -4,6 +4,7 @@ import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
 import jakarta.persistence.Table
+import java.time.Instant
 
 @Entity
 @Table(name = "connector_configurations")
@@ -12,4 +13,6 @@ class ConnectorConfiguration(
     var id: String,
     @Column(nullable = false)
     var enabled: Boolean = false,
+    @Column(name = "last_enabled_at", nullable = false)
+    var lastEnabledAt: Instant? = null,
 )

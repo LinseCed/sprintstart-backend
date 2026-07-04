@@ -2,7 +2,6 @@ package com.sprintstart.sprintstartbackend.connectors.overview.models.api.reques
 
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
-import jakarta.validation.constraints.Pattern
 
 data class PatchSourcesRequest(
     @NotEmpty
@@ -12,5 +11,5 @@ data class PatchSourcesRequest(
 data class PatchSourceRequest(
     @NotBlank
     val sourceId: String,
-    val enabled: Boolean
+    val enabled: Boolean,
 )

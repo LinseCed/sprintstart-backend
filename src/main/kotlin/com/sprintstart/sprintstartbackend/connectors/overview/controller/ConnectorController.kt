@@ -1,13 +1,11 @@
 package com.sprintstart.sprintstartbackend.connectors.overview.controller
 
-import com.sprintstart.sprintstartbackend.connectors.core.service.ConnectorConfigurationService
 import com.sprintstart.sprintstartbackend.connectors.overview.models.IConnector
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.request.ConfigureConnectorRequest
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.request.PatchSourcesRequest
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.ConfigureConnectorResponse
-import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.ConnectorConfigurationDto
+import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.ConnectorDto
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.GetSourcesOfConnectorResponse
-import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.toDto
 import com.sprintstart.sprintstartbackend.connectors.overview.service.ConnectorConfigurationService
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Pattern
@@ -26,7 +24,7 @@ private const val ID_PATTERN = "^[a-z0-9-]+$"
 @RestController
 @RequestMapping("/api/v1/connectors")
 class ConnectorController(
-    private val connectors: List<IConnector>,
+    connectors: List<IConnector>,
     private val connectorConfigurationService: ConnectorConfigurationService,
 ) {
     // Verify all connector ids are truly unique on bean init
@@ -36,8 +34,8 @@ class ConnectorController(
     }
 
     @GetMapping
-    fun listAll(): ResponseEntity<List<ConnectorConfigurationDto>> =
-        ResponseEntity.ok(connectors.map { it.toDto() })
+    fun listAll(): ResponseEntity<List<ConnectorDto>> =
+        ResponseEntity.ok(connectorConfigurationService.findAllConnectors())
 
     @PatchMapping("/{id}")
     fun configureConnector(

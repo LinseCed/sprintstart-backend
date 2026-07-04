@@ -27,4 +27,3 @@ class GithubConnector(
     override fun patchSource(source: ConnectorSource, newStatus: Boolean) =
         service.patchSource(source, newStatus)
 }
-

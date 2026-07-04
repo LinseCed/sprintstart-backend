@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.connectors.overview
 
 import com.sprintstart.sprintstartbackend.ApplicationConfig
-import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorSource
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import java.net.URI
 

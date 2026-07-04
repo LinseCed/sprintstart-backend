@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.connectors.overview.controller
 
+import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorConfigurationNotFoundException
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ControllerAdvice
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -15,15 +17,15 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 @ControllerAdvice
 class ExceptionHandler {
     /**
-     * Handles exceptions of type [RepositoryNotFoundException] and converts them into
+     * Handles exceptions of type [ConnectorConfigurationNotFoundException] and converts them into
      * a standardized error response with a 404 NOT FOUND HTTP status code.
      *
      * @param ex The exception containing details about the repository that could not be found.
      * @return A [ResponseEntity] containing the [ErrorResponse] with the exception's message
      *         and an HTTP status of 404 (NOT FOUND).
      */
-    @ExceptionHandler()
-    fun handleRepositoryNotFound(ex: ): ResponseEntity<ErrorResponse> =
+    @ExceptionHandler(ConnectorConfigurationNotFoundException::class)
+    fun handleRepositoryNotFound(ex: ConnectorConfigurationNotFoundException): ResponseEntity<ErrorResponse> =
         ResponseEntity
             .status(HttpStatus.NOT_FOUND)
             .body(ErrorResponse(ex.message))
@@ -32,4 +34,3 @@ class ExceptionHandler {
 data class ErrorResponse(
     val message: String?,
 )
-

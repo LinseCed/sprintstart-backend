@@ -5,10 +5,10 @@ package com.sprintstart.sprintstartbackend.connectors.overview.models
  *
  * # Summary
  *
- * Defines the interface, each connector (github, jira, ...) need to implement to automagically be picked up by the 
+ * Defines the interface, each connector (github, jira, ...) need to implement to automagically be picked up by the
  * connector overview.
  *
- * Correctly implementing this interface involves introducing a new file `{Module}Connector.kt` to the module, and 
+ * Correctly implementing this interface involves introducing a new file `{Module}Connector.kt` to the module, and
  * setting all the values and implementing the functions. An example of this is the `GithubConnector.kt` in the GitHub
  * module. In my opinion, this file should be placed at project root.
  *

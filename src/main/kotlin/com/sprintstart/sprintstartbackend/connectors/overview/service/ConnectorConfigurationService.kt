@@ -2,17 +2,21 @@ package com.sprintstart.sprintstartbackend.connectors.overview.service
 
 import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.connectors.overview.SourceClient
+import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorConfiguration
 import com.sprintstart.sprintstartbackend.connectors.overview.models.IConnector
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.request.ConfigureConnectorRequest
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.request.PatchSourcesRequest
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.ConfigureConnectorResponse
+import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.ConnectorDto
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.GetSourcesOfConnectorResponse
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.toConfigureConnectorResponse
-import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorConfigurationNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.overview.repository.ConnectorConfigurationRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import jakarta.annotation.PostConstruct
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class ConnectorConfigurationService(
@@ -21,19 +25,42 @@ class ConnectorConfigurationService(
     private val connectors: List<IConnector>,
     private val sourceClient: SourceClient,
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
+
+    @PostConstruct
+    fun ensureAllConnectorsHaveConfig() {
+        logger.info("Verifying connector db entry integrity")
+        connectors.forEach { connector ->
+            repository.findById(connector.id).orElseGet {
+                logger.info("Found missing connector db entry (${connector.id}) - inserting")
+                repository.save(ConnectorConfiguration(id = connector.id))
+            }
+        }
+    }
+
+    @Tracked("Retrieving all connectors")
+    @Transactional(readOnly = true)
+    fun findAllConnectors(): List<ConnectorDto> {
+        return repository.findAll().map { config ->
+            val iConnector = connectors.find { it.id == config.id }
+                ?: throw RuntimeException("Connector db state is desynced with soft state. Should not happen.")
+
+            ConnectorDto(config.id, iConnector.displayName, config.enabled, config.lastEnabledAt)
+        }
+    }
+
     @Tracked("Configuring new connector")
     fun configure(connectorId: String, request: ConfigureConnectorRequest): ConfigureConnectorResponse {
-        val configuration = repository.findById(connectorId).orElseThrow {
-            ConnectorConfigurationNotFoundException(
-                "Could not find configuration for connector $connectorId",
-            )
-        }
+        val connector = connectors.find { it.id == connectorId }
+            ?: throw ConnectorNotFoundException("No connector with id $connectorId")
+        val configuration = repository.findById(connectorId).get()
 
         configuration.enabled = request.enabled
         return repository.save(configuration).toConfigureConnectorResponse()
     }
 
     @Tracked("Retrieving all sources of given connector")
+    @Transactional(readOnly = true)
     fun getSourcesOfConnector(connectorId: String): GetSourcesOfConnectorResponse {
         val connector = connectors.stream().filter { it.id == connectorId }.findFirst().orElseThrow {
             ConnectorNotFoundException("Unable to load up connector with id $connectorId")
