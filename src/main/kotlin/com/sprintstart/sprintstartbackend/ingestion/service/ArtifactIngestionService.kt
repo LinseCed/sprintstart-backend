@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
+import com.sprintstart.sprintstartbackend.github.external.GithubRepositoryApi
 import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileDeletedEvent
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand
@@ -11,7 +12,6 @@ import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunSta
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.SourceIdFactory.buildSourceId
-import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ingestion.ArtifactAiMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import jakarta.transaction.Transactional
@@ -33,7 +33,7 @@ import java.util.UUID
 class ArtifactIngestionService(
     private val ingestionRunRepository: IngestionRunRepository,
     private val artifactRepository: ArtifactRepository,
-    private val artifactAiMapper: ArtifactAiMapper,
+    private val githubRepositoryApi: GithubRepositoryApi,
 ) {
     /**
      * Persists or updates an ingestion artifact for the active ingestion run.
@@ -54,15 +54,14 @@ class ArtifactIngestionService(
     @Transactional
     fun persistArtifact(command: ArtifactCommand) {
         val runId = command.ingestionRunId
-        if (!ingestionRunRepository.existsById(runId)) {
-            throw IngestionRunNotFoundException(runId)
-        }
+        val projectIds = githubRepositoryApi.getRepositoryProjectIdsById(command.repositoryId).toMutableSet()
         var artifact: Artifact?
         when (command.artifactType) {
             ArtifactType.COMMIT,
             -> {
                 artifact = artifactRepository.findBySourceId(command.sourceId)
                 if (artifact != null) {
+                    artifact.addProjectId(projectIds)
                     return
                 }
             }
@@ -71,6 +70,7 @@ class ArtifactIngestionService(
             -> {
                 artifact = artifactRepository.findBySourceId(command.sourceId)
                 if (artifact != null) {
+                    artifact.addProjectId(projectIds)
                     if (artifact.hash != command.hash) {
                         artifact.bodyText = command.bodyText
                         artifact.hash = command.hash
@@ -84,6 +84,7 @@ class ArtifactIngestionService(
             -> {
                 artifact = artifactRepository.findBySourceId(command.sourceId)
                 if (artifact != null) {
+                    artifact.addProjectId(projectIds)
                     if (artifact.hash != command.hash) {
                         artifact.title = command.title
                         artifact.bodyText = command.bodyText
@@ -97,6 +98,7 @@ class ArtifactIngestionService(
             -> {
                 artifact = artifactRepository.findBySourceId(command.sourceId)
                 if (artifact != null) {
+                    artifact.addProjectId(projectIds)
                     artifact.title = command.title
                     artifact.bodyText = command.bodyText
                     ingestionRunRepository.incrementUpdatedCount(runId)
@@ -110,11 +112,13 @@ class ArtifactIngestionService(
             sourceSystem = command.sourceSystem,
             sourceId = command.sourceId,
             sourceUrl = command.sourceUrl,
+            repositoryId = command.repositoryId ,
             artifactType = command.artifactType,
             title = command.title,
             bodyText = command.bodyText,
             mime = command.mime,
             language = command.language,
+            projectIdsInternal = projectIds, //TODO: Add companion obj to Artifact to have Artifact.create without exposing internal
             ingestionRun = ingestionRun,
             hash = command.hash,
             createdAtSource = null,

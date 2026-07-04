@@ -112,6 +112,7 @@ class GithubPullRequestsService(
                         } ?: emptyList(),
                     )
                 },
+                repositoryId = githubRepositoryId,
             )
 
             eventPublisher.publishEvent(event)

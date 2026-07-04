@@ -86,6 +86,7 @@ class GithubIssuesService(
                         createdAt = node.createdAt,
                     )
                 } ?: emptyList(),
+                repositoryId = githubRepositoryId,
             )
             eventPublisher.publishEvent(event)
         }

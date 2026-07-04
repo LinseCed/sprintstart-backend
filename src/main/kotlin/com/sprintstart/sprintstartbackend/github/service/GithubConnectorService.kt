@@ -4,7 +4,6 @@ import com.sprintstart.sprintstartbackend.github.GithubClient
 import com.sprintstart.sprintstartbackend.github.external.events.GithubRepositoryResourcesFetchingStartedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.initial.GithubRepositoryConnectionInitiatedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.initial.GithubRepositoryConnectionInitiationFailedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.update.GithubAllRepositoriesUpdateStartedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.update.GithubRepositoryUpdateFailedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.update.GithubRepositoryUpdateStartedEvent
 import com.sprintstart.sprintstartbackend.github.models.GithubRepositoryConnection
@@ -12,7 +11,6 @@ import com.sprintstart.sprintstartbackend.github.models.GithubRepositorySnapshot
 import com.sprintstart.sprintstartbackend.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.github.models.api.requests.ConnectRepositoryRequest
 import com.sprintstart.sprintstartbackend.github.models.api.requests.UpdateRepositoryRequest
-import com.sprintstart.sprintstartbackend.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.github.models.api.responses.UpdateRepositoryResponse
 import com.sprintstart.sprintstartbackend.github.models.exceptions.GithubUserPatNotFoundException
 import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotConnectedException
@@ -26,11 +24,16 @@ import com.sprintstart.sprintstartbackend.github.service.internal.GithubFileServ
 import com.sprintstart.sprintstartbackend.github.service.internal.GithubIssuesService
 import com.sprintstart.sprintstartbackend.github.service.internal.GithubPullRequestsService
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.user.external.UserApi
 import jakarta.transaction.Transactional
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 import java.util.UUID
 
@@ -52,6 +55,7 @@ class GithubConnectorService(
     private val pullRequestsService: GithubPullRequestsService,
     private val githubClient: GithubClient,
     private val eventPublisher: ApplicationEventPublisher,
+    private val userApi: UserApi,
 ) {
     /**
      * Connect a new repository.
@@ -78,6 +82,13 @@ class GithubConnectorService(
     @Tracked("Connecting GitHub repository")
     @Transactional
     suspend fun connectRepositoryIfExists(authId: String, request: ConnectRepositoryRequest): UUID {
+
+        val userInRepo = userApi.getUserByAuthId(authId)
+
+        if(userInRepo.project?.projectId != request.projectId){
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project")
+        }
+
         val transactionId = UUID.randomUUID()
         eventPublisher.publishEvent(
             GithubRepositoryConnectionInitiatedEvent(transactionId, request.owner, request.name),
@@ -86,10 +97,14 @@ class GithubConnectorService(
         val user = githubUserRepository.findById(GithubUserPat(authId = authId, name = request.tokenName)).orElseThrow {
             GithubUserPatNotFoundException(request.tokenName, authId)
         }
+
+
+        val projectIds = mutableSetOf(request.projectId)
         val repoConnection = GithubRepositoryConnection(
             owner = request.owner,
             name = request.name,
             user = user,
+            projectIdsInternal = projectIds,
         )
 
         if (!githubClient.repositoryExists(repoConnection)) {
@@ -118,17 +133,16 @@ class GithubConnectorService(
      * @return A UUID representing the transaction ID assigned to this update operation.
      */
     @Tracked("Updating all GitHub repositories")
-    suspend fun updateAllRepositories(): UpdateAllRepositoriesResponse {
-        val transactionId = UUID.randomUUID()
+    suspend fun updateAllRepositories(): List<UpdateRepositoryResponse> {
         val allRepositories = repoConnectionRepository.findAll()
-
-        eventPublisher.publishEvent(GithubAllRepositoriesUpdateStartedEvent(transactionId))
-
+        val responses = mutableListOf<UpdateRepositoryResponse>()
         allRepositories.forEach { repo ->
-            updateRepository(repo, transactionId)
+            val uuid = UUID.randomUUID()
+            updateRepository(repo, uuid )
+            responses.add(UpdateRepositoryResponse(uuid))
         }
 
-        return UpdateAllRepositoriesResponse(transactionId)
+        return responses.toList()
     }
 
     /**
@@ -146,15 +160,10 @@ class GithubConnectorService(
     suspend fun updateRepository(request: UpdateRepositoryRequest): UpdateRepositoryResponse {
         val transactionId = UUID.randomUUID()
 
-        eventPublisher.publishEvent(GithubRepositoryUpdateStartedEvent(transactionId, request.owner, request.name))
-
-        val repository = runCatching {
+        val repository = withContext(Dispatchers.IO) {
             repoConnectionRepository.findByOwnerAndName(request.owner, request.name)
-                ?: throw RepositoryNotConnectedException(request.owner, request.name)
-        }.onFailure { e ->
-            eventPublisher.publishEvent(GithubRepositoryUpdateFailedEvent(transactionId, request.owner, request.name))
-            throw e
-        }.getOrNull() ?: return UpdateRepositoryResponse(transactionId)
+        }
+            ?: throw RepositoryNotConnectedException(request.owner, request.name)
 
         updateRepository(repository, transactionId)
 
@@ -169,6 +178,7 @@ class GithubConnectorService(
      * @param transactionId The unique identifier for the transaction to track the update process.
      */
     private suspend fun updateRepository(githubRepository: GithubRepositoryConnection, transactionId: UUID) {
+
         eventPublisher.publishEvent(
             GithubRepositoryUpdateStartedEvent(
                 transactionId,

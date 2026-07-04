@@ -250,6 +250,7 @@ class GithubFileService(
                         eventPublisher.publishEvent(
                             GithubFileFetchedEvent(
                                 transactionId,
+                                repo.id,
                                 repo.owner,
                                 repo.name,
                                 changedFile.relativePath,
@@ -263,6 +264,7 @@ class GithubFileService(
                         eventPublisher.publishEvent(
                             GithubFileDeletedEvent(
                                 transactionId,
+                                repo.id,
                                 repo.owner,
                                 repo.name,
                                 changedFile.relativePath,
@@ -276,6 +278,7 @@ class GithubFileService(
                 eventPublisher.publishEvent(
                     GithubFileFetchFailedEvent(
                         transactionId,
+                        repo.id,
                         repo.owner,
                         repo.name,
                         filePath,
@@ -351,6 +354,7 @@ class GithubFileService(
                         eventPublisher.publishEvent(
                             GithubFileFetchedEvent(
                                 transactionId,
+                                githubRepository.id,
                                 githubRepository.owner,
                                 githubRepository.name,
                                 result.payload.path,
@@ -364,6 +368,7 @@ class GithubFileService(
                         eventPublisher.publishEvent(
                             GithubFileFetchFailedEvent(
                                 transactionId,
+                                githubRepository.id,
                                 githubRepository.owner,
                                 githubRepository.name,
                                 result.path,

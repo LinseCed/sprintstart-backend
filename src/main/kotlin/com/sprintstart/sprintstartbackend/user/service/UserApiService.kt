@@ -9,6 +9,8 @@ import com.sprintstart.sprintstartbackend.user.external.dto.UserSkillDto
 import com.sprintstart.sprintstartbackend.user.model.entity.Project
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.entity.User
+import com.sprintstart.sprintstartbackend.user.model.mapper.toUserApiDto
+import com.sprintstart.sprintstartbackend.user.repository.ProjectRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import jakarta.persistence.criteria.JoinType
 import jakarta.persistence.criteria.Predicate
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.Optional
 import java.util.UUID
+import kotlin.jvm.optionals.getOrElse
 
 /**
  * Service implementation of the user API used by other modules.
@@ -29,6 +32,7 @@ import java.util.UUID
 @Service
 class UserApiService(
     private val userRepository: UserRepository,
+    private val projectRepository: ProjectRepository,
 ) : UserApi {
     /**
      * Checks whether a user with the given identifier exists.
@@ -50,6 +54,13 @@ class UserApiService(
     @Transactional
     override fun getUserIdByAuthId(authId: String): Optional<UUID> {
         return userRepository.findIdByAuthId(authId)
+    }
+
+    override fun getUserByAuthId(authId: String): UserDto {
+       val user = userRepository.findByAuthId(authId).orElseThrow {
+           NoSuchElementException("User with id $authId not found")
+       }
+        return user.toUserApiDto()
     }
 
     @Transactional(readOnly = true)
@@ -86,70 +97,12 @@ class UserApiService(
             if (predicates.isEmpty()) null else cb.and(*predicates.toTypedArray())
         }
 
-        return userRepository.findAll(spec, pageable).map { user ->
-            UserDto(
-                id = user.id,
-                username = user.username,
-                firstname = user.firstname,
-                lastname = user.lastname,
-                avatarUrl = user.avatarUrl,
-                project = user.project?.let {
-                    ProjectDto(
-                        projectId = it.id,
-                        name = it.name,
-                        description = it.description,
-                    )
-                },
-                skills = user.skillAssessments.map { assessment ->
-                    UserSkillDto(
-                        skillId = assessment.skill.id,
-                        name = assessment.skill.name,
-                        level = assessment.level.name,
-                    )
-                },
-                projectRoles = user.projectRoles.map { role ->
-                    ProjectRoleDto(
-                        roleId = role.id,
-                        name = role.name,
-                        description = role.description,
-                    )
-                },
-            )
-        }
+        return userRepository.findAll(spec, pageable).map { it.toUserApiDto() }
     }
 
     @Transactional(readOnly = true)
     override fun getUsersByIds(ids: List<UUID>): List<UserDto> {
-        return userRepository.findAllById(ids).map { user ->
-            UserDto(
-                id = user.id,
-                username = user.username,
-                firstname = user.firstname,
-                lastname = user.lastname,
-                avatarUrl = user.avatarUrl,
-                project = user.project?.let {
-                    ProjectDto(
-                        projectId = it.id,
-                        name = it.name,
-                        description = it.description,
-                    )
-                },
-                skills = user.skillAssessments.map { assessment ->
-                    UserSkillDto(
-                        skillId = assessment.skill.id,
-                        name = assessment.skill.name,
-                        level = assessment.level.name,
-                    )
-                },
-                projectRoles = user.projectRoles.map { role ->
-                    ProjectRoleDto(
-                        roleId = role.id,
-                        name = role.name,
-                        description = role.description,
-                    )
-                },
-            )
-        }
+        return userRepository.findAllById(ids).map { it.toUserApiDto() }
     }
 
     /**
@@ -179,4 +132,12 @@ class UserApiService(
                 },
             )
         }
+
+    @Transactional(readOnly = true)
+    override fun userHasAccessToProject(authId: String, projectId: UUID): Boolean {
+        val user = userRepository.findByAuthId(authId).orElse(null)
+            ?: return false
+        return user.project?.id == projectId
+
+    }
 }

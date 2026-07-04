@@ -1,6 +1,8 @@
 package com.sprintstart.sprintstartbackend.ingestion.model.entity
 
+import jakarta.persistence.CollectionTable
 import jakarta.persistence.Column
+import jakarta.persistence.ElementCollection
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
@@ -22,6 +24,8 @@ class Artifact(
     val sourceId: String,
     @Column(length = 2048)
     val sourceUrl: String?,
+    @Column(nullable = false)
+    val repositoryId: UUID,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     val artifactType: ArtifactType,
@@ -30,6 +34,13 @@ class Artifact(
     var bodyText: String?,
     val mime: String?,
     val language: String?,
+    @ElementCollection
+    @CollectionTable(
+        name = "artifact_projects",
+        joinColumns = [JoinColumn(name = "artifact_id")]
+    )
+    @Column(name = "project_id", nullable = false)
+    private val projectIdsInternal: MutableSet<UUID> = mutableSetOf(),
     val createdAtSource: Instant?,
     val updatedAtSource: Instant?,
     @Column(nullable = false)
@@ -40,3 +51,11 @@ class Artifact(
     @Column(name = "content_hash", length = 64)
     var hash: String?,
 )
+{
+    val projectIds: Set<UUID>
+    get() = projectIdsInternal.toSet()
+
+    fun addProjectId(projectIds: Set<UUID>){
+        projectIdsInternal.addAll(projectIds)
+    }
+}

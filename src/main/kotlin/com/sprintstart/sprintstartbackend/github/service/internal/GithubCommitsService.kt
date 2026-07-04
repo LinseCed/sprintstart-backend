@@ -144,6 +144,7 @@ class GithubCommitsService(
                 eventPublisher.publishEvent(
                     GithubCommitFetchFailedEvent(
                         transactionId,
+                        repository.id,
                         repository.owner,
                         repository.name,
                         null,
@@ -158,6 +159,7 @@ class GithubCommitsService(
                 eventPublisher.publishEvent(
                     GithubCommitFetchFailedEvent(
                         transactionId,
+                        repository.id,
                         repository.owner,
                         repository.name,
                         commit.sha,
@@ -210,6 +212,7 @@ class GithubCommitsService(
         eventPublisher.publishEvent(
             GithubCommitFetchedEvent(
                 transactionId,
+                repository.id,
                 repository.owner,
                 repository.name,
                 commit.author,

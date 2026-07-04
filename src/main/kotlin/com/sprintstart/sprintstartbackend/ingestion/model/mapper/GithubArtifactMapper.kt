@@ -32,6 +32,7 @@ class GithubArtifactMapper {
      * full message in `bodyText`.
      */
     fun toCommand(event: GithubCommitFetchedEvent): ArtifactCommand {
+
         return ArtifactCommand(
             ingestionRunId = event.transactionId,
             sourceSystem = SourceSystem.GITHUB,
@@ -46,6 +47,7 @@ class GithubArtifactMapper {
                 repositoryName = event.repositoryName,
                 sha = event.sha,
             ),
+            repositoryId = event.repositoryId,
             artifactType = ArtifactType.COMMIT,
             title = event.msg.take(GITHUB_COMMIT_MESSAGE_LENGTH),
             bodyText = event.msg,
@@ -83,6 +85,7 @@ class GithubArtifactMapper {
                 unique = event.path,
             ),
             sourceUrl = event.sourceUrl,
+            repositoryId = event.repositoryId,
             artifactType = ArtifactType.FILE,
             title = title,
             bodyText = event.content,
@@ -119,6 +122,7 @@ class GithubArtifactMapper {
                 unique = event.number.toString(),
             ),
             sourceUrl = event.url,
+            repositoryId = event.repositoryId,
             artifactType = ArtifactType.ISSUE,
             title = "Issue #${event.number} " + event.title,
             bodyText = event.body,
@@ -148,6 +152,7 @@ class GithubArtifactMapper {
                 unique = event.number.toString(),
             ),
             sourceUrl = event.url,
+            repositoryId = event.repositoryId,
             artifactType = ArtifactType.PULL_REQUEST,
             title = "PR #${event.number} " + event.title,
             bodyText = event.body,
