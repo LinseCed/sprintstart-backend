@@ -175,7 +175,7 @@ class ConnectorConfigurationService(
                 PatchedSource(source.id, source.name, source.url, source.enabled)
             }.toList()
 
-        sourceClient.patchSources(requestedSources)
+        sourceClient.patchSources(connector.id, requestedSources)
 
         return PatchSourcesOfConnectorResponse(
             connectorId = connector.id,

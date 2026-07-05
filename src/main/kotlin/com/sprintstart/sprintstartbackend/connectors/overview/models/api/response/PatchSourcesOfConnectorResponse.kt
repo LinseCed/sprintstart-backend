@@ -11,4 +11,3 @@ data class PatchedSource(
     val url: String,
     val enabled: Boolean,
 )
-
