@@ -10,11 +10,13 @@ import java.util.UUID
 class GithubArtifactFailedMapperTest {
     private val mapper = GithubArtifactFailedMapper()
     private val runId = UUID.randomUUID()
+    private val repositoryId = UUID.randomUUID()
 
     @Test
     fun `toCommand maps failed commit with source url`() {
         val event = GithubCommitFetchFailedEvent(
             transactionId = runId,
+            repositoryId = repositoryId,
             repositoryOwner = "owner",
             repositoryName = "repo",
             sha = "abc123",
@@ -36,6 +38,7 @@ class GithubArtifactFailedMapperTest {
     fun `toCommand maps failed file without source url`() {
         val event = GithubFileFetchFailedEvent(
             transactionId = runId,
+            repositoryId = repositoryId,
             repositoryOwner = "owner",
             repositoryName = "repo",
             path = "src/main/App.kt",

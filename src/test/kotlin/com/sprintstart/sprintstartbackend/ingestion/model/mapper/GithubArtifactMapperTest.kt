@@ -15,11 +15,13 @@ import java.util.UUID
 class GithubArtifactMapperTest {
     private val mapper = GithubArtifactMapper()
     private val runId = UUID.randomUUID()
+    private val repositoryId = UUID.randomUUID()
 
     @Test
     fun `toCommand maps github file metadata and hash`() {
         val event = GithubFileFetchedEvent(
             transactionId = runId,
+            repositoryId = repositoryId,
             repositoryOwner = "owner",
             repositoryName = "repo",
             path = "src/main/App.kt",
@@ -31,6 +33,7 @@ class GithubArtifactMapperTest {
 
         assertThat(result.ingestionRunId).isEqualTo(runId)
         assertThat(result.sourceSystem).isEqualTo(SourceSystem.GITHUB)
+        assertThat(result.repositoryId).isEqualTo(repositoryId)
         assertThat(result.sourceId).isEqualTo("github:owner/repo:FILE:src/main/App.kt")
         assertThat(result.sourceUrl).isEqualTo(event.sourceUrl)
         assertThat(result.artifactType).isEqualTo(ArtifactType.FILE)
@@ -45,6 +48,7 @@ class GithubArtifactMapperTest {
     fun `toCommand maps dockerfile as dockerfile language`() {
         val event = GithubFileFetchedEvent(
             transactionId = runId,
+            repositoryId = repositoryId,
             repositoryOwner = "owner",
             repositoryName = "repo",
             path = "Dockerfile",
@@ -64,6 +68,7 @@ class GithubArtifactMapperTest {
         val message = "a".repeat(80)
         val event = GithubCommitFetchedEvent(
             transactionId = runId,
+            repositoryId = repositoryId,
             repositoryOwner = "owner",
             repositoryName = "repo",
             author = "alice",
@@ -75,6 +80,7 @@ class GithubArtifactMapperTest {
         val result = mapper.toCommand(event)
 
         assertThat(result.sourceId).isEqualTo("github:owner/repo:COMMIT:abc123")
+        assertThat(result.repositoryId).isEqualTo(repositoryId)
         assertThat(result.sourceUrl).isEqualTo("https://github.com/owner/repo/commit/abc123")
         assertThat(result.artifactType).isEqualTo(ArtifactType.COMMIT)
         assertThat(result.title).hasSize(72)
@@ -87,6 +93,7 @@ class GithubArtifactMapperTest {
     fun `toCommand maps issue with stable hash`() {
         val event = GithubIssueFetchedEvent(
             transactionId = runId,
+            repositoryId = repositoryId,
             repositoryOwner = "owner",
             repositoryName = "repo",
             number = 42,
@@ -105,6 +112,7 @@ class GithubArtifactMapperTest {
         val result = mapper.toCommand(event)
 
         assertThat(result.sourceId).isEqualTo("github:owner/repo:ISSUE:42")
+        assertThat(result.repositoryId).isEqualTo(repositoryId)
         assertThat(result.sourceUrl).isEqualTo(event.url)
         assertThat(result.artifactType).isEqualTo(ArtifactType.ISSUE)
         assertThat(result.title).isEqualTo("Issue #42 Bug report")
@@ -117,6 +125,7 @@ class GithubArtifactMapperTest {
     fun `toCommand maps pull request without hash`() {
         val event = GithubPullRequestFetchedEvent(
             transactionId = runId,
+            repositoryId = repositoryId,
             repositoryOwner = "owner",
             repositoryName = "repo",
             number = 7,
@@ -136,6 +145,7 @@ class GithubArtifactMapperTest {
         val result = mapper.toCommand(event)
 
         assertThat(result.sourceId).isEqualTo("github:owner/repo:PULL_REQUEST:7")
+        assertThat(result.repositoryId).isEqualTo(repositoryId)
         assertThat(result.sourceUrl).isEqualTo(event.url)
         assertThat(result.artifactType).isEqualTo(ArtifactType.PULL_REQUEST)
         assertThat(result.title).isEqualTo("PR #7 Improve docs")

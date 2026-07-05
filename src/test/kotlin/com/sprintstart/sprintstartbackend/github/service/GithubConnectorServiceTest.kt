@@ -23,6 +23,9 @@ import com.sprintstart.sprintstartbackend.github.service.internal.GithubCommitsS
 import com.sprintstart.sprintstartbackend.github.service.internal.GithubFileService
 import com.sprintstart.sprintstartbackend.github.service.internal.GithubIssuesService
 import com.sprintstart.sprintstartbackend.github.service.internal.GithubPullRequestsService
+import com.sprintstart.sprintstartbackend.user.external.UserApi
+import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
+import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerify
@@ -58,6 +61,8 @@ class GithubConnectorServiceTest {
     private val pullRequestsService = mockk<GithubPullRequestsService>()
     private val githubClient = mockk<GithubClient>()
     private val eventPublisher = mockk<ApplicationEventPublisher>(relaxed = true)
+    private val userApi = mockk<UserApi>()
+    private val projectId = UUID.randomUUID()
 
     private lateinit var service: GithubConnectorService
 
@@ -83,6 +88,7 @@ class GithubConnectorServiceTest {
         @Test
         fun `connectRepositoryIfExists throws GithubUserPatNotFoundException when PAT not found`() =
             runTest {
+                every { userApi.getUserByAuthId("mock-id") } returns userDto(projectId)
                 every { githubUserRepository.findById(any()) } returns Optional.empty()
 
                 assertFailsWith<GithubUserPatNotFoundException> {
@@ -93,6 +99,7 @@ class GithubConnectorServiceTest {
         @Test
         fun `connectRepositoryIfExists throws RepositoryNotFoundException when repo does not exist on GitHub`() =
             runTest {
+                every { userApi.getUserByAuthId("mock-id") } returns userDto(projectId)
                 every {
                     githubUserRepository.findById(any())
                 } returns Optional.of(
@@ -121,7 +128,15 @@ class GithubConnectorServiceTest {
 
             service.connectRepositoryIfExists("auth-id", connectRequest())
 
-            coVerify { repoConnectionRepository.save(match { it.owner == "owner" && it.name == "repo" }) }
+            verify {
+                repoConnectionRepository.save(
+                    match {
+                        it.owner == "owner" &&
+                            it.name == "repo" &&
+                            projectId in it.projectIds
+                    },
+                )
+            }
         }
 
         @Test
@@ -161,7 +176,7 @@ class GithubConnectorServiceTest {
 
             val response = service.updateAllRepositories()
 
-            assertThat(response.transactionId).isNotNull()
+            assertThat(response).isEmpty()
         }
 
         @Test
@@ -186,7 +201,7 @@ class GithubConnectorServiceTest {
 
             val response = service.updateAllRepositories()
 
-            assertThat(response.transactionId).isNotNull()
+            assertThat(response).isEmpty()
             coVerify(exactly = 0) { repoSnapshotRepository.findLatestByRepository(any()) }
         }
     }
@@ -289,6 +304,7 @@ class GithubConnectorServiceTest {
 
         @Test
         fun `publishes GithubRepositoryConnectionInitiationFailedEvent when repo not found`() = testScope.runTest {
+            every { userApi.getUserByAuthId("auth-id") } returns userDto(projectId)
             every {
                 githubUserRepository.findById(any())
             } returns Optional.of(
@@ -304,12 +320,12 @@ class GithubConnectorServiceTest {
         }
 
         @Test
-        fun `publishes GithubAllRepositoriesUpdateStartedEvent on updateAll`() = testScope.runTest {
+        fun `updateAllRepositories does not publish repository started event when no repositories exist`() = testScope.runTest {
             every { repoConnectionRepository.findAll() } returns emptyList()
 
             service.updateAllRepositories()
 
-            verify { eventPublisher.publishEvent(any<GithubAllRepositoriesUpdateStartedEvent>()) }
+            verify(exactly = 0) { eventPublisher.publishEvent(any<GithubRepositoryUpdateStartedEvent>()) }
         }
 
         @Test
@@ -325,14 +341,14 @@ class GithubConnectorServiceTest {
         }
 
         @Test
-        fun `publishes GithubRepositoryUpdateFailedEvent when repo not found on update`() = testScope.runTest {
+        fun `does not publish GithubRepositoryUpdateFailedEvent when repo is not connected`() = testScope.runTest {
             every { repoConnectionRepository.findByOwnerAndName("owner", "repo") } returns null
 
             assertFailsWith<RepositoryNotConnectedException> {
                 service.updateRepository(updateRequest())
             }
 
-            verify { eventPublisher.publishEvent(any<GithubRepositoryUpdateFailedEvent>()) }
+            verify(exactly = 0) { eventPublisher.publishEvent(any<GithubRepositoryUpdateFailedEvent>()) }
         }
     }
 
@@ -342,6 +358,7 @@ class GithubConnectorServiceTest {
         owner = "owner",
         name = "repo",
         tokenName = "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+        projectId = projectId,
     )
 
     private fun updateRequest() = UpdateRepositoryRequest(owner = "owner", name = "repo")
@@ -357,6 +374,7 @@ class GithubConnectorServiceTest {
     )
 
     private fun stubSuccessfulConnect() {
+        every { userApi.getUserByAuthId(any()) } returns userDto(projectId)
         every {
             githubUserRepository.findById(any())
         } returns Optional.of(
@@ -378,4 +396,19 @@ class GithubConnectorServiceTest {
         coJustRun { issuesService.fetchAndIngestAllIssues(any(), any(), any(), any(), any()) }
         coJustRun { pullRequestsService.fetchAndIngestAllPullRequests(any(), any(), any(), any(), any()) }
     }
+
+    private fun userDto(projectId: UUID) = UserDto(
+        id = UUID.randomUUID(),
+        username = "alice",
+        firstname = "Alice",
+        lastname = "Doe",
+        avatarUrl = null,
+        project = ProjectDto(
+            projectId = projectId,
+            name = "Project",
+            description = null,
+        ),
+        skills = emptyList(),
+        projectRoles = emptyList(),
+    )
 }

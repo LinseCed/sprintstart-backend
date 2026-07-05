@@ -19,7 +19,7 @@ class ArtifactService(
     fun getArtifactContent(projectId: UUID, artifactId: UUID, authId: String): ArtifactContentResponse {
         val userHasAccessToProject = userApi.userHasAccessToProject(authId, projectId)
         if (!userHasAccessToProject){
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project")
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project with id $projectId")
         }
         val artifact = artifactRepository.findById(artifactId)
             .orElseThrow{

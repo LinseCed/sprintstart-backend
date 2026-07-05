@@ -88,6 +88,7 @@ class ArtifactIngestionService(
                     if (artifact.hash != command.hash) {
                         artifact.title = command.title
                         artifact.bodyText = command.bodyText
+                        artifact.hash = command.hash
                         ingestionRunRepository.incrementUpdatedCount(runId)
                     }
                     return

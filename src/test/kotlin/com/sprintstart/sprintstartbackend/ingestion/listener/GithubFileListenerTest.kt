@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test
 import java.util.UUID
 
 class GithubFileListenerTest {
+    private val repositoryId = UUID.randomUUID()
     private val artifactIngestionService = mockk<ArtifactIngestionService>()
     private val artifactMapper = mockk<GithubArtifactMapper>()
     private val failedMapper = mockk<GithubArtifactFailedMapper>()
@@ -51,6 +52,7 @@ class GithubFileListenerTest {
     fun `file fetch failed event maps and records failed artifact`() {
         val event = GithubFileFetchFailedEvent(
             transactionId = UUID.randomUUID(),
+            repositoryId = repositoryId,
             repositoryOwner = "owner",
             repositoryName = "repo",
             path = "src/main/App.kt",
@@ -114,6 +116,7 @@ class GithubFileListenerTest {
     fun `file deleted event un-ingests file artifact`() {
         val event = GithubFileDeletedEvent(
             transactionId = UUID.randomUUID(),
+            repositoryId = repositoryId,
             repositoryOwner = "owner",
             repositoryName = "repo",
             path = "src/main/App.kt",
@@ -127,6 +130,7 @@ class GithubFileListenerTest {
 
     private fun fileFetchedEvent() = GithubFileFetchedEvent(
         transactionId = UUID.randomUUID(),
+        repositoryId = repositoryId,
         repositoryOwner = "owner",
         repositoryName = "repo",
         path = "src/main/App.kt",
@@ -139,6 +143,7 @@ class GithubFileListenerTest {
         sourceSystem = SourceSystem.GITHUB,
         sourceId = "github:owner/repo:FILE:src/main/App.kt",
         sourceUrl = "https://github.com/owner/repo/blob/main/src/main/App.kt",
+        repositoryId = repositoryId,
         artifactType = ArtifactType.FILE,
         title = "App.kt",
         bodyText = "content",
