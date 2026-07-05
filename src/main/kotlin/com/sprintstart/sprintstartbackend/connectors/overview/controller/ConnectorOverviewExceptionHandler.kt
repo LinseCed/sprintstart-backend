@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
  * and returns a meaningful error response with an appropriate HTTP status code.
  */
 @ControllerAdvice
-class ExceptionHandler {
+class ConnectorOverviewExceptionHandler {
     /**
      * Handles exceptions of type [ConnectorConfigurationNotFoundException] and converts them into
      * a standardized error response with a 404 NOT FOUND HTTP status code.

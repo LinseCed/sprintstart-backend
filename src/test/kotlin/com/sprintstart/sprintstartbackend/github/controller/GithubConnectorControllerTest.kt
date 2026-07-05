@@ -2,8 +2,8 @@ package com.sprintstart.sprintstartbackend.github.controller
 
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.connectors.github.controller.ExceptionHandler
 import com.sprintstart.sprintstartbackend.connectors.github.controller.GithubConnectorController
+import com.sprintstart.sprintstartbackend.connectors.github.controller.GithubExceptionHandler
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
@@ -38,7 +38,7 @@ import java.util.UUID
 
 @WebMvcTest(controllers = [GithubConnectorController::class])
 @AutoConfigureMockMvc
-@Import(ExceptionHandler::class, SecurityConfig::class)
+@Import(GithubExceptionHandler::class, SecurityConfig::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GithubConnectorControllerTest {
     @Autowired

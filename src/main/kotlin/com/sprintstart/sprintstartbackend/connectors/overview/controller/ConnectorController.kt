@@ -29,6 +29,7 @@ class ConnectorController(
 ) {
     // Verify all connector ids are truly unique on bean init
     init {
+        println(connectors)
         val duplicates = connectors.groupBy { it.id }.filterValues { it.size > 1 }.keys
         require(duplicates.isEmpty()) { "Duplicate connector IDs detected: $duplicates" }
     }

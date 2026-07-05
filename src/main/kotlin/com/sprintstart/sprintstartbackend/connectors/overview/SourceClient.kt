@@ -2,8 +2,10 @@ package com.sprintstart.sprintstartbackend.connectors.overview
 
 import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
+import org.springframework.stereotype.Component
 import java.net.URI
 
+@Component
 class SourceClient(
     val applicationConfig: ApplicationConfig,
     val webClient: WebClient,

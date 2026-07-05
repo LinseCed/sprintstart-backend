@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
  * and returns a meaningful error response with an appropriate HTTP status code.
  */
 @ControllerAdvice
-class ExceptionHandler {
+class GithubExceptionHandler {
     /**
      * Handles exceptions of type [RepositoryNotFoundException] and converts them into
      * a standardized error response with a 404 NOT FOUND HTTP status code.
