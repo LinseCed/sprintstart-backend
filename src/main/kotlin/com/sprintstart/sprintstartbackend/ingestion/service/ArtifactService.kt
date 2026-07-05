@@ -11,10 +11,30 @@ import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @Service
+/**
+ * Resolves project-scoped artifact content for authenticated callers.
+ *
+ * This service centralizes the authorization and ownership checks required before raw artifact
+ * payloads can be returned to the API layer.
+ */
 class ArtifactService(
     private val userApi: UserApi,
     private val artifactRepository: ArtifactRepository,
 ) {
+    /**
+     * Loads one artifact payload when the authenticated user has access to the requested project.
+     *
+     * The method first verifies project access through the user module, then ensures the artifact
+     * exists and is linked to the same project before returning its stored content and mime type.
+     *
+     * @param projectId The project that scopes access to the artifact.
+     * @param artifactId The identifier of the artifact to retrieve.
+     * @param authId The authenticated caller subject from the JWT.
+     * @return The stored artifact payload together with the effective mime type.
+     * @throws ResponseStatusException `403` when the caller has no access to the project.
+     * @throws ResponseStatusException `404` when the artifact is missing, not linked to the
+     * requested project, or has no stored content.
+     */
     @Transactional(readOnly = true)
     fun getArtifactContent(projectId: UUID, artifactId: UUID, authId: String): ArtifactContentResponse {
         val userHasAccessToProject = userApi.userHasAccessToProject(authId, projectId)

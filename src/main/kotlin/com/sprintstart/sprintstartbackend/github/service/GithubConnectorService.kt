@@ -60,9 +60,9 @@ class GithubConnectorService(
     /**
      * Connect a new repository.
      *
-     * Given a `owner` and a `name` of a GitHub repository, this connects the repository
-     * to the SprintStart application and starts all processing jobs in the background,
-     * if the repository exists.
+     * Given an authenticated user and a repository request, this validates project access,
+     * verifies that the named PAT exists for that user, persists the connection, and starts
+     * the initial background ingestion jobs if the repository exists.
      *
      * Tasks started for background execution include:
      *
@@ -74,7 +74,8 @@ class GithubConnectorService(
      *
      * _**Schema:** `https://github.com/{owner}/{name}`_
      *
-     * @param request The request containing the details of the repository to connect, e.g., owner and name.
+     * @param authId The authenticated user subject used to resolve PAT ownership and project access.
+     * @param request The request containing repository owner/name, PAT alias, and target project.
      * @return A UUID representing the transaction ID assigned to this connection operation.
      * @throws IllegalStateException If on one of the processed file resources, the GitHub api
      * returns malformed responses.
@@ -130,7 +131,7 @@ class GithubConnectorService(
      * an update for each, ensuring that related resources (files, commits, issues, pull requests)
      * are synchronized. A unique transaction ID is generated to track the overall update process.
      *
-     * @return A UUID representing the transaction ID assigned to this update operation.
+     * @return One update response per connected repository, each containing its own transaction id.
      */
     @Tracked("Updating all GitHub repositories")
     suspend fun updateAllRepositories(): List<UpdateRepositoryResponse> {
@@ -240,7 +241,8 @@ class GithubConnectorService(
      * Establishes a connection to a GitHub repository and initiates data collection processes.
      *
      * @param transactionId The transaction id.
-     * @param repository The GitHub repository connection object containing connection details.
+     * @param repository The GitHub repository connection object containing connection details and
+     * linked project ids.
      * @return A unique identifier (UUID) representing the transaction associated with this operation.
      */
     private suspend fun connectRepository(repository: GithubRepositoryConnection, transactionId: UUID): UUID {

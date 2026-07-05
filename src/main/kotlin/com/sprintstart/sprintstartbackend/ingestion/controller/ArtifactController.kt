@@ -15,21 +15,32 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 /**
- * Read-only HTTP entry point for browsing recent ingestion executions.
+ * Read-only HTTP entry point for retrieving the stored content of one artifact.
  *
- * This endpoint is intended for operational views that need a compact run history rather than
- * artifact-level details.
+ * The endpoint is project-scoped so callers must supply both the project identifier used for
+ * authorization and the artifact identifier used to locate the payload.
  */
 @RestController
 @Validated
 @RequestMapping("/api/v1")
 @Tag(
-    name = "Ingestion Runs",
-    description = "Read-only history of ingestion runs with per-run counters and timing",
+    name = "Artifacts",
+    description = "Read-only artifact content retrieval scoped to a project",
 )
 class ArtifactController(
     private val artifactService: ArtifactService,
 ) {
+    /**
+     * Returns the raw stored payload of one artifact together with its effective mime type.
+     *
+     * The caller must have `USER` access to the given project, and the artifact must be linked to
+     * that same project.
+     *
+     * @param projectId The SprintStart project that scopes access to the artifact.
+     * @param artifactId The artifact whose stored content should be returned.
+     * @param jwt The authenticated JWT used to resolve the caller subject.
+     * @return The artifact payload with a response `Content-Type` derived from the stored mime type.
+     */
     @GetMapping("/projects/{projectId}/artifacts/{artifactId}/content")
     @PreAuthorize("hasRole('USER')")
     fun getArtifactContent(

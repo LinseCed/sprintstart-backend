@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotBlank
 import java.util.UUID
 
 /**
- * Represents a request to connect a GitHub repository.
+ * Represents a request to connect a GitHub repository to one SprintStart project.
  */
 data class ConnectRepositoryRequest(
     @NotBlank
