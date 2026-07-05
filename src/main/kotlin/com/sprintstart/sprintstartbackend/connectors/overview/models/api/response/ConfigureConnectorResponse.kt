@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.connectors.overview.models.api.response
 
 import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorConfiguration
+import java.time.Instant
 
 /**
  * The response for [ConfigureConnectorRequest].
@@ -11,10 +12,14 @@ import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorCo
 data class ConfigureConnectorResponse(
     val id: String,
     val enabled: Boolean,
+    val firstConfiguredAt: Instant?,
+    val lastConfiguredAt: Instant?,
 )
 
 fun ConnectorConfiguration.toConfigureConnectorResponse() =
     ConfigureConnectorResponse(
         id = this.id,
         enabled = this.enabled,
+        firstConfiguredAt = this.firstConfiguredAt,
+        lastConfiguredAt = this.lastConfiguredAt,
     )

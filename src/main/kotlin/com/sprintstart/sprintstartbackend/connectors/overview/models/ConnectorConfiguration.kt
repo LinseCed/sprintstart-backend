@@ -13,6 +13,8 @@ class ConnectorConfiguration(
     var id: String,
     @Column(nullable = false)
     var enabled: Boolean = false,
-    @Column(name = "last_enabled_at")
-    var lastEnabledAt: Instant? = null,
+    @Column(name = "first_configured_at")
+    var firstConfiguredAt: Instant? = null,
+    @Column(name = "last_configured_at")
+    var lastConfiguredAt: Instant? = null,
 )

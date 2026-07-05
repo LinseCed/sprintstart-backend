@@ -55,10 +55,3 @@ interface IConnector {
      */
     fun patchSource(source: ConnectorSource, newStatus: Boolean)
 }
-
-data class ConnectorSource(
-    val id: String,
-    val name: String,
-    val url: String,
-    var enabled: Boolean,
-)

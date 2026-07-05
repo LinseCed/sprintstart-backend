@@ -29,7 +29,6 @@ class ConnectorController(
 ) {
     // Verify all connector ids are truly unique on bean init
     init {
-        println(connectors)
         val duplicates = connectors.groupBy { it.id }.filterValues { it.size > 1 }.keys
         require(duplicates.isEmpty()) { "Duplicate connector IDs detected: $duplicates" }
     }
@@ -56,6 +55,6 @@ class ConnectorController(
         @Pattern(regexp = ID_PATTERN) @PathVariable id: String,
         @Valid @RequestBody request: PatchSourcesRequest,
     ): ResponseEntity<Unit> {
-        return ResponseEntity.ok(connectorConfigurationService.patchSourcesIfExists(id, request))
+        return ResponseEntity.ok(connectorConfigurationService.patchSourcesIfConnectorExists(id, request))
     }
 }
