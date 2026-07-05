@@ -25,6 +25,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.service.internal.Git
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubFileService
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubIssuesService
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubPullRequestsService
+import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorSource
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerify
@@ -334,6 +335,84 @@ class GithubConnectorServiceTest {
             }
 
             verify { eventPublisher.publishEvent(any<GithubRepositoryUpdateFailedEvent>()) }
+        }
+    }
+
+    @Nested
+    inner class SourceManagement {
+        @Test
+        fun `getAllSources returns all connections`() {
+            val user = GithubUser(id = GithubUserPat("some-id", "test-pat"), token = "test-token")
+            val repo = repoConnection("owner", "repo", user)
+            every { repoConnectionRepository.findAll() } returns listOf(repo)
+
+            val result = service.getAllSources()
+
+            assertThat(result).hasSize(1)
+            assertThat(result[0].owner).isEqualTo("owner")
+            assertThat(result[0].name).isEqualTo("repo")
+        }
+
+        @Test
+        fun `getAllSources returns empty list when no connections exist`() {
+            every { repoConnectionRepository.findAll() } returns emptyList()
+
+            val result = service.getAllSources()
+
+            assertThat(result).isEmpty()
+        }
+
+        @Test
+        fun `patchSource sets sourceEnabled on matching connection`() {
+            val user = GithubUser(id = GithubUserPat("some-id", "test-pat"), token = "test-token")
+            val repo = repoConnection("owner", "repo", user).apply { sourceEnabled = false }
+            val source = ConnectorSource(
+                id = "owner/repo",
+                name = "repo",
+                url = "https://github.com/owner/repo",
+                enabled = false,
+            )
+
+            every { repoConnectionRepository.findAll() } returns listOf(repo)
+            every { repoConnectionRepository.save(repo) } returns repo
+
+            service.patchSource(source, true)
+
+            assertThat(repo.sourceEnabled).isTrue()
+            verify { repoConnectionRepository.save(repo) }
+        }
+
+        @Test
+        fun `patchSource disables source when newStatus is false`() {
+            val user = GithubUser(id = GithubUserPat("some-id", "test-pat"), token = "test-token")
+            val repo = repoConnection("owner", "repo", user).apply { sourceEnabled = true }
+            val source = ConnectorSource(
+                id = "owner/repo",
+                name = "repo",
+                url = "https://github.com/owner/repo",
+                enabled = true,
+            )
+
+            every { repoConnectionRepository.findAll() } returns listOf(repo)
+            every { repoConnectionRepository.save(repo) } returns repo
+
+            service.patchSource(source, false)
+
+            assertThat(repo.sourceEnabled).isFalse()
+            verify { repoConnectionRepository.save(repo) }
+        }
+
+        @Test
+        fun `patchSource throws RuntimeException when source not found`() {
+            val source = ConnectorSource(
+                id = "unknown/repo",
+                name = "repo",
+                url = "https://github.com/unknown/repo",
+                enabled = false,
+            )
+            every { repoConnectionRepository.findAll() } returns emptyList()
+
+            assertFailsWith<RuntimeException> { service.patchSource(source, true) }
         }
     }
 
