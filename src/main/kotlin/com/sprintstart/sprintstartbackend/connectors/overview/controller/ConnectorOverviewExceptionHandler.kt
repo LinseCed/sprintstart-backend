@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.connectors.overview.controller
 
-import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorConfigurationNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorNotFoundException
 import jakarta.validation.ConstraintViolationException
 import org.springframework.http.HttpStatus
@@ -18,20 +17,6 @@ import org.springframework.web.bind.annotation.ExceptionHandler
  */
 @ControllerAdvice
 class ConnectorOverviewExceptionHandler {
-    /**
-     * Handles exceptions of type [ConnectorConfigurationNotFoundException] and converts them into
-     * a standardized error response with a 404 NOT FOUND HTTP status code.
-     *
-     * @param ex The exception containing details like the specific message.
-     * @return A [ResponseEntity] containing the [ErrorResponse] with the exception's message
-     *         and an HTTP status of 404 (NOT FOUND).
-     */
-    @ExceptionHandler(ConnectorConfigurationNotFoundException::class)
-    fun handleConnectorConfigNotFound(ex: ConnectorConfigurationNotFoundException): ResponseEntity<ErrorResponse> =
-        ResponseEntity
-            .status(HttpStatus.NOT_FOUND)
-            .body(ErrorResponse(ex.message))
-
     /**
      * Handles exceptions of type [ConnectorNotFoundException] and converts them into a standardized error response
      * with a 404 NOT FOUND HTTP status code.
