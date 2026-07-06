@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.user.model.dto
+package com.sprintstart.sprintstartbackend.user.model.response.user
 
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import java.util.UUID

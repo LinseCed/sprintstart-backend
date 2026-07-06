@@ -1,10 +1,10 @@
 package com.sprintstart.sprintstartbackend.user.controller
 
-import com.sprintstart.sprintstartbackend.user.model.dto.SkillAssessmentDto
-import com.sprintstart.sprintstartbackend.user.model.dto.SkillDto
-import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillAssessmentRequest
-import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillRequest
-import com.sprintstart.sprintstartbackend.user.model.request.UpdateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillAssessmentRequest
+import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.request.skill.UpdateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillAssessmentDto
+import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillDto
 import com.sprintstart.sprintstartbackend.user.service.SkillService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter

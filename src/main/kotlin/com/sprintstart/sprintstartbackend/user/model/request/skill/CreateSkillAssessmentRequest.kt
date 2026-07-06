@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.user.model.request
+package com.sprintstart.sprintstartbackend.user.model.request.skill
 
 import com.sprintstart.sprintstartbackend.user.external.enums.SkillLevel
 import java.util.UUID

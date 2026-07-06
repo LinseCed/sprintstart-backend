@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.user.model.request
+package com.sprintstart.sprintstartbackend.user.model.request.skill
 
 import java.util.UUID
 

@@ -6,9 +6,9 @@ import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.entity.Skill
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.model.entity.UserSkillAssessment
-import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillAssessmentRequest
-import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillRequest
-import com.sprintstart.sprintstartbackend.user.model.request.UpdateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillAssessmentRequest
+import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.request.skill.UpdateSkillRequest
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRoleRepository
 import com.sprintstart.sprintstartbackend.user.repository.SkillRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
