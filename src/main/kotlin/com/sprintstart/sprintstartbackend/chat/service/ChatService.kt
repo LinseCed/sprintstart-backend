@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.chat.ChatAiClient
 import com.sprintstart.sprintstartbackend.chat.models.Chat
 import com.sprintstart.sprintstartbackend.chat.models.ChatMessage
 import com.sprintstart.sprintstartbackend.chat.models.ChatRole
+import com.sprintstart.sprintstartbackend.chat.models.Citation
 import com.sprintstart.sprintstartbackend.chat.models.requests.AiGenerateChatTitleRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.AiPromptRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.CreateChatRequest
@@ -20,6 +21,7 @@ import com.sprintstart.sprintstartbackend.chat.models.responses.toChatMessageRes
 import com.sprintstart.sprintstartbackend.chat.models.responses.toChatResponse
 import com.sprintstart.sprintstartbackend.chat.repository.ChatMessageRepository
 import com.sprintstart.sprintstartbackend.chat.repository.ChatRepository
+import com.sprintstart.sprintstartbackend.chat.repository.CitationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import jakarta.validation.Valid
 import kotlinx.coroutines.flow.Flow
@@ -41,6 +43,7 @@ import java.util.UUID
 internal class ChatService(
     private val chatRepository: ChatRepository,
     private val messageRepository: ChatMessageRepository,
+    private val citationRepository: CitationRepository,
     private val chatAiClient: ChatAiClient,
     private val userApi: UserApi,
 ) {
@@ -169,15 +172,34 @@ internal class ChatService(
 
         messageRepository.save(msg)
 
+        data class PendingCitation(
+            val id: UUID,
+            val chunkId: String,
+            val filename: String
+        )
+
         val sb = StringBuilder()
+        val citations = mutableListOf<PendingCitation>()
 
         // Define stream handler
         // - On each token we collect the token and emit it to the controller
         // - On completion, we store the entire response as msg in db
         return chatAiClient
             .streamPrompt(AiPromptRequest(request.msg, context))
-            .onEach { msg ->
-                msg.content?.let { sb.append(it) }
+            .onEach { event ->
+                when (event.type) {
+                    "token" -> {
+                        event.content?.let(sb::append)
+                    }
+
+                    "citation" -> {
+                        citations += PendingCitation(
+                            id = UUID.randomUUID(),
+                            chunkId = event.chunkId!!,
+                            filename = event.filename!!
+                        )
+                    }
+                }
             }.onCompletion { cause ->
                 if (cause == null) {
                     val msg = ChatMessage(
@@ -186,7 +208,19 @@ internal class ChatService(
                         content = sb.toString(),
                         createdAt = OffsetDateTime.now(),
                     )
+
                     messageRepository.save(msg)
+
+                    val citationEntities = citations.map {
+                        Citation(
+                            id = it.id,
+                            chunkId = it.chunkId,
+                            filename = it.filename,
+                            message = msg
+                        )
+                    }
+
+                    citationRepository.saveAll(citationEntities)
                 } else {
                     println("Stream either got killed or experienced an error: ${cause.message}")
                 }

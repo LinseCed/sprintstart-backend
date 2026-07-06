@@ -1,0 +1,20 @@
+package com.sprintstart.sprintstartbackend.chat.models
+
+import jakarta.persistence.Entity
+import jakarta.persistence.Id
+import jakarta.persistence.JoinColumn
+import jakarta.persistence.ManyToOne
+import jakarta.persistence.Table
+import java.util.UUID
+
+@Entity
+@Table(name = "citations")
+internal data class Citation(
+    @Id
+    var id: UUID = UUID.randomUUID(),
+    @ManyToOne
+    @JoinColumn(name = "message_id")
+    val message: ChatMessage,
+    var chunkId: String,
+    var filename: String
+)

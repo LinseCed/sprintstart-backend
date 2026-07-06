@@ -12,7 +12,7 @@ class GetChatMessagesResponseTest {
     @Test
     fun `conversion to response succeeds`() {
         val chat = Chat(UUID.randomUUID(), "Chat title", UUID.randomUUID(), OffsetDateTime.now())
-        val chatMessage = ChatMessage(UUID.randomUUID(), ChatRole.USER, chat, "Some content", OffsetDateTime.now())
+        val chatMessage = ChatMessage(UUID.randomUUID(), ChatRole.USER, chat, emptyList(), "Some content", OffsetDateTime.now())
 
         val request = chatMessage.toChatMessageResponse()
 
