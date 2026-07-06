@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.model.request
 
-import com.sprintstart.sprintstartbackend.user.model.entity.SkillLevel
+import com.sprintstart.sprintstartbackend.user.external.enums.SkillLevel
 import java.util.UUID
 
 data class CreateSkillAssessmentRequest(

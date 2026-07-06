@@ -3,11 +3,13 @@ package com.sprintstart.sprintstartbackend.user.controller
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
+import com.sprintstart.sprintstartbackend.user.external.enums.SkillLevel
+import com.sprintstart.sprintstartbackend.user.external.enums.SkillStatus
 import com.sprintstart.sprintstartbackend.user.model.dto.SkillAssessmentDto
 import com.sprintstart.sprintstartbackend.user.model.dto.SkillDto
-import com.sprintstart.sprintstartbackend.user.model.entity.SkillLevel
 import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillAssessmentRequest
 import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.request.UpdateSkillRequest
 import com.sprintstart.sprintstartbackend.user.service.SkillService
 import io.mockk.Runs
 import io.mockk.every
@@ -18,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.JwtDecoder
@@ -25,9 +28,11 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @WebMvcTest(SkillController::class)
@@ -44,35 +49,59 @@ class SkillControllerTest(
     @MockkBean
     private lateinit var jwtDecoder: JwtDecoder
 
-    private val userJwt = jwt()
-        .authorities(SimpleGrantedAuthority("ROLE_USER"))
+    private val userJwt = jwt().authorities(SimpleGrantedAuthority("ROLE_USER"))
+    private val adminJwt = jwt().authorities(
+        SimpleGrantedAuthority("ROLE_USER"),
+        SimpleGrantedAuthority("ROLE_ADMIN"),
+    )
 
-    private val adminJwt = jwt()
-        .authorities(
-            SimpleGrantedAuthority("ROLE_USER"),
-            SimpleGrantedAuthority("ROLE_ADMIN"),
-        )
+    private fun skillDto(
+        id: UUID = UUID.randomUUID(),
+        name: String = "Kotlin",
+        status: SkillStatus = SkillStatus.ACTIVE,
+    ) = SkillDto(id = id, name = name, roleId = UUID.randomUUID(), description = null, status = status)
 
     @Test
-    fun `getAllSkills should return 200 and all skills for any valid role`() {
-        val skillDto = SkillDto(id = UUID.randomUUID(), name = "Kotlin", roleId = UUID.randomUUID())
-        every { skillService.getAllSkills() } returns listOf(skillDto)
+    fun `getAllSkills returns 200 with skill list including status`() {
+        val dto = skillDto()
+        every { skillService.getAllSkills() } returns listOf(dto)
 
         mockMvc
-            .perform(
-                get("/api/v1/skills")
-                    .with(userJwt), // userJwt has ROLE_USER, which is allowed for this endpoint
-            ).andExpect(status().isOk)
+            .perform(get("/api/v1/skills").with(userJwt))
+            .andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
         verify(exactly = 1) { skillService.getAllSkills() }
     }
 
     @Test
-    fun `createSkill should return 201 and created skill for admins`() {
+    fun `getSkillById returns 200`() {
+        val dto = skillDto()
+        every { skillService.getSkillById(dto.id) } returns dto
+
+        mockMvc
+            .perform(get("/api/v1/skills/${dto.id}").with(userJwt))
+            .andExpect(status().isOk)
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+
+        verify(exactly = 1) { skillService.getSkillById(dto.id) }
+    }
+
+    @Test
+    fun `getSkillById returns 404 when not found`() {
+        val id = UUID.randomUUID()
+        every { skillService.getSkillById(id) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(get("/api/v1/skills/$id").with(userJwt))
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `createSkill returns 201 for admins`() {
         val request = CreateSkillRequest("Kotlin", UUID.randomUUID())
-        val skillDto = SkillDto(id = UUID.randomUUID(), name = "Kotlin", roleId = request.roleId)
-        every { skillService.createSkill(request) } returns skillDto
+        val dto = skillDto(name = "Kotlin")
+        every { skillService.createSkill(request) } returns dto
 
         mockMvc
             .perform(
@@ -87,7 +116,7 @@ class SkillControllerTest(
     }
 
     @Test
-    fun `createSkill should return 403 for normal users`() {
+    fun `createSkill returns 403 for normal users`() {
         val request = CreateSkillRequest("Kotlin", UUID.randomUUID())
 
         mockMvc
@@ -102,40 +131,68 @@ class SkillControllerTest(
     }
 
     @Test
-    fun `deleteSkill should return 204`() {
-        val skillId = UUID.randomUUID()
-        every { skillService.deleteSkill(skillId) } just Runs
+    fun `updateSkill returns 200 for admins`() {
+        val id = UUID.randomUUID()
+        val request = UpdateSkillRequest(name = "Go", description = "A language", roleId = null)
+        val dto = skillDto(id = id, name = "Go")
+        every { skillService.updateSkill(id, request) } returns dto
 
         mockMvc
             .perform(
-                delete("/api/v1/skills/$skillId")
-                    .with(adminJwt),
-            ).andExpect(status().isNoContent)
+                patch("/api/v1/skills/$id")
+                    .with(adminJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isOk)
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
-        verify(exactly = 1) { skillService.deleteSkill(skillId) }
+        verify(exactly = 1) { skillService.updateSkill(id, request) }
     }
 
     @Test
-    fun `getUserSkillAssessments should return 200`() {
+    fun `retireSkill returns 204`() {
+        val skillId = UUID.randomUUID()
+        every { skillService.retireSkill(skillId) } just Runs
+
+        mockMvc
+            .perform(delete("/api/v1/skills/$skillId").with(adminJwt))
+            .andExpect(status().isNoContent)
+
+        verify(exactly = 1) { skillService.retireSkill(skillId) }
+    }
+
+    @Test
+    fun `retireSkill returns 404 when skill not found`() {
+        val skillId = UUID.randomUUID()
+        every { skillService.retireSkill(skillId) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(delete("/api/v1/skills/$skillId").with(adminJwt))
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `getUserSkillAssessments returns 200`() {
         val userId = UUID.randomUUID()
         val assessment = SkillAssessmentDto(userId = userId, skillId = UUID.randomUUID(), level = SkillLevel.BEGINNER)
         every { skillService.getUserSkillAssessments(userId) } returns listOf(assessment)
 
         mockMvc
-            .perform(
-                get("/api/v1/users/$userId/skill-assessments/completed")
-                    .with(userJwt),
-            ).andExpect(status().isOk)
+            .perform(get("/api/v1/users/$userId/skill-assessments/completed").with(userJwt))
+            .andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
         verify(exactly = 1) { skillService.getUserSkillAssessments(userId) }
     }
 
     @Test
-    fun `assessSkill should return 200`() {
+    fun `assessSkill returns 200`() {
         val request = CreateSkillAssessmentRequest(skillId = UUID.randomUUID(), level = SkillLevel.EXPERT)
-        val assessment =
-            SkillAssessmentDto(userId = UUID.randomUUID(), skillId = request.skillId, level = request.level)
+        val assessment = SkillAssessmentDto(
+            userId = UUID.randomUUID(),
+            skillId = request.skillId,
+            level = request.level,
+        )
         every { skillService.assessSkillForMe(any(), request) } returns assessment
 
         mockMvc
@@ -148,5 +205,20 @@ class SkillControllerTest(
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
         verify(exactly = 1) { skillService.assessSkillForMe(any(), request) }
+    }
+
+    @Test
+    fun `assessSkill returns 400 when skill is retired`() {
+        val request = CreateSkillAssessmentRequest(skillId = UUID.randomUUID(), level = SkillLevel.BEGINNER)
+        every { skillService.assessSkillForMe(any(), request) } throws
+            ResponseStatusException(HttpStatus.BAD_REQUEST, "Skill is retired")
+
+        mockMvc
+            .perform(
+                post("/api/v1/skill-assessments")
+                    .with(userJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isBadRequest)
     }
 }

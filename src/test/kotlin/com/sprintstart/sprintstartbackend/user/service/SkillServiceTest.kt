@@ -1,23 +1,24 @@
 package com.sprintstart.sprintstartbackend.user.service
 
+import com.sprintstart.sprintstartbackend.user.external.enums.SkillLevel
+import com.sprintstart.sprintstartbackend.user.external.enums.SkillStatus
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.entity.Skill
-import com.sprintstart.sprintstartbackend.user.model.entity.SkillLevel
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.model.entity.UserSkillAssessment
 import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillAssessmentRequest
 import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.request.UpdateSkillRequest
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRoleRepository
 import com.sprintstart.sprintstartbackend.user.repository.SkillRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserSkillAssessmentRepository
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
-import io.mockk.runs
 import io.mockk.verify
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
 import java.util.Optional
 import java.util.UUID
@@ -31,33 +32,76 @@ class SkillServiceTest {
     private val service =
         SkillService(skillRepository, projectRoleRepository, userRepository, userSkillAssessmentRepository)
 
+    private fun role(id: UUID = UUID.randomUUID()) = ProjectRole(id = id, name = "Dev", description = "Test")
+
+    private fun skill(
+        id: UUID = UUID.randomUUID(),
+        name: String = "Kotlin",
+        status: SkillStatus = SkillStatus.ACTIVE,
+        role: ProjectRole = role(),
+    ) = Skill(id = id, name = name, projectRole = role, status = status)
+
     @Test
     fun `getAllSkills returns list of mapped skills`() {
-        val role = ProjectRole(id = UUID.randomUUID(), name = "Dev", description = "Test")
-        val skill = Skill(id = UUID.randomUUID(), name = "Kotlin", projectRole = role)
-        every { skillRepository.findAll() } returns listOf(skill)
+        val r = role()
+        val s = skill(role = r)
+        every { skillRepository.findAll() } returns listOf(s)
 
         val result = service.getAllSkills()
 
         assertEquals(1, result.size)
         assertEquals("Kotlin", result[0].name)
-        assertEquals(role.id, result[0].roleId)
+        assertEquals(r.id, result[0].roleId)
+        assertEquals(SkillStatus.ACTIVE, result[0].status)
+    }
+
+    @Test
+    fun `getSkillById returns skill when found`() {
+        val s = skill()
+        every { skillRepository.findById(s.id) } returns Optional.of(s)
+
+        val result = service.getSkillById(s.id)
+
+        assertEquals(s.id, result.id)
+        assertEquals("Kotlin", result.name)
+    }
+
+    @Test
+    fun `getSkillById throws 404 when not found`() {
+        val id = UUID.randomUUID()
+        every { skillRepository.findById(id) } returns Optional.empty()
+
+        val ex = assertThrows<ResponseStatusException> { service.getSkillById(id) }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
     }
 
     @Test
     fun `createSkill saves and returns skill`() {
         val roleId = UUID.randomUUID()
-        val role = ProjectRole(id = roleId, name = "Dev", description = "Test")
+        val r = role(roleId)
         val request = CreateSkillRequest(name = "Kotlin", roleId = roleId)
 
-        every { projectRoleRepository.findById(roleId) } returns Optional.of(role)
+        every { skillRepository.existsByNormalizedName("Kotlin") } returns false
+        every { projectRoleRepository.findById(roleId) } returns Optional.of(r)
         every { skillRepository.save(any()) } answers { firstArg() }
 
         val result = service.createSkill(request)
 
         assertEquals("Kotlin", result.name)
         assertEquals(roleId, result.roleId)
+        assertEquals(SkillStatus.ACTIVE, result.status)
         verify(exactly = 1) { skillRepository.save(any()) }
+    }
+
+    @Test
+    fun `createSkill throws 409 if normalized name already exists`() {
+        val roleId = UUID.randomUUID()
+        val request = CreateSkillRequest(name = "kotlin", roleId = roleId)
+
+        every { skillRepository.existsByNormalizedName("kotlin") } returns true
+
+        val ex = assertThrows<ResponseStatusException> { service.createSkill(request) }
+        assertEquals(HttpStatus.CONFLICT, ex.statusCode)
     }
 
     @Test
@@ -65,32 +109,74 @@ class SkillServiceTest {
         val roleId = UUID.randomUUID()
         val request = CreateSkillRequest(name = "Kotlin", roleId = roleId)
 
+        every { skillRepository.existsByNormalizedName("Kotlin") } returns false
         every { projectRoleRepository.findById(roleId) } returns Optional.empty()
 
-        assertThrows<ResponseStatusException> {
-            service.createSkill(request)
-        }
+        val ex = assertThrows<ResponseStatusException> { service.createSkill(request) }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
     }
 
     @Test
-    fun `deleteSkill deletes when found`() {
-        val id = UUID.randomUUID()
-        every { skillRepository.existsById(id) } returns true
-        every { skillRepository.deleteById(id) } just runs
+    fun `updateSkill changes editable fields`() {
+        val s = skill()
+        val newRoleId = UUID.randomUUID()
+        val newRole = role(newRoleId)
+        val request = UpdateSkillRequest(name = "Go", description = "New desc", roleId = newRoleId)
 
-        service.deleteSkill(id)
+        every { skillRepository.findById(s.id) } returns Optional.of(s)
+        every { skillRepository.existsByNormalizedNameExcluding("Go", s.id) } returns false
+        every { projectRoleRepository.findById(newRoleId) } returns Optional.of(newRole)
+        every { skillRepository.save(any()) } answers { firstArg() }
 
-        verify(exactly = 1) { skillRepository.deleteById(id) }
+        val result = service.updateSkill(s.id, request)
+
+        assertEquals("Go", result.name)
+        assertEquals("New desc", result.description)
+        assertEquals(newRoleId, result.roleId)
     }
 
     @Test
-    fun `deleteSkill throws 404 when not found`() {
-        val id = UUID.randomUUID()
-        every { skillRepository.existsById(id) } returns false
+    fun `updateSkill throws 409 if name conflicts with another skill`() {
+        val s = skill()
+        val request = UpdateSkillRequest(name = "Go", description = null, roleId = null)
 
-        assertThrows<ResponseStatusException> {
-            service.deleteSkill(id)
+        every { skillRepository.findById(s.id) } returns Optional.of(s)
+        every { skillRepository.existsByNormalizedNameExcluding("Go", s.id) } returns true
+
+        val ex = assertThrows<ResponseStatusException> { service.updateSkill(s.id, request) }
+        assertEquals(HttpStatus.CONFLICT, ex.statusCode)
+    }
+
+    @Test
+    fun `updateSkill throws 404 when skill not found`() {
+        val id = UUID.randomUUID()
+        every { skillRepository.findById(id) } returns Optional.empty()
+
+        val ex = assertThrows<ResponseStatusException> {
+            service.updateSkill(id, UpdateSkillRequest(name = "Go", description = null, roleId = null))
         }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+    }
+
+    @Test
+    fun `retireSkill marks skill as RETIRED`() {
+        val s = skill()
+        every { skillRepository.findById(s.id) } returns Optional.of(s)
+        every { skillRepository.save(any()) } answers { firstArg() }
+
+        service.retireSkill(s.id)
+
+        assertEquals(SkillStatus.RETIRED, s.status)
+        verify(exactly = 1) { skillRepository.save(s) }
+    }
+
+    @Test
+    fun `retireSkill throws 404 when skill not found`() {
+        val id = UUID.randomUUID()
+        every { skillRepository.findById(id) } returns Optional.empty()
+
+        val ex = assertThrows<ResponseStatusException> { service.retireSkill(id) }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
     }
 
     @Test
@@ -104,30 +190,42 @@ class SkillServiceTest {
             lastname = "Test",
             email = null,
         )
-        val skillId = UUID.randomUUID()
-        val skill =
-            Skill(
-                id = skillId,
-                name = "Kotlin",
-                projectRole = ProjectRole(id = UUID.randomUUID(), name = "Dev", description = "Test"),
-            )
-
+        val s = skill()
         val oldAssessment =
-            UserSkillAssessment(id = UUID.randomUUID(), user = user, skill = skill, level = SkillLevel.BEGINNER)
+            UserSkillAssessment(id = UUID.randomUUID(), user = user, skill = s, level = SkillLevel.BEGINNER)
         user.skillAssessments.add(oldAssessment)
 
-        val request = CreateSkillAssessmentRequest(skillId = skillId, level = SkillLevel.EXPERT)
+        val request = CreateSkillAssessmentRequest(skillId = s.id, level = SkillLevel.EXPERT)
 
         every { userRepository.findByAuthId("auth1") } returns Optional.of(user)
-        every { skillRepository.findById(skillId) } returns Optional.of(skill)
+        every { skillRepository.findById(s.id) } returns Optional.of(s)
         every { userRepository.save(any()) } answers { firstArg() }
 
         val result = service.assessSkillForMe("auth1", request)
 
         assertEquals(SkillLevel.EXPERT, result.level)
-        assertEquals(1, user.skillAssessments.size) // Old one removed, new one added
-        assertEquals(SkillLevel.EXPERT, user.skillAssessments.first().level)
+        assertEquals(1, user.skillAssessments.size)
         verify(exactly = 1) { userRepository.save(user) }
+    }
+
+    @Test
+    fun `assessSkillForMe throws 400 when skill is retired`() {
+        val user = User(
+            id = UUID.randomUUID(),
+            authId = "auth1",
+            username = "alice",
+            firstname = "Alice",
+            lastname = "Test",
+            email = null,
+        )
+        val s = skill(status = SkillStatus.RETIRED)
+        val request = CreateSkillAssessmentRequest(skillId = s.id, level = SkillLevel.BEGINNER)
+
+        every { userRepository.findByAuthId("auth1") } returns Optional.of(user)
+        every { skillRepository.findById(s.id) } returns Optional.of(s)
+
+        val ex = assertThrows<ResponseStatusException> { service.assessSkillForMe("auth1", request) }
+        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
     }
 
     @Test
@@ -141,16 +239,8 @@ class SkillServiceTest {
             lastname = "Test",
             email = null,
         )
-        val skillId = UUID.randomUUID()
-        val skill =
-            Skill(
-                id = skillId,
-                name = "Kotlin",
-                projectRole = ProjectRole(id = UUID.randomUUID(), name = "Dev", description = "Test"),
-            )
-        val assessment =
-            UserSkillAssessment(id = UUID.randomUUID(), user = user, skill = skill, level = SkillLevel.EXPERT)
-        user.skillAssessments.add(assessment)
+        val s = skill()
+        val assessment = UserSkillAssessment(id = UUID.randomUUID(), user = user, skill = s, level = SkillLevel.EXPERT)
 
         every { userRepository.existsById(userId) } returns true
         every { userSkillAssessmentRepository.findByUserId(userId) } returns listOf(assessment)
@@ -158,7 +248,7 @@ class SkillServiceTest {
         val result = service.getUserSkillAssessments(userId)
 
         assertEquals(1, result.size)
-        assertEquals(skillId, result[0].skillId)
+        assertEquals(s.id, result[0].skillId)
         assertEquals(SkillLevel.EXPERT, result[0].level)
     }
 }

@@ -1,11 +1,14 @@
 package com.sprintstart.sprintstartbackend.user.service
 
+import com.sprintstart.sprintstartbackend.user.external.enums.SkillStatus
 import com.sprintstart.sprintstartbackend.user.model.dto.SkillAssessmentDto
 import com.sprintstart.sprintstartbackend.user.model.dto.SkillDto
 import com.sprintstart.sprintstartbackend.user.model.entity.Skill
 import com.sprintstart.sprintstartbackend.user.model.entity.UserSkillAssessment
+import com.sprintstart.sprintstartbackend.user.model.mapper.toDto
 import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillAssessmentRequest
 import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.request.UpdateSkillRequest
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRoleRepository
 import com.sprintstart.sprintstartbackend.user.repository.SkillRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
@@ -25,45 +28,68 @@ class SkillService(
 ) {
     @Transactional(readOnly = true)
     fun getAllSkills(): List<SkillDto> {
-        return skillRepository.findAll().map { skill ->
-            SkillDto(
-                id = skill.id,
-                name = skill.name,
-                roleId = skill.projectRole.id,
-            )
-        }
+        return skillRepository.findAll().map { it.toDto() }
+    }
+
+    @Transactional(readOnly = true)
+    fun getSkillById(skillId: UUID): SkillDto {
+        return skillRepository
+            .findById(skillId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Skill with id $skillId not found") }
+            .toDto()
     }
 
     @Transactional
     fun createSkill(request: CreateSkillRequest): SkillDto {
+        if (skillRepository.existsByNormalizedName(request.name)) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Skill with name '${request.name}' already exists")
+        }
+
         val role = projectRoleRepository
             .findById(request.roleId)
             .orElseThrow {
-                ResponseStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "Project role with id ${request.roleId} not found",
-                )
+                ResponseStatusException(HttpStatus.NOT_FOUND, "Project role with id ${request.roleId} not found")
             }
 
-        val skill = Skill(
-            name = request.name,
-            projectRole = role,
-        )
-        val savedSkill = skillRepository.save(skill)
-
-        return SkillDto(
-            id = savedSkill.id,
-            name = savedSkill.name,
-            roleId = savedSkill.projectRole.id,
-        )
+        return skillRepository.save(Skill(name = request.name, projectRole = role)).toDto()
     }
 
     @Transactional
-    fun deleteSkill(skillId: UUID) {
-        if (!skillRepository.existsById(skillId)) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Skill with id $skillId not found")
+    fun updateSkill(skillId: UUID, request: UpdateSkillRequest): SkillDto {
+        val skill = skillRepository
+            .findById(skillId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Skill with id $skillId not found") }
+
+        request.name?.let { newName ->
+            if (skillRepository.existsByNormalizedNameExcluding(newName, skillId)) {
+                throw ResponseStatusException(HttpStatus.CONFLICT, "Skill with name '$newName' already exists")
+            }
+            skill.name = newName
         }
-        skillRepository.deleteById(skillId)
+
+        request.description?.let { skill.description = it }
+
+        request.roleId?.let { roleId ->
+            skill.projectRole = projectRoleRepository
+                .findById(roleId)
+                .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Project role with id $roleId not found") }
+        }
+
+        return skillRepository.save(skill).toDto()
+    }
+
+    /**
+     * Retires a skill so it can no longer be assigned to new users.
+     * Existing assessments referencing this skill are preserved.
+     */
+    @Transactional
+    fun retireSkill(skillId: UUID) {
+        val skill = skillRepository
+            .findById(skillId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Skill with id $skillId not found") }
+
+        skill.status = SkillStatus.RETIRED
+        skillRepository.save(skill)
     }
 
     @Transactional(readOnly = true)
@@ -90,7 +116,13 @@ class SkillService(
             .findById(request.skillId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Skill with id ${request.skillId} not found") }
 
-        // Remove existing assessment for this skill
+        if (skill.status == SkillStatus.RETIRED) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Skill '${skill.name}' is retired and cannot be assigned",
+            )
+        }
+
         user.skillAssessments.removeIf { it.skill.id == skill.id }
 
         val assessment = UserSkillAssessment(
@@ -102,7 +134,6 @@ class SkillService(
         user.skillAssessments.add(assessment)
         userRepository.save(user)
 
-        // After saving user, return the assessment DTO
         val savedAssessment = user.skillAssessments.first { it.skill.id == skill.id }
         return SkillAssessmentDto(
             userId = savedAssessment.user.id,

@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.user.model.dto.SkillAssessmentDto
 import com.sprintstart.sprintstartbackend.user.model.dto.SkillDto
 import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillAssessmentRequest
 import com.sprintstart.sprintstartbackend.user.model.request.CreateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.request.UpdateSkillRequest
 import com.sprintstart.sprintstartbackend.user.service.SkillService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -16,6 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -53,6 +55,24 @@ class SkillController(
         return skillService.getAllSkills()
     }
 
+    @Operation(summary = "Get skill by ID", description = "Retrieves a skill by its unique identifier.")
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Skill returned successfully"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "Skill not found"),
+        ],
+    )
+    @GetMapping("/skills/{skillId}")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR', 'USER')")
+    fun getSkillById(
+        @Parameter(description = "UUID of the skill") @PathVariable skillId: UUID,
+    ): SkillDto {
+        return skillService.getSkillById(skillId)
+    }
+
     /**
      * Creates a new skill.
      *
@@ -66,9 +86,10 @@ class SkillController(
             ApiResponse(responseCode = "401", description = "Authentication required"),
             ApiResponse(responseCode = "403", description = "Insufficient role"),
             ApiResponse(responseCode = "404", description = "Project role not found"),
+            ApiResponse(responseCode = "409", description = "Skill with same name already exists"),
         ],
     )
-    @PostMapping("/skills")
+    @PostMapping("/admin/skills")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun createSkill(
@@ -77,27 +98,52 @@ class SkillController(
         return skillService.createSkill(request)
     }
 
-    /**
-     * Deletes a skill by its ID.
-     *
-     * @param skillId The UUID of the skill to delete.
-     */
-    @Operation(summary = "Delete skill", description = "Deletes a skill by its unique identifier.")
+    @Operation(summary = "Update skill", description = "Updates editable fields of an existing skill.")
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "204", description = "Skill deleted successfully"),
+            ApiResponse(responseCode = "200", description = "Skill updated successfully"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "Skill or project role not found"),
+            ApiResponse(responseCode = "409", description = "Skill with same name already exists"),
+        ],
+    )
+    @PatchMapping("/admin/skills/{skillId}")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
+    fun updateSkill(
+        @Parameter(description = "UUID of the skill to update") @PathVariable skillId: UUID,
+        @RequestBody request: UpdateSkillRequest,
+    ): SkillDto {
+        return skillService.updateSkill(skillId, request)
+    }
+
+    /**
+     * Retires a skill by its ID. The skill is not physically deleted; it is marked RETIRED so it
+     * cannot be assigned to new users while existing assessments remain intact.
+     *
+     * @param skillId The UUID of the skill to be retired.
+     */
+    @Operation(
+        summary = "Retire skill",
+        description = "Marks a skill as retired. Retired skills cannot be assigned to new users " +
+            "but existing assessments are preserved.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "Skill retired successfully"),
             ApiResponse(responseCode = "401", description = "Authentication required"),
             ApiResponse(responseCode = "403", description = "Insufficient role"),
             ApiResponse(responseCode = "404", description = "Skill not found"),
         ],
     )
-    @DeleteMapping("/skills/{skillId}")
+    @DeleteMapping("/admin/skills/{skillId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
-    fun deleteSkill(
-        @Parameter(description = "UUID of the skill to delete") @PathVariable skillId: UUID,
+    fun retireSkill(
+        @Parameter(description = "UUID of the skill to retire") @PathVariable skillId: UUID,
     ) {
-        skillService.deleteSkill(skillId)
+        skillService.retireSkill(skillId)
     }
 
     /**
@@ -118,7 +164,7 @@ class SkillController(
             ApiResponse(responseCode = "404", description = "User not found"),
         ],
     )
-    @GetMapping("/users/{userId}/skill-assessments/completed")
+    @GetMapping("/admin/users/{userId}/skill-assessments/completed")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR', 'USER')")
     fun getUserSkillAssessments(
@@ -136,17 +182,18 @@ class SkillController(
      */
     @Operation(
         summary = "Assess skill for current user",
-        description = "Assesses a skill for the currently authenticated user.",
+        description = "Assesses a skill for the currently authenticated user. Retired skills cannot be assessed.",
     )
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "200", description = "Skill assessed successfully"),
+            ApiResponse(responseCode = "400", description = "Skill is retired"),
             ApiResponse(responseCode = "401", description = "Authentication required"),
             ApiResponse(responseCode = "403", description = "Insufficient role"),
             ApiResponse(responseCode = "404", description = "User or skill not found"),
         ],
     )
-    @PostMapping("/skill-assessments")
+    @PostMapping("/me/skill-assessments")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR', 'USER')")
     fun assessSkill(

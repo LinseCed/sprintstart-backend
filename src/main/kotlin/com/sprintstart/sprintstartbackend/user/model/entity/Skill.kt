@@ -1,7 +1,10 @@
 package com.sprintstart.sprintstartbackend.user.model.entity
 
+import com.sprintstart.sprintstartbackend.user.external.enums.SkillStatus
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.FetchType
 import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
@@ -20,4 +23,9 @@ class Skill(
     @JoinColumn(name = "role_id", nullable = false)
     @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.CASCADE)
     var projectRole: ProjectRole,
+    @Column(nullable = true)
+    var description: String? = null,
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    var status: SkillStatus = SkillStatus.ACTIVE,
 )
