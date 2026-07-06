@@ -14,7 +14,7 @@ internal data class Citation(
     var id: UUID = UUID.randomUUID(),
     @ManyToOne
     @JoinColumn(name = "message_id")
-    val message: ChatMessage,
+    var message: ChatMessage,
     var chunkId: String,
-    var filename: String
+    var filename: String,
 )

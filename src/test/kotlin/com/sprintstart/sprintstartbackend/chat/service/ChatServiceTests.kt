@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.chat.ChatAiClient
 import com.sprintstart.sprintstartbackend.chat.models.Chat
 import com.sprintstart.sprintstartbackend.chat.models.ChatMessage
 import com.sprintstart.sprintstartbackend.chat.models.ChatRole
+import com.sprintstart.sprintstartbackend.chat.models.Citation
 import com.sprintstart.sprintstartbackend.chat.models.requests.AiPromptRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.CreateChatRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.GetChatMessagesRequest
@@ -373,6 +374,63 @@ class ChatServiceTests {
 
             // Only the user message should have been saved, not the AI response
             verify(exactly = 1) { chatMessageRepository.save(any()) }
+        }
+
+        @Test
+        fun `persists citations after ai response`() = runTest {
+            val chat = Chat(
+                id = chatId,
+                userId = userId,
+                title = "Existing title",
+                createdAt = OffsetDateTime.now(),
+            )
+
+            val stream = listOf(
+                AiStreamMessage(
+                    type = "token",
+                    content = "Hello",
+                ),
+                AiStreamMessage(
+                    type = "citation",
+                    chunkId = "chunk-123",
+                    filename = "architecture.md",
+                ),
+                AiStreamMessage(
+                    type = "citation",
+                    chunkId = "chunk-456",
+                    filename = "backend.md",
+                ),
+                AiStreamMessage(type = "done"),
+            )
+
+            val savedMessages = mutableListOf<ChatMessage>()
+            val citationSlot = slot<Iterable<Citation>>()
+
+            every { chatRepository.findById(chatId) } returns Optional.of(chat)
+            every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
+            every { chatMessageRepository.save(capture(savedMessages)) } answers { firstArg() }
+            every { citationRepository.saveAll(capture(citationSlot)) } answers { firstArg() }
+
+            coEvery { chatAiClient.streamPrompt(any()) } returns flowOf(*stream.toTypedArray())
+            every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
+
+            chatService.prompt(PromptRequest(chatId, "Hello")).toList()
+
+            assertEquals(2, savedMessages.size)
+            assertEquals(ChatRole.ASSISTANT, savedMessages[1].role)
+
+            val savedCitations = citationSlot.captured.toList()
+
+            assertEquals(2, savedCitations.size)
+
+            assertEquals("chunk-123", savedCitations[0].chunkId)
+            assertEquals("architecture.md", savedCitations[0].filename)
+
+            assertEquals("chunk-456", savedCitations[1].chunkId)
+            assertEquals("backend.md", savedCitations[1].filename)
+            
+            assertEquals(savedMessages[1], savedCitations[0].message)
+            assertEquals(savedMessages[1], savedCitations[1].message)
         }
     }
 }

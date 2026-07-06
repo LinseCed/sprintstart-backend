@@ -27,9 +27,9 @@ internal data class ChatMessage(
     @OneToMany(
         mappedBy = "message",
         cascade = [CascadeType.ALL],
-        orphanRemoval = true
+        orphanRemoval = true,
     )
-    val citations: List<Citation> = emptyList(),
+    var citations: List<Citation> = emptyList(),
     @Column(nullable = false, columnDefinition = "TEXT")
     var content: String,
     @Column("created_at")

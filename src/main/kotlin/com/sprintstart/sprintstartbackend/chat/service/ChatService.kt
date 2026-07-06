@@ -175,7 +175,7 @@ internal class ChatService(
         data class PendingCitation(
             val id: UUID,
             val chunkId: String,
-            val filename: String
+            val filename: String,
         )
 
         val sb = StringBuilder()
@@ -196,7 +196,7 @@ internal class ChatService(
                         citations += PendingCitation(
                             id = UUID.randomUUID(),
                             chunkId = event.chunkId!!,
-                            filename = event.filename!!
+                            filename = event.filename!!,
                         )
                     }
                 }
@@ -216,7 +216,7 @@ internal class ChatService(
                             id = it.id,
                             chunkId = it.chunkId,
                             filename = it.filename,
-                            message = msg
+                            message = msg,
                         )
                     }
 
