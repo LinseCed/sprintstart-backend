@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -255,6 +256,7 @@ class ChatServiceTests {
             every { chatRepository.findById(chatId) } returns Optional.of(chat)
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(any()) } answers { firstArg() }
+            every { citationRepository.saveAll(any<List<Citation>>()) } answers { firstArg() }
             coEvery { chatAiClient.streamPrompt(aiPromptRequest) } returns flowOf(*tokens.toTypedArray())
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
 
@@ -277,6 +279,7 @@ class ChatServiceTests {
             every { chatRepository.findById(chatId) } returns Optional.of(chat)
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(capture(savedMessages)) } answers { firstArg() }
+            every { citationRepository.saveAll(any<List<Citation>>()) } answers { firstArg() }
             every { chatAiClient.streamPrompt(aiPromptRequest) } returns flowOf(*stream.toTypedArray())
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
 
@@ -302,6 +305,7 @@ class ChatServiceTests {
             every { chatRepository.findById(chatId) } returns Optional.of(chat)
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(capture(savedMessages)) } answers { firstArg() }
+            every { citationRepository.saveAll(any<List<Citation>>()) } answers { firstArg() }
             every { chatAiClient.streamPrompt(aiPromptRequest) } returns flowOf(*tokens.toTypedArray())
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
 
@@ -321,6 +325,7 @@ class ChatServiceTests {
             every { chatRepository.save(any()) } answers { firstArg() }
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(any()) } answers { firstArg() }
+            every { citationRepository.saveAll(any<List<Citation>>()) } answers { firstArg() }
             coEvery { chatAiClient.getChatTitle(any()) } returns AiGenerateChatTitleResponse("Sprint planning")
             every { chatAiClient.streamPrompt(aiPromptRequest) } returns flowOf()
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
@@ -337,6 +342,7 @@ class ChatServiceTests {
             every { chatRepository.findById(chatId) } returns Optional.of(chat)
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(any()) } answers { firstArg() }
+            every { citationRepository.saveAll(any<List<Citation>>()) } answers { firstArg() }
             every { chatAiClient.streamPrompt(any()) } returns flowOf()
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
 
