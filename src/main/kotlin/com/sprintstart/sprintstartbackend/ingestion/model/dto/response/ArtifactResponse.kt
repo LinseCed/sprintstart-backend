@@ -1,7 +1,7 @@
-package com.sprintstart.sprintstartbackend.canonical.model.dto.response
+package com.sprintstart.sprintstartbackend.ingestion.model.dto.response
 
-import com.sprintstart.sprintstartbackend.canonical.model.entity.ArtifactType
-import com.sprintstart.sprintstartbackend.canonical.model.entity.SourceSystem
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import java.util.UUID
 
 data class ArtifactResponse(

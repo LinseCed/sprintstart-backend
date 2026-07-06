@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.controller
 
 import com.sprintstart.sprintstartbackend.canonical.model.dto.response.ArtifactPageResponse
-import com.sprintstart.sprintstartbackend.canonical.service.ArtifactQueryService
+import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactQueryService
 import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactService
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.constraints.Max
@@ -47,7 +47,7 @@ class ArtifactController(
             artifactQueryService.getAllArtifacts(page, size, filter),
         )
 
-    @GetMapping("projects/{projectId}/artifacts")
+    /*@GetMapping("projects/{projectId}/artifacts")
     fun getProjectArtifacts(
         @RequestParam(defaultValue = "1") @Min(1) page: Int,
         @RequestParam(defaultValue = "20") @Min(1) @Max(100) size: Int,
@@ -56,7 +56,7 @@ class ArtifactController(
     ): ResponseEntity<ArtifactPageResponse> =
         ResponseEntity.ok(
             artifactQueryService.getProjectArtifacts(page, size, filter, projectId),
-        )
+        )*/
 
 
     /**

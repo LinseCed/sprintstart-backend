@@ -1,7 +1,7 @@
-package com.sprintstart.sprintstartbackend.canonical.model.mapper
+package com.sprintstart.sprintstartbackend.ingestion.model.mapper
 
-import com.sprintstart.sprintstartbackend.canonical.model.dto.response.ArtifactResponse
-import com.sprintstart.sprintstartbackend.canonical.model.entity.Artifact
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactResponse
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import org.springframework.stereotype.Component
 
 @Component

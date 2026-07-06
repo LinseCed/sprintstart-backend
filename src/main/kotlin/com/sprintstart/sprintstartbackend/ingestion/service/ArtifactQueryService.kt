@@ -1,10 +1,10 @@
-package com.sprintstart.sprintstartbackend.canonical.service
+package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.canonical.model.dto.response.ArtifactPageResponse
 import com.sprintstart.sprintstartbackend.canonical.model.dto.response.PageMetadata
-import com.sprintstart.sprintstartbackend.canonical.model.entity.Artifact
-import com.sprintstart.sprintstartbackend.canonical.model.mapper.ArtifactMapper
-import com.sprintstart.sprintstartbackend.canonical.repository.ArtifactRepository
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
+import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMapper
+import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
@@ -38,7 +38,7 @@ class ArtifactQueryService(
         )
     }
 
-    fun getProjectArtifacts(page: Int, size: Int, filter: String?, projectId: String) : ArtifactPageResponse{
+    /*fun getProjectArtifacts(page: Int, size: Int, filter: String?, projectId: String) : ArtifactPageResponse{
 
-    }
+    }*/
 }

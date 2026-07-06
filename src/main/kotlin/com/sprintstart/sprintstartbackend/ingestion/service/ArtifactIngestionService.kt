@@ -113,6 +113,7 @@ class ArtifactIngestionService(
             sourceSystem = command.sourceSystem,
             sourceId = command.sourceId,
             sourceUrl = command.sourceUrl,
+            repositoryFullName = command.repositoryFullName,
             repositoryId = command.repositoryId ,
             artifactType = command.artifactType,
             title = command.title,
