@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.canonical.model.dto.response
+package com.sprintstart.sprintstartbackend.ingestion.model.dto.response
 
 data class PageMetadata(
     val number: Long,

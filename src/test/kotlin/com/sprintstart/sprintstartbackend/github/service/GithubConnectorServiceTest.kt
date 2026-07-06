@@ -320,13 +320,14 @@ class GithubConnectorServiceTest {
         }
 
         @Test
-        fun `updateAllRepositories does not publish repository started event when no repositories exist`() = testScope.runTest {
-            every { repoConnectionRepository.findAll() } returns emptyList()
+        fun `updateAllRepositories does not publish repository started event when no repositories exist`() = testScope
+            .runTest {
+                every { repoConnectionRepository.findAll() } returns emptyList()
 
-            service.updateAllRepositories()
+                service.updateAllRepositories()
 
-            verify(exactly = 0) { eventPublisher.publishEvent(any<GithubRepositoryUpdateStartedEvent>()) }
-        }
+                verify(exactly = 0) { eventPublisher.publishEvent(any<GithubRepositoryUpdateStartedEvent>()) }
+            }
 
         @Test
         fun `publishes GithubRepositoryUpdateStartedEvent on single update`() = testScope.runTest {

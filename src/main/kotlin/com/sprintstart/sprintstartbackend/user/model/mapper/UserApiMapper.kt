@@ -6,8 +6,8 @@ import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserSkillDto
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 
-fun User.toUserApiDto(): UserDto{
-   return UserDto(
+fun User.toUserApiDto(): UserDto {
+    return UserDto(
         id = this.id,
         username = this.username,
         firstname = this.firstname,

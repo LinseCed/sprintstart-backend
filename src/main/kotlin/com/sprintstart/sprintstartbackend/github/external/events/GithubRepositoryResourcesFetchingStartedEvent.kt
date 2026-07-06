@@ -13,5 +13,4 @@ class GithubRepositoryResourcesFetchingStartedEvent(
     val transactionId: UUID,
     val owner: String,
     val name: String,
-
 )

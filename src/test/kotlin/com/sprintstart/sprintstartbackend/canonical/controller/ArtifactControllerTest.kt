@@ -1,12 +1,12 @@
 package com.sprintstart.sprintstartbackend.canonical.controller
 
 import com.ninjasquad.springmockk.MockkBean
-import com.sprintstart.sprintstartbackend.canonical.model.dto.response.ArtifactPageResponse
 import com.sprintstart.sprintstartbackend.canonical.model.dto.response.ArtifactResponse
-import com.sprintstart.sprintstartbackend.canonical.model.dto.response.PageMetadata
 import com.sprintstart.sprintstartbackend.canonical.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.canonical.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.canonical.service.ArtifactQueryService
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactPageResponse
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.PageMetadata
 import io.mockk.every
 import io.mockk.verify
 import org.junit.jupiter.api.Test

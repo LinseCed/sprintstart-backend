@@ -10,7 +10,9 @@ import java.util.UUID
 
 interface ArtifactRepository : JpaRepository<Artifact, UUID> {
     fun findBySourceId(sourceId: String): Artifact?
+
     fun findAllByIngestionRunId(runId: UUID): MutableList<Artifact>
+
     fun deleteBySourceId(sourceId: String)
 
     @Query(
@@ -23,7 +25,6 @@ interface ArtifactRepository : JpaRepository<Artifact, UUID> {
         """,
     )
     fun search(
-        @Param("filter") filter: String, pageable: Pageable
+        @Param("filter") filter: String, pageable: Pageable,
     ): Page<Artifact>
-
 }

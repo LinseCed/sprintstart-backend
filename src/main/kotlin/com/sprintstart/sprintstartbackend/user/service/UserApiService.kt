@@ -2,7 +2,6 @@ package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile
-import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserSkillDto
@@ -21,7 +20,6 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.Optional
 import java.util.UUID
-import kotlin.jvm.optionals.getOrElse
 
 /**
  * Service implementation of the user API used by other modules.
@@ -57,9 +55,9 @@ class UserApiService(
     }
 
     override fun getUserByAuthId(authId: String): UserDto {
-       val user = userRepository.findByAuthId(authId).orElseThrow {
-           NoSuchElementException("User with id $authId not found")
-       }
+        val user = userRepository.findByAuthId(authId).orElseThrow {
+            NoSuchElementException("User with id $authId not found")
+        }
         return user.toUserApiDto()
     }
 
@@ -138,6 +136,5 @@ class UserApiService(
         val user = userRepository.findByAuthId(authId).orElse(null)
             ?: return false
         return user.project?.id == projectId
-
     }
 }

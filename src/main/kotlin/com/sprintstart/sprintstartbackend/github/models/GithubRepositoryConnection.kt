@@ -29,7 +29,7 @@ class GithubRepositoryConnection(
     @ElementCollection
     @CollectionTable(
         name = "gh_repository_connection_projects",
-        joinColumns = [JoinColumn(name = "repository_connection_id")]
+        joinColumns = [JoinColumn(name = "repository_connection_id")],
     )
     @Column(name = "project_id", nullable = false)
     private val projectIdsInternal: MutableSet<UUID> = mutableSetOf(),
@@ -48,8 +48,7 @@ class GithubRepositoryConnection(
     var snapshot: GithubRepositorySnapshot? = null,
     @OneToMany(mappedBy = "repository", orphanRemoval = true)
     var filesSnapshots: MutableList<GithubFileSnapshot> = mutableListOf(),
-
-    ){
+) {
     val projectIds: Set<UUID>
         get() = projectIdsInternal.toSet()
 }

@@ -13,5 +13,5 @@ interface GithubRepositoryApi {
      * @param id The internal repository connection identifier.
      * @return All SprintStart project ids currently linked to the repository connection.
      */
-    fun getRepositoryProjectIdsById(id: UUID) : Set<UUID>
+    fun getRepositoryProjectIdsById(id: UUID): Set<UUID>
 }

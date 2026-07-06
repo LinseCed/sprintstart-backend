@@ -39,7 +39,7 @@ class Artifact(
     @ElementCollection
     @CollectionTable(
         name = "artifact_projects",
-        joinColumns = [JoinColumn(name = "artifact_id")]
+        joinColumns = [JoinColumn(name = "artifact_id")],
     )
     @Column(name = "project_id", nullable = false)
     private val projectIdsInternal: MutableSet<UUID> = mutableSetOf(),
@@ -52,12 +52,11 @@ class Artifact(
     val ingestionRun: IngestionRun,
     @Column(name = "content_hash", length = 64)
     var hash: String?,
-)
-{
+) {
     val projectIds: Set<UUID>
-    get() = projectIdsInternal.toSet()
+        get() = projectIdsInternal.toSet()
 
-    fun addProjectId(projectIds: Set<UUID>){
+    fun addProjectId(projectIds: Set<UUID>) {
         projectIdsInternal.addAll(projectIds)
     }
 }

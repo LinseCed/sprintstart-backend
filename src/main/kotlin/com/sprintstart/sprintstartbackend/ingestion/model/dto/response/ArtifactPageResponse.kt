@@ -1,6 +1,4 @@
-package com.sprintstart.sprintstartbackend.canonical.model.dto.response
-
-import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactResponse
+package com.sprintstart.sprintstartbackend.ingestion.model.dto.response
 
 data class ArtifactPageResponse(
     val items: List<ArtifactResponse>,

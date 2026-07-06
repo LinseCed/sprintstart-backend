@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.controller
 
-import com.sprintstart.sprintstartbackend.canonical.model.dto.response.ArtifactPageResponse
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactPageResponse
 import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactQueryService
 import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactService
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -19,6 +19,10 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
+private const val DEFAULT_PAGE = "1"
+private const val DEFAULT_SIZE = "20"
+private const val MAX_PAGE_SIZE = 100L
+
 /**
  * Read-only HTTP entry point for retrieving the stored content of one artifact.
  *
@@ -36,12 +40,11 @@ class ArtifactController(
     private val artifactService: ArtifactService,
     private val artifactQueryService: ArtifactQueryService,
 ) {
-
     @GetMapping("admin/artifacts")
     fun getAllArtifacts(
-        @RequestParam(defaultValue = "1") @Min(1) page: Int,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(100) size: Int,
-        @RequestParam filter: String,
+        @RequestParam(defaultValue = DEFAULT_PAGE) @Min(1) page: Int,
+        @RequestParam(defaultValue = DEFAULT_SIZE) @Min(1) @Max(MAX_PAGE_SIZE) size: Int,
+        @RequestParam(defaultValue = "") filter: String,
     ): ResponseEntity<ArtifactPageResponse> =
         ResponseEntity.ok(
             artifactQueryService.getAllArtifacts(page, size, filter),
@@ -58,7 +61,6 @@ class ArtifactController(
             artifactQueryService.getProjectArtifacts(page, size, filter, projectId),
         )*/
 
-
     /**
      * Returns the raw stored payload of one artifact together with its effective mime type.
      *
@@ -73,14 +75,20 @@ class ArtifactController(
     @GetMapping("/projects/{projectId}/artifacts/{artifactId}/content")
     @PreAuthorize("hasRole('USER')")
     fun getArtifactContent(
-        @PathVariable projectId : UUID,
-        @PathVariable artifactId : UUID,
+        @PathVariable projectId: UUID,
+        @PathVariable artifactId: UUID,
         @AuthenticationPrincipal jwt: Jwt,
     ): ResponseEntity<ByteArray> {
-        val response = artifactService.getArtifactContent(projectId = projectId, artifactId = artifactId, authId = jwt.subject)
-        val mediaType = runCatching { MediaType.parseMediaType(response.mime) }.getOrDefault(MediaType.APPLICATION_OCTET_STREAM)
+        val response = artifactService.getArtifactContent(
+            projectId = projectId,
+            artifactId = artifactId,
+            authId = jwt.subject,
+        )
+        val mediaType = runCatching {
+            MediaType.parseMediaType(
+                response.mime,
+            )
+        }.getOrDefault(MediaType.APPLICATION_OCTET_STREAM)
         return ResponseEntity.ok().contentType(mediaType).body(response.content)
-
     }
-
 }

@@ -28,7 +28,8 @@ interface UserApi {
      * @return The matching user ID when present.
      */
     fun getUserIdByAuthId(authId: String): Optional<UUID>
-    fun getUserByAuthId(authId: String) : UserDto
+
+    fun getUserByAuthId(authId: String): UserDto
 
     fun searchUsers(
         search: String?,
@@ -47,5 +48,5 @@ interface UserApi {
      */
     fun getOnboardingProfileByAuthId(authId: String): Optional<UserOnboardingProfile>
 
-    fun userHasAccessToProject(authId: String, projectId: UUID) : Boolean
+    fun userHasAccessToProject(authId: String, projectId: UUID): Boolean
 }

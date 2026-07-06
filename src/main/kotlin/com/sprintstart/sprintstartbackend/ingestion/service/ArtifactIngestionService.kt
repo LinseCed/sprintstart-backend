@@ -114,13 +114,13 @@ class ArtifactIngestionService(
             sourceId = command.sourceId,
             sourceUrl = command.sourceUrl,
             repositoryFullName = command.repositoryFullName,
-            repositoryId = command.repositoryId ,
+            repositoryId = command.repositoryId,
             artifactType = command.artifactType,
             title = command.title,
             bodyText = command.bodyText,
             mime = command.mime,
             language = command.language,
-            projectIdsInternal = projectIds, //TODO: Add companion obj to Artifact to have Artifact.create without exposing internal
+            projectIdsInternal = projectIds, // Add companion obj to Artifact to have Artifact.create without exposing internal
             ingestionRun = ingestionRun,
             hash = command.hash,
             createdAtSource = null,

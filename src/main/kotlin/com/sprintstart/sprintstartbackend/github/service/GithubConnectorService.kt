@@ -83,10 +83,9 @@ class GithubConnectorService(
     @Tracked("Connecting GitHub repository")
     @Transactional
     suspend fun connectRepositoryIfExists(authId: String, request: ConnectRepositoryRequest): UUID {
-
         val userInRepo = userApi.getUserByAuthId(authId)
 
-        if(userInRepo.project?.projectId != request.projectId){
+        if (userInRepo.project?.projectId != request.projectId) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project")
         }
 
@@ -98,7 +97,6 @@ class GithubConnectorService(
         val user = githubUserRepository.findById(GithubUserPat(authId = authId, name = request.tokenName)).orElseThrow {
             GithubUserPatNotFoundException(request.tokenName, authId)
         }
-
 
         val projectIds = mutableSetOf(request.projectId)
         val repoConnection = GithubRepositoryConnection(
@@ -139,7 +137,7 @@ class GithubConnectorService(
         val responses = mutableListOf<UpdateRepositoryResponse>()
         allRepositories.forEach { repo ->
             val uuid = UUID.randomUUID()
-            updateRepository(repo, uuid )
+            updateRepository(repo, uuid)
             responses.add(UpdateRepositoryResponse(uuid))
         }
 
@@ -179,7 +177,6 @@ class GithubConnectorService(
      * @param transactionId The unique identifier for the transaction to track the update process.
      */
     private suspend fun updateRepository(githubRepository: GithubRepositoryConnection, transactionId: UUID) {
-
         eventPublisher.publishEvent(
             GithubRepositoryUpdateStartedEvent(
                 transactionId,

@@ -32,7 +32,6 @@ class GithubArtifactMapper {
      * full message in `bodyText`.
      */
     fun toCommand(event: GithubCommitFetchedEvent): ArtifactCommand {
-
         return ArtifactCommand(
             ingestionRunId = event.transactionId,
             sourceSystem = SourceSystem.GITHUB,

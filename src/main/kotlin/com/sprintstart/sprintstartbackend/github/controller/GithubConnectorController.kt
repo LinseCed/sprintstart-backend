@@ -3,7 +3,6 @@ package com.sprintstart.sprintstartbackend.github.controller
 import com.sprintstart.sprintstartbackend.github.models.api.requests.ConnectRepositoryRequest
 import com.sprintstart.sprintstartbackend.github.models.api.requests.UpdateRepositoryRequest
 import com.sprintstart.sprintstartbackend.github.models.api.responses.ConnectRepositoryResponse
-import com.sprintstart.sprintstartbackend.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.github.models.api.responses.UpdateRepositoryResponse
 import com.sprintstart.sprintstartbackend.github.service.GithubConnectorService
 import io.swagger.v3.oas.annotations.Operation
