@@ -6,7 +6,7 @@ import java.util.UUID
 data class SkillDto(
     val id: UUID,
     val name: String,
-    val roleId: UUID,
+    val roleIds: List<UUID>,
     val description: String?,
     val status: SkillStatus,
 )

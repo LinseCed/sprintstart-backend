@@ -10,6 +10,8 @@ import java.util.UUID
 interface SkillRepository : JpaRepository<Skill, UUID> {
     fun findByName(name: String): Skill?
 
+    fun findAllByProjectRolesId(roleId: UUID): List<Skill>
+
     @Query("SELECT COUNT(s) > 0 FROM Skill s WHERE LOWER(TRIM(s.name)) = LOWER(TRIM(:name)) AND s.id <> :excludeId")
     fun existsByNormalizedNameExcluding(name: String, excludeId: UUID): Boolean
 

@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.user.external.enums.SkillStatus
+import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.entity.Skill
 import com.sprintstart.sprintstartbackend.user.model.entity.UserSkillAssessment
 import com.sprintstart.sprintstartbackend.user.model.mapper.toDto
@@ -47,13 +48,9 @@ class SkillService(
             throw ResponseStatusException(HttpStatus.CONFLICT, "Skill with name '${request.name}' already exists")
         }
 
-        val role = projectRoleRepository
-            .findById(request.roleId)
-            .orElseThrow {
-                ResponseStatusException(HttpStatus.NOT_FOUND, "Project role with id ${request.roleId} not found")
-            }
+        val roles = findRolesByIds(request.roleIds)
 
-        return skillRepository.save(Skill(name = request.name, projectRole = role)).toDto()
+        return skillRepository.save(Skill(name = request.name, projectRoles = roles)).toDto()
     }
 
     @Transactional
@@ -71,13 +68,24 @@ class SkillService(
 
         request.description?.let { skill.description = it }
 
-        request.roleId?.let { roleId ->
-            skill.projectRole = projectRoleRepository
-                .findById(roleId)
-                .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Project role with id $roleId not found") }
+        request.roleIds?.let { roleIds ->
+            if (roleIds.isEmpty()) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one roleId is required")
+            }
+            skill.projectRoles = findRolesByIds(roleIds)
         }
 
         return skillRepository.save(skill).toDto()
+    }
+
+    private fun findRolesByIds(roleIds: List<UUID>): MutableSet<ProjectRole> {
+        val roles = projectRoleRepository.findAllById(roleIds)
+        val foundIds = roles.map { it.id }.toSet()
+        val missingIds = roleIds.toSet() - foundIds
+        if (missingIds.isNotEmpty()) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project role(s) with id(s) $missingIds not found")
+        }
+        return roles.toMutableSet()
     }
 
     /**
@@ -144,10 +152,6 @@ class SkillService(
         userRepository.save(user)
 
         val savedAssessment = user.skillAssessments.first { it.skill.id == skill.id }
-        return SkillAssessmentDto(
-            userId = savedAssessment.user.id,
-            skillId = savedAssessment.skill.id,
-            level = savedAssessment.level,
-        )
+        return savedAssessment.toDto()
     }
 }

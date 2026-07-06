@@ -56,7 +56,7 @@ class SkillControllerTest(
         id: UUID = UUID.randomUUID(),
         name: String = "Kotlin",
         status: SkillStatus = SkillStatus.ACTIVE,
-    ) = SkillDto(id = id, name = name, roleId = UUID.randomUUID(), description = null, status = status)
+    ) = SkillDto(id = id, name = name, roleIds = listOf(UUID.randomUUID()), description = null, status = status)
 
     @Test
     fun `getAllSkills returns 200 with skill list including status`() {
@@ -197,11 +197,11 @@ class SkillAdminControllerTest(
         id: UUID = UUID.randomUUID(),
         name: String = "Kotlin",
         status: SkillStatus = SkillStatus.ACTIVE,
-    ) = SkillDto(id = id, name = name, roleId = UUID.randomUUID(), description = null, status = status)
+    ) = SkillDto(id = id, name = name, roleIds = listOf(UUID.randomUUID()), description = null, status = status)
 
     @Test
     fun `createSkill returns 201 for admins`() {
-        val request = CreateSkillRequest("Kotlin", UUID.randomUUID())
+        val request = CreateSkillRequest("Kotlin", listOf(UUID.randomUUID()))
         val dto = skillDto(name = "Kotlin")
         every { skillService.createSkill(request) } returns dto
 
@@ -219,7 +219,7 @@ class SkillAdminControllerTest(
 
     @Test
     fun `createSkill returns 403 for normal users`() {
-        val request = CreateSkillRequest("Kotlin", UUID.randomUUID())
+        val request = CreateSkillRequest("Kotlin", listOf(UUID.randomUUID()))
 
         mockMvc
             .perform(
@@ -234,7 +234,7 @@ class SkillAdminControllerTest(
 
     @Test
     fun `createSkill returns 404 when project role not found`() {
-        val request = CreateSkillRequest("Kotlin", UUID.randomUUID())
+        val request = CreateSkillRequest("Kotlin", listOf(UUID.randomUUID()))
         every { skillService.createSkill(request) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
 
         mockMvc
@@ -248,7 +248,7 @@ class SkillAdminControllerTest(
 
     @Test
     fun `createSkill returns 409 when skill name already exists`() {
-        val request = CreateSkillRequest("Kotlin", UUID.randomUUID())
+        val request = CreateSkillRequest("Kotlin", listOf(UUID.randomUUID()))
         every { skillService.createSkill(request) } throws ResponseStatusException(HttpStatus.CONFLICT)
 
         mockMvc
@@ -263,7 +263,7 @@ class SkillAdminControllerTest(
     @Test
     fun `updateSkill returns 200 for admins`() {
         val id = UUID.randomUUID()
-        val request = UpdateSkillRequest(name = "Go", description = "A language", roleId = null)
+        val request = UpdateSkillRequest(name = "Go", description = "A language", roleIds = null)
         val dto = skillDto(id = id, name = "Go")
         every { skillService.updateSkill(id, request) } returns dto
 
@@ -282,7 +282,7 @@ class SkillAdminControllerTest(
     @Test
     fun `updateSkill returns 404 when skill not found`() {
         val id = UUID.randomUUID()
-        val request = UpdateSkillRequest(name = "Go", description = null, roleId = null)
+        val request = UpdateSkillRequest(name = "Go", description = null, roleIds = null)
         every { skillService.updateSkill(id, request) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
 
         mockMvc
@@ -297,7 +297,7 @@ class SkillAdminControllerTest(
     @Test
     fun `updateSkill returns 409 when new name conflicts with another skill`() {
         val id = UUID.randomUUID()
-        val request = UpdateSkillRequest(name = "Go", description = null, roleId = null)
+        val request = UpdateSkillRequest(name = "Go", description = null, roleIds = null)
         every { skillService.updateSkill(id, request) } throws ResponseStatusException(HttpStatus.CONFLICT)
 
         mockMvc

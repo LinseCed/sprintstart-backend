@@ -9,7 +9,7 @@ import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillDto
 fun Skill.toDto() = SkillDto(
     id = id,
     name = name,
-    roleId = projectRole.id,
+    roleIds = projectRoles.map { it.id },
     description = description,
     status = status,
 )
