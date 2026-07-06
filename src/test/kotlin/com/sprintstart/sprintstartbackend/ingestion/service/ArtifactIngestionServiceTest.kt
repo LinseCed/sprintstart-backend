@@ -77,8 +77,7 @@ class ArtifactIngestionServiceTest {
                     reason = "Not found",
                 ),
             )
-        }
-            .isInstanceOf(IngestionRunNotFoundException::class.java)
+        }.isInstanceOf(IngestionRunNotFoundException::class.java)
             .hasMessageContaining(runId.toString())
 
         verify(exactly = 0) { artifactRepository.save(any()) }
