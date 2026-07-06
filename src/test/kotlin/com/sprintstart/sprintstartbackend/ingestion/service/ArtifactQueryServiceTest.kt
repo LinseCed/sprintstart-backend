@@ -1,12 +1,5 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.canonical.model.entity.Artifact
-import com.sprintstart.sprintstartbackend.canonical.model.entity.ArtifactType
-import com.sprintstart.sprintstartbackend.canonical.model.entity.IngestionRun
-import com.sprintstart.sprintstartbackend.canonical.model.entity.IngestionRunStatus
-import com.sprintstart.sprintstartbackend.canonical.model.entity.SourceSystem
-import com.sprintstart.sprintstartbackend.canonical.model.mapper.ArtifactMapper
-import com.sprintstart.sprintstartbackend.canonical.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
@@ -14,6 +7,7 @@ import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunSta
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
+import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -28,9 +22,11 @@ import java.util.UUID
 
 class ArtifactQueryServiceTest {
     private val artifactRepository = mockk<ArtifactRepository>()
+    private val userApi = mockk<UserApi>()
     private val service = ArtifactQueryService(
         artifactRepository = artifactRepository,
         artifactMapper = ArtifactMapper(),
+        userApi = userApi,
     )
 
     @Test
@@ -85,6 +81,7 @@ class ArtifactQueryServiceTest {
         sourceSystem = SourceSystem.GITHUB,
         sourceId = "github:owner/repo:FILE:README.md",
         sourceUrl = "https://github.com/owner/repo/blob/main/README.md",
+        repositoryId = UUID.fromString("13bfe827-f1a7-44d0-a560-2643fa409c2c"),
         repositoryFullName = "owner/repo",
         artifactType = ArtifactType.FILE,
         title = "README.md",

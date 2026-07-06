@@ -1,14 +1,16 @@
-package com.sprintstart.sprintstartbackend.canonical.service
+package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.canonical.model.dto.command.ArtifactCommand
-import com.sprintstart.sprintstartbackend.canonical.model.dto.command.ArtifactFailedCommand
-import com.sprintstart.sprintstartbackend.canonical.model.entity.Artifact
-import com.sprintstart.sprintstartbackend.canonical.model.entity.ArtifactType
-import com.sprintstart.sprintstartbackend.canonical.model.entity.IngestionRun
-import com.sprintstart.sprintstartbackend.canonical.model.entity.IngestionRunStatus
-import com.sprintstart.sprintstartbackend.canonical.model.entity.SourceSystem
-import com.sprintstart.sprintstartbackend.canonical.repository.ArtifactRepository
-import com.sprintstart.sprintstartbackend.canonical.repository.IngestionRunRepository
+import com.sprintstart.sprintstartbackend.github.external.GithubRepositoryApi
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactCommand
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
+import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
+import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
+import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -23,42 +25,60 @@ import java.util.UUID
 class ArtifactIngestionServiceTest {
     private val ingestionRunRepository = mockk<IngestionRunRepository>()
     private val artifactRepository = mockk<ArtifactRepository>()
-    private val service = ArtifactIngestionService(ingestionRunRepository, artifactRepository)
+    private val githubRepositoryApi = mockk<GithubRepositoryApi>()
+    private val service = ArtifactIngestionService(ingestionRunRepository, artifactRepository, githubRepositoryApi)
 
     private val runId = UUID.randomUUID()
+    private val repositoryId = UUID.randomUUID()
+    private val projectId = UUID.randomUUID()
 
     @BeforeEach
     fun setUp() {
         every { artifactRepository.save(any()) } answers { firstArg() }
+        every { githubRepositoryApi.getRepositoryProjectIdsById(repositoryId) } returns setOf(projectId)
     }
 
     @Test
     fun `ingest saves new artifact and increments ingested count`() {
         val run = ingestionRun()
         val savedArtifact = slot<Artifact>()
-        every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
+        every { ingestionRunRepository.getReferenceById(runId) } returns run
         every { artifactRepository.findBySourceId("github:owner/repo:FILE:src/main/App.kt") } returns null
         every { artifactRepository.save(capture(savedArtifact)) } answers { savedArtifact.captured }
+        every { ingestionRunRepository.incrementIngestedCount(runId) } returns Unit
 
-        service.ingest(artifactCommand())
+        service.persistArtifact(artifactCommand())
 
-        assertThat(run.ingestedCount).isEqualTo(1)
-        assertThat(run.updatedCount).isZero()
         assertThat(savedArtifact.captured.sourceSystem).isEqualTo(SourceSystem.GITHUB)
         assertThat(savedArtifact.captured.sourceId).isEqualTo("github:owner/repo:FILE:src/main/App.kt")
+        assertThat(savedArtifact.captured.repositoryId).isEqualTo(repositoryId)
         assertThat(savedArtifact.captured.repositoryFullName).isEqualTo("owner/repo")
+        assertThat(savedArtifact.captured.projectIds).containsExactly(projectId)
         assertThat(savedArtifact.captured.title).isEqualTo("App.kt")
         assertThat(savedArtifact.captured.bodyText).isEqualTo("content")
         assertThat(savedArtifact.captured.hash).isEqualTo("hash-1")
         assertThat(savedArtifact.captured.ingestionRun).isSameAs(run)
+        verify(exactly = 1) { ingestionRunRepository.incrementIngestedCount(runId) }
     }
 
     @Test
     fun `ingest throws when run does not exist`() {
         every { ingestionRunRepository.findById(runId) } returns Optional.empty()
 
-        assertThatThrownBy { service.ingest(artifactCommand()) }
-            .isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy {
+            service.addFailedArtifact(
+                ArtifactFailedCommand(
+                    transactionId = runId,
+                    repositoryOwner = "owner",
+                    repositoryName = "repo",
+                    sourceId = "source-id",
+                    sourceUrl = null,
+                    artifactType = ArtifactType.FILE,
+                    reason = "Not found",
+                ),
+            )
+        }
+            .isInstanceOf(IngestionRunNotFoundException::class.java)
             .hasMessageContaining(runId.toString())
 
         verify(exactly = 0) { artifactRepository.save(any()) }
@@ -71,7 +91,7 @@ class ArtifactIngestionServiceTest {
         every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
         every { artifactRepository.findBySourceId(existing.sourceId) } returns existing
 
-        service.ingest(
+        service.persistArtifact(
             artifactCommand(
                 sourceId = existing.sourceId,
                 artifactType = ArtifactType.COMMIT,
@@ -81,6 +101,7 @@ class ArtifactIngestionServiceTest {
 
         assertThat(run.ingestedCount).isZero()
         assertThat(run.updatedCount).isZero()
+        assertThat(existing.projectIds).containsExactly(projectId)
         verify(exactly = 0) { artifactRepository.save(any()) }
     }
 
@@ -91,11 +112,12 @@ class ArtifactIngestionServiceTest {
         every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
         every { artifactRepository.findBySourceId(existing.sourceId) } returns existing
 
-        service.ingest(artifactCommand(sourceId = existing.sourceId, hash = "same-hash"))
+        service.persistArtifact(artifactCommand(sourceId = existing.sourceId, hash = "same-hash"))
 
         assertThat(run.ingestedCount).isZero()
         assertThat(run.updatedCount).isZero()
         assertThat(existing.bodyText).isEqualTo("old content")
+        assertThat(existing.projectIds).containsExactly(projectId)
         verify(exactly = 0) { artifactRepository.save(any()) }
     }
 
@@ -105,8 +127,9 @@ class ArtifactIngestionServiceTest {
         val existing = artifact(hash = "old-hash")
         every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
         every { artifactRepository.findBySourceId(existing.sourceId) } returns existing
+        every { ingestionRunRepository.incrementUpdatedCount(runId) } returns Unit
 
-        service.ingest(
+        service.persistArtifact(
             artifactCommand(
                 sourceId = existing.sourceId,
                 bodyText = "new content",
@@ -115,9 +138,10 @@ class ArtifactIngestionServiceTest {
         )
 
         assertThat(run.ingestedCount).isZero()
-        assertThat(run.updatedCount).isEqualTo(1)
         assertThat(existing.bodyText).isEqualTo("new content")
         assertThat(existing.hash).isEqualTo("new-hash")
+        assertThat(existing.projectIds).containsExactly(projectId)
+        verify(exactly = 1) { ingestionRunRepository.incrementUpdatedCount(runId) }
         verify(exactly = 0) { artifactRepository.save(any()) }
     }
 
@@ -156,6 +180,7 @@ class ArtifactIngestionServiceTest {
         sourceSystem = SourceSystem.GITHUB,
         sourceId = sourceId,
         sourceUrl = "https://github.com/owner/repo/blob/main/src/main/App.kt",
+        repositoryId = repositoryId,
         repositoryFullName = "owner/repo",
         artifactType = artifactType,
         title = "App.kt",
@@ -180,6 +205,7 @@ class ArtifactIngestionServiceTest {
         sourceSystem = SourceSystem.GITHUB,
         sourceId = "github:owner/repo:${artifactType.name}:src/main/App.kt",
         sourceUrl = "https://github.com/owner/repo/blob/main/src/main/App.kt",
+        repositoryId = repositoryId,
         repositoryFullName = "owner/repo",
         artifactType = artifactType,
         title = "App.kt",

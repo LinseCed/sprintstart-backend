@@ -14,6 +14,7 @@ import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.GithubArtifactFailedMapper
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.GithubArtifactMapper
 import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactIngestionService
+import com.sprintstart.sprintstartbackend.ingestion.service.IngestionStatusService
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -25,13 +26,11 @@ import java.util.UUID
 class GithubFileListenerTest {
     private val repositoryId = UUID.randomUUID()
     private val artifactIngestionService = mockk<ArtifactIngestionService>()
-    private val completionTracker = mockk<GithubFetchingCompletionTracker>()
     private val artifactMapper = mockk<GithubArtifactMapper>()
     private val failedMapper = mockk<GithubArtifactFailedMapper>()
     private val ingestionStatusService = mockk<IngestionStatusService>()
     private val listener = GithubFileListener(
         artifactIngestionService,
-        completionTracker,
         artifactMapper,
         failedMapper,
         ingestionStatusService,
@@ -145,6 +144,7 @@ class GithubFileListenerTest {
         sourceId = "github:owner/repo:FILE:src/main/App.kt",
         sourceUrl = "https://github.com/owner/repo/blob/main/src/main/App.kt",
         repositoryId = repositoryId,
+        repositoryFullName = "owner/repo",
         artifactType = ArtifactType.FILE,
         title = "App.kt",
         bodyText = "content",
