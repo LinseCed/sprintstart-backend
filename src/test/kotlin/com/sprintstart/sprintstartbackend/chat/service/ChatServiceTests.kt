@@ -428,7 +428,6 @@ class ChatServiceTests {
 
             assertEquals("chunk-456", savedCitations[1].chunkId)
             assertEquals("backend.md", savedCitations[1].filename)
-            
             assertEquals(savedMessages[1], savedCitations[0].message)
             assertEquals(savedMessages[1], savedCitations[1].message)
         }
