@@ -135,6 +135,6 @@ class UserApiService(
     override fun userHasAccessToProject(authId: String, projectId: UUID): Boolean {
         val user = userRepository.findByAuthId(authId).orElse(null)
             ?: return false
-        return user.project?.id == projectId
+        return projectId in user.projects.map { it.id }
     }
 }

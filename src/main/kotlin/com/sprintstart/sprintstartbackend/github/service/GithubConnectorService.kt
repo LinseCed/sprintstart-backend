@@ -85,7 +85,7 @@ class GithubConnectorService(
     suspend fun connectRepositoryIfExists(authId: String, request: ConnectRepositoryRequest): UUID {
         val userInRepo = userApi.getUserByAuthId(authId)
 
-        if (userInRepo.project?.projectId != request.projectId) {
+        if (request.projectId !in userInRepo.projects.map { it.projectId }) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project")
         }
 

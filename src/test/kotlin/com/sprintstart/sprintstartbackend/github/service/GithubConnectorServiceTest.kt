@@ -404,7 +404,7 @@ class GithubConnectorServiceTest {
         firstname = "Alice",
         lastname = "Doe",
         avatarUrl = null,
-        project = ProjectDto(
+        projects = ProjectDto(
             projectId = projectId,
             name = "Project",
             description = null,

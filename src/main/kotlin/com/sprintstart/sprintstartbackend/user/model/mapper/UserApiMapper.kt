@@ -13,13 +13,14 @@ fun User.toUserApiDto(): UserDto {
         firstname = this.firstname,
         lastname = this.lastname,
         avatarUrl = this.avatarUrl,
-        project = this.project?.let {
-            ProjectDto(
-                projectId = it.id,
-                name = it.name,
-                description = it.description,
-            )
-        },
+        projects = this.projects
+            .map {
+                ProjectDto(
+                    projectId = it.id,
+                    name = it.name,
+                    description = it.description,
+                )
+            }.toSet(),
         skills = this.skillAssessments.map { assessment ->
             UserSkillDto(
                 skillId = assessment.skill.id,

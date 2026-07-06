@@ -252,7 +252,7 @@ class OnboardingPathService(
             userId = userDto.id.toString(),
             firstname = userDto.firstname,
             lastname = userDto.lastname,
-            project = userDto.project,
+            projectIds = userDto.projects,
             roles = userDto.projectRoles,
             skills = userSkills,
             progressPercentage = progressPercentage,
