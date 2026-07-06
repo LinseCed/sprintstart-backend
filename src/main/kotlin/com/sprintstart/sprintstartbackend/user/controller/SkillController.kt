@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.user.controller
 import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillAssessmentRequest
 import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillRequest
 import com.sprintstart.sprintstartbackend.user.model.request.skill.UpdateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillAssessmentResponse
 import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillAssessmentDto
 import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillDto
 import com.sprintstart.sprintstartbackend.user.service.SkillService
@@ -166,11 +167,38 @@ class SkillController(
     )
     @GetMapping("/admin/users/{userId}/skill-assessments/completed")
     @ResponseStatus(HttpStatus.OK)
-    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR', 'USER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun getUserSkillAssessments(
         @Parameter(description = "UUID of the user") @PathVariable userId: UUID,
     ): List<SkillAssessmentDto> {
         return skillService.getUserSkillAssessments(userId)
+    }
+
+    /**
+     * Retrieves all completed skill assessments for the currently authenticated user.
+     *
+     * @param jwt The authenticated JWT used to resolve the current user.
+     * @return List of the user's skill assessments.
+     */
+    @Operation(
+        summary = "Get user skill assessments",
+        description = "Retrieves all completed skill assessments for a specific user.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Skill assessments returned successfully"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "User not found"),
+        ],
+    )
+    @GetMapping("/me/skills")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR', 'USER')")
+    fun getMySkillAssessments(
+        @Parameter(hidden = true) @AuthenticationPrincipal jwt: Jwt,
+    ): List<GetSkillAssessmentResponse> {
+        return skillService.getMySkillAssessments(jwt.subject)
     }
 
     /**
@@ -193,7 +221,7 @@ class SkillController(
             ApiResponse(responseCode = "404", description = "User or skill not found"),
         ],
     )
-    @PostMapping("/me/skill-assessments")
+    @PostMapping("/me/skill/assess")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR', 'USER')")
     fun assessSkill(

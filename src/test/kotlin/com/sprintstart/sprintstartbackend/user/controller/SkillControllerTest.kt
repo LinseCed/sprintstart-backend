@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.user.external.enums.SkillStatus
 import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillAssessmentRequest
 import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillRequest
 import com.sprintstart.sprintstartbackend.user.model.request.skill.UpdateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillAssessmentResponse
 import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillAssessmentDto
 import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillDto
 import com.sprintstart.sprintstartbackend.user.service.SkillService
@@ -105,7 +106,7 @@ class SkillControllerTest(
 
         mockMvc
             .perform(
-                post("/api/v1/skills")
+                post("/api/v1/admin/skills")
                     .with(adminJwt)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)),
@@ -121,13 +122,41 @@ class SkillControllerTest(
 
         mockMvc
             .perform(
-                post("/api/v1/skills")
+                post("/api/v1/admin/skills")
                     .with(userJwt)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)),
             ).andExpect(status().isForbidden)
 
         verify(exactly = 0) { skillService.createSkill(any()) }
+    }
+
+    @Test
+    fun `createSkill returns 404 when project role not found`() {
+        val request = CreateSkillRequest("Kotlin", UUID.randomUUID())
+        every { skillService.createSkill(request) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/skills")
+                    .with(adminJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `createSkill returns 409 when skill name already exists`() {
+        val request = CreateSkillRequest("Kotlin", UUID.randomUUID())
+        every { skillService.createSkill(request) } throws ResponseStatusException(HttpStatus.CONFLICT)
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/skills")
+                    .with(adminJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isConflict)
     }
 
     @Test
@@ -139,7 +168,7 @@ class SkillControllerTest(
 
         mockMvc
             .perform(
-                patch("/api/v1/skills/$id")
+                patch("/api/v1/admin/skills/$id")
                     .with(adminJwt)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)),
@@ -150,12 +179,42 @@ class SkillControllerTest(
     }
 
     @Test
+    fun `updateSkill returns 404 when skill not found`() {
+        val id = UUID.randomUUID()
+        val request = UpdateSkillRequest(name = "Go", description = null, roleId = null)
+        every { skillService.updateSkill(id, request) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(
+                patch("/api/v1/admin/skills/$id")
+                    .with(adminJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `updateSkill returns 409 when new name conflicts with another skill`() {
+        val id = UUID.randomUUID()
+        val request = UpdateSkillRequest(name = "Go", description = null, roleId = null)
+        every { skillService.updateSkill(id, request) } throws ResponseStatusException(HttpStatus.CONFLICT)
+
+        mockMvc
+            .perform(
+                patch("/api/v1/admin/skills/$id")
+                    .with(adminJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isConflict)
+    }
+
+    @Test
     fun `retireSkill returns 204`() {
         val skillId = UUID.randomUUID()
         every { skillService.retireSkill(skillId) } just Runs
 
         mockMvc
-            .perform(delete("/api/v1/skills/$skillId").with(adminJwt))
+            .perform(delete("/api/v1/admin/skills/$skillId").with(adminJwt))
             .andExpect(status().isNoContent)
 
         verify(exactly = 1) { skillService.retireSkill(skillId) }
@@ -167,22 +226,70 @@ class SkillControllerTest(
         every { skillService.retireSkill(skillId) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
 
         mockMvc
-            .perform(delete("/api/v1/skills/$skillId").with(adminJwt))
+            .perform(delete("/api/v1/admin/skills/$skillId").with(adminJwt))
             .andExpect(status().isNotFound)
     }
 
     @Test
-    fun `getUserSkillAssessments returns 200`() {
+    fun `getUserSkillAssessments returns 200 for admins`() {
         val userId = UUID.randomUUID()
         val assessment = SkillAssessmentDto(userId = userId, skillId = UUID.randomUUID(), level = SkillLevel.BEGINNER)
         every { skillService.getUserSkillAssessments(userId) } returns listOf(assessment)
 
         mockMvc
-            .perform(get("/api/v1/users/$userId/skill-assessments/completed").with(userJwt))
+            .perform(get("/api/v1/admin/users/$userId/skill-assessments/completed").with(adminJwt))
             .andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
 
         verify(exactly = 1) { skillService.getUserSkillAssessments(userId) }
+    }
+
+    @Test
+    fun `getUserSkillAssessments returns 403 for normal users`() {
+        val userId = UUID.randomUUID()
+
+        mockMvc
+            .perform(get("/api/v1/admin/users/$userId/skill-assessments/completed").with(userJwt))
+            .andExpect(status().isForbidden)
+
+        verify(exactly = 0) { skillService.getUserSkillAssessments(any()) }
+    }
+
+    @Test
+    fun `getUserSkillAssessments returns 404 when user not found`() {
+        val userId = UUID.randomUUID()
+        every { skillService.getUserSkillAssessments(userId) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(get("/api/v1/admin/users/$userId/skill-assessments/completed").with(adminJwt))
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `getMySkillAssessments returns 200`() {
+        val assessment = GetSkillAssessmentResponse(
+            id = UUID.randomUUID(),
+            userId = UUID.randomUUID(),
+            skillId = UUID.randomUUID(),
+            level = SkillLevel.BEGINNER,
+        )
+        every { skillService.getMySkillAssessments(any()) } returns listOf(assessment)
+
+        mockMvc
+            .perform(get("/api/v1/me/skills").with(userJwt))
+            .andExpect(status().isOk)
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+
+        verify(exactly = 1) { skillService.getMySkillAssessments(any()) }
+    }
+
+    @Test
+    fun `getMySkillAssessments returns 404 when user not found`() {
+        every { skillService.getMySkillAssessments(any()) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(get("/api/v1/me/skills").with(userJwt))
+            .andExpect(status().isNotFound)
     }
 
     @Test
@@ -197,7 +304,7 @@ class SkillControllerTest(
 
         mockMvc
             .perform(
-                post("/api/v1/skill-assessments")
+                post("/api/v1/me/skill/assess")
                     .with(userJwt)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)),
@@ -215,10 +322,24 @@ class SkillControllerTest(
 
         mockMvc
             .perform(
-                post("/api/v1/skill-assessments")
+                post("/api/v1/me/skill/assess")
                     .with(userJwt)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)),
             ).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `assessSkill returns 404 when user or skill not found`() {
+        val request = CreateSkillAssessmentRequest(skillId = UUID.randomUUID(), level = SkillLevel.BEGINNER)
+        every { skillService.assessSkillForMe(any(), request) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(
+                post("/api/v1/me/skill/assess")
+                    .with(userJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isNotFound)
     }
 }

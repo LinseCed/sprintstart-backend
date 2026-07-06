@@ -229,6 +229,35 @@ class SkillServiceTest {
     }
 
     @Test
+    fun `assessSkillForMe throws 404 when user not found`() {
+        val request = CreateSkillAssessmentRequest(skillId = UUID.randomUUID(), level = SkillLevel.BEGINNER)
+        every { userRepository.findByAuthId("unknown") } returns Optional.empty()
+
+        val ex = assertThrows<ResponseStatusException> { service.assessSkillForMe("unknown", request) }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+    }
+
+    @Test
+    fun `assessSkillForMe throws 404 when skill not found`() {
+        val user = User(
+            id = UUID.randomUUID(),
+            authId = "auth1",
+            username = "alice",
+            firstname = "Alice",
+            lastname = "Test",
+            email = null,
+        )
+        val skillId = UUID.randomUUID()
+        val request = CreateSkillAssessmentRequest(skillId = skillId, level = SkillLevel.BEGINNER)
+
+        every { userRepository.findByAuthId("auth1") } returns Optional.of(user)
+        every { skillRepository.findById(skillId) } returns Optional.empty()
+
+        val ex = assertThrows<ResponseStatusException> { service.assessSkillForMe("auth1", request) }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+    }
+
+    @Test
     fun `getUserSkillAssessments returns mapped assessments`() {
         val userId = UUID.randomUUID()
         val user = User(
@@ -250,5 +279,46 @@ class SkillServiceTest {
         assertEquals(1, result.size)
         assertEquals(s.id, result[0].skillId)
         assertEquals(SkillLevel.EXPERT, result[0].level)
+    }
+
+    @Test
+    fun `getUserSkillAssessments throws 404 when user not found`() {
+        val userId = UUID.randomUUID()
+        every { userRepository.existsById(userId) } returns false
+
+        val ex = assertThrows<ResponseStatusException> { service.getUserSkillAssessments(userId) }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+    }
+
+    @Test
+    fun `getMySkillAssessments returns mapped assessments for current user`() {
+        val user = User(
+            id = UUID.randomUUID(),
+            authId = "auth1",
+            username = "alice",
+            firstname = "Alice",
+            lastname = "Test",
+            email = null,
+        )
+        val s = skill()
+        val assessment = UserSkillAssessment(id = UUID.randomUUID(), user = user, skill = s, level = SkillLevel.EXPERT)
+
+        every { userRepository.findByAuthId("auth1") } returns Optional.of(user)
+        every { userSkillAssessmentRepository.findByUserId(user.id) } returns listOf(assessment)
+
+        val result = service.getMySkillAssessments("auth1")
+
+        assertEquals(1, result.size)
+        assertEquals(assessment.id, result[0].id)
+        assertEquals(s.id, result[0].skillId)
+        assertEquals(SkillLevel.EXPERT, result[0].level)
+    }
+
+    @Test
+    fun `getMySkillAssessments throws 404 when user not found`() {
+        every { userRepository.findByAuthId("unknown") } returns Optional.empty()
+
+        val ex = assertThrows<ResponseStatusException> { service.getMySkillAssessments("unknown") }
+        assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
     }
 }

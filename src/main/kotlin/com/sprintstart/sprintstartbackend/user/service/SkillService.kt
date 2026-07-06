@@ -4,9 +4,11 @@ import com.sprintstart.sprintstartbackend.user.external.enums.SkillStatus
 import com.sprintstart.sprintstartbackend.user.model.entity.Skill
 import com.sprintstart.sprintstartbackend.user.model.entity.UserSkillAssessment
 import com.sprintstart.sprintstartbackend.user.model.mapper.toDto
+import com.sprintstart.sprintstartbackend.user.model.mapper.toGetResponse
 import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillAssessmentRequest
 import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillRequest
 import com.sprintstart.sprintstartbackend.user.model.request.skill.UpdateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillAssessmentResponse
 import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillAssessmentDto
 import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillDto
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRoleRepository
@@ -97,13 +99,20 @@ class SkillService(
         if (!userRepository.existsById(userId)) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "User with id $userId not found")
         }
-        return userSkillAssessmentRepository.findByUserId(userId).map { assessment ->
-            SkillAssessmentDto(
-                userId = assessment.user.id,
-                skillId = assessment.skill.id,
-                level = assessment.level,
-            )
-        }
+        return userSkillAssessmentRepository.findByUserId(userId).map { it.toDto() }
+    }
+
+    @Transactional
+    fun getMySkillAssessments(authId: String): List<GetSkillAssessmentResponse> {
+        val user = userRepository
+            .findByAuthId(authId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with authId $authId not found") }
+
+        val assessments = userSkillAssessmentRepository
+            .findByUserId(user.id)
+            .map { it.toGetResponse() }
+
+        return assessments
     }
 
     @Transactional
