@@ -69,9 +69,6 @@ class SkillService(
         request.description?.let { skill.description = it }
 
         request.roleIds?.let { roleIds ->
-            if (roleIds.isEmpty()) {
-                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one roleId is required")
-            }
             skill.projectRoles = findRolesByIds(roleIds)
         }
 

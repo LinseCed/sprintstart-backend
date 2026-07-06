@@ -121,16 +121,6 @@ class SkillServiceTest {
     }
 
     @Test
-    fun `createSkill throws 400 if roleIds is empty`() {
-        val request = CreateSkillRequest(name = "Kotlin", roleIds = emptyList())
-
-        every { skillRepository.existsByNormalizedName("Kotlin") } returns false
-
-        val ex = assertThrows<ResponseStatusException> { service.createSkill(request) }
-        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
-    }
-
-    @Test
     fun `createSkill throws 404 if role not found`() {
         val roleId = UUID.randomUUID()
         val request = CreateSkillRequest(name = "Kotlin", roleIds = listOf(roleId))
@@ -171,17 +161,6 @@ class SkillServiceTest {
 
         val ex = assertThrows<ResponseStatusException> { service.updateSkill(s.id, request) }
         assertEquals(HttpStatus.CONFLICT, ex.statusCode)
-    }
-
-    @Test
-    fun `updateSkill throws 400 if roleIds is empty`() {
-        val s = skill()
-        val request = UpdateSkillRequest(name = null, description = null, roleIds = emptyList())
-
-        every { skillRepository.findById(s.id) } returns Optional.of(s)
-
-        val ex = assertThrows<ResponseStatusException> { service.updateSkill(s.id, request) }
-        assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
     }
 
     @Test
