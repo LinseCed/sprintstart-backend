@@ -120,7 +120,7 @@ class ArtifactIngestionService(
             bodyText = command.bodyText,
             mime = command.mime,
             language = command.language,
-            projectIdsInternal = projectIds, // Add companion obj to Artifact to have Artifact.create without exposing internal
+            projectIdsInternal = projectIds,
             ingestionRun = ingestionRun,
             hash = command.hash,
             createdAtSource = null,

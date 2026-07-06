@@ -3,6 +3,10 @@ package com.sprintstart.sprintstartbackend.ingestion.controller
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactPageResponse
 import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactQueryService
 import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactService
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.responses.ApiResponse
+import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
@@ -40,7 +44,25 @@ class ArtifactController(
     private val artifactService: ArtifactService,
     private val artifactQueryService: ArtifactQueryService,
 ) {
+    /**
+     * Returns a paginated artifact list across all projects for administrative callers.
+     *
+     * When a filter is provided, the response is narrowed to artifacts whose searchable fields
+     * contain the given case-insensitive fragment.
+     */
     @GetMapping("admin/artifacts")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(
+        summary = "Get all artifacts",
+        description =
+            "Returns a paginated artifact list across all projects. When a filter is provided, " +
+                "the search is performed case-insensitively across the configured searchable fields.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Artifact page returned successfully"),
+        ],
+    )
     fun getAllArtifacts(
         @RequestParam(defaultValue = DEFAULT_PAGE) @Min(1) page: Int,
         @RequestParam(defaultValue = DEFAULT_SIZE) @Min(1) @Max(MAX_PAGE_SIZE) size: Int,
@@ -50,16 +72,39 @@ class ArtifactController(
             artifactQueryService.getAllArtifacts(page, size, filter),
         )
 
-    /*@GetMapping("projects/{projectId}/artifacts")
+    /**
+     * Returns a paginated artifact list for one project visible to the authenticated caller.
+     *
+     * When a filter is provided, the response is narrowed to project artifacts whose searchable
+     * fields contain the given case-insensitive fragment.
+     */
+    @GetMapping("projects/{projectId}/artifacts")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(
+        summary = "Get project artifacts",
+        description =
+            "Returns a paginated artifact list limited to one project visible to the " +
+                "authenticated user. When a filter is provided, the search is performed " +
+                "case-insensitively across the configured searchable fields.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Project artifact page returned successfully"),
+            ApiResponse(responseCode = "403", description = "Caller has no access to the project"),
+        ],
+    )
     fun getProjectArtifacts(
-        @RequestParam(defaultValue = "1") @Min(1) page: Int,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(100) size: Int,
-        @RequestParam filter: String,
-        @PathVariable projectId: String
+        @RequestParam(defaultValue = DEFAULT_PAGE) @Min(1) page: Int,
+        @RequestParam(defaultValue = DEFAULT_SIZE) @Min(1) @Max(MAX_PAGE_SIZE) size: Int,
+        @RequestParam(defaultValue = "") filter: String,
+        @Parameter(
+            description = "UUID of the project whose artifacts should be returned",
+        ) @PathVariable projectId: UUID,
+        @Parameter(hidden = true) @AuthenticationPrincipal jwt: Jwt,
     ): ResponseEntity<ArtifactPageResponse> =
         ResponseEntity.ok(
-            artifactQueryService.getProjectArtifacts(page, size, filter, projectId),
-        )*/
+            artifactQueryService.getProjectArtifacts(page, size, filter, projectId, jwt.subject),
+        )
 
     /**
      * Returns the raw stored payload of one artifact together with its effective mime type.
@@ -74,10 +119,25 @@ class ArtifactController(
      */
     @GetMapping("/projects/{projectId}/artifacts/{artifactId}/content")
     @PreAuthorize("hasRole('USER')")
+    @Operation(
+        summary = "Get artifact content",
+        description =
+            "Returns the raw stored payload for one artifact when the authenticated user has " +
+                "access to the requested project and the artifact is linked to that project.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Artifact content returned successfully"),
+            ApiResponse(responseCode = "403", description = "Caller has no access to the project"),
+            ApiResponse(responseCode = "404", description = "Artifact or artifact content not found"),
+        ],
+    )
     fun getArtifactContent(
-        @PathVariable projectId: UUID,
-        @PathVariable artifactId: UUID,
-        @AuthenticationPrincipal jwt: Jwt,
+        @Parameter(description = "UUID of the project that scopes artifact access") @PathVariable projectId: UUID,
+        @Parameter(
+            description = "UUID of the artifact whose content should be returned",
+        ) @PathVariable artifactId: UUID,
+        @Parameter(hidden = true) @AuthenticationPrincipal jwt: Jwt,
     ): ResponseEntity<ByteArray> {
         val response = artifactService.getArtifactContent(
             projectId = projectId,

@@ -42,6 +42,8 @@ class Artifact(
         joinColumns = [JoinColumn(name = "artifact_id")],
     )
     @Column(name = "project_id", nullable = false)
+    // Add companion obj to Artifact to have Artifact.create
+    // to keep internal state hidden
     private val projectIdsInternal: MutableSet<UUID> = mutableSetOf(),
     val createdAtSource: Instant?,
     val updatedAtSource: Instant?,
