@@ -140,7 +140,7 @@ class OnboardingFeedbackService(
      * @param feedbackId The id of the feedback to mark as read.
      * @throws ResponseStatusException (not found) if feedback with given id could not be found.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     fun markFeedbackAsRead(feedbackId: UUID): ReadOnboardingFeedbackResponse {
         val feedback = onboardingFeedbackRepository
             .findById(feedbackId)
