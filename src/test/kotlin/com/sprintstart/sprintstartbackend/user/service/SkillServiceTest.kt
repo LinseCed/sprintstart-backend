@@ -115,7 +115,9 @@ class SkillServiceTest {
         val request = CreateSkillRequest(name = "kotlin", roleIds = listOf(roleId))
 
         every { projectRoleRepository.findAllById(listOf(roleId)) } returns listOf(role(roleId))
-        every { skillRepository.findByNormalizedName("kotlin") } returns skill(name = "Kotlin", status = SkillStatus.ACTIVE)
+        every {
+            skillRepository.findByNormalizedName("kotlin")
+        } returns skill(name = "Kotlin", status = SkillStatus.ACTIVE)
 
         val ex = assertThrows<ResponseStatusException> { service.createSkill(request) }
         assertEquals(HttpStatus.CONFLICT, ex.statusCode)
