@@ -7,6 +7,5 @@ data class UpdateRoleSkillsResponse(
     val id: UUID,
     val name: String,
     val roleIds: List<UUID>,
-    val description: String?,
     val status: SkillStatus,
 )

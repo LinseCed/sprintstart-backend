@@ -10,7 +10,6 @@ fun Skill.toGetResponse() = GetSkillResponse(
     id = id,
     name = name,
     roleIds = projectRoles.map { it.id },
-    description = description,
     status = status,
 )
 
@@ -18,7 +17,6 @@ fun Skill.toCreateResponse() = CreateSkillResponse(
     id = id,
     name = name,
     roleIds = projectRoles.map { it.id },
-    description = description,
     status = status,
 )
 
@@ -26,7 +24,6 @@ fun Skill.toUpdateResponse() = UpdateSkillResponse(
     id = id,
     name = name,
     roleIds = projectRoles.map { it.id },
-    description = description,
     status = status,
 )
 
@@ -34,6 +31,5 @@ fun Skill.toUpdateRoleSkillsResponse() = UpdateRoleSkillsResponse(
     id = id,
     name = name,
     roleIds = projectRoles.map { it.id },
-    description = description,
     status = status,
 )

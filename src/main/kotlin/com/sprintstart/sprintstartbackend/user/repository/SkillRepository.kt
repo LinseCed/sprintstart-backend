@@ -12,6 +12,9 @@ interface SkillRepository : JpaRepository<Skill, UUID> {
 
     fun findAllByProjectRolesId(roleId: UUID): List<Skill>
 
+    @Query("SELECT s FROM Skill s WHERE LOWER(TRIM(s.name)) = LOWER(TRIM(:name))")
+    fun findByNormalizedName(name: String): Skill?
+
     @Query("SELECT COUNT(s) > 0 FROM Skill s WHERE LOWER(TRIM(s.name)) = LOWER(TRIM(:name)) AND s.id <> :excludeId")
     fun existsByNormalizedNameExcluding(name: String, excludeId: UUID): Boolean
 

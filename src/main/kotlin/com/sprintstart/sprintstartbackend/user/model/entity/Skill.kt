@@ -27,8 +27,6 @@ class Skill(
         inverseJoinColumns = [JoinColumn(name = "role_id")],
     )
     var projectRoles: MutableSet<ProjectRole> = mutableSetOf(),
-    @Column(nullable = true)
-    var description: String? = null,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var status: SkillStatus = SkillStatus.ACTIVE,

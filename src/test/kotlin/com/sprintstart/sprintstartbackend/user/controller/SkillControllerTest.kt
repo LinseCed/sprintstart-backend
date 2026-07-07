@@ -58,7 +58,7 @@ class SkillControllerTest(
         id: UUID = UUID.randomUUID(),
         name: String = "Kotlin",
         status: SkillStatus = SkillStatus.ACTIVE,
-    ) = GetSkillResponse(id = id, name = name, roleIds = listOf(UUID.randomUUID()), description = null, status = status)
+    ) = GetSkillResponse(id = id, name = name, roleIds = listOf(UUID.randomUUID()), status = status)
 
     @Test
     fun `getAllSkills returns 200 with skill list including status`() {
@@ -203,7 +203,6 @@ class SkillAdminControllerTest(
         id = id,
         name = name,
         roleIds = listOf(UUID.randomUUID()),
-        description = null,
         status = status,
     )
 
@@ -215,7 +214,6 @@ class SkillAdminControllerTest(
         id = id,
         name = name,
         roleIds = listOf(UUID.randomUUID()),
-        description = null,
         status = status,
     )
 
@@ -283,7 +281,7 @@ class SkillAdminControllerTest(
     @Test
     fun `updateSkill returns 200 for admins`() {
         val id = UUID.randomUUID()
-        val request = UpdateSkillRequest(name = "Go", description = "A language", roleIds = null)
+        val request = UpdateSkillRequest(name = "Go", roleIds = null)
         val dto = updateSkillResponse(id = id, name = "Go")
         every { skillService.updateSkill(id, request) } returns dto
 
@@ -302,7 +300,7 @@ class SkillAdminControllerTest(
     @Test
     fun `updateSkill returns 404 when skill not found`() {
         val id = UUID.randomUUID()
-        val request = UpdateSkillRequest(name = "Go", description = null, roleIds = null)
+        val request = UpdateSkillRequest(name = "Go", roleIds = null)
         every { skillService.updateSkill(id, request) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
 
         mockMvc
@@ -317,7 +315,7 @@ class SkillAdminControllerTest(
     @Test
     fun `updateSkill returns 409 when new name conflicts with another skill`() {
         val id = UUID.randomUUID()
-        val request = UpdateSkillRequest(name = "Go", description = null, roleIds = null)
+        val request = UpdateSkillRequest(name = "Go", roleIds = null)
         every { skillService.updateSkill(id, request) } throws ResponseStatusException(HttpStatus.CONFLICT)
 
         mockMvc

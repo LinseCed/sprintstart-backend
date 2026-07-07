@@ -47,13 +47,28 @@ class SkillService(
 
     @Transactional
     fun createSkill(request: CreateSkillRequest): CreateSkillResponse {
-        if (skillRepository.existsByNormalizedName(request.name)) {
-            throw ResponseStatusException(HttpStatus.CONFLICT, "Skill with name '${request.name}' already exists")
+        val roles = findRolesByIds(request.roleIds)
+        val existingSkill = skillRepository.findByNormalizedName(request.name)
+
+        if (existingSkill != null) {
+            if (existingSkill.status != SkillStatus.RETIRED) {
+                throw ResponseStatusException(HttpStatus.CONFLICT, "Skill with name '${request.name}' already exists")
+            }
+
+            existingSkill.name = request.name
+            existingSkill.projectRoles = roles
+            existingSkill.status = SkillStatus.ACTIVE
+
+            return skillRepository.save(existingSkill).toCreateResponse()
         }
 
-        val roles = findRolesByIds(request.roleIds)
-
-        return skillRepository.save(Skill(name = request.name, projectRoles = roles)).toCreateResponse()
+        return skillRepository
+            .save(
+                Skill(
+                    name = request.name,
+                    projectRoles = roles,
+                ),
+            ).toCreateResponse()
     }
 
     @Transactional
@@ -68,8 +83,6 @@ class SkillService(
             }
             skill.name = newName
         }
-
-        request.description?.let { skill.description = it }
 
         request.roleIds?.let { roleIds ->
             skill.projectRoles = findRolesByIds(roleIds)

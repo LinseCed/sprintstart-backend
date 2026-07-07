@@ -146,10 +146,19 @@ class SkillAdminController(
     /**
      * Creates a new skill.
      *
+     * Creates a new active skill, or reactivates a retired skill with the same normalized name.
+     *
+     * When a retired skill is reactivated through this endpoint, its role assignments are refreshed
+     * from the request instead of creating a duplicate row.
+     *
      * @param request The request containing the skill details.
-     * @return The created skill.
+     * @return The created or reactivated skill.
      */
-    @Operation(summary = "Create skill", description = "Creates a new skill with the given details.")
+    @Operation(
+        summary = "Create skill",
+        description = "Creates a new skill with the given details. If a retired skill with the same normalized " +
+            "name already exists, that skill is reactivated and updated instead.",
+    )
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "201", description = "Skill created successfully"),

@@ -167,7 +167,6 @@ class ProjectRoleControllerTest(
             id = UUID.randomUUID(),
             name = "Kotlin",
             roleIds = listOf(roleId),
-            description = null,
             status = SkillStatus.ACTIVE,
         )
         every { projectRoleService.getSkillsForRole(roleId) } returns listOf(dto)
@@ -198,7 +197,6 @@ class ProjectRoleControllerTest(
             id = request.skillIds[0],
             name = "Kotlin",
             roleIds = listOf(roleId),
-            description = null,
             status = SkillStatus.ACTIVE,
         )
         every { projectRoleService.setSkillsForRole(roleId, request) } returns listOf(dto)

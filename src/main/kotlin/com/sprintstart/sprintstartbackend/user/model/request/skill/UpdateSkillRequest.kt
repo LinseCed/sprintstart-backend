@@ -4,6 +4,5 @@ import java.util.UUID
 
 data class UpdateSkillRequest(
     val name: String?,
-    val description: String?,
     val roleIds: List<UUID>?,
 )
