@@ -11,27 +11,27 @@ data class ConfigureRepositoryRequest(
 data class UpdateSchedule(
     val seconds: List<
             @Pattern(regexp = "^(\\*|[0-9]|[1-5][0-9])$")
-            Int
+            String
             >,
     val minutes: List<
             @Pattern(regexp = "^(\\*|[0-9]|[1-5][0-9])$")
-            Int
+            String
             >,
     val hour: List<
             @Pattern(regexp = "^(\\*|[0-9]|[1-2][0-3])$")
-            Int
+            String
             >,
     val dayOfWeek: List<
             @Pattern(regexp = "^(\\*|[1-7])$")
-            Int
+            String
             >,
     val dayOfMonth: List<
             @Pattern(regexp = "^(\\*|[1-9]|[1-2][0-9]|3[0-1])$")
-            Int
+            String
             >,
     val monthOfYear: List<
             @Pattern(regexp = "^(\\*|[1-9]|1[0-2])$")
-            Int
+            String
             >,
 )
 

@@ -117,8 +117,8 @@ class GithubConnectorService(
             GithubRepositoryConnectionInitiatedEvent(transactionId, request.owner, request.name),
         )
 
-        val user = githubUserRepository.findById(GithubUserPat(authId = userId, name = request.tokenName)).orElseThrow {
-            GithubUserPatNotFoundException(request.tokenName, userId)
+        val user = githubUserRepository.findById(GithubUserPat(authId = userId.toString(), name = request.tokenName)).orElseThrow {
+            GithubUserPatNotFoundException(request.tokenName, userId.toString())
         }
         val repoConnection = GithubRepositoryConnection(
             owner = request.owner,

@@ -8,6 +8,7 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.MapsId
 import jakarta.persistence.OneToOne
 import jakarta.persistence.Table
+import java.time.Instant
 import java.util.UUID
 
 @Entity
@@ -22,6 +23,8 @@ data class GithubConfig(
     @Column(name = "auto_update", nullable = false)
     var autoUpdate: Boolean = false,
     @Column(nullable = false)
-    var schedule: String = "0 0 2 * * *"
+    var schedule: String = "0 0 2 * * *",
+    @Column("next_sync_at")
+    var nextSyncAt: Instant? = null
 )
 
