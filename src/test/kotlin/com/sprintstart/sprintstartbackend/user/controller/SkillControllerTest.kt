@@ -8,9 +8,11 @@ import com.sprintstart.sprintstartbackend.user.external.enums.SkillStatus
 import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillAssessmentRequest
 import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillRequest
 import com.sprintstart.sprintstartbackend.user.model.request.skill.UpdateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.response.skill.CreateSkillAssessmentResponse
+import com.sprintstart.sprintstartbackend.user.model.response.skill.CreateSkillResponse
 import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillAssessmentResponse
-import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillAssessmentDto
-import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillDto
+import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillResponse
+import com.sprintstart.sprintstartbackend.user.model.response.skill.UpdateSkillResponse
 import com.sprintstart.sprintstartbackend.user.service.SkillService
 import io.mockk.Runs
 import io.mockk.every
@@ -52,15 +54,15 @@ class SkillControllerTest(
 
     private val userJwt = jwt().authorities(SimpleGrantedAuthority("ROLE_USER"))
 
-    private fun skillDto(
+    private fun getSkillResponse(
         id: UUID = UUID.randomUUID(),
         name: String = "Kotlin",
         status: SkillStatus = SkillStatus.ACTIVE,
-    ) = SkillDto(id = id, name = name, roleIds = listOf(UUID.randomUUID()), description = null, status = status)
+    ) = GetSkillResponse(id = id, name = name, roleIds = listOf(UUID.randomUUID()), description = null, status = status)
 
     @Test
     fun `getAllSkills returns 200 with skill list including status`() {
-        val dto = skillDto()
+        val dto = getSkillResponse()
         every { skillService.getAllSkills() } returns listOf(dto)
 
         mockMvc
@@ -73,7 +75,7 @@ class SkillControllerTest(
 
     @Test
     fun `getSkillById returns 200`() {
-        val dto = skillDto()
+        val dto = getSkillResponse()
         every { skillService.getSkillById(dto.id) } returns dto
 
         mockMvc
@@ -124,7 +126,7 @@ class SkillControllerTest(
     @Test
     fun `assessSkill returns 200`() {
         val request = CreateSkillAssessmentRequest(skillId = UUID.randomUUID(), level = SkillLevel.EXPERT)
-        val assessment = SkillAssessmentDto(
+        val assessment = CreateSkillAssessmentResponse(
             userId = UUID.randomUUID(),
             skillId = request.skillId,
             level = request.level,
@@ -193,16 +195,34 @@ class SkillAdminControllerTest(
         SimpleGrantedAuthority("ROLE_ADMIN"),
     )
 
-    private fun skillDto(
+    private fun createSkillResponse(
         id: UUID = UUID.randomUUID(),
         name: String = "Kotlin",
         status: SkillStatus = SkillStatus.ACTIVE,
-    ) = SkillDto(id = id, name = name, roleIds = listOf(UUID.randomUUID()), description = null, status = status)
+    ) = CreateSkillResponse(
+        id = id,
+        name = name,
+        roleIds = listOf(UUID.randomUUID()),
+        description = null,
+        status = status,
+    )
+
+    private fun updateSkillResponse(
+        id: UUID = UUID.randomUUID(),
+        name: String = "Kotlin",
+        status: SkillStatus = SkillStatus.ACTIVE,
+    ) = UpdateSkillResponse(
+        id = id,
+        name = name,
+        roleIds = listOf(UUID.randomUUID()),
+        description = null,
+        status = status,
+    )
 
     @Test
     fun `createSkill returns 201 for admins`() {
         val request = CreateSkillRequest("Kotlin", listOf(UUID.randomUUID()))
-        val dto = skillDto(name = "Kotlin")
+        val dto = createSkillResponse(name = "Kotlin")
         every { skillService.createSkill(request) } returns dto
 
         mockMvc
@@ -264,7 +284,7 @@ class SkillAdminControllerTest(
     fun `updateSkill returns 200 for admins`() {
         val id = UUID.randomUUID()
         val request = UpdateSkillRequest(name = "Go", description = "A language", roleIds = null)
-        val dto = skillDto(id = id, name = "Go")
+        val dto = updateSkillResponse(id = id, name = "Go")
         every { skillService.updateSkill(id, request) } returns dto
 
         mockMvc
@@ -334,7 +354,12 @@ class SkillAdminControllerTest(
     @Test
     fun `getUserSkillAssessments returns 200 for admins`() {
         val userId = UUID.randomUUID()
-        val assessment = SkillAssessmentDto(userId = userId, skillId = UUID.randomUUID(), level = SkillLevel.BEGINNER)
+        val assessment = GetSkillAssessmentResponse(
+            id = UUID.randomUUID(),
+            userId = userId,
+            skillId = UUID.randomUUID(),
+            level = SkillLevel.BEGINNER,
+        )
         every { skillService.getUserSkillAssessments(userId) } returns listOf(assessment)
 
         mockMvc

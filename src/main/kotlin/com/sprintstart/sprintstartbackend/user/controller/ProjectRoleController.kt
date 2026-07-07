@@ -4,7 +4,8 @@ import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.request.AssignProjectRoleRequest
 import com.sprintstart.sprintstartbackend.user.model.request.CreateProjectRoleRequest
 import com.sprintstart.sprintstartbackend.user.model.request.UpdateRoleSkillsRequest
-import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillDto
+import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillResponse
+import com.sprintstart.sprintstartbackend.user.model.response.skill.UpdateRoleSkillsResponse
 import com.sprintstart.sprintstartbackend.user.service.ProjectRoleService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -172,7 +173,7 @@ class ProjectRoleController(
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR', 'USER')")
     fun getSkillsForRole(
         @Parameter(description = "UUID of the project role") @PathVariable roleId: UUID,
-    ): List<SkillDto> {
+    ): List<GetSkillResponse> {
         return projectRoleService.getSkillsForRole(roleId)
     }
 
@@ -202,7 +203,7 @@ class ProjectRoleController(
     fun setSkillsForRole(
         @Parameter(description = "UUID of the project role") @PathVariable roleId: UUID,
         @RequestBody request: UpdateRoleSkillsRequest,
-    ): List<SkillDto> {
+    ): List<UpdateRoleSkillsResponse> {
         return projectRoleService.setSkillsForRole(roleId, request)
     }
 }

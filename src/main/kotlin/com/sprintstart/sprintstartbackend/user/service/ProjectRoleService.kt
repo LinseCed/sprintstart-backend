@@ -1,10 +1,12 @@
 package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
-import com.sprintstart.sprintstartbackend.user.model.mapper.toDto
+import com.sprintstart.sprintstartbackend.user.model.mapper.toGetResponse
+import com.sprintstart.sprintstartbackend.user.model.mapper.toUpdateRoleSkillsResponse
 import com.sprintstart.sprintstartbackend.user.model.request.CreateProjectRoleRequest
 import com.sprintstart.sprintstartbackend.user.model.request.UpdateRoleSkillsRequest
-import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillDto
+import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillResponse
+import com.sprintstart.sprintstartbackend.user.model.response.skill.UpdateRoleSkillsResponse
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRoleRepository
 import com.sprintstart.sprintstartbackend.user.repository.SkillRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
@@ -65,11 +67,11 @@ class ProjectRoleService(
     }
 
     @Transactional(readOnly = true)
-    fun getSkillsForRole(roleId: UUID): List<SkillDto> {
+    fun getSkillsForRole(roleId: UUID): List<GetSkillResponse> {
         if (!projectRoleRepository.existsById(roleId)) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project role with id $roleId not found")
         }
-        return skillRepository.findAllByProjectRolesId(roleId).map { it.toDto() }
+        return skillRepository.findAllByProjectRolesId(roleId).map { it.toGetResponse() }
     }
 
     /**
@@ -79,7 +81,7 @@ class ProjectRoleService(
      * no role at all, since every skill must belong to at least one project role.
      */
     @Transactional
-    fun setSkillsForRole(roleId: UUID, request: UpdateRoleSkillsRequest): List<SkillDto> {
+    fun setSkillsForRole(roleId: UUID, request: UpdateRoleSkillsRequest): List<UpdateRoleSkillsResponse> {
         val role = projectRoleRepository
             .findById(roleId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Project role with id $roleId not found") }
@@ -106,6 +108,6 @@ class ProjectRoleService(
         skillsToAssign.forEach { it.projectRoles.add(role) }
         skillRepository.saveAll(skillsToUnassign + skillsToAssign)
 
-        return skillRepository.findAllByProjectRolesId(roleId).map { it.toDto() }
+        return skillRepository.findAllByProjectRolesId(roleId).map { it.toUpdateRoleSkillsResponse() }
     }
 }

@@ -8,7 +8,8 @@ import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.request.AssignProjectRoleRequest
 import com.sprintstart.sprintstartbackend.user.model.request.CreateProjectRoleRequest
 import com.sprintstart.sprintstartbackend.user.model.request.UpdateRoleSkillsRequest
-import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillDto
+import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillResponse
+import com.sprintstart.sprintstartbackend.user.model.response.skill.UpdateRoleSkillsResponse
 import com.sprintstart.sprintstartbackend.user.service.ProjectRoleService
 import io.mockk.Runs
 import io.mockk.every
@@ -162,7 +163,7 @@ class ProjectRoleControllerTest(
     @Test
     fun `getSkillsForRole should return 200 and skills for the role`() {
         val roleId = UUID.randomUUID()
-        val dto = SkillDto(
+        val dto = GetSkillResponse(
             id = UUID.randomUUID(),
             name = "Kotlin",
             roleIds = listOf(roleId),
@@ -193,7 +194,7 @@ class ProjectRoleControllerTest(
     fun `setSkillsForRole should return 200 for admins`() {
         val roleId = UUID.randomUUID()
         val request = UpdateRoleSkillsRequest(skillIds = listOf(UUID.randomUUID()))
-        val dto = SkillDto(
+        val dto = UpdateRoleSkillsResponse(
             id = request.skillIds[0],
             name = "Kotlin",
             roleIds = listOf(roleId),

@@ -3,9 +3,11 @@ package com.sprintstart.sprintstartbackend.user.controller
 import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillAssessmentRequest
 import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillRequest
 import com.sprintstart.sprintstartbackend.user.model.request.skill.UpdateSkillRequest
+import com.sprintstart.sprintstartbackend.user.model.response.skill.CreateSkillAssessmentResponse
+import com.sprintstart.sprintstartbackend.user.model.response.skill.CreateSkillResponse
 import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillAssessmentResponse
-import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillAssessmentDto
-import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillDto
+import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillResponse
+import com.sprintstart.sprintstartbackend.user.model.response.skill.UpdateSkillResponse
 import com.sprintstart.sprintstartbackend.user.service.SkillService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -52,7 +54,7 @@ class SkillController(
     @GetMapping("/skills")
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR', 'USER')")
-    fun getAllSkills(): List<SkillDto> {
+    fun getAllSkills(): List<GetSkillResponse> {
         return skillService.getAllSkills()
     }
 
@@ -70,7 +72,7 @@ class SkillController(
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR', 'USER')")
     fun getSkillById(
         @Parameter(description = "UUID of the skill") @PathVariable skillId: UUID,
-    ): SkillDto {
+    ): GetSkillResponse {
         return skillService.getSkillById(skillId)
     }
 
@@ -127,7 +129,7 @@ class SkillController(
     fun assessSkill(
         @Parameter(hidden = true) @AuthenticationPrincipal jwt: Jwt,
         @RequestBody request: CreateSkillAssessmentRequest,
-    ): SkillAssessmentDto {
+    ): CreateSkillAssessmentResponse {
         return skillService.assessSkillForMe(jwt.subject, request)
     }
 }
@@ -162,7 +164,7 @@ class SkillAdminController(
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun createSkill(
         @RequestBody request: CreateSkillRequest,
-    ): SkillDto {
+    ): CreateSkillResponse {
         return skillService.createSkill(request)
     }
 
@@ -182,7 +184,7 @@ class SkillAdminController(
     fun updateSkill(
         @Parameter(description = "UUID of the skill to update") @PathVariable skillId: UUID,
         @RequestBody request: UpdateSkillRequest,
-    ): SkillDto {
+    ): UpdateSkillResponse {
         return skillService.updateSkill(skillId, request)
     }
 
@@ -237,7 +239,7 @@ class SkillAdminController(
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     fun getUserSkillAssessments(
         @Parameter(description = "UUID of the user") @PathVariable userId: UUID,
-    ): List<SkillAssessmentDto> {
+    ): List<GetSkillAssessmentResponse> {
         return skillService.getUserSkillAssessments(userId)
     }
 }

@@ -1,12 +1,12 @@
 package com.sprintstart.sprintstartbackend.user.model.mapper
 
 import com.sprintstart.sprintstartbackend.user.model.entity.Skill
-import com.sprintstart.sprintstartbackend.user.model.entity.UserSkillAssessment
-import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillAssessmentResponse
-import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillAssessmentDto
-import com.sprintstart.sprintstartbackend.user.model.response.skill.SkillDto
+import com.sprintstart.sprintstartbackend.user.model.response.skill.CreateSkillResponse
+import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillResponse
+import com.sprintstart.sprintstartbackend.user.model.response.skill.UpdateRoleSkillsResponse
+import com.sprintstart.sprintstartbackend.user.model.response.skill.UpdateSkillResponse
 
-fun Skill.toDto() = SkillDto(
+fun Skill.toGetResponse() = GetSkillResponse(
     id = id,
     name = name,
     roleIds = projectRoles.map { it.id },
@@ -14,15 +14,26 @@ fun Skill.toDto() = SkillDto(
     status = status,
 )
 
-fun UserSkillAssessment.toDto() = SkillAssessmentDto(
-    userId = user.id,
-    skillId = skill.id,
-    level = level,
+fun Skill.toCreateResponse() = CreateSkillResponse(
+    id = id,
+    name = name,
+    roleIds = projectRoles.map { it.id },
+    description = description,
+    status = status,
 )
 
-fun UserSkillAssessment.toGetResponse() = GetSkillAssessmentResponse(
+fun Skill.toUpdateResponse() = UpdateSkillResponse(
     id = id,
-    userId = user.id,
-    skillId = skill.id,
-    level = level,
+    name = name,
+    roleIds = projectRoles.map { it.id },
+    description = description,
+    status = status,
+)
+
+fun Skill.toUpdateRoleSkillsResponse() = UpdateRoleSkillsResponse(
+    id = id,
+    name = name,
+    roleIds = projectRoles.map { it.id },
+    description = description,
+    status = status,
 )
