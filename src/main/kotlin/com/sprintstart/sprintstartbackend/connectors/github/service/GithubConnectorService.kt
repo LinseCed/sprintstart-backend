@@ -18,6 +18,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.Gi
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.UserWithAuthIdNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositorySnapshotRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
@@ -27,6 +28,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.service.internal.Git
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubPullRequestsService
 import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorSource
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.user.external.UserApi
 import jakarta.transaction.Transactional
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -53,10 +55,30 @@ class GithubConnectorService(
     private val pullRequestsService: GithubPullRequestsService,
     private val githubClient: GithubClient,
     private val eventPublisher: ApplicationEventPublisher,
+    private val userApi: UserApi,
 ) {
+    /**
+     * Retrieves all 'sources' in the connector overview sense.
+     *
+     * For the connector overview, sources are GitHub repositories.
+     * Therefore, this function retrieves a list of all connected GitHub repositories.
+     *
+     * @return a list of all connected GitHub repositories.
+     */
+    @Tracked("Retrieving all GitHub repositories for overview")
     fun getAllSources(): List<GithubRepositoryConnection> =
         repoConnectionRepository.findAll()
 
+    /**
+     * Patches a 'source' in the connector overview sense.
+     *
+     * For the connector overview, sources are GitHub repositories.
+     * Patching a GitHub repository means changing it's status, eg. enabling or disabling it.
+     *
+     * @param source The 'source' (GitHub repository) to patch.
+     * @param newStatus The new status of the 'source'.
+     */
+    @Tracked("Patching a GitHub repository from overview")
     fun patchSource(source: ConnectorSource, newStatus: Boolean) {
         val source = getAllSources().find { "${it.owner}/${it.name}" == source.id } ?: throw RuntimeException("")
         source.sourceEnabled = newStatus
@@ -72,11 +94,11 @@ class GithubConnectorService(
      *
      * Tasks started for background execution include:
      *
-     * * Fetching the repository code
-     * * Fetching the repository commits
-     * * Fetching the repository issues
-     * * Fetching the repository pull requests
-     * * Starting a CRON job that checks for upates every night.
+     * - Fetching the repository code
+     * - Fetching the repository commits
+     * - Fetching the repository issues
+     * - Fetching the repository pull requests
+     * - Starting a CRON job that checks for upates every night.
      *
      * _**Schema:** `https://github.com/{owner}/{name}`_
      *
@@ -89,12 +111,14 @@ class GithubConnectorService(
     @Transactional
     suspend fun connectRepositoryIfExists(authId: String, request: ConnectRepositoryRequest): UUID {
         val transactionId = UUID.randomUUID()
+        val userId = userApi.getUserIdByAuthId(authId).orElseThrow { UserWithAuthIdNotFoundException(authId) }
+
         eventPublisher.publishEvent(
             GithubRepositoryConnectionInitiatedEvent(transactionId, request.owner, request.name),
         )
 
-        val user = githubUserRepository.findById(GithubUserPat(authId = authId, name = request.tokenName)).orElseThrow {
-            GithubUserPatNotFoundException(request.tokenName, authId)
+        val user = githubUserRepository.findById(GithubUserPat(authId = userId, name = request.tokenName)).orElseThrow {
+            GithubUserPatNotFoundException(request.tokenName, userId)
         }
         val repoConnection = GithubRepositoryConnection(
             owner = request.owner,
