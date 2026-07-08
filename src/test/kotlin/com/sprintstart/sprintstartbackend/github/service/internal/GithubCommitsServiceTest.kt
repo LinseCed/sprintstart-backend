@@ -72,7 +72,7 @@ class GithubCommitsServiceTest {
                 )
             } returns ""
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
 
             verify {
                 gitRunner.exec(
@@ -91,7 +91,11 @@ class GithubCommitsServiceTest {
                 gitRunner.exec(repoPath, match { it.command().any { arg -> arg.contains("--after") } })
             } returns ""
 
-            service.fetchAndIngestLatestCommits(snapshot(lastCommitsSyncAt = syncAt), transactionId, doSyncAll = false)
+            service.fetchAndIngestLatestCommitsIfNecessary(
+                snapshot(lastCommitsSyncAt = syncAt),
+                transactionId,
+                doSyncAll = false,
+            )
 
             verify {
                 gitRunner.exec(
@@ -110,7 +114,7 @@ class GithubCommitsServiceTest {
                 gitRunner.exec(repoPath, match { it.command().any { arg -> arg.contains("--after") } })
             } returns ""
 
-            service.fetchAndIngestLatestCommits(snapshot(lastCommitsSyncAt = syncAt), transactionId)
+            service.fetchAndIngestLatestCommitsIfNecessary(snapshot(lastCommitsSyncAt = syncAt), transactionId)
 
             verify {
                 gitRunner.exec(
@@ -138,7 +142,7 @@ class GithubCommitsServiceTest {
                 2024-01-03T00:00:00Z - ghi789 - carol - refactor
                 """.trimIndent()
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
 
             verify(exactly = 5) { eventPublisher.publishEvent(any<GithubCommitFetchedEvent>()) }
         }
@@ -147,7 +151,7 @@ class GithubCommitsServiceTest {
         fun `publishes lifecycle events when output is empty`() = runTest {
             every { gitRunner.exec(repoPath, any()) } returns ""
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
 
             val events = mutableListOf<Any>()
             verify(exactly = 2) { eventPublisher.publishEvent(capture(events)) }
@@ -159,7 +163,7 @@ class GithubCommitsServiceTest {
         fun `publishes lifecycle events when output contains only blank lines`() = runTest {
             every { gitRunner.exec(repoPath, any()) } returns "\n\n\n"
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
 
             val events = mutableListOf<Any>()
             verify(exactly = 2) { eventPublisher.publishEvent(capture(events)) }
@@ -171,7 +175,7 @@ class GithubCommitsServiceTest {
         fun `publishes GithubCommitsFetchingStartedEvent on start`() = runTest {
             every { gitRunner.exec(repoPath, any()) } returns ""
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
 
             verify { eventPublisher.publishEvent(any<GithubCommitsFetchStartedEvent>()) }
         }
@@ -180,7 +184,7 @@ class GithubCommitsServiceTest {
         fun `publishes GithubCommitsFetchingCompletedEvent on completion`() = runTest {
             every { gitRunner.exec(repoPath, any()) } returns ""
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
 
             verify { eventPublisher.publishEvent(any<GithubCommitsFetchCompletedEvent>()) }
         }
@@ -190,7 +194,7 @@ class GithubCommitsServiceTest {
             every { gitRunner.exec(repoPath, any()) } returns "malformed"
 
             assertThrows<GithubCommitsFetchFailedPartiallyException> {
-                service.fetchAndIngestLatestCommits(
+                service.fetchAndIngestLatestCommitsIfNecessary(
                     snapshot(),
                     transactionId,
                     doSyncAll = true,
@@ -210,7 +214,7 @@ class GithubCommitsServiceTest {
                 """.trimIndent()
 
             assertThrows<GithubCommitsFetchFailedPartiallyException> {
-                service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+                service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
             }
 
             val events = mutableListOf<Any>()
@@ -229,7 +233,7 @@ class GithubCommitsServiceTest {
             every { gitRunner.exec(repoPath, any()) } returns
                 "2024-01-15T10:30:00Z - abc123def456 - alice - fix authentication bug"
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
 
             val eventSlot = slot<GithubCommitFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -253,7 +257,7 @@ class GithubCommitsServiceTest {
                 2024-01-02T00:00:00Z - sha2 - bob - commit two
                 """.trimIndent()
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
 
             val capturedEvents = mutableListOf<GithubCommitFetchedEvent>()
             verify(exactly = 2) { eventPublisher.publishEvent(capture(capturedEvents)) }
@@ -271,7 +275,7 @@ class GithubCommitsServiceTest {
             every { gitRunner.exec(repoPath, any()) } returns "malformed-line-without-separators"
 
             assertThrows<GithubCommitsFetchFailedPartiallyException> {
-                service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+                service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
             }
         }
 
@@ -280,7 +284,7 @@ class GithubCommitsServiceTest {
             every { gitRunner.exec(repoPath, any()) } returns "2024-01-01T00:00:00Z - sha123"
 
             assertThrows<GithubCommitsFetchFailedPartiallyException> {
-                service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+                service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
             }
         }
 
@@ -289,7 +293,7 @@ class GithubCommitsServiceTest {
             every { gitRunner.exec(repoPath, any()) } returns "not-a-date - sha123 - alice - message"
 
             assertThrows<GithubCommitsFetchFailedPartiallyException> {
-                service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+                service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
             }
         }
 
@@ -298,7 +302,7 @@ class GithubCommitsServiceTest {
             every { gitRunner.exec(repoPath, any()) } returns
                 "2024-01-01T00:00:00Z - sha123 - alice - fix bug - with dash in message"
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestLatestCommitsIfNecessary(snapshot(), transactionId, doSyncAll = true)
 
             val eventSlot = slot<GithubCommitFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }

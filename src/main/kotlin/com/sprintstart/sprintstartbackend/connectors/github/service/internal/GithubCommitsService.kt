@@ -5,21 +5,27 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.comm
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitsFetchCompletedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitsFetchFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitsFetchStartedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.models.ConnectionState
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
 import com.sprintstart.sprintstartbackend.connectors.github.models.client.dto.Commit
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubCommitsFetchFailedPartiallyException
+import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.connectors.github.util.CustomOnDiskCache
 import com.sprintstart.sprintstartbackend.connectors.github.util.GitOperationRunner
 import com.sprintstart.sprintstartbackend.connectors.github.util.OnDiskOperations
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
+import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
 
 @Service
 class GithubCommitsService(
+    private val repoConnectionRepository: GithubRepositoryConnectionRepository,
     private val onDiskOperations: OnDiskOperations,
     private val customCache: CustomOnDiskCache,
     private val eventPublisher: ApplicationEventPublisher,
@@ -39,9 +45,10 @@ class GithubCommitsService(
      * operation, this exception is thrown with details of the failures.
      */
     @Tracked("Fetching latest commits from repository")
-    internal suspend fun fetchAndIngestLatestCommits(
+    internal suspend fun fetchAndIngestLatestCommitsIfNecessary(
         latestSnapshot: GithubRepositorySnapshot,
         transactionId: UUID,
+        performUpdate: Boolean,
         doSyncAll: Boolean = false,
     ) {
         eventPublisher.publishEvent(
@@ -51,6 +58,10 @@ class GithubCommitsService(
                 latestSnapshot.repository.name,
             ),
         )
+
+        if (!performUpdate) {
+            verifyCommitSyncStatus(latestSnapshot.repository)
+        }
 
         val rawOutput = fetchCommits(latestSnapshot, doSyncAll, transactionId)
         val failures = mutableListOf<String>()
@@ -79,6 +90,38 @@ class GithubCommitsService(
                 latestSnapshot.repository.name,
             ),
         )
+    }
+
+    /**
+     * Verifies the sync status of commits of a given GitHub repository.
+     *
+     * Given a GitHub repository connected to this application, this function checks if the local state is outdated,
+     * and if so marks the repository as [ConnectionState.OUT_OF_DATE], but does not update it.
+     *
+     * @param githubRepository The GitHub repository to check.
+     */
+    private suspend fun verifyCommitSyncStatus(githubRepository: GithubRepositoryConnection) {
+        val localFsPath = customCache.getLocalRepositoryPath(githubRepository)
+
+        if (!isRepositoryUpToDate(localFsPath)) {
+            githubRepository.connectionState = ConnectionState.OUT_OF_DATE
+
+            withContext(Dispatchers.IO) {
+                repoConnectionRepository.save(githubRepository)
+            }
+        }
+    }
+
+    /**
+     * Checks the remote, if this local copy of the repository is still up to date.
+     *
+     * @param localFsPath The path to the local copy of the GitHub repository.
+     * @return true, if the repository is up to date with remote, otherwise false.
+     */
+    private suspend fun isRepositoryUpToDate(localFsPath: Path): Boolean {
+        val localHead = gitRunner.exec(localFsPath, onDiskOperations.gitRevParse())
+        val remoteHead = gitRunner.exec(localFsPath, onDiskOperations.gitLsRemote())
+        return localHead == remoteHead
     }
 
     /**

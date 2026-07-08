@@ -45,12 +45,20 @@ class OnDiskOperations {
     fun gitMerge() = ProcessBuilder("git", "merge", "FETCH_HEAD")
 
     /**
-     * Resolves `HEAD` to its full 40-character commit SHA.
+     * Resolves current `HEAD` to its full 40-character commit SHA.
      *
      * Output includes a trailing newline — call `.trim()` on the result of [exec] before
      * storing or comparing the SHA.
      */
     fun gitRevParse() = ProcessBuilder("git", "rev-parse", "HEAD")
+
+    /**
+     * Resolves remote `HEAD` to its full 40-character commit SHA.
+     *
+     * Output includes a trailing newline — call `.trim()` on the result of [exec] before
+     * storing or comparing the SHA.
+     */
+    fun gitLsRemote() = ProcessBuilder("git", "ls-remote", "origin", "HEAD")
 
     /** Lists remote-tracking branches so callers can repair a clone with an invalid local HEAD. */
     fun gitRemoteBranches() =

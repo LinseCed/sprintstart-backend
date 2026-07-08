@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
+import com.sprintstart.sprintstartbackend.connectors.github.service.GithubUpdatesService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -33,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController
 @Validated
 internal class GithubConnectorController(
     val githubConnectorService: GithubConnectorService,
+    val githubUpdateService: GithubUpdatesService,
 ) {
     /**
      * Connects a GitHub repository to the SprintStart application.
@@ -114,7 +116,7 @@ internal class GithubConnectorController(
     @ResponseStatus(HttpStatus.ACCEPTED)
     @PreAuthorize("hasRole('USER')")
     suspend fun updateAllRepositories(): ResponseEntity<UpdateAllRepositoriesResponse> {
-        val response = githubConnectorService.updateAllRepositories()
+        val response = githubUpdateService.updateAllRepositories()
         return ResponseEntity.accepted().body(response)
     }
 
@@ -144,7 +146,7 @@ internal class GithubConnectorController(
     suspend fun updateRepository(
         @Valid @RequestBody request: UpdateRepositoryRequest,
     ): ResponseEntity<UpdateRepositoryResponse> {
-        val response = githubConnectorService.updateRepository(request)
+        val response = githubUpdateService.updateRepository(request, true)
         return ResponseEntity.accepted().body(response)
     }
 }
