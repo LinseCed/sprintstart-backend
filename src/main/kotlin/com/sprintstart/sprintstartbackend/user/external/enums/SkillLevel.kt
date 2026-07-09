@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.user.model.entity
+package com.sprintstart.sprintstartbackend.user.external.enums
 
 enum class SkillLevel {
     BEGINNER,

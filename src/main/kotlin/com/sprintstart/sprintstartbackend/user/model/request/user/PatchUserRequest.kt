@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.user.model.dto
+package com.sprintstart.sprintstartbackend.user.model.request.user
 
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 

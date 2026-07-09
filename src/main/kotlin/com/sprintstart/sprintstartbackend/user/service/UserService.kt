@@ -2,13 +2,13 @@ package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.external.events.UserCreatedEvent
-import com.sprintstart.sprintstartbackend.user.model.dto.DeleteUserResponse
-import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
-import com.sprintstart.sprintstartbackend.user.model.dto.PatchMeRequest
-import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserRequest
-import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserEnabledRequest
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.model.mapper.toGetResponse
+import com.sprintstart.sprintstartbackend.user.model.request.user.PatchMeRequest
+import com.sprintstart.sprintstartbackend.user.model.request.user.PatchUserRequest
+import com.sprintstart.sprintstartbackend.user.model.request.user.UpdateUserEnabledRequest
+import com.sprintstart.sprintstartbackend.user.model.response.user.DeleteUserResponse
+import com.sprintstart.sprintstartbackend.user.model.response.user.GetUserResponse
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus

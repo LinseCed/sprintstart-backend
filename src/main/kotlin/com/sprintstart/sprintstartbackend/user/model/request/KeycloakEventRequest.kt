@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.user.model.dto
+package com.sprintstart.sprintstartbackend.user.model.request
 
 data class KeycloakEventRequest(
     val source: String,
