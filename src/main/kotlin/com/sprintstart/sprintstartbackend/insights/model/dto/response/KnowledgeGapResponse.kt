@@ -1,0 +1,37 @@
+package com.sprintstart.sprintstartbackend.insights.model.dto.response
+
+import io.swagger.v3.oas.annotations.media.Schema
+import java.time.Instant
+import java.util.UUID
+
+@Schema(description = "A component that is missing critical documentation.")
+data class KnowledgeGapResponse(
+    @field:Schema(description = "Stable identifier of the gap.")
+    val id: UUID,
+    @field:Schema(description = "Name of the component that has gaps.")
+    val component: String,
+    @field:Schema(description = "Document types the component is missing, for example runbook or adr.")
+    val missingTypes: List<String>,
+    @field:Schema(description = "Timestamp of the component's most recent activity.")
+    val lastUpdated: Instant,
+    @field:Schema(description = "People responsible for the component.")
+    val owners: List<KnowledgeGapOwnerResponse>,
+    @field:Schema(description = "Impact level of the gap: high, medium or low.")
+    val severity: String,
+    @field:Schema(description = "Number of user questions related to this component.")
+    val relatedQuestions: Int,
+)
+
+@Schema(description = "A person responsible for a component with a knowledge gap.")
+data class KnowledgeGapOwnerResponse(
+    @field:Schema(description = "Identifier of the user in the upstream system.")
+    val id: String,
+    @field:Schema(description = "Username of the owner.")
+    val username: String,
+    @field:Schema(description = "First name of the owner.")
+    val firstname: String,
+    @field:Schema(description = "Last name of the owner.")
+    val lastname: String,
+    @field:Schema(description = "Working area the owner belongs to, for example BACKEND.")
+    val workingArea: String,
+)
