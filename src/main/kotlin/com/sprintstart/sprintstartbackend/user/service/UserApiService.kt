@@ -93,6 +93,7 @@ class UserApiService(
                 firstname = user.firstname,
                 lastname = user.lastname,
                 avatarUrl = user.avatarUrl,
+                profileIcon = user.profileIcon,
                 project = user.project?.let {
                     ProjectDto(
                         projectId = it.id,
@@ -127,6 +128,7 @@ class UserApiService(
                 firstname = user.firstname,
                 lastname = user.lastname,
                 avatarUrl = user.avatarUrl,
+                profileIcon = user.profileIcon,
                 project = user.project?.let {
                     ProjectDto(
                         projectId = it.id,
