@@ -7,6 +7,7 @@ data class TeamOverviewUserDto(
     val userId: String,
     val firstname: String,
     val lastname: String,
+    val profileIcon: String?,
     val project: ProjectDto?,
     val roles: List<ProjectRoleDto>,
     val skills: List<SkillDto>,
