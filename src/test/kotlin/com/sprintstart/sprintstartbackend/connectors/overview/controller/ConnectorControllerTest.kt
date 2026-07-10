@@ -143,15 +143,20 @@ class ConnectorControllerTest {
                 firstConfiguredAt = Instant.now(),
                 lastConfiguredAt = Instant.now(),
             )
-            every { connectorConfigurationService.configure(id, request) } returns response
+            coEvery { connectorConfigurationService.configure(id, request) } returns response
 
-            mockMvc
+            val asyncResult = mockMvc
                 .perform(
                     patch("/api/v1/connectors/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
                         .with(adminJwt),
-                ).andExpect(status().isOk)
+                ).andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
+                .andExpect(status().isOk)
                 .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.enabled").value(true))
         }
@@ -166,15 +171,20 @@ class ConnectorControllerTest {
                 firstConfiguredAt = Instant.now(),
                 lastConfiguredAt = Instant.now(),
             )
-            every { connectorConfigurationService.configure(id, request) } returns response
+            coEvery { connectorConfigurationService.configure(id, request) } returns response
 
-            mockMvc
+            val asyncResult = mockMvc
                 .perform(
                     patch("/api/v1/connectors/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
                         .with(pmJwt),
-                ).andExpect(status().isOk)
+                ).andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
+                .andExpect(status().isOk)
                 .andExpect(jsonPath("$.enabled").value(false))
         }
 
@@ -190,52 +200,72 @@ class ConnectorControllerTest {
 
         @Test
         fun `should return 403 when authenticated as USER`() {
-            mockMvc
+            val asyncResult = mockMvc
                 .perform(
                     patch("/api/v1/connectors/{id}", githubId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(ConfigureConnectorRequest(true)))
                         .with(userJwt),
-                ).andExpect(status().isForbidden)
+                ).andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
+                .andExpect(status().isForbidden)
         }
 
         @Test
         fun `should return 404 when connector not found`() {
             val id = "unknown"
             val request = ConfigureConnectorRequest(enabled = true)
-            every { connectorConfigurationService.configure(id, request) } throws
+            coEvery { connectorConfigurationService.configure(id, request) } throws
                 ConnectorNotFoundException("No connector with id $id")
 
-            mockMvc
+            val asyncResult = mockMvc
                 .perform(
                     patch("/api/v1/connectors/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
                         .with(adminJwt),
-                ).andExpect(status().isNotFound)
+                ).andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
+                .andExpect(status().isNotFound)
                 .andExpect(jsonPath("$.message").value("No connector with id $id"))
         }
 
         @Test
         fun `should return 400 when connector id contains uppercase letters`() {
-            mockMvc
+            val asyncResult = mockMvc
                 .perform(
                     patch("/api/v1/connectors/{id}", "GITHUB")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(ConfigureConnectorRequest(true)))
                         .with(adminJwt),
-                ).andExpect(status().isBadRequest)
+                ).andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
+                .andExpect(status().isBadRequest)
         }
 
         @Test
         fun `should return 400 when connector id contains spaces`() {
-            mockMvc
+            val asyncResult = mockMvc
                 .perform(
                     patch("/api/v1/connectors/{id}", "my connector")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(ConfigureConnectorRequest(true)))
                         .with(adminJwt),
-                ).andExpect(status().isBadRequest)
+                ).andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
+                .andExpect(status().isBadRequest)
         }
     }
 

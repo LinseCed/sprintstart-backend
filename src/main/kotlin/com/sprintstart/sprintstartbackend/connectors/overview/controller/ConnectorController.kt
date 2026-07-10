@@ -104,7 +104,7 @@ class ConnectorController(
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
     @PatchMapping("/{id}")
-    fun configureConnector(
+    suspend fun configureConnector(
         @Pattern(regexp = ID_PATTERN) @PathVariable id: String,
         @Valid @RequestBody request: ConfigureConnectorRequest,
     ): ResponseEntity<ConfigureConnectorResponse> =

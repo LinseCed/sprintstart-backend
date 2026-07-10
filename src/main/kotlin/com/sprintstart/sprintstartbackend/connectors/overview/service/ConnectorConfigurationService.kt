@@ -15,6 +15,8 @@ import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.
 import com.sprintstart.sprintstartbackend.connectors.overview.repository.ConnectorConfigurationRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import jakarta.annotation.PostConstruct
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -89,17 +91,19 @@ class ConnectorConfigurationService(
     }
 
     /**
-     * Configures a connector - eg. enables or disables it globally.
+     * Configures a connector - e.g. enables or disables it globally.
      *
      * @param connectorId The id of the connector to configure.
      * @param request [ConfigureConnectorRequest] contains the new state of the connector.
      * @return the updated connector.
      */
     @Tracked("Configuring connector")
-    fun configure(connectorId: String, request: ConfigureConnectorRequest): ConfigureConnectorResponse {
+    suspend fun configure(connectorId: String, request: ConfigureConnectorRequest): ConfigureConnectorResponse {
         connectors.find { it.id == connectorId }
             ?: throw ConnectorNotFoundException("No connector with id $connectorId")
-        val configuration = repository.findById(connectorId).get()
+        val configuration = withContext(Dispatchers.IO) {
+            repository.findById(connectorId)
+        }.get()
 
         configuration.enabled = request.enabled
         configuration.lastConfiguredAt = Instant.now()
@@ -108,7 +112,11 @@ class ConnectorConfigurationService(
             configuration.firstConfiguredAt = Instant.now()
         }
 
-        return repository.save(configuration).toConfigureConnectorResponse()
+        sourceClient.configureConnector(connectorId, request.enabled)
+
+        return withContext(Dispatchers.IO) {
+            repository.save(configuration)
+        }.toConfigureConnectorResponse()
     }
 
     /**
@@ -157,6 +165,8 @@ class ConnectorConfigurationService(
     /**
      * Patches a list of sources of a given connector.
      *
+     * Patching in this context means changing the status of a source.
+     *
      * @param connector The connector to patch sources of.
      * @param requestedSources A map, sourceId -> newStatus, representing the requested changes.
      * @return the updated sources
@@ -172,7 +182,7 @@ class ConnectorConfigurationService(
                 requestedSources.containsKey(source.id) && requestedSources[source.id] != null
             }.map { source ->
                 connector.patchSource(source, requestedSources[source.id]!!)
-                PatchedSource(source.id, source.name, source.url, source.enabled)
+                PatchedSource(source.id, source.name, source.url, requestedSources[source.id]!!)
             }.toList()
 
         sourceClient.patchSources(connector.id, requestedSources)

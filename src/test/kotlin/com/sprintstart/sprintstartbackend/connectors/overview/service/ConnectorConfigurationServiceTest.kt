@@ -156,11 +156,12 @@ class ConnectorConfigurationServiceTest {
     @Nested
     inner class Configure {
         @Test
-        fun `should enable a connector`() {
+        fun `should enable a connector`() = runTest {
             val config = ConnectorConfiguration(id = "github", enabled = false)
             val request = ConfigureConnectorRequest(enabled = true)
             every { repository.findById("github") } returns Optional.of(config)
             every { repository.save(any()) } answers { firstArg() }
+            coEvery { sourceClient.configureConnector(any(), any()) } just runs
 
             val result = service.configure("github", request)
 
@@ -168,11 +169,12 @@ class ConnectorConfigurationServiceTest {
         }
 
         @Test
-        fun `should disable a connector`() {
+        fun `should disable a connector`() = runTest {
             val config = ConnectorConfiguration(id = "github", enabled = true)
             val request = ConfigureConnectorRequest(enabled = false)
             every { repository.findById("github") } returns Optional.of(config)
             every { repository.save(any()) } answers { firstArg() }
+            coEvery { sourceClient.configureConnector(any(), any()) } just runs
 
             val result = service.configure("github", request)
 
@@ -180,11 +182,12 @@ class ConnectorConfigurationServiceTest {
         }
 
         @Test
-        fun `should set timestamps on first configuration`() {
+        fun `should set timestamps on first configuration`() = runTest {
             val config = ConnectorConfiguration(id = "github")
             val request = ConfigureConnectorRequest(enabled = true)
             every { repository.findById("github") } returns Optional.of(config)
             every { repository.save(any()) } answers { firstArg() }
+            coEvery { sourceClient.configureConnector(any(), any()) } just runs
 
             val result = service.configure("github", request)
 
@@ -193,7 +196,7 @@ class ConnectorConfigurationServiceTest {
         }
 
         @Test
-        fun `should update lastConfiguredAt but not firstConfiguredAt on subsequent config`() {
+        fun `should update lastConfiguredAt but not firstConfiguredAt on subsequent config`() = runTest {
             val now = java.time.Instant.now()
             val config = ConnectorConfiguration(
                 id = "github",
@@ -204,6 +207,7 @@ class ConnectorConfigurationServiceTest {
             val request = ConfigureConnectorRequest(enabled = false)
             every { repository.findById("github") } returns Optional.of(config)
             every { repository.save(any()) } answers { firstArg() }
+            coEvery { sourceClient.configureConnector(any(), any()) } just runs
 
             val result = service.configure("github", request)
 
@@ -212,10 +216,23 @@ class ConnectorConfigurationServiceTest {
         }
 
         @Test
-        fun `should throw ConnectorNotFoundException when connector does not exist`() {
+        fun `should throw ConnectorNotFoundException when connector does not exist`() = runTest {
             assertFailsWith<ConnectorNotFoundException> {
                 service.configure("unknown", ConfigureConnectorRequest(enabled = true))
             }
+        }
+
+        @Test
+        fun `should call sourceClient dot configureConnector when configuring`() = runTest {
+            val config = ConnectorConfiguration(id = "github", enabled = false)
+            val request = ConfigureConnectorRequest(enabled = true)
+            every { repository.findById("github") } returns Optional.of(config)
+            every { repository.save(any()) } answers { firstArg() }
+            coEvery { sourceClient.configureConnector(any(), any()) } just runs
+
+            service.configure("github", request)
+
+            coVerify { sourceClient.configureConnector("github", true) }
         }
     }
 
