@@ -1,13 +1,16 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.github.external.GithubRepositoryApi
-import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand
+import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileDeletedEvent
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.GithubArtifactCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
+import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMetadataJsonMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import com.sprintstart.sprintstartbackend.ingestion.service.provider.GithubArtifactProviderService
@@ -26,6 +29,7 @@ class GithubArtifactProviderServiceTest {
     private val ingestionRunRepository = mockk<IngestionRunRepository>()
     private val artifactRepository = mockk<ArtifactRepository>()
     private val githubRepositoryApi = mockk<GithubRepositoryApi>()
+    private val artifactMetadataJsonMapper = mockk<ArtifactMetadataJsonMapper>()
     private val service = GithubArtifactProviderService(
         ingestionRunRepository,
         artifactRepository,
@@ -41,10 +45,11 @@ class GithubArtifactProviderServiceTest {
     fun setUp() {
         every { artifactRepository.save(any()) } answers { firstArg() }
         every { githubRepositoryApi.getRepositoryProjectIdsById(repositoryId) } returns setOf(projectId)
+        every { artifactMetadataJsonMapper.toJson(any()) } returns """{"repositoryFullName":"owner/repo"}"""
     }
 
     @Test
-    fun `ingest saves new artifact and increments ingested count`() {
+    fun `persistArtifact saves new artifact and increments ingested count`() {
         val run = ingestionRun()
         val savedArtifact = slot<Artifact>()
         every { ingestionRunRepository.getReferenceById(runId) } returns run
@@ -52,12 +57,11 @@ class GithubArtifactProviderServiceTest {
         every { artifactRepository.save(capture(savedArtifact)) } answers { savedArtifact.captured }
         every { ingestionRunRepository.incrementIngestedCount(runId) } returns Unit
 
-        service.persistGithubArtifact(artifactCommand())
+        service.persistArtifact(artifactCommand())
 
         assertThat(savedArtifact.captured.sourceSystem).isEqualTo(SourceSystem.GITHUB)
         assertThat(savedArtifact.captured.sourceId).isEqualTo("github:owner/repo:FILE:src/main/App.kt")
-        assertThat(savedArtifact.captured.repositoryId).isEqualTo(repositoryId)
-        assertThat(savedArtifact.captured.repositoryFullName).isEqualTo("owner/repo")
+        assertThat(savedArtifact.captured.metadata).isEqualTo("""{"repositoryFullName":"owner/repo"}""")
         assertThat(savedArtifact.captured.projectIds).containsExactly(projectId)
         assertThat(savedArtifact.captured.title).isEqualTo("App.kt")
         assertThat(savedArtifact.captured.content).isEqualTo("content")
@@ -67,35 +71,11 @@ class GithubArtifactProviderServiceTest {
     }
 
     @Test
-    fun `ingest throws when run does not exist`() {
-        every { ingestionRunRepository.findById(runId) } returns Optional.empty()
-
-        assertThatThrownBy {
-            service.addFailedArtifact(
-                ArtifactFailedCommand(
-                    transactionId = runId,
-                    repositoryOwner = "owner",
-                    repositoryName = "repo",
-                    sourceId = "source-id",
-                    sourceUrl = null,
-                    artifactType = ArtifactType.FILE,
-                    reason = "Not found",
-                ),
-            )
-        }.isInstanceOf(IngestionRunNotFoundException::class.java)
-            .hasMessageContaining(runId.toString())
-
-        verify(exactly = 0) { artifactRepository.save(any()) }
-    }
-
-    @Test
-    fun `ingest ignores duplicate commit source id`() {
-        val run = ingestionRun()
+    fun `persistArtifact ignores duplicate commit source id`() {
         val existing = artifact(artifactType = ArtifactType.COMMIT, hash = null)
-        every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
         every { artifactRepository.findBySourceId(existing.sourceId) } returns existing
 
-        service.persistGithubArtifact(
+        service.persistArtifact(
             artifactCommand(
                 sourceId = existing.sourceId,
                 artifactType = ArtifactType.COMMIT,
@@ -103,37 +83,29 @@ class GithubArtifactProviderServiceTest {
             ),
         )
 
-        assertThat(run.ingestedCount).isZero()
-        assertThat(run.updatedCount).isZero()
         assertThat(existing.projectIds).containsExactly(projectId)
         verify(exactly = 0) { artifactRepository.save(any()) }
     }
 
     @Test
-    fun `ingest ignores unchanged file source id`() {
-        val run = ingestionRun()
+    fun `persistArtifact ignores unchanged file source id`() {
         val existing = artifact(hash = "same-hash")
-        every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
         every { artifactRepository.findBySourceId(existing.sourceId) } returns existing
 
-        service.persistGithubArtifact(artifactCommand(sourceId = existing.sourceId, hash = "same-hash"))
+        service.persistArtifact(artifactCommand(sourceId = existing.sourceId, hash = "same-hash"))
 
-        assertThat(run.ingestedCount).isZero()
-        assertThat(run.updatedCount).isZero()
         assertThat(existing.content).isEqualTo("old content")
         assertThat(existing.projectIds).containsExactly(projectId)
         verify(exactly = 0) { artifactRepository.save(any()) }
     }
 
     @Test
-    fun `ingest updates changed file and increments updated count`() {
-        val run = ingestionRun()
+    fun `persistArtifact updates changed file and increments updated count`() {
         val existing = artifact(hash = "old-hash")
-        every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
         every { artifactRepository.findBySourceId(existing.sourceId) } returns existing
         every { ingestionRunRepository.incrementUpdatedCount(runId) } returns Unit
 
-        service.persistGithubArtifact(
+        service.persistArtifact(
             artifactCommand(
                 sourceId = existing.sourceId,
                 bodyText = "new content",
@@ -141,7 +113,6 @@ class GithubArtifactProviderServiceTest {
             ),
         )
 
-        assertThat(run.ingestedCount).isZero()
         assertThat(existing.content).isEqualTo("new content")
         assertThat(existing.hash).isEqualTo("new-hash")
         assertThat(existing.projectIds).containsExactly(projectId)
@@ -150,28 +121,41 @@ class GithubArtifactProviderServiceTest {
     }
 
     @Test
-    fun `addFailedArtifact appends failure and increments failed count`() {
+    fun `deleteFileArtifact deletes existing artifact and records deindex id`() {
         val run = ingestionRun()
-        every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
-
-        service.addFailedArtifact(
-            ArtifactFailedCommand(
-                transactionId = runId,
-                repositoryOwner = "owner",
-                repositoryName = "repo",
-                sourceId = "source-id",
-                sourceUrl = "https://github.com/owner/repo/blob/main/App.kt",
-                artifactType = ArtifactType.FILE,
-                reason = "Not found",
-            ),
+        val existing = artifact(hash = "hash")
+        val event = GithubFileDeletedEvent(
+            transactionId = runId,
+            repositoryId = repositoryId,
+            repositoryOwner = "owner",
+            repositoryName = "repo",
+            path = "src/main/App.kt",
         )
+        every { ingestionRunRepository.findByIdForUpdate(runId) } returns Optional.of(run)
+        every { artifactRepository.findBySourceId(existing.sourceId) } returns existing
+        every { artifactRepository.deleteById(existing.id) } returns Unit
 
-        assertThat(run.failedCount).isEqualTo(1)
-        val failedItem = run.failedItems.single()
-        assertThat(failedItem.sourceId).isEqualTo("source-id")
-        assertThat(failedItem.sourceUrl).isEqualTo("https://github.com/owner/repo/blob/main/App.kt")
-        assertThat(failedItem.artifactType).isEqualTo(ArtifactType.FILE)
-        assertThat(failedItem.reason).isEqualTo("Not found")
+        service.deleteFileArtifact(event)
+
+        assertThat(run.deletedCount).isEqualTo(1)
+        assertThat(run.artifactIdsToDeindex).containsExactly(existing.id.toString())
+        verify(exactly = 1) { artifactRepository.deleteById(existing.id) }
+    }
+
+    @Test
+    fun `deleteFileArtifact throws when run is missing`() {
+        val event = GithubFileDeletedEvent(
+            transactionId = runId,
+            repositoryId = repositoryId,
+            repositoryOwner = "owner",
+            repositoryName = "repo",
+            path = "src/main/App.kt",
+        )
+        every { ingestionRunRepository.findByIdForUpdate(runId) } returns Optional.empty()
+
+        assertThatThrownBy { service.deleteFileArtifact(event) }
+            .isInstanceOf(IngestionRunNotFoundException::class.java)
+            .hasMessageContaining(runId.toString())
     }
 
     private fun artifactCommand(
@@ -184,8 +168,6 @@ class GithubArtifactProviderServiceTest {
         sourceSystem = SourceSystem.GITHUB,
         sourceId = sourceId,
         sourceUrl = "https://github.com/owner/repo/blob/main/src/main/App.kt",
-        repositoryId = repositoryId,
-        repositoryFullName = "owner/repo",
         artifactType = artifactType,
         title = "App.kt",
         bodyText = bodyText,
@@ -194,6 +176,10 @@ class GithubArtifactProviderServiceTest {
         createdAtSource = null,
         updatedAtSource = null,
         hash = hash,
+        metadata = GithubArtifactMetadata(
+            repositoryId = repositoryId,
+            repositoryFullName = "owner/repo",
+        ),
     )
 
     private fun ingestionRun() = IngestionRun(
@@ -209,13 +195,12 @@ class GithubArtifactProviderServiceTest {
         sourceSystem = SourceSystem.GITHUB,
         sourceId = "github:owner/repo:${artifactType.name}:src/main/App.kt",
         sourceUrl = "https://github.com/owner/repo/blob/main/src/main/App.kt",
-        repositoryId = repositoryId,
-        repositoryFullName = "owner/repo",
         artifactType = artifactType,
         title = "App.kt",
         content = "old content",
         mime = "text/x-kotlin",
         language = "Kotlin",
+        metadata = """{"repositoryFullName":"owner/repo"}""",
         createdAtSource = null,
         updatedAtSource = null,
         ingestionRun = ingestionRun(),

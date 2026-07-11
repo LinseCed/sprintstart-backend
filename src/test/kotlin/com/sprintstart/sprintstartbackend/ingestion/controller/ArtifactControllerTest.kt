@@ -41,7 +41,7 @@ class ArtifactControllerTest(
             .perform(get("/api/v1/admin/artifacts"))
             .andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-            .andExpect(jsonPath("$.items[0].repositoryFullName").value("owner/repo"))
+            .andExpect(jsonPath("$.items[0].metadata").value("""{"repositoryFullName":"owner/repo"}"""))
             .andExpect(jsonPath("$.page.number").value(1))
             .andExpect(jsonPath("$.page.size").value(20))
 
@@ -66,8 +66,8 @@ class ArtifactControllerTest(
                 title = "README.md",
                 sourceSystem = SourceSystem.GITHUB,
                 sourceUrl = "https://github.com/owner/repo/blob/main/README.md",
-                repositoryFullName = "owner/repo",
                 artifactType = ArtifactType.FILE,
+                metadata = """{"repositoryFullName":"owner/repo"}""",
             ),
         ),
         page = PageMetadata(

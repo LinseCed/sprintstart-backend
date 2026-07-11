@@ -6,12 +6,16 @@ import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFil
 import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFilesFetchCompletedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFilesFetchFailedEvent
 import com.sprintstart.sprintstartbackend.ingestion.listener.github.GithubFileListener
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.GithubArtifactCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.FinishedTypes
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.GithubArtifactFailedMapper
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.GithubArtifactMapper
-import com.sprintstart.sprintstartbackend.ingestion.service.IngestionStatusService
+import com.sprintstart.sprintstartbackend.ingestion.service.FailedArtifactService
+import com.sprintstart.sprintstartbackend.ingestion.service.GithubIngestionRunService
 import com.sprintstart.sprintstartbackend.ingestion.service.provider.GithubArtifactProviderService
 import io.mockk.every
 import io.mockk.just
@@ -26,12 +30,14 @@ class GithubFileListenerTest {
     private val githubArtifactProviderService = mockk<GithubArtifactProviderService>()
     private val artifactMapper = mockk<GithubArtifactMapper>()
     private val failedMapper = mockk<GithubArtifactFailedMapper>()
-    private val ingestionStatusService = mockk<IngestionStatusService>()
+    private val githubIngestionRunService = mockk<GithubIngestionRunService>()
+    private val failedArtifactService = mockk<FailedArtifactService>()
     private val listener = GithubFileListener(
         githubArtifactProviderService,
         artifactMapper,
         failedMapper,
-        ingestionStatusService,
+        githubIngestionRunService,
+        failedArtifactService,
     )
 
     @Test
@@ -39,11 +45,11 @@ class GithubFileListenerTest {
         val event = fileFetchedEvent()
         val command = artifactCommand(event.transactionId)
         every { artifactMapper.toCommand(event) } returns command
-        every { githubArtifactProviderService.persistGithubArtifact(command) } just runs
+        every { githubArtifactProviderService.persistArtifact(command) } just runs
 
         listener.on(event)
 
-        verify(exactly = 1) { githubArtifactProviderService.persistGithubArtifact(command) }
+        verify(exactly = 1) { githubArtifactProviderService.persistArtifact(command) }
     }
 
     @Test
@@ -58,25 +64,27 @@ class GithubFileListenerTest {
         )
         val command = ArtifactFailedCommand(
             transactionId = event.transactionId,
-            repositoryOwner = "owner",
-            repositoryName = "repo",
             sourceId = "github:owner/repo:FILE:src/main/App.kt",
             sourceUrl = null,
             artifactType = ArtifactType.FILE,
             reason = "Missing",
+            metadata = GithubArtifactMetadata(
+                repositoryId = repositoryId,
+                repositoryFullName = "owner/repo",
+            ),
         )
         every { failedMapper.toCommand(event) } returns command
-        every { githubArtifactProviderService.addFailedArtifact(command) } just runs
+        every { failedArtifactService.addFailedArtifact(command) } just runs
 
         listener.on(event)
 
-        verify(exactly = 1) { githubArtifactProviderService.addFailedArtifact(command) }
+        verify(exactly = 1) { failedArtifactService.addFailedArtifact(command) }
     }
 
     @Test
     fun `files completed event marks files phase finished`() {
         val runId = UUID.randomUUID()
-        every { ingestionStatusService.markFetchPhaseFinished(any(), any()) } just runs
+        every { githubIngestionRunService.markFetchPhaseFinished(any(), any()) } just runs
 
         listener.on(
             GithubFilesFetchCompletedEvent(
@@ -87,14 +95,14 @@ class GithubFileListenerTest {
         )
 
         verify(exactly = 1) {
-            ingestionStatusService.markFetchPhaseFinished(runId, FinishedTypes.FILES)
+            githubIngestionRunService.markFetchPhaseFinished(runId, FinishedTypes.FILES)
         }
     }
 
     @Test
     fun `files failed event marks files phase finished`() {
         val runId = UUID.randomUUID()
-        every { ingestionStatusService.markFetchPhaseFinished(any(), any()) } just runs
+        every { githubIngestionRunService.markFetchPhaseFinished(any(), any()) } just runs
 
         listener.on(
             GithubFilesFetchFailedEvent(
@@ -106,7 +114,7 @@ class GithubFileListenerTest {
         )
 
         verify(exactly = 1) {
-            ingestionStatusService.markFetchPhaseFinished(runId, FinishedTypes.FILES)
+            githubIngestionRunService.markFetchPhaseFinished(runId, FinishedTypes.FILES)
         }
     }
 
@@ -141,8 +149,6 @@ class GithubFileListenerTest {
         sourceSystem = SourceSystem.GITHUB,
         sourceId = "github:owner/repo:FILE:src/main/App.kt",
         sourceUrl = "https://github.com/owner/repo/blob/main/src/main/App.kt",
-        repositoryId = repositoryId,
-        repositoryFullName = "owner/repo",
         artifactType = ArtifactType.FILE,
         title = "App.kt",
         bodyText = "content",
@@ -151,5 +157,9 @@ class GithubFileListenerTest {
         createdAtSource = null,
         updatedAtSource = null,
         hash = "hash",
+        metadata = GithubArtifactMetadata(
+            repositoryId = repositoryId,
+            repositoryFullName = "owner/repo",
+        ),
     )
 }

@@ -51,7 +51,7 @@ class ArtifactQueryServiceTest {
         ).isTrue()
         assertThat(result.items).hasSize(1)
         assertThat(result.items.single().id).isEqualTo(artifact.id)
-        assertThat(result.items.single().repositoryFullName).isEqualTo("owner/repo")
+        assertThat(result.items.single().metadata).isEqualTo("""{"repositoryFullName":"owner/repo"}""")
         assertThat(result.page.number).isEqualTo(2)
         assertThat(result.page.size).isEqualTo(10)
         assertThat(result.page.totalElements).isEqualTo(21)
@@ -81,13 +81,12 @@ class ArtifactQueryServiceTest {
         sourceSystem = SourceSystem.GITHUB,
         sourceId = "github:owner/repo:FILE:README.md",
         sourceUrl = "https://github.com/owner/repo/blob/main/README.md",
-        repositoryId = UUID.fromString("13bfe827-f1a7-44d0-a560-2643fa409c2c"),
-        repositoryFullName = "owner/repo",
         artifactType = ArtifactType.FILE,
         title = "README.md",
         content = "content",
         mime = "text/markdown",
         language = "Markdown",
+        metadata = """{"repositoryFullName":"owner/repo"}""",
         createdAtSource = null,
         updatedAtSource = Instant.parse("2026-06-19T09:15:30Z"),
         ingestedAt = Instant.parse("2026-06-19T09:16:30Z"),

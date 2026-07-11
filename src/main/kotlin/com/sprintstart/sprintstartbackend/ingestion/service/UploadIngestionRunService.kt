@@ -55,10 +55,6 @@ class UploadIngestionRunService(
             .orElseThrow { IngestionRunNotFoundException(event.transactionId) }
         event.deleteArtifactOutcomes.forEach { outcome ->
             when (outcome.status) {
-                UploadArtifactStatus.DELETED -> {
-                    run.artifactIdsToDeindex.add(outcome.id.toString())
-                }
-
                 UploadArtifactStatus.FAILED -> {
                     failedArtifactService.addFailedArtifact(
                         uploadArtifactFailedMapper.toCommand(

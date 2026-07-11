@@ -18,7 +18,6 @@ class ArtifactLinkingServiceTest {
         ArtifactLinkingService(
             repository,
             MarkdownImageReferenceExtractor(),
-            applicationEventPublisher,
         )
 
     @Test
