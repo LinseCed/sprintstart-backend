@@ -30,7 +30,6 @@ class AiFaqGroupMapper {
                     documentRef = document.id,
                     title = document.title,
                     source = document.source,
-                    url = document.url,
                     group = group,
                 ),
             )

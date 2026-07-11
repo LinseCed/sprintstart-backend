@@ -12,7 +12,8 @@ import java.util.UUID
  *
  * [documentRef] is the identifier of the document in the upstream knowledge base as reported by the
  * AI service. It is exposed to API clients as the document id so they can reference the real
- * document, while [id] remains the internal primary key of this cache row.
+ * document, while [id] remains the internal primary key of this cache row. [source] is optional
+ * because the AI service does not always know the document's origin system.
  */
 @Entity
 class FaqDocument(
@@ -22,10 +23,8 @@ class FaqDocument(
     val documentRef: String,
     @Column(nullable = false)
     val title: String,
-    @Column(nullable = false)
-    val source: String,
-    @Column(nullable = false, columnDefinition = "TEXT")
-    val url: String,
+    @Column(nullable = true)
+    val source: String?,
     @ManyToOne(optional = false)
     @JoinColumn(name = "group_id", nullable = false)
     val group: FaqGroup,

@@ -81,7 +81,6 @@ class InsightsFaqControllerTest(
                 id = "doc_001",
                 title = "VPN Setup Guide",
                 source = "confluence",
-                url = "https://example.com/vpn",
             ),
         ),
     )

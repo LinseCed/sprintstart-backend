@@ -29,8 +29,6 @@ data class FaqDocumentResponse(
     val id: String,
     @field:Schema(description = "Human-readable document title.")
     val title: String,
-    @field:Schema(description = "Source system the document originates from, for example confluence.")
-    val source: String,
-    @field:Schema(description = "Link to the document.")
-    val url: String,
+    @field:Schema(description = "Source system the document originates from, for example confluence. May be null.")
+    val source: String?,
 )

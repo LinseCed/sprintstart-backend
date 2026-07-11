@@ -30,11 +30,11 @@ data class AiFaqGroup(
  * A knowledge-base document reference returned by the AI service.
  *
  * @property id identifier of the document in the upstream knowledge base
+ * @property source origin system of the document, for example confluence or github; may be absent
  */
 @Serializable
 data class AiFaqDocument(
     val id: String,
     val title: String,
-    val source: String,
-    val url: String,
+    val source: String? = null,
 )

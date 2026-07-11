@@ -1,7 +1,9 @@
 package com.sprintstart.sprintstartbackend.insights.service
 
+import com.sprintstart.sprintstartbackend.chat.external.ChatQuestionApi
 import com.sprintstart.sprintstartbackend.insights.InsightsAiClient
 import com.sprintstart.sprintstartbackend.insights.model.ai.AiFaqGroupingRequest
+import com.sprintstart.sprintstartbackend.insights.model.ai.AiFaqQuestion
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.FaqDetailResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.FaqOverviewResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.RefreshFaqResponse
@@ -25,6 +27,7 @@ import java.util.UUID
 class InsightsFaqService(
     private val faqGroupRepository: FaqGroupRepository,
     private val insightsAiClient: InsightsAiClient,
+    private val chatQuestionApi: ChatQuestionApi,
     private val aiFaqGroupMapper: AiFaqGroupMapper,
     private val faqResponseMapper: FaqResponseMapper,
 ) {
@@ -54,13 +57,18 @@ class InsightsFaqService(
     /**
      * Recomputes the recurring-question groups via the AI service and replaces the cache.
      *
-     * The previous groups are removed and the freshly grouped result is stored as the new cache.
+     * Collects all user questions, sends them to the stateless AI service for grouping, and stores
+     * the freshly grouped result as the new cache, replacing the previous groups.
      *
      * @throws com.sprintstart.sprintstartbackend.insights.model.exceptions.InsightsAiException
      *   if the AI service does not return a grouping result.
      */
     suspend fun refreshFaqGroups(): RefreshFaqResponse {
-        val aiResponse = insightsAiClient.groupFaqQuestions(AiFaqGroupingRequest())
+        val questions = chatQuestionApi
+            .getAllUserQuestions()
+            .map { AiFaqQuestion(id = it.id.toString(), text = it.text) }
+
+        val aiResponse = insightsAiClient.groupFaqQuestions(AiFaqGroupingRequest(questions))
         val groups = aiResponse.groups.map { aiFaqGroupMapper.toEntity(it) }
 
         faqGroupRepository.deleteAll()

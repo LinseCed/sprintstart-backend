@@ -50,7 +50,6 @@ class FaqResponseMapper {
                     id = document.documentRef,
                     title = document.title,
                     source = document.source,
-                    url = document.url,
                 )
             },
         )

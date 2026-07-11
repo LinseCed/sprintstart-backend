@@ -1,8 +1,11 @@
 package com.sprintstart.sprintstartbackend.insights.service
 
+import com.sprintstart.sprintstartbackend.chat.external.ChatQuestion
+import com.sprintstart.sprintstartbackend.chat.external.ChatQuestionApi
 import com.sprintstart.sprintstartbackend.insights.InsightsAiClient
 import com.sprintstart.sprintstartbackend.insights.model.ai.AiFaqDocument
 import com.sprintstart.sprintstartbackend.insights.model.ai.AiFaqGroup
+import com.sprintstart.sprintstartbackend.insights.model.ai.AiFaqGroupingRequest
 import com.sprintstart.sprintstartbackend.insights.model.ai.AiFaqGroupingResponse
 import com.sprintstart.sprintstartbackend.insights.model.entity.FaqDocument
 import com.sprintstart.sprintstartbackend.insights.model.entity.FaqGroup
@@ -31,12 +34,14 @@ import java.util.UUID
 class InsightsFaqServiceTest {
     private val faqGroupRepository = mockk<FaqGroupRepository>()
     private val insightsAiClient = mockk<InsightsAiClient>()
+    private val chatQuestionApi = mockk<ChatQuestionApi>()
     private val aiFaqGroupMapper = AiFaqGroupMapper()
     private val faqResponseMapper = FaqResponseMapper()
 
     private val service = InsightsFaqService(
         faqGroupRepository = faqGroupRepository,
         insightsAiClient = insightsAiClient,
+        chatQuestionApi = chatQuestionApi,
         aiFaqGroupMapper = aiFaqGroupMapper,
         faqResponseMapper = faqResponseMapper,
     )
@@ -49,7 +54,6 @@ class InsightsFaqServiceTest {
                 documentRef = "doc_001",
                 title = "VPN Setup Guide",
                 source = "confluence",
-                url = "https://example.com/vpn",
                 group = group,
             ),
         )
@@ -84,7 +88,6 @@ class InsightsFaqServiceTest {
         assertEquals("How do I get VPN access?", detail.questions.first().text)
         assertEquals("doc_001", detail.answeringDocuments.first().id)
         assertEquals("confluence", detail.answeringDocuments.first().source)
-        assertEquals("https://example.com/vpn", detail.answeringDocuments.first().url)
     }
 
     @Test
@@ -111,13 +114,15 @@ class InsightsFaqServiceTest {
                             id = "doc_001",
                             title = "VPN Setup Guide",
                             source = "confluence",
-                            url = "https://example.com/vpn",
                         ),
                     ),
                 ),
             ),
         )
-        coEvery { insightsAiClient.groupFaqQuestions(any()) } returns aiResponse
+        every { chatQuestionApi.getAllUserQuestions() } returns
+            listOf(ChatQuestion(id = UUID.randomUUID(), text = "How do I get VPN access?"))
+        val requestSlot = slot<AiFaqGroupingRequest>()
+        coEvery { insightsAiClient.groupFaqQuestions(capture(requestSlot)) } returns aiResponse
         every { faqGroupRepository.deleteAll() } just Runs
         val savedSlot = slot<List<FaqGroup>>()
         every { faqGroupRepository.saveAll(capture(savedSlot)) } answers { savedSlot.captured.toMutableList() }
@@ -125,6 +130,10 @@ class InsightsFaqServiceTest {
         val result = service.refreshFaqGroups()
 
         assertEquals(1, result.groupCount)
+
+        val sentRequest = requestSlot.captured
+        assertEquals(1, sentRequest.questions.size)
+        assertEquals("How do I get VPN access?", sentRequest.questions.first().text)
 
         val persisted = savedSlot.captured.first()
         assertEquals("How do I get VPN access?", persisted.question)
@@ -141,6 +150,7 @@ class InsightsFaqServiceTest {
 
     @Test
     fun `refreshFaqGroups clears the cache even when the AI returns no groups`() = runTest {
+        every { chatQuestionApi.getAllUserQuestions() } returns emptyList()
         coEvery { insightsAiClient.groupFaqQuestions(any()) } returns AiFaqGroupingResponse(groups = emptyList())
         every { faqGroupRepository.deleteAll() } just Runs
         every { faqGroupRepository.saveAll(any<List<FaqGroup>>()) } answers { mutableListOf() }
