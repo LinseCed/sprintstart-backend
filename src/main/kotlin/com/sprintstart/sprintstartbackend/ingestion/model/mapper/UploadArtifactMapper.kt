@@ -6,9 +6,8 @@ import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.UploadArti
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.upload.external.UploadedArtifactReader
-import com.sprintstart.sprintstartbackend.upload.external.events.ArtifactUploadedEvent
+import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.ArtifactUploadedEvent
 import org.springframework.stereotype.Component
-
 
 /**
  * Translates GitHub domain events into canonical artifact commands.
@@ -18,7 +17,9 @@ import org.springframework.stereotype.Component
  * mime type and language.
  */
 @Component
-class UploadArtifactMapper(private val uploadedArtifactReader: UploadedArtifactReader) {
+class UploadArtifactMapper(
+    private val uploadedArtifactReader: UploadedArtifactReader,
+) {
     /**
      * Maps a fetched commit into the canonical command shape.
      *
@@ -36,7 +37,7 @@ class UploadArtifactMapper(private val uploadedArtifactReader: UploadedArtifactR
             ingestionRunId = event.transactionId,
             projectId = event.projectId,
             sourceSystem = SourceSystem.UPLOAD,
-            sourceId = event.storagePath,
+            sourceId = event.artifactId.toString(),
             artifactType = ArtifactType.FILE,
             title = event.filename,
             content = bodyText,
@@ -47,9 +48,8 @@ class UploadArtifactMapper(private val uploadedArtifactReader: UploadedArtifactR
             hash = event.hash,
             metadata = UploadArtifactMetadata(
                 storagePath = event.storagePath,
-                uploaderId = event.uploaderId,
-            )
+                actorId = event.uploaderId,
+            ),
         )
     }
-
 }

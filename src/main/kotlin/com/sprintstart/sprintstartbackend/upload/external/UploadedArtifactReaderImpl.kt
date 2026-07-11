@@ -9,13 +9,13 @@ import java.nio.file.Path
 import java.util.UUID
 
 @Service
-class UploadedArtifactReaderImpl(private val uploadedArtifactRepository: UploadedArtifactRepository )
-    : UploadedArtifactReader{
+class UploadedArtifactReaderImpl(
+    private val uploadedArtifactRepository: UploadedArtifactRepository,
+) : UploadedArtifactReader {
     override fun readText(artifactId: UUID): String {
         val uploadedArtifact = uploadedArtifactRepository.findByIdOrNull(artifactId)
-        uploadedArtifact?: throw IllegalArgumentException("Artifact with id $artifactId not found")
+        uploadedArtifact ?: throw IllegalArgumentException("Artifact with id $artifactId not found")
 
         return Files.readString(Path.of(uploadedArtifact.storagePath), StandardCharset.UTF_8)
     }
-
 }

@@ -4,7 +4,7 @@ import com.sprintstart.sprintstartbackend.upload.model.entity.LinkedImage
 import org.springframework.data.jpa.repository.JpaRepository
 import java.util.UUID
 
-interface ArtifactImageRepository : JpaRepository<LinkedImage, UUID> {
+interface LinkedImageRepository : JpaRepository<LinkedImage, UUID> {
     fun deleteAllByArtifactId(
         artifactId: UUID,
     )

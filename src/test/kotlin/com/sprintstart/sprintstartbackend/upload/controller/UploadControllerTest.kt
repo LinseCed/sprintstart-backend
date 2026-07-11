@@ -2,8 +2,8 @@ package com.sprintstart.sprintstartbackend.upload.controller
 
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.upload.model.dto.UploadArtifactResponse
-import com.sprintstart.sprintstartbackend.upload.model.dto.UploadListItemResponse
+import com.sprintstart.sprintstartbackend.upload.model.dto.response.UploadArtifactResponse
+import com.sprintstart.sprintstartbackend.upload.model.dto.response.UploadListItemResponse
 import com.sprintstart.sprintstartbackend.upload.service.UploadService
 import io.mockk.every
 import io.mockk.verify

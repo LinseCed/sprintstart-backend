@@ -34,6 +34,12 @@ interface IngestionRunRepository : JpaRepository<IngestionRun, UUID> {
     )
 
     @Modifying
+    @Query("UPDATE IngestionRun r SET r.deletedCount = r.deletedCount + 1 WHERE r.id = :id")
+    fun incrementDeletedCount(
+        @Param("id") id: UUID, // TODO delete it
+    )
+
+    @Modifying
     @Query("UPDATE IngestionRun r SET r.updatedCount = r.updatedCount + 1 WHERE r.id = :id")
     fun incrementUpdatedCount(
         @Param("id") id: UUID,

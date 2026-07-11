@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.upload.external.events
+package com.sprintstart.sprintstartbackend.upload.external.events.ingestion
 
 import java.util.UUID
 

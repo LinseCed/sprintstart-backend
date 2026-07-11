@@ -1,11 +1,11 @@
-package com.sprintstart.sprintstartbackend.upload.external.events
+package com.sprintstart.sprintstartbackend.upload.external.events.ingestion
 
-import com.sprintstart.sprintstartbackend.upload.model.dto.UploadArtifactOutcome
 import java.util.UUID
 
 data class UploadBatchFinishedEvent(
     val transactionId: UUID,
+    val uploaderId: UUID,
     val artifactsId: Set<UUID>,
     val linkedImages: Set<UUID>,
-    val uploadArtifactOutcomes : Set<UploadArtifactOutcome>,
+    val uploadArtifactOperationOutcomes: Set<UploadArtifactOperationOutcome>,
 )

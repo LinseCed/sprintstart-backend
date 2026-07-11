@@ -1,5 +1,5 @@
 @ApplicationModule(
-        allowedDependencies = {"github::github-events", "github", "shared :: shared", "user :: api", "github :: api"}
+        allowedDependencies = {"github::github-events", "github", "shared :: shared", "user :: api", "github :: api", "upload :: api"}
 )
 package com.sprintstart.sprintstartbackend.ingestion;
 

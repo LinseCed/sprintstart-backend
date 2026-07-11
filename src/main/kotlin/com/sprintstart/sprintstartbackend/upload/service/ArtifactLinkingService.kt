@@ -1,20 +1,21 @@
 package com.sprintstart.sprintstartbackend.upload.service
 
-import com.sprintstart.sprintstartbackend.upload.model.entity.ArtifactImage
+import com.sprintstart.sprintstartbackend.upload.model.entity.LinkedImage
 import com.sprintstart.sprintstartbackend.upload.model.entity.UploadedArtifact
-import com.sprintstart.sprintstartbackend.upload.repository.ArtifactImageRepository
+import com.sprintstart.sprintstartbackend.upload.repository.LinkedImageRepository
 import org.springframework.stereotype.Service
 import java.nio.file.Paths
 
 @Service
 class ArtifactLinkingService(
-    private val artifactImageRepository: ArtifactImageRepository,
+    private val linkedImageRepository: LinkedImageRepository,
     private val extractor: MarkdownImageReferenceExtractor,
 ) {
     fun linkMarkdownImages(
         markdownArtifacts: List<Pair<UploadedArtifact, String>>,
         uploadedArtifactsByFilename: Map<String, UploadedArtifact>,
-    ) {
+    ): Set<LinkedImage> {
+        val linkedImages = mutableSetOf<LinkedImage>()
         markdownArtifacts.forEach { (artifact, markdownContent) ->
 
             val imagePaths = extractor.extract(markdownContent)
@@ -31,14 +32,17 @@ class ArtifactLinkingService(
                     uploadedArtifactsByFilename[normalizedFilename]
                         ?: return@forEach
 
-                val artifactImage = ArtifactImage(
-                    artifact = artifact,
+                val linkedImage = LinkedImage(
+                    markdownArtifact = artifact,
                     originalPath = imagePath,
                     imageArtifact = imageArtifact,
                 )
 
-                artifactImageRepository.save(artifactImage)
+                linkedImageRepository.save(linkedImage)
+
+                linkedImages.add(linkedImage)
             }
         }
+        return linkedImages.toSet()
     }
 }

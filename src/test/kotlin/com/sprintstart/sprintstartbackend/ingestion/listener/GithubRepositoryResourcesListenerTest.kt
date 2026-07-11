@@ -3,7 +3,7 @@ package com.sprintstart.sprintstartbackend.ingestion.listener
 import com.sprintstart.sprintstartbackend.github.external.events.GithubRepositoryResourcesFetchingStartedEvent
 import com.sprintstart.sprintstartbackend.ingestion.listener.github.GithubRepositoryResourcesListener
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
-import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactIngestionService
+import com.sprintstart.sprintstartbackend.ingestion.service.provider.GithubArtifactProviderService
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -13,13 +13,13 @@ import org.junit.jupiter.api.Test
 import java.util.UUID
 
 class GithubRepositoryResourcesListenerTest {
-    private val artifactIngestionService = mockk<ArtifactIngestionService>()
-    private val listener = GithubRepositoryResourcesListener(artifactIngestionService)
+    private val githubArtifactProviderService = mockk<GithubArtifactProviderService>()
+    private val listener = GithubRepositoryResourcesListener(githubArtifactProviderService)
 
     @Test
     fun `fetching started event marks run as running`() {
         val runId = UUID.randomUUID()
-        every { artifactIngestionService.updateRunStatus(any(), any()) } just runs
+        every { githubArtifactProviderService.updateRunStatus(any(), any()) } just runs
 
         listener.on(
             GithubRepositoryResourcesFetchingStartedEvent(
@@ -30,7 +30,7 @@ class GithubRepositoryResourcesListenerTest {
         )
 
         verify(exactly = 1) {
-            artifactIngestionService.updateRunStatus(
+            githubArtifactProviderService.updateRunStatus(
                 transactionId = runId,
                 status = IngestionRunStatus.RUNNING,
             )

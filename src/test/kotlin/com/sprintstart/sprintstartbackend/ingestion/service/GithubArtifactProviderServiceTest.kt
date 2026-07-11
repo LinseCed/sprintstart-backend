@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.github.external.GithubRepositoryApi
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
@@ -29,7 +30,7 @@ class GithubArtifactProviderServiceTest {
         ingestionRunRepository,
         artifactRepository,
         githubRepositoryApi,
-        artifactMetadataJsonMapper
+        artifactMetadataJsonMapper,
     )
 
     private val runId = UUID.randomUUID()

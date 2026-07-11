@@ -6,7 +6,7 @@ import tools.jackson.databind.ObjectMapper
 
 @Component
 class ArtifactMetadataJsonMapper(
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
 ) {
     fun toJson(
         metadata: ArtifactMetadata,
@@ -16,7 +16,7 @@ class ArtifactMetadataJsonMapper(
 
     fun fromJson(
         json: String,
-    ): ArtifactMetadata{
+    ): ArtifactMetadata {
         return objectMapper.readValue(json, ArtifactMetadata::class.java)
     }
 }

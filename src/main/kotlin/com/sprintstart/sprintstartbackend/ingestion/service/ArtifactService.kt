@@ -47,7 +47,7 @@ class ArtifactService(
                 "This artifact does not belong to project with id $projectId.",
             )
         }
-        val bodyText = artifact.bodyText?.toByteArray(Charsets.UTF_8)
+        val bodyText = artifact.content?.toByteArray(Charsets.UTF_8)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Artifact content not found")
 
         return ArtifactContentResponse(

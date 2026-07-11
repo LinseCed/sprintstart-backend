@@ -1,20 +1,23 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.FailedArtifact
+import com.sprintstart.sprintstartbackend.ingestion.events.RunFinishedEvent
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import jakarta.transaction.Transactional
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.UUID
 
 @Service
-class ArtifactIngestionService (private val ingestionRunRepository: IngestionRunRepository){
+class IngestionRunLifeCycleService(
+    private val ingestionRunRepository: IngestionRunRepository,
+    private val publisher: ApplicationEventPublisher,
+) {
     /**
      * Creates an ingestion run before connector work begins.
      *
@@ -23,7 +26,8 @@ class ArtifactIngestionService (private val ingestionRunRepository: IngestionRun
      * exists, the mutable lifecycle fields are updated instead of creating a duplicate row.
      *
      * @param transactionId The id of the transaction to start.
-     * @param sourceSystem [com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem] The source of the new run.
+     * @param sourceSystem [com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem]
+     * The source of the new run.
      * @param status [com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus] The status of the ingestion run.
      * @param failureReason Optional run-level failure reason for lifecycle failures.
      */
@@ -67,33 +71,21 @@ class ArtifactIngestionService (private val ingestionRunRepository: IngestionRun
         run.status = status
     }
 
-    fun finishRun(
-
-    )
-
-    /**
-     * Appends one failed source artifact to the current run and increments the aggregated failure
-     * counter in the same transaction.
-     *
-     * The individual failed item is preserved for status/history views that need artifact-level
-     * error details without scanning connector logs.
-     *
-     * @param command [com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand] The command for a failed artifact containing all data needed.
-     * @throws IngestionRunNotFoundException when the run id is unknown
-     */
     @Transactional
-    fun addFailedArtifact(command: ArtifactFailedCommand) {
-        val run = ingestionRunRepository
-            .findByIdOrNull(command.transactionId)
-            ?: throw IngestionRunNotFoundException(command.transactionId)
-        run.failedItems.add(
-            FailedArtifact(
-                sourceId = command.sourceId,
-                reason = command.reason,
-                artifactType = command.artifactType,
-                sourceUrl = command.sourceUrl,
-            ),
-        )
-        run.failedCount++
+    fun finishRun(run: IngestionRun) {
+        if (run.failedCount > 0) {
+            if (run.ingestedCount > 0 || run.updatedCount > 0 || run.deletedCount > 0) {
+                run.status = IngestionRunStatus.PARTIAL
+            } else {
+                run.status = IngestionRunStatus.FAILED
+            }
+        } else {
+            run.status = IngestionRunStatus.COMPLETED
+        }
+
+        run.finishedAt = Instant.now()
+        if (run.status in setOf(IngestionRunStatus.COMPLETED, IngestionRunStatus.PARTIAL)) {
+            publisher.publishEvent(RunFinishedEvent(run.id))
+        }
     }
 }

@@ -12,7 +12,7 @@ class ArtifactMapper {
             title = artifact.title,
             sourceSystem = artifact.sourceSystem,
             sourceUrl = artifact.sourceUrl,
-            repositoryFullName = artifact.repositoryFullName,
+            metadata = artifact.metadata,
             artifactType = artifact.artifactType,
         )
     }

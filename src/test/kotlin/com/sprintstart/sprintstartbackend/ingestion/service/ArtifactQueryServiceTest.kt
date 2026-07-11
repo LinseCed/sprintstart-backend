@@ -85,7 +85,7 @@ class ArtifactQueryServiceTest {
         repositoryFullName = "owner/repo",
         artifactType = ArtifactType.FILE,
         title = "README.md",
-        bodyText = "content",
+        content = "content",
         mime = "text/markdown",
         language = "Markdown",
         createdAtSource = null,

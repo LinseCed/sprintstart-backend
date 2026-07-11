@@ -1,8 +1,7 @@
 package com.sprintstart.sprintstartbackend.upload.service
 
-import com.sprintstart.sprintstartbackend.upload.IngestionAiClient
-import com.sprintstart.sprintstartbackend.upload.events.ArtifactUploadedEvent
 import com.sprintstart.sprintstartbackend.upload.external.events.AiIngestRequest
+import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.ArtifactUploadedEvent
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk

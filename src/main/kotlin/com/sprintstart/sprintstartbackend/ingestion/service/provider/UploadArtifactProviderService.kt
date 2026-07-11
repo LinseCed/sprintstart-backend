@@ -1,16 +1,13 @@
 package com.sprintstart.sprintstartbackend.ingestion.service.provider
 
-import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileDeletedEvent
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.UploadArtifactCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.FailedArtifact
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
-import com.sprintstart.sprintstartbackend.ingestion.model.mapper.SourceIdFactory
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import jakarta.transaction.Transactional
-import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
+import java.util.UUID
 
 /**
  * Owns writes to the ingestion artifact store and the mutable parts of `IngestionRun`.
@@ -46,9 +43,8 @@ class UploadArtifactProviderService(
     fun persistArtifact(command: UploadArtifactCommand) {
         val runId = command.ingestionRunId
         val projectId = command.projectId
-        var artifact: Artifact?
 
-        artifact = artifactRepository.findBySourceId(command.sourceId)
+        var artifact = artifactRepository.findBySourceId(command.sourceId)
         if (artifact != null) {
             artifact.addProjectId(projectId)
             if (artifact.hash != command.hash) {
@@ -78,61 +74,26 @@ class UploadArtifactProviderService(
         ingestionRunRepository.incrementIngestedCount(runId)
     }
 
+    /**
+     * Removes an ingestion file artifact when GitHub reports that the source file was deleted and
+     * records its id for AI deindexing at the end of the run.
+     *
+     * This does not affect historic run counters. If no stored artifact exists for the deleted
+     * source file, the method leaves the run unchanged.
+     *
+     * @param event [com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileDeletedEvent] The event, emitted by the GitHub module, indicating a file deletion.
+     * @throws IngestionRunNotFoundException when the run id is unknown.
+     */
+    @Transactional
+    fun deleteArtifact(transactionId: UUID, uploadArtifactId: UUID) {
+        val run = ingestionRunRepository.findByIdForUpdate(transactionId).orElseThrow {
+            IngestionRunNotFoundException(transactionId)
+        }
+        val sourceId = uploadArtifactId.toString()
+        val artifact = artifactRepository.findBySourceId(sourceId) ?: return
 
-}
-
-
-/**
- * Appends one failed source artifact to the current run and increments the aggregated failure
- * counter in the same transaction.
- *
- * The individual failed item is preserved for status/history views that need artifact-level
- * error details without scanning connector logs.
- *
- * @param command [com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand] The command for a failed artifact containing all data needed.
- * @throws IngestionRunNotFoundException when the run id is unknown
- */
-@Transactional
-fun addFailedArtifact(command: ArtifactFailedCommand) {
-    val run = ingestionRunRepository
-        .findByIdOrNull(command.transactionId)
-        ?: throw IngestionRunNotFoundException(command.transactionId)
-    run.failedItems.add(
-        FailedArtifact(
-            sourceId = command.sourceId,
-            reason = command.reason,
-            artifactType = command.artifactType,
-            sourceUrl = command.sourceUrl,
-        ),
-    )
-    run.failedCount++
-}
-
-/**
- * Removes an ingestion file artifact when GitHub reports that the source file was deleted and
- * records its id for AI deindexing at the end of the run.
- *
- * This does not affect historic run counters. If no stored artifact exists for the deleted
- * source file, the method leaves the run unchanged.
- *
- * @param event [com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileDeletedEvent] The event, emitted by the GitHub module, indicating a file deletion.
- * @throws IngestionRunNotFoundException when the run id is unknown.
- */
-@Transactional
-fun deleteFileArtifact(event: GithubFileDeletedEvent) {
-    val run = ingestionRunRepository.findByIdOrNull(event.transactionId)
-        ?: throw IngestionRunNotFoundException(event.transactionId)
-
-    val sourceId = SourceIdFactory.buildSourceId(
-        repositoryOwner = event.repositoryOwner,
-        repositoryName = event.repositoryName,
-        type = ArtifactType.FILE,
-        unique = event.path,
-    )
-    val artifact = artifactRepository.findBySourceId(sourceId) ?: return
-
-    artifactRepository.deleteById(artifact.id)
-
-    run.artifactIdsToDeindex.add(artifact.id.toString())
-}
+        artifactRepository.deleteById(artifact.id)
+        run.deletedCount++
+        run.artifactIdsToDeindex.add(artifact.id.toString())
+    }
 }

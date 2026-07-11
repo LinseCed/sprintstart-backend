@@ -9,6 +9,6 @@ data class ArtifactResponse(
     var title: String?,
     val sourceSystem: SourceSystem,
     val sourceUrl: String?,
-    val repositoryFullName: String,
     val artifactType: ArtifactType,
+    val metadata: String,
 )

@@ -2,16 +2,15 @@ package com.sprintstart.sprintstartbackend.ingestion.service.provider
 
 import com.sprintstart.sprintstartbackend.github.external.GithubRepositoryApi
 import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileDeletedEvent
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.GithubArtifactCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.FailedArtifact
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMetadataJsonMapper
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.SourceIdFactory
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import jakarta.transaction.Transactional
-import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 
 /**
@@ -43,7 +42,7 @@ class GithubArtifactProviderService(
      * - `ingestedCount` increments only when a new artifact row is created
      * - `updatedCount` increments only when an existing artifact is changed
      *
-     * @param command [com.sprintstart.sprintstartbackend.ingestion.model.dto.command.GithubArtifactCommand] the command containing all data needed for ingestion.
+     * @param command [GithubArtifactCommand] the command containing all data needed for ingestion.
      * @throws com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException when the referenced ingestion run does not exist.
      */
     @Transactional
@@ -124,34 +123,6 @@ class GithubArtifactProviderService(
         ingestionRunRepository.incrementIngestedCount(runId)
     }
 
-
-
-    /**
-     * Appends one failed source artifact to the current run and increments the aggregated failure
-     * counter in the same transaction.
-     *
-     * The individual failed item is preserved for status/history views that need artifact-level
-     * error details without scanning connector logs.
-     *
-     * @param command [com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand] The command for a failed artifact containing all data needed.
-     * @throws IngestionRunNotFoundException when the run id is unknown
-     */
-    @Transactional
-    fun addFailedArtifact(command: ArtifactFailedCommand) {
-        val run = ingestionRunRepository
-            .findByIdOrNull(command.transactionId)
-            ?: throw IngestionRunNotFoundException(command.transactionId)
-        run.failedItems.add(
-            FailedArtifact(
-                sourceId = command.sourceId,
-                reason = command.reason,
-                artifactType = command.artifactType,
-                sourceUrl = command.sourceUrl,
-            ),
-        )
-        run.failedCount++
-    }
-
     /**
      * Removes an ingestion file artifact when GitHub reports that the source file was deleted and
      * records its id for AI deindexing at the end of the run.
@@ -164,8 +135,9 @@ class GithubArtifactProviderService(
      */
     @Transactional
     fun deleteFileArtifact(event: GithubFileDeletedEvent) {
-        val run = ingestionRunRepository.findByIdOrNull(event.transactionId)
-            ?: throw IngestionRunNotFoundException(event.transactionId)
+        val run = ingestionRunRepository.findByIdForUpdate(event.transactionId).orElseThrow {
+            IngestionRunNotFoundException(event.transactionId)
+        }
 
         val sourceId = SourceIdFactory.buildSourceId(
             repositoryOwner = event.repositoryOwner,
@@ -176,7 +148,7 @@ class GithubArtifactProviderService(
         val artifact = artifactRepository.findBySourceId(sourceId) ?: return
 
         artifactRepository.deleteById(artifact.id)
-
+        run.deletedCount++
         run.artifactIdsToDeindex.add(artifact.id.toString())
     }
 }

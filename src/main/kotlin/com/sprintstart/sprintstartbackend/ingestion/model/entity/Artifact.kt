@@ -24,18 +24,16 @@ class Artifact(
     val sourceId: String,
     @Column(length = 2048)
     val sourceUrl: String?,
-    @Column(nullable = false)
-    val repositoryId: UUID,
-    @Column(nullable = false)
-    val repositoryFullName: String,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     val artifactType: ArtifactType,
     var title: String?,
     @Column(columnDefinition = "TEXT")
-    var bodyText: String?,
+    var content: String?,
     val mime: String?,
     val language: String?,
+    @Column(nullable = false)
+    val metadata: String = "{}",
     @ElementCollection
     @CollectionTable(
         name = "artifact_projects",
@@ -58,7 +56,11 @@ class Artifact(
     val projectIds: Set<UUID>
         get() = projectIdsInternal.toSet()
 
-    fun addProjectId(projectIds: Set<UUID>) {
+    fun addProjectIds(projectIds: Set<UUID>) {
         projectIdsInternal.addAll(projectIds)
+    }
+
+    fun addProjectId(projectId: UUID) {
+        projectIdsInternal.add(projectId)
     }
 }

@@ -6,15 +6,13 @@ import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFil
 import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFilesFetchCompletedEvent
 import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFilesFetchFailedEvent
 import com.sprintstart.sprintstartbackend.ingestion.listener.github.GithubFileListener
-import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactCommand
-import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.FinishedTypes
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.GithubArtifactFailedMapper
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.GithubArtifactMapper
-import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactIngestionService
 import com.sprintstart.sprintstartbackend.ingestion.service.IngestionStatusService
+import com.sprintstart.sprintstartbackend.ingestion.service.provider.GithubArtifactProviderService
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -25,12 +23,12 @@ import java.util.UUID
 
 class GithubFileListenerTest {
     private val repositoryId = UUID.randomUUID()
-    private val artifactIngestionService = mockk<ArtifactIngestionService>()
+    private val githubArtifactProviderService = mockk<GithubArtifactProviderService>()
     private val artifactMapper = mockk<GithubArtifactMapper>()
     private val failedMapper = mockk<GithubArtifactFailedMapper>()
     private val ingestionStatusService = mockk<IngestionStatusService>()
     private val listener = GithubFileListener(
-        artifactIngestionService,
+        githubArtifactProviderService,
         artifactMapper,
         failedMapper,
         ingestionStatusService,
@@ -41,11 +39,11 @@ class GithubFileListenerTest {
         val event = fileFetchedEvent()
         val command = artifactCommand(event.transactionId)
         every { artifactMapper.toCommand(event) } returns command
-        every { artifactIngestionService.persistArtifact(command) } just runs
+        every { githubArtifactProviderService.persistGithubArtifact(command) } just runs
 
         listener.on(event)
 
-        verify(exactly = 1) { artifactIngestionService.persistArtifact(command) }
+        verify(exactly = 1) { githubArtifactProviderService.persistGithubArtifact(command) }
     }
 
     @Test
@@ -68,11 +66,11 @@ class GithubFileListenerTest {
             reason = "Missing",
         )
         every { failedMapper.toCommand(event) } returns command
-        every { artifactIngestionService.addFailedArtifact(command) } just runs
+        every { githubArtifactProviderService.addFailedArtifact(command) } just runs
 
         listener.on(event)
 
-        verify(exactly = 1) { artifactIngestionService.addFailedArtifact(command) }
+        verify(exactly = 1) { githubArtifactProviderService.addFailedArtifact(command) }
     }
 
     @Test
@@ -121,11 +119,11 @@ class GithubFileListenerTest {
             repositoryName = "repo",
             path = "src/main/App.kt",
         )
-        every { artifactIngestionService.deleteFileArtifact(event) } just runs
+        every { githubArtifactProviderService.deleteFileArtifact(event) } just runs
 
         listener.on(event)
 
-        verify(exactly = 1) { artifactIngestionService.deleteFileArtifact(event) }
+        verify(exactly = 1) { githubArtifactProviderService.deleteFileArtifact(event) }
     }
 
     private fun fileFetchedEvent() = GithubFileFetchedEvent(
@@ -138,7 +136,7 @@ class GithubFileListenerTest {
         sourceUrl = "https://github.com/owner/repo/blob/main/src/main/App.kt",
     )
 
-    private fun artifactCommand(runId: UUID) = ArtifactCommand(
+    private fun artifactCommand(runId: UUID) = GithubArtifactCommand(
         ingestionRunId = runId,
         sourceSystem = SourceSystem.GITHUB,
         sourceId = "github:owner/repo:FILE:src/main/App.kt",

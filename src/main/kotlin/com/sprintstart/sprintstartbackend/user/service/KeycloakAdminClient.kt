@@ -25,7 +25,7 @@ interface KeycloakAdminClient {
         email: String? = null,
         firstName: String? = null,
         lastName: String? = null,
-        projects: Set<UUID>,
+        projectIds: Set<UUID>,
     )
 
     fun setUserEnabled(authId: String, enabled: Boolean)
