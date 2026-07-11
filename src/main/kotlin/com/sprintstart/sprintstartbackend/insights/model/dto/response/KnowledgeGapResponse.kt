@@ -12,14 +12,16 @@ data class KnowledgeGapResponse(
     val component: String,
     @field:Schema(description = "Document types the component is missing, for example runbook or adr.")
     val missingTypes: List<String>,
+    @field:Schema(description = "Document types the component already has.")
+    val presentTypes: List<String>,
     @field:Schema(description = "Timestamp of the component's most recent activity.")
     val lastUpdated: Instant,
-    @field:Schema(description = "People responsible for the component.")
+    @field:Schema(
+        description = "People responsible for the component. Enriched by the backend; empty until owners are assigned.",
+    )
     val owners: List<KnowledgeGapOwnerResponse>,
     @field:Schema(description = "Impact level of the gap: high, medium or low.")
     val severity: String,
-    @field:Schema(description = "Number of user questions related to this component.")
-    val relatedQuestions: Int,
 )
 
 @Schema(description = "A person responsible for a component with a knowledge gap.")

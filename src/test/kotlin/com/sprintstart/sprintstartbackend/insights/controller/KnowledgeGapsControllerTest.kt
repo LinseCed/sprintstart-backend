@@ -2,7 +2,6 @@ package com.sprintstart.sprintstartbackend.insights.controller
 
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.insights.model.dto.response.KnowledgeGapOwnerResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.KnowledgeGapResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.KnowledgeGapsOverviewResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.RefreshKnowledgeGapsResponse
@@ -63,18 +62,10 @@ class KnowledgeGapsControllerTest(
         id = gapId,
         component = "auth-service",
         missingTypes = listOf("runbook", "adr"),
+        presentTypes = listOf("readme"),
         lastUpdated = Instant.parse("2025-05-01T00:00:00Z"),
-        owners = listOf(
-            KnowledgeGapOwnerResponse(
-                id = "user_001",
-                username = "jdoe",
-                firstname = "John",
-                lastname = "Doe",
-                workingArea = "BACKEND",
-            ),
-        ),
+        owners = emptyList(),
         severity = "high",
-        relatedQuestions = 12,
     )
 
     // ========================== Overview ==========================

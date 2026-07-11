@@ -2,7 +2,6 @@ package com.sprintstart.sprintstartbackend.insights.service
 
 import com.sprintstart.sprintstartbackend.insights.KnowledgeGapsAiClient
 import com.sprintstart.sprintstartbackend.insights.model.ai.AiKnowledgeGap
-import com.sprintstart.sprintstartbackend.insights.model.ai.AiKnowledgeGapOwner
 import com.sprintstart.sprintstartbackend.insights.model.ai.AiKnowledgeGapsResponse
 import com.sprintstart.sprintstartbackend.insights.model.entity.KnowledgeGap
 import com.sprintstart.sprintstartbackend.insights.model.entity.KnowledgeGapSeverity
@@ -19,6 +18,7 @@ import io.mockk.slot
 import io.mockk.verifyOrder
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.http.HttpStatus
@@ -43,45 +43,34 @@ class KnowledgeGapsServiceTest {
     private fun buildGap(
         component: String,
         severity: KnowledgeGapSeverity,
-        relatedQuestions: Int,
     ): KnowledgeGap {
         return KnowledgeGap(
             component = component,
             lastUpdated = Instant.parse("2025-05-01T00:00:00Z"),
             severity = severity,
-            relatedQuestions = relatedQuestions,
         )
     }
 
     @Test
-    fun `getKnowledgeGaps orders by severity then related questions`() {
-        val lowGap = buildGap("frontend-portal", KnowledgeGapSeverity.LOW, 3)
-        val highFew = buildGap("auth-service", KnowledgeGapSeverity.HIGH, 10)
-        val highMany = buildGap("payment-service", KnowledgeGapSeverity.HIGH, 18)
-        every { knowledgeGapRepository.findAll() } returns listOf(lowGap, highFew, highMany)
+    fun `getKnowledgeGaps orders by severity then component`() {
+        val lowGap = buildGap("frontend-portal", KnowledgeGapSeverity.LOW)
+        val highB = buildGap("payment-service", KnowledgeGapSeverity.HIGH)
+        val highA = buildGap("auth-service", KnowledgeGapSeverity.HIGH)
+        every { knowledgeGapRepository.findAll() } returns listOf(lowGap, highB, highA)
 
         val overview = service.getKnowledgeGaps()
 
         assertEquals(
-            listOf("payment-service", "auth-service", "frontend-portal"),
+            listOf("auth-service", "payment-service", "frontend-portal"),
             overview.gaps.map { it.component },
         )
     }
 
     @Test
-    fun `getKnowledgeGap maps fields and exposes lowercase severity and owner id`() {
-        val gap = buildGap("auth-service", KnowledgeGapSeverity.HIGH, 12)
+    fun `getKnowledgeGap maps fields, exposes lowercase severity and empty owners`() {
+        val gap = buildGap("auth-service", KnowledgeGapSeverity.HIGH)
         gap.missingTypes.addAll(listOf("runbook", "adr"))
-        gap.owners.add(
-            com.sprintstart.sprintstartbackend.insights.model.entity.KnowledgeGapOwner(
-                externalUserId = "user_001",
-                username = "jdoe",
-                firstname = "John",
-                lastname = "Doe",
-                workingArea = "BACKEND",
-                knowledgeGap = gap,
-            ),
-        )
+        gap.presentTypes.add("readme")
         every { knowledgeGapRepository.findById(gap.id) } returns Optional.of(gap)
 
         val detail = service.getKnowledgeGap(gap.id)
@@ -89,9 +78,9 @@ class KnowledgeGapsServiceTest {
         assertEquals(gap.id, detail.id)
         assertEquals("auth-service", detail.component)
         assertEquals(listOf("runbook", "adr"), detail.missingTypes)
+        assertEquals(listOf("readme"), detail.presentTypes)
         assertEquals("high", detail.severity)
-        assertEquals("user_001", detail.owners.first().id)
-        assertEquals("BACKEND", detail.owners.first().workingArea)
+        assertTrue(detail.owners.isEmpty())
     }
 
     @Test
@@ -112,18 +101,9 @@ class KnowledgeGapsServiceTest {
                 AiKnowledgeGap(
                     component = "auth-service",
                     missingTypes = listOf("runbook", "adr"),
+                    presentTypes = listOf("readme"),
                     lastUpdated = "2025-05-01T00:00:00Z",
-                    owners = listOf(
-                        AiKnowledgeGapOwner(
-                            id = "user_001",
-                            username = "jdoe",
-                            firstname = "John",
-                            lastname = "Doe",
-                            workingArea = "BACKEND",
-                        ),
-                    ),
                     severity = "high",
-                    relatedQuestions = 12,
                 ),
             ),
         )
@@ -141,7 +121,7 @@ class KnowledgeGapsServiceTest {
         assertEquals(KnowledgeGapSeverity.HIGH, persisted.severity)
         assertEquals(Instant.parse("2025-05-01T00:00:00Z"), persisted.lastUpdated)
         assertEquals(listOf("runbook", "adr"), persisted.missingTypes)
-        assertEquals("user_001", persisted.owners.first().externalUserId)
+        assertEquals(listOf("readme"), persisted.presentTypes)
 
         coVerify(exactly = 1) { knowledgeGapsAiClient.detectKnowledgeGaps(any()) }
         verifyOrder {

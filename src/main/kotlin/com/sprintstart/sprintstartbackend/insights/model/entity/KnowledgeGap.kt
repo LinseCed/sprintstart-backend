@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.insights.model.entity
 
-import jakarta.persistence.CascadeType
 import jakarta.persistence.CollectionTable
 import jakarta.persistence.Column
 import jakarta.persistence.ElementCollection
@@ -9,7 +8,6 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
-import jakarta.persistence.OneToMany
 import java.time.Instant
 import java.util.UUID
 
@@ -20,8 +18,9 @@ import java.util.UUID
  * inspects the ingested artifacts, determines which components lack runbooks/ADRs and other
  * critical documents, and reports the result. Each reported component becomes one [KnowledgeGap].
  * The rows are treated as a rebuildable cache — a refresh replaces the whole set. [missingTypes]
- * holds free-form document-type identifiers (for example "runbook", "adr") as delivered by the AI,
- * so new types do not require a schema change.
+ * and [presentTypes] hold free-form document-type identifiers (for example "runbook", "adr") as
+ * delivered by the AI, so new types do not require a schema change. Component ownership is not
+ * stored here; it is resolved separately when the gap is served.
  */
 @Entity
 class KnowledgeGap(
@@ -36,15 +35,18 @@ class KnowledgeGap(
     )
     @Column(name = "missing_type", nullable = false)
     val missingTypes: MutableList<String> = mutableListOf(),
+    @ElementCollection
+    @CollectionTable(
+        name = "knowledge_gap_present_types",
+        joinColumns = [JoinColumn(name = "knowledge_gap_id")],
+    )
+    @Column(name = "present_type", nullable = false)
+    val presentTypes: MutableList<String> = mutableListOf(),
     @Column(nullable = false)
     val lastUpdated: Instant,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     val severity: KnowledgeGapSeverity,
     @Column(nullable = false)
-    val relatedQuestions: Int,
-    @Column(nullable = false)
     val refreshedAt: Instant = Instant.now(),
-    @OneToMany(mappedBy = "knowledgeGap", cascade = [CascadeType.ALL], orphanRemoval = true)
-    val owners: MutableList<KnowledgeGapOwner> = mutableListOf(),
 )

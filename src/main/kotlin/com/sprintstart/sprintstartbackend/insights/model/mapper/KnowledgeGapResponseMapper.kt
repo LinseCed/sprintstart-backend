@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.insights.model.mapper
 
-import com.sprintstart.sprintstartbackend.insights.model.dto.response.KnowledgeGapOwnerResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.KnowledgeGapResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.KnowledgeGapsOverviewResponse
 import com.sprintstart.sprintstartbackend.insights.model.entity.KnowledgeGap
@@ -9,9 +8,9 @@ import org.springframework.stereotype.Component
 /**
  * Converts persisted knowledge gaps into API response DTOs.
  *
- * The upstream owner id
- * ([com.sprintstart.sprintstartbackend.insights.model.entity.KnowledgeGapOwner.externalUserId]) is
- * exposed as the owner id, and the severity enum is rendered as its lowercase API value.
+ * The severity enum is rendered as its lowercase API value. Owners are not stored on the gap; they
+ * are resolved from a separate component-ownership mapping and are empty until that mapping is
+ * populated.
  */
 @Component
 class KnowledgeGapResponseMapper {
@@ -26,18 +25,10 @@ class KnowledgeGapResponseMapper {
             id = gap.id,
             component = gap.component,
             missingTypes = gap.missingTypes.toList(),
+            presentTypes = gap.presentTypes.toList(),
             lastUpdated = gap.lastUpdated,
-            owners = gap.owners.map { owner ->
-                KnowledgeGapOwnerResponse(
-                    id = owner.externalUserId,
-                    username = owner.username,
-                    firstname = owner.firstname,
-                    lastname = owner.lastname,
-                    workingArea = owner.workingArea,
-                )
-            },
+            owners = emptyList(),
             severity = gap.severity.apiValue,
-            relatedQuestions = gap.relatedQuestions,
         )
     }
 }

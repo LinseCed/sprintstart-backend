@@ -30,13 +30,13 @@ class KnowledgeGapsService(
     private val knowledgeGapResponseMapper: KnowledgeGapResponseMapper,
 ) {
     /**
-     * Returns all cached knowledge gaps, most severe first and then by related-question count.
+     * Returns all cached knowledge gaps, most severe first and then by component name.
      */
     @Transactional(readOnly = true)
     fun getKnowledgeGaps(): KnowledgeGapsOverviewResponse {
         val gaps = knowledgeGapRepository
             .findAll()
-            .sortedWith(compareBy({ it.severity.ordinal }, { -it.relatedQuestions }))
+            .sortedWith(compareBy({ it.severity.ordinal }, { it.component }))
         return knowledgeGapResponseMapper.toOverviewResponse(gaps)
     }
 
