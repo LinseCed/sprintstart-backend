@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.insights.controller
 
+import com.sprintstart.sprintstartbackend.insights.model.dto.request.SetComponentOwnersRequest
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.KnowledgeGapOwnerResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.KnowledgeGapResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.KnowledgeGapsOverviewResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.RefreshKnowledgeGapsResponse
@@ -8,12 +10,16 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
@@ -95,5 +101,52 @@ class KnowledgeGapsController(
     @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
     suspend fun refreshKnowledgeGaps(): RefreshKnowledgeGapsResponse {
         return knowledgeGapsService.refreshKnowledgeGaps()
+    }
+
+    /**
+     * Returns the owners currently assigned to a component.
+     */
+    @Operation(
+        summary = "Get component owners",
+        description = "Returns the users assigned as owners of the given component. PM/Admin only.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Component owners returned successfully"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role to access endpoint"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/component-owners")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun getComponentOwners(
+        @RequestParam component: String,
+    ): List<KnowledgeGapOwnerResponse> {
+        return knowledgeGapsService.getComponentOwners(component)
+    }
+
+    /**
+     * Replaces the owners of a component and returns the resolved owners.
+     */
+    @Operation(
+        summary = "Set component owners",
+        description = "Assigns the owners of a component, replacing any previous assignment. PM/Admin only.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Component owners updated successfully"),
+            ApiResponse(responseCode = "400", description = "Invalid request body"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role to access endpoint"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PutMapping("/component-owners")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun setComponentOwners(
+        @Valid @RequestBody request: SetComponentOwnersRequest,
+    ): List<KnowledgeGapOwnerResponse> {
+        return knowledgeGapsService.setComponentOwners(request)
     }
 }

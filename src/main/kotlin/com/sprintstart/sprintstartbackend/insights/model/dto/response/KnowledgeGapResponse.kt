@@ -26,7 +26,7 @@ data class KnowledgeGapResponse(
 
 @Schema(description = "A person responsible for a component with a knowledge gap.")
 data class KnowledgeGapOwnerResponse(
-    @field:Schema(description = "Identifier of the user in the upstream system.")
+    @field:Schema(description = "Identifier of the owning user.")
     val id: String,
     @field:Schema(description = "Username of the owner.")
     val username: String,
@@ -34,6 +34,6 @@ data class KnowledgeGapOwnerResponse(
     val firstname: String,
     @field:Schema(description = "Last name of the owner.")
     val lastname: String,
-    @field:Schema(description = "Working area the owner belongs to, for example BACKEND.")
-    val workingArea: String,
+    @field:Schema(description = "Project role of the owner, for example Backend Developer. May be null.")
+    val role: String?,
 )

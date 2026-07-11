@@ -1,7 +1,10 @@
 package com.sprintstart.sprintstartbackend.insights.controller
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
+import com.sprintstart.sprintstartbackend.insights.model.dto.request.SetComponentOwnersRequest
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.KnowledgeGapOwnerResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.KnowledgeGapResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.KnowledgeGapsOverviewResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.RefreshKnowledgeGapsResponse
@@ -25,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.request
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -45,6 +49,7 @@ class KnowledgeGapsControllerTest(
     private lateinit var jwtDecoder: JwtDecoder
 
     private val gapId = UUID.randomUUID()
+    private val objectMapper = jacksonObjectMapper()
 
     private fun jwtWithRoles(vararg roles: String): JwtRequestPostProcessor {
         return jwt()
@@ -183,5 +188,79 @@ class KnowledgeGapsControllerTest(
             .andExpect(status().isForbidden)
 
         coVerify(exactly = 0) { knowledgeGapsService.refreshKnowledgeGaps() }
+    }
+
+    // ========================== Component owners ==========================
+
+    private fun buildOwner() = KnowledgeGapOwnerResponse(
+        id = UUID.randomUUID().toString(),
+        username = "jdoe",
+        firstname = "John",
+        lastname = "Doe",
+        role = "Backend Developer",
+    )
+
+    @Test
+    fun `getComponentOwners should return 200 and owners for a PM`() {
+        every { knowledgeGapsService.getComponentOwners("owner/repo") } returns listOf(buildOwner())
+
+        mockMvc
+            .perform(
+                get("/api/v1/insights/knowledge-gaps/component-owners")
+                    .param("component", "owner/repo")
+                    .with(pmJwt),
+            ).andExpect(status().isOk)
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+
+        verify(exactly = 1) { knowledgeGapsService.getComponentOwners("owner/repo") }
+    }
+
+    @Test
+    fun `getComponentOwners should return 403 for a non-PM role`() {
+        mockMvc
+            .perform(
+                get("/api/v1/insights/knowledge-gaps/component-owners")
+                    .param("component", "owner/repo")
+                    .with(userJwt),
+            ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `setComponentOwners should return 200 and the resolved owners for a PM`() {
+        val request = SetComponentOwnersRequest(component = "owner/repo", userIds = listOf(UUID.randomUUID()))
+        every { knowledgeGapsService.setComponentOwners(request) } returns listOf(buildOwner())
+
+        mockMvc
+            .perform(
+                put("/api/v1/insights/knowledge-gaps/component-owners")
+                    .with(pmJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isOk)
+            .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+
+        verify(exactly = 1) { knowledgeGapsService.setComponentOwners(request) }
+    }
+
+    @Test
+    fun `setComponentOwners should return 400 when the component is blank`() {
+        mockMvc
+            .perform(
+                put("/api/v1/insights/knowledge-gaps/component-owners")
+                    .with(pmJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"component": "", "userIds": []}"""),
+            ).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `setComponentOwners should return 403 for a non-PM role`() {
+        mockMvc
+            .perform(
+                put("/api/v1/insights/knowledge-gaps/component-owners")
+                    .with(userJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"component": "owner/repo", "userIds": []}"""),
+            ).andExpect(status().isForbidden)
     }
 }
