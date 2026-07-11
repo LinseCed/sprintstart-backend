@@ -1,13 +1,11 @@
 package com.sprintstart.sprintstartbackend.upload.model.dto.request
 
-import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotEmpty
 import java.util.UUID
 
 data class DeleteArtifactsRequest(
-    @NotBlank
+    @field:NotEmpty
     val artifactIds: Set<UUID>,
-    @NotBlank
     val removerId: UUID,
-    @NotBlank
     val projectId: UUID,
 )

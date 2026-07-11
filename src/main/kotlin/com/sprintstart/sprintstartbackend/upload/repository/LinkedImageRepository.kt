@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository
 import java.util.UUID
 
 interface LinkedImageRepository : JpaRepository<LinkedImage, UUID> {
-    fun deleteAllByArtifactId(
+    fun deleteAllByMarkdownArtifactId(
         artifactId: UUID,
     )
 

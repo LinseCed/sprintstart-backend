@@ -85,7 +85,7 @@ class UserApiService(
             }
 
             if (!projectIds.isNullOrEmpty()) {
-                val projectJoin = root.join<User, Project>("project", JoinType.INNER)
+                val projectJoin = root.join<User, Project>("projects", JoinType.INNER)
                 predicates.add(projectJoin.get<UUID>("id").`in`(projectIds))
             }
 

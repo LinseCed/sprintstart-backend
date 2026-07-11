@@ -133,6 +133,6 @@ class UserApiServiceTest {
         email = "alice@example.com",
         firstname = "Alice",
         lastname = "Doe",
-        project = project,
+        projects = project?.let { mutableSetOf(it) } ?: mutableSetOf(),
     )
 }

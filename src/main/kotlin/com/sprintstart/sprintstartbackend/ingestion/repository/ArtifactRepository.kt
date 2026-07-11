@@ -41,7 +41,7 @@ interface ArtifactRepository : JpaRepository<Artifact, UUID> {
                 AND (LOWER(a.title) LIKE LOWER(CONCAT('%', :filter, '%'))
                 OR LOWER(a.artifactType) LIKE LOWER(CONCAT('%', :filter, '%'))
                 OR LOWER(a.sourceSystem) LIKE LOWER(CONCAT('%', :filter, '%'))
-                OR LOWER(a.repositoryFullName) LIKE LOWER(CONCAT('%', :filter, '%')))
+                OR LOWER(a.metadata) LIKE LOWER(CONCAT('%', :filter, '%')))
         """,
     )
     fun searchByProjectId(
@@ -63,7 +63,7 @@ interface ArtifactRepository : JpaRepository<Artifact, UUID> {
             WHERE LOWER(a.title) LIKE LOWER(CONCAT('%', :filter, '%'))
                 OR LOWER(a.artifactType) LIKE LOWER(CONCAT('%', :filter, '%'))
                 OR LOWER(a.sourceSystem) LIKE LOWER(CONCAT('%', :filter, '%'))
-                OR LOWER(a.repositoryFullName) LIKE LOWER(CONCAT('%', :filter, '%'))
+                OR LOWER(a.metadata) LIKE LOWER(CONCAT('%', :filter, '%'))
         """,
     )
     fun search(

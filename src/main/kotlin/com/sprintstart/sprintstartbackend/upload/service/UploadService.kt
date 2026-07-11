@@ -335,7 +335,7 @@ class UploadService(
             }
 
             linkedImageRepository
-                .deleteAllByArtifactId(
+                .deleteAllByMarkdownArtifactId(
                     artifactId,
                 )
 

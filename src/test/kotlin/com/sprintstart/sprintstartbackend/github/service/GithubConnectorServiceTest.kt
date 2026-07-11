@@ -404,10 +404,12 @@ class GithubConnectorServiceTest {
         firstname = "Alice",
         lastname = "Doe",
         avatarUrl = null,
-        projects = ProjectDto(
-            projectId = projectId,
-            name = "Project",
-            description = null,
+        projects = setOf(
+            ProjectDto(
+                projectId = projectId,
+                name = "Project",
+                description = null,
+            ),
         ),
         skills = emptyList(),
         projectRoles = emptyList(),
