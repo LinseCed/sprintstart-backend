@@ -311,6 +311,7 @@ class UploadService(
                         error = e.message,
                     ),
                 )
+                return@forEach
             }
             publisher.publishEvent(
                 UploadFileDeletedEvent(

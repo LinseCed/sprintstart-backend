@@ -51,7 +51,7 @@ class UploadArtifactFailedMapper {
     ): ArtifactFailedCommand {
         return ArtifactFailedCommand(
             transactionId = transactionId,
-            sourceId = outcome.id.toString(),
+            sourceId = outcome.id?.toString(),
             sourceUrl = null,
             artifactType = ArtifactType.FILE,
             reason = requireNotNull(outcome.error) {

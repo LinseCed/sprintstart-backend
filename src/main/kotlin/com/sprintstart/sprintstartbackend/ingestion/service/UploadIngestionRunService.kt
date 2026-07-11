@@ -33,7 +33,6 @@ class UploadIngestionRunService(
             when (it.status) {
                 UploadArtifactStatus.FAILED,
                 -> {
-                    run.failedCount++
                     failedArtifactService.addFailedArtifact(
                         uploadArtifactFailedMapper.toCommand(
                             event = event,
@@ -61,7 +60,6 @@ class UploadIngestionRunService(
                 }
 
                 UploadArtifactStatus.FAILED -> {
-                    run.failedCount++
                     failedArtifactService.addFailedArtifact(
                         uploadArtifactFailedMapper.toCommand(
                             event = event,
