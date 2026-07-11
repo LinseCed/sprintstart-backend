@@ -14,6 +14,7 @@ class ArtifactMapper {
             sourceUrl = artifact.sourceUrl,
             metadata = artifact.metadata,
             artifactType = artifact.artifactType,
+            ingestedAt = artifact.ingestedAt,
         )
     }
 }
