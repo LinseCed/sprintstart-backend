@@ -1,29 +1,31 @@
 package com.sprintstart.sprintstartbackend.github.service
 
-import com.sprintstart.sprintstartbackend.github.GithubClient
-import com.sprintstart.sprintstartbackend.github.external.events.GithubRepositoryResourcesFetchingStartedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.initial.GithubRepositoryConnectionInitiatedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.initial.GithubRepositoryConnectionInitiationFailedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.update.GithubAllRepositoriesUpdateStartedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.update.GithubRepositoryUpdateFailedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.update.GithubRepositoryUpdateStartedEvent
-import com.sprintstart.sprintstartbackend.github.models.GithubRepositoryConnection
-import com.sprintstart.sprintstartbackend.github.models.GithubRepositorySnapshot
-import com.sprintstart.sprintstartbackend.github.models.GithubUser
-import com.sprintstart.sprintstartbackend.github.models.GithubUserPat
-import com.sprintstart.sprintstartbackend.github.models.api.requests.ConnectRepositoryRequest
-import com.sprintstart.sprintstartbackend.github.models.api.requests.UpdateRepositoryRequest
-import com.sprintstart.sprintstartbackend.github.models.exceptions.GithubUserPatNotFoundException
-import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotConnectedException
-import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotFoundException
-import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotInitializedException
-import com.sprintstart.sprintstartbackend.github.repository.GithubRepositoryConnectionRepository
-import com.sprintstart.sprintstartbackend.github.repository.GithubRepositorySnapshotRepository
-import com.sprintstart.sprintstartbackend.github.repository.GithubUserRepository
-import com.sprintstart.sprintstartbackend.github.service.internal.GithubCommitsService
-import com.sprintstart.sprintstartbackend.github.service.internal.GithubFileService
-import com.sprintstart.sprintstartbackend.github.service.internal.GithubIssuesService
-import com.sprintstart.sprintstartbackend.github.service.internal.GithubPullRequestsService
+import com.sprintstart.sprintstartbackend.connectors.github.GithubClient
+import com.sprintstart.sprintstartbackend.connectors.github.external.events.GithubRepositoryResourcesFetchingStartedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.external.events.initial.GithubRepositoryConnectionInitiatedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.external.events.initial.GithubRepositoryConnectionInitiationFailedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubAllRepositoriesUpdateStartedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateFailedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateStartedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNotFoundException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
+import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
+import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositorySnapshotRepository
+import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
+import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
+import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubCommitsService
+import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubFileService
+import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubIssuesService
+import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubPullRequestsService
+import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorSource
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerify
@@ -333,6 +335,84 @@ class GithubConnectorServiceTest {
             }
 
             verify { eventPublisher.publishEvent(any<GithubRepositoryUpdateFailedEvent>()) }
+        }
+    }
+
+    @Nested
+    inner class SourceManagement {
+        @Test
+        fun `getAllSources returns all connections`() {
+            val user = GithubUser(id = GithubUserPat("some-id", "test-pat"), token = "test-token")
+            val repo = repoConnection("owner", "repo", user)
+            every { repoConnectionRepository.findAll() } returns listOf(repo)
+
+            val result = service.getAllSources()
+
+            assertThat(result).hasSize(1)
+            assertThat(result[0].owner).isEqualTo("owner")
+            assertThat(result[0].name).isEqualTo("repo")
+        }
+
+        @Test
+        fun `getAllSources returns empty list when no connections exist`() {
+            every { repoConnectionRepository.findAll() } returns emptyList()
+
+            val result = service.getAllSources()
+
+            assertThat(result).isEmpty()
+        }
+
+        @Test
+        fun `patchSource sets sourceEnabled on matching connection`() {
+            val user = GithubUser(id = GithubUserPat("some-id", "test-pat"), token = "test-token")
+            val repo = repoConnection("owner", "repo", user).apply { sourceEnabled = false }
+            val source = ConnectorSource(
+                id = "owner/repo",
+                name = "repo",
+                url = "https://github.com/owner/repo",
+                enabled = false,
+            )
+
+            every { repoConnectionRepository.findAll() } returns listOf(repo)
+            every { repoConnectionRepository.save(repo) } returns repo
+
+            service.patchSource(source, true)
+
+            assertThat(repo.sourceEnabled).isTrue()
+            verify { repoConnectionRepository.save(repo) }
+        }
+
+        @Test
+        fun `patchSource disables source when newStatus is false`() {
+            val user = GithubUser(id = GithubUserPat("some-id", "test-pat"), token = "test-token")
+            val repo = repoConnection("owner", "repo", user).apply { sourceEnabled = true }
+            val source = ConnectorSource(
+                id = "owner/repo",
+                name = "repo",
+                url = "https://github.com/owner/repo",
+                enabled = true,
+            )
+
+            every { repoConnectionRepository.findAll() } returns listOf(repo)
+            every { repoConnectionRepository.save(repo) } returns repo
+
+            service.patchSource(source, false)
+
+            assertThat(repo.sourceEnabled).isFalse()
+            verify { repoConnectionRepository.save(repo) }
+        }
+
+        @Test
+        fun `patchSource throws RuntimeException when source not found`() {
+            val source = ConnectorSource(
+                id = "unknown/repo",
+                name = "repo",
+                url = "https://github.com/unknown/repo",
+                enabled = false,
+            )
+            every { repoConnectionRepository.findAll() } returns emptyList()
+
+            assertFailsWith<RuntimeException> { service.patchSource(source, true) }
         }
     }
 

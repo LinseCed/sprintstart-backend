@@ -1,16 +1,18 @@
 package com.sprintstart.sprintstartbackend.github.service.internal
 
-import com.sprintstart.sprintstartbackend.github.external.events.commits.GithubCommitFetchFailedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.commits.GithubCommitFetchedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.commits.GithubCommitsFetchCompletedEvent
-import com.sprintstart.sprintstartbackend.github.external.events.commits.GithubCommitsFetchStartedEvent
-import com.sprintstart.sprintstartbackend.github.models.GithubRepositoryConnection
-import com.sprintstart.sprintstartbackend.github.models.GithubRepositorySnapshot
-import com.sprintstart.sprintstartbackend.github.models.GithubUser
-import com.sprintstart.sprintstartbackend.github.models.GithubUserPat
-import com.sprintstart.sprintstartbackend.github.util.CustomOnDiskCache
-import com.sprintstart.sprintstartbackend.github.util.GitOperationRunner
-import com.sprintstart.sprintstartbackend.github.util.OnDiskOperations
+import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitFetchFailedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitFetchedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitsFetchCompletedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitsFetchStartedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubCommitsFetchFailedPartiallyException
+import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubCommitsService
+import com.sprintstart.sprintstartbackend.connectors.github.util.CustomOnDiskCache
+import com.sprintstart.sprintstartbackend.connectors.github.util.GitOperationRunner
+import com.sprintstart.sprintstartbackend.connectors.github.util.OnDiskOperations
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -21,6 +23,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.springframework.context.ApplicationEventPublisher
 import java.nio.file.Path
 import java.time.Instant
@@ -186,7 +189,13 @@ class GithubCommitsServiceTest {
         fun `publishes GithubCommitFetchFailedEvent on parse failure`() = runTest {
             every { gitRunner.exec(repoPath, any()) } returns "malformed"
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            assertThrows<GithubCommitsFetchFailedPartiallyException> {
+                service.fetchAndIngestLatestCommits(
+                    snapshot(),
+                    transactionId,
+                    doSyncAll = true,
+                )
+            }
 
             verify { eventPublisher.publishEvent(any<GithubCommitFetchFailedEvent>()) }
         }
@@ -200,7 +209,9 @@ class GithubCommitsServiceTest {
                 2024-01-03T00:00:00Z - sha3 - carol - another good commit
                 """.trimIndent()
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            assertThrows<GithubCommitsFetchFailedPartiallyException> {
+                service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            }
 
             val events = mutableListOf<Any>()
             verify(exactly = 5) { eventPublisher.publishEvent(capture(events)) }
@@ -259,21 +270,27 @@ class GithubCommitsServiceTest {
         fun `throws GithubCommitsFetchFailedPartiallyException when commit line has wrong number of parts`() = runTest {
             every { gitRunner.exec(repoPath, any()) } returns "malformed-line-without-separators"
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            assertThrows<GithubCommitsFetchFailedPartiallyException> {
+                service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            }
         }
 
         @Test
         fun `throws GithubCommitsFetchFailedPartiallyException when commit line has too few parts`() = runTest {
             every { gitRunner.exec(repoPath, any()) } returns "2024-01-01T00:00:00Z - sha123"
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            assertThrows<GithubCommitsFetchFailedPartiallyException> {
+                service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            }
         }
 
         @Test
         fun `throws GithubCommitsFetchFailedPartiallyException when date string is malformed`() = runTest {
             every { gitRunner.exec(repoPath, any()) } returns "not-a-date - sha123 - alice - message"
 
-            service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            assertThrows<GithubCommitsFetchFailedPartiallyException> {
+                service.fetchAndIngestLatestCommits(snapshot(), transactionId, doSyncAll = true)
+            }
         }
 
         @Test
