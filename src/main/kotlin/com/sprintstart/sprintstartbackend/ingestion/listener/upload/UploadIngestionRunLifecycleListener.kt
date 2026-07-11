@@ -10,6 +10,13 @@ import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.Uploa
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
 
+/**
+ * Bridges upload lifecycle events into ingestion run lifecycle updates.
+ *
+ * The upload module owns file storage and publishes coarse batch events. This listener creates the
+ * ingestion run when a batch starts and delegates upload or deletion completion to the service that
+ * records failed outcomes and finalizes the run.
+ */
 @Component
 internal class UploadIngestionRunLifecycleListener(
     private val ingestionRunLifeCycleService: IngestionRunLifeCycleService,

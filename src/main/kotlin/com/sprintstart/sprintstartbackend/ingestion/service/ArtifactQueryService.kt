@@ -36,6 +36,7 @@ class ArtifactQueryService(
      * @param size The maximum number of artifacts to include in one page.
      * @param filter Optional case-insensitive text used to narrow the result set.
      * @return One artifact page together with pagination metadata.
+     * @throws IllegalArgumentException when Spring Data rejects the requested page or page size.
      */
     fun getAllArtifacts(page: Int, size: Int, filter: String?): ArtifactPageResponse {
         val pageable = PageRequest.of(
@@ -76,6 +77,7 @@ class ArtifactQueryService(
      * @param authId The authenticated caller subject from the JWT.
      * @return One project-scoped artifact page together with pagination metadata.
      * @throws ResponseStatusException `403` when the caller has no access to the project.
+     * @throws IllegalArgumentException when Spring Data rejects the requested page or page size.
      */
     fun getProjectArtifacts(
         page: Int,

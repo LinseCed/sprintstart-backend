@@ -13,6 +13,13 @@ import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.UUID
 
+/**
+ * Centralizes ingestion run lifecycle transitions shared by source-specific listeners.
+ *
+ * Source modules are responsible for deciding when their work starts and when all source-specific
+ * artifacts have been processed. This service applies the common status rules and emits the
+ * run-finished event only for runs that produced at least a partial result.
+ */
 @Service
 class IngestionRunLifeCycleService(
     private val ingestionRunRepository: IngestionRunRepository,
@@ -25,11 +32,10 @@ class IngestionRunLifeCycleService(
      * connection setup, active fetching, and immediate startup failures. If the run already
      * exists, the mutable lifecycle fields are updated instead of creating a duplicate row.
      *
-     * @param transactionId The id of the transaction to start.
-     * @param sourceSystem [com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem]
-     * The source of the new run.
-     * @param status [com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus] The status of the ingestion run.
-     * @param failureReason Optional run-level failure reason for lifecycle failures.
+     * @param transactionId The source transaction id that also identifies the ingestion run.
+     * @param sourceSystem The external system that owns the run.
+     * @param status The initial or replacement lifecycle status.
+     * @param failureReason Optional run-level failure reason for startup failures.
      */
     @Transactional
     fun startRun(
@@ -59,9 +65,9 @@ class IngestionRunLifeCycleService(
      * Updates the run status inside a transaction so listener-triggered state transitions are
      * persisted even when they only mutate the managed entity.
      *
-     * @param transactionId The id of the transaction to update the status of.
-     * @param status [IngestionRunStatus] The new status.
-     * @throws com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException when the run id is unknown
+     * @param transactionId The ingestion run id to update.
+     * @param status The status to persist.
+     * @throws IngestionRunNotFoundException when the run id is unknown.
      */
     @Transactional
     fun updateRunStatus(transactionId: UUID, status: IngestionRunStatus) {
@@ -71,6 +77,15 @@ class IngestionRunLifeCycleService(
         run.status = status
     }
 
+    /**
+     * Applies the shared terminal-status rule for all source systems.
+     *
+     * A run with failures is `PARTIAL` when at least one artifact was ingested, updated, or deleted;
+     * otherwise it is `FAILED`. Fully failed runs do not publish `RunFinishedEvent`, because there
+     * is nothing for the AI sync layer to ingest or deindex.
+     *
+     * @param run The managed ingestion run entity whose terminal status should be calculated.
+     */
     @Transactional
     fun finishRun(run: IngestionRun) {
         if (run.failedCount > 0) {

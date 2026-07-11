@@ -183,8 +183,7 @@ class UploadControllerTest {
             .perform(
                 multipart(HttpMethod.DELETE, "/api/v1/uploads/$artifactId")
                     .file(deleteRequest),
-            )
-            .andExpect(status().isUnauthorized)
+            ).andExpect(status().isUnauthorized)
     }
 
     @Test

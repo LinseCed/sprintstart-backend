@@ -19,11 +19,12 @@ class IngestionStatusService(
     /**
      * Returns the latest status row for each source currently exposed by the API.
      *
-     * For the current GitHub-only v0 shape, the method returns a single row. When no run exists,
-     * counters default to zero and the timestamp stays null so clients can render a "no runs yet"
-     * state without special-case error handling.
+     * The current API shape still exposes a single GitHub row. When no run exists, counters
+     * default to zero and the timestamp stays null so clients can render a "no runs yet" state
+     * without special-case error handling.
      *
-     * @return One status row per supported source system.
+     * @return The latest exposed source status rows, including the empty-state row when no run
+     * exists yet.
      */
     fun getIngestionStatusPerSource(): List<SourceIngestionStatusResponse> {
         val lastRun = ingestionRunRepository.findFirstByOrderByStartedAtDesc()

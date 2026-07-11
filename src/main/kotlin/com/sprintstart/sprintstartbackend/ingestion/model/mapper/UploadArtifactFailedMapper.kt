@@ -10,21 +10,17 @@ import org.springframework.stereotype.Component
 import java.util.UUID
 
 /**
- * Maps GitHub fetch failures into ingestion failed-artifact commands.
+ * Maps failed upload-module outcomes into ingestion failed-artifact commands.
  *
- * These commands preserve enough source identity for status and history endpoints to explain which
- * artifact failed and, when possible, where it came from upstream.
+ * Upload creation and deletion both report failures through the same outcome shape. The mapper
+ * keeps the upload artifact id as the source id when one is available and records the actor that
+ * performed the operation in upload metadata.
  */
 
 @Component
 class UploadArtifactFailedMapper {
-    /**
-     * Maps a failed commit fetch. The resulting command carries a stable commit source id and
-     * source URL when the SHA is known.
-     */
-
     fun toCommand(event: UploadBatchFinishedEvent, outcome: UploadArtifactOperationOutcome, operation: String):
-            ArtifactFailedCommand {
+        ArtifactFailedCommand {
         return buildArtifactFailedCommand(
             transactionId = event.transactionId,
             outcome = outcome,
@@ -34,7 +30,7 @@ class UploadArtifactFailedMapper {
     }
 
     fun toCommand(event: UploadBatchDeletionFinishedEvent, outcome: UploadArtifactOperationOutcome, operation: String):
-            ArtifactFailedCommand {
+        ArtifactFailedCommand {
         return buildArtifactFailedCommand(
             transactionId = event.transactionId,
             outcome = outcome,
@@ -47,7 +43,7 @@ class UploadArtifactFailedMapper {
         transactionId: UUID,
         outcome: UploadArtifactOperationOutcome,
         operation: String,
-        actorId: UUID
+        actorId: UUID,
     ): ArtifactFailedCommand {
         return ArtifactFailedCommand(
             transactionId = transactionId,

@@ -9,6 +9,10 @@ data class GithubArtifactMetadata(
     val repositoryFullName: String,
 ) : ArtifactMetadata
 
+/**
+ * `actorId` is operation-neutral: it is the uploader for stored artifact metadata and the remover
+ * for failed deletion metadata.
+ */
 data class UploadArtifactMetadata(
     var storagePath: String? = null,
     var actorId: UUID,

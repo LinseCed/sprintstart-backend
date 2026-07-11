@@ -42,8 +42,8 @@ class GithubArtifactProviderService(
      * - `ingestedCount` increments only when a new artifact row is created
      * - `updatedCount` increments only when an existing artifact is changed
      *
-     * @param command [GithubArtifactCommand] the command containing all data needed for ingestion.
-     * @throws com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException when the referenced ingestion run does not exist.
+     * @param command The mapped GitHub artifact command containing source identity, content, and
+     * repository metadata.
      */
     @Transactional
     fun persistArtifact(command: GithubArtifactCommand) {
@@ -127,10 +127,10 @@ class GithubArtifactProviderService(
      * Removes an ingestion file artifact when GitHub reports that the source file was deleted and
      * records its id for AI deindexing at the end of the run.
      *
-     * This does not affect historic run counters. If no stored artifact exists for the deleted
-     * source file, the method leaves the run unchanged.
+     * The run is locked because deletion events mutate both `deletedCount` and the deindex list. If
+     * no stored artifact exists for the deleted source file, the method leaves the run unchanged.
      *
-     * @param event [com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileDeletedEvent] The event, emitted by the GitHub module, indicating a file deletion.
+     * @param event The GitHub file deletion event containing repository identity and file path.
      * @throws IngestionRunNotFoundException when the run id is unknown.
      */
     @Transactional

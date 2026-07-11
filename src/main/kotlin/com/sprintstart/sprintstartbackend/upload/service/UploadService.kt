@@ -23,6 +23,13 @@ import org.springframework.web.server.ResponseStatusException
 import java.security.MessageDigest
 import java.util.UUID
 
+/**
+ * Coordinates upload storage, upload metadata persistence, and ingestion lifecycle events.
+ *
+ * Each upload or deletion batch gets a transaction id that is reused by ingestion listeners as the
+ * ingestion run id. Per-artifact failures are collected into operation outcomes so one bad file
+ * can fail without hiding the rest of the batch from the caller.
+ */
 @Service
 class UploadService(
     private val uploadedArtifactRepository: UploadedArtifactRepository,
@@ -33,6 +40,23 @@ class UploadService(
     private val artifactLinkingService: ArtifactLinkingService,
     private val publisher: ApplicationEventPublisher,
 ) {
+    /**
+     * Access to the project and existence of the uploader are checked before individual files are
+     * processed. Successful artifacts publish per-file events, while validation or storage failures
+     * are returned as failed upload responses and included in the batch completion event.
+     *
+     * The whole batch runs in one transaction and publishes one `UploadStartedEvent` followed by
+     * one `UploadBatchFinishedEvent`. Per-file failures do not abort the batch after access checks
+     * pass; they are represented in both the HTTP response and ingestion outcome set.
+     *
+     * @param authId The authenticated user's external auth id used for project access checks.
+     * @param files The files to process as one upload batch.
+     * @param projectId The project that should receive the uploaded artifacts.
+     * @param uploaderId The user recorded as the upload actor and stored on new upload artifacts.
+     * @return One response item per input file, including failed items whose upload was skipped.
+     * @throws ResponseStatusException `403` when the authenticated user cannot access the project.
+     * @throws ResponseStatusException `404` when the uploader id does not exist.
+     */
     @Transactional
     fun upload(
         authId: String,
@@ -233,6 +257,12 @@ class UploadService(
         val artifact: UploadedArtifact?,
     )
 
+    /**
+     * Returns persisted uploads for a single uploader.
+     *
+     * @param uploaderId The user whose uploaded artifacts should be listed.
+     * @return Upload list items sorted according to repository default ordering.
+     */
     fun listUploads(
         uploaderId: UUID,
     ): List<UploadListItemResponse> =
@@ -247,6 +277,22 @@ class UploadService(
                 )
             }
 
+    /**
+     * Missing artifacts and storage failures are recorded as failed deletion outcomes. Successful
+     * deletions publish per-artifact deletion events before the upload metadata row is removed, so
+     * ingestion listeners can deindex the mirrored artifact.
+     *
+     * The deletion batch publishes start and finish events even when every requested artifact
+     * fails. Missing artifacts and storage-delete errors are not thrown to the caller; they are
+     * reported through `UploadBatchDeletionFinishedEvent`.
+     *
+     * @param authId The authenticated user's external auth id used for project access checks.
+     * @param artifactIds The uploaded artifact ids requested for deletion.
+     * @param removerId The user recorded as the deletion actor in ingestion failure metadata.
+     * @param projectId The project used to authorize the deletion request.
+     * @throws ResponseStatusException `403` when the authenticated user cannot access the project.
+     * @throws ResponseStatusException `404` when the remover id does not exist.
+     */
     @Transactional
     fun deleteUpload(
         authId: String,

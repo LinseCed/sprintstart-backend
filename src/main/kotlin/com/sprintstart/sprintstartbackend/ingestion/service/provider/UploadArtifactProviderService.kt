@@ -10,13 +10,11 @@ import org.springframework.stereotype.Service
 import java.util.UUID
 
 /**
- * Owns writes to the ingestion artifact store and the mutable parts of `IngestionRun`.
+ * Owns upload-backed writes to the ingestion artifact store and related run counters.
  *
- * Connector listeners do not persist artifacts directly. They first map source-specific events to
- * ingestion commands, then delegate here so version-independent business rules stay in one place:
- * duplicate commits are ignored, files and issues update existing rows only when their effective
- * content changes, pull requests are treated as mutable records, and run counters are updated in
- * the same transaction as the underlying entity changes.
+ * Upload listeners do not persist artifacts directly. They first map upload events to ingestion
+ * commands, then delegate here so duplicate detection, content-change updates, deletion tracking,
+ * and run counters stay in one transactional boundary.
  */
 @Service
 class UploadArtifactProviderService(
@@ -24,20 +22,19 @@ class UploadArtifactProviderService(
     private val artifactRepository: ArtifactRepository,
 ) {
     /**
-     * Persists or updates an ingestion artifact for the active ingestion run.
+     * Persists or updates an upload-backed ingestion artifact for the active run.
      *
      * Business rules:
-     * - commits are idempotent by `sourceId`; an already-known commit is ignored
-     * - files are updated only when the incoming content hash changes
-     * - issues are updated only when the computed issue hash changes
-     * - pull requests are always treated as mutable and overwrite title/body on re-fetch
+     * - upload artifacts are idempotent by `sourceId`
+     * - an existing upload artifact is updated only when the incoming content hash changes
+     * - the current project id is added to the artifact before change detection returns
      *
      * Counter side effects happen inside the same transaction:
      * - `ingestedCount` increments only when a new artifact row is created
      * - `updatedCount` increments only when an existing artifact is changed
      *
-     * @param command [com.sprintstart.sprintstartbackend.ingestion.model.dto.command.GithubArtifactCommand] the command containing all data needed for ingestion.
-     * @throws com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException when the referenced ingestion run does not exist.
+     * @param command The mapped upload artifact command containing source identity, project id,
+     * content, and upload metadata.
      */
     @Transactional
     fun persistArtifact(command: UploadArtifactCommand) {
@@ -75,13 +72,14 @@ class UploadArtifactProviderService(
     }
 
     /**
-     * Removes an ingestion file artifact when GitHub reports that the source file was deleted and
-     * records its id for AI deindexing at the end of the run.
+     * Removes an ingestion artifact when the matching uploaded artifact is deleted.
      *
-     * This does not affect historic run counters. If no stored artifact exists for the deleted
-     * source file, the method leaves the run unchanged.
+     * The upload artifact id is used as the ingestion source id. When a matching artifact exists,
+     * its ingestion artifact id is recorded for AI deindexing and `deletedCount` is incremented on
+     * the locked run. If no matching ingestion artifact exists, the run is left unchanged.
      *
-     * @param event [com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileDeletedEvent] The event, emitted by the GitHub module, indicating a file deletion.
+     * @param transactionId The ingestion run id for the upload deletion batch.
+     * @param uploadArtifactId The uploaded artifact id used as the ingestion artifact source id.
      * @throws IngestionRunNotFoundException when the run id is unknown.
      */
     @Transactional

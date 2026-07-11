@@ -10,11 +10,12 @@ import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
 
 /**
- * Builds the compact "latest status per source" view used by operational UIs.
+ * Finalizes ingestion runs that originate from the upload module.
  *
- * Unlike run history, this service collapses the persistence model down to the latest known run
- * for each exposed source system and also defines the empty-state behavior when a source has never
- * run.
+ * Upload batches report per-artifact outcomes after the storage operation has completed. This
+ * service turns failed outcomes into ingestion failure records and then delegates the final run
+ * status calculation to the shared lifecycle service. The same flow is used for upload creation
+ * and upload deletion batches.
  */
 @Service
 class UploadIngestionRunService(
@@ -23,6 +24,16 @@ class UploadIngestionRunService(
     private val uploadArtifactFailedMapper: UploadArtifactFailedMapper,
     private val ingestionRunLifeCycleService: IngestionRunLifeCycleService,
 ) {
+    /**
+     * Failed artifact outcomes are stored before the run is marked completed, partial, or failed,
+     * so the final status reflects both successful artifact writes and per-artifact failures.
+     *
+     * Non-failed outcomes are ignored here because upload artifact listeners have already applied
+     * their storage-side effects and run counters.
+     *
+     * @param event The upload batch completion event for the ingestion run.
+     * @throws IngestionRunNotFoundException when the run id is unknown.
+     */
     @Transactional
     fun finishUploadIngestionRun(event: UploadBatchFinishedEvent) {
         val run = ingestionRunRepository
@@ -48,6 +59,14 @@ class UploadIngestionRunService(
         ingestionRunLifeCycleService.finishRun(run)
     }
 
+    /**
+     * Failed delete outcomes are tracked as failed artifacts before the run status is finalized.
+     * Successful deletions are counted and deindexed by upload artifact listeners while each
+     * artifact deletion event is handled.
+     *
+     * @param event The upload deletion batch completion event for the ingestion run.
+     * @throws IngestionRunNotFoundException when the run id is unknown.
+     */
     @Transactional
     fun finishUploadDeletionIngestionRun(event: UploadBatchDeletionFinishedEvent) {
         val run = ingestionRunRepository

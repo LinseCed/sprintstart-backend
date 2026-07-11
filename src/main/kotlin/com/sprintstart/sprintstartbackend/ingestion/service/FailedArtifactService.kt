@@ -19,9 +19,9 @@ class FailedArtifactService(
      * The individual failed item is preserved for status/history views that need artifact-level
      * error details without scanning connector logs.
      *
-     * @param command [com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFailedCommand]
-     * The command for a failed artifact containing all data needed.
-     * @throws IngestionRunNotFoundException when the run id is unknown
+     * @param command The failed artifact command containing the run id and source-level failure
+     * details.
+     * @throws IngestionRunNotFoundException when the run id is unknown.
      */
     @Transactional
     fun addFailedArtifact(command: ArtifactFailedCommand) {

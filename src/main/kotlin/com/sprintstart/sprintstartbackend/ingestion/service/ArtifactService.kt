@@ -56,6 +56,13 @@ class ArtifactService(
         )
     }
 
+    /**
+     * Verifies project access through the user module before artifact content is exposed.
+     *
+     * @param authId The authenticated caller subject from the JWT.
+     * @param projectId The project whose artifacts the caller wants to read.
+     * @throws ResponseStatusException `403` when the caller has no access to the project.
+     */
     fun ensureAccessToProject(authId: String, projectId: UUID) {
         val userHasAccessToProject = userApi.userHasAccessToProject(authId, projectId)
         if (!userHasAccessToProject) {
@@ -63,6 +70,13 @@ class ArtifactService(
         }
     }
 
+    /**
+     * Loads an artifact or converts the missing-row case into the API-level not-found exception.
+     *
+     * @param artifactId The artifact id to resolve.
+     * @return The persisted artifact entity.
+     * @throws ResponseStatusException `404` when no artifact exists for the id.
+     */
     fun requireArtifact(artifactId: UUID): Artifact {
         return artifactRepository
             .findById(artifactId)

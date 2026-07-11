@@ -10,21 +10,19 @@ import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.Artif
 import org.springframework.stereotype.Component
 
 /**
- * Translates GitHub domain events into canonical artifact commands.
+ * Translates upload-domain events into canonical artifact commands.
  *
- * The mapper normalizes source-specific identifiers, derives stable hashes where the ingestion
- * service uses change detection, and enriches file artifacts with lightweight metadata such as
- * mime type and language.
+ * Uploaded files use the upload artifact id as the ingestion source id. The mapper reads the
+ * stored file content through the upload boundary and enriches the command with lightweight file
+ * metadata such as mime type, language, storage path, and actor id.
  */
 @Component
 class UploadArtifactMapper(
     private val uploadedArtifactReader: UploadedArtifactReader,
 ) {
     /**
-     * Maps a fetched commit into the canonical command shape.
-     *
-     * The commit title is intentionally shortened to keep list views compact while preserving the
-     * full message in `bodyText`.
+     * The stored upload id becomes the stable `sourceId`, allowing later deletion events to
+     * find and remove the same ingestion artifact.
      */
     fun toCommand(event: ArtifactUploadedEvent): UploadArtifactCommand {
         val extension = when (event.filename.lowercase()) {
