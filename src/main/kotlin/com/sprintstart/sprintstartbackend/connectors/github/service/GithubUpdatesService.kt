@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.upda
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateStartedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
@@ -52,7 +53,7 @@ class GithubUpdatesService(
         eventPublisher.publishEvent(GithubAllRepositoriesUpdateStartedEvent(transactionId))
 
         allRepositories.forEach { repo ->
-            updateRepository(repo, transactionId, true)
+            updateRepositoryOrCheckForUpdates(repo, transactionId, true)
         }
 
         return UpdateAllRepositoriesResponse(transactionId)
@@ -83,19 +84,12 @@ class GithubUpdatesService(
             throw e
         }.getOrNull() ?: return UpdateRepositoryResponse(transactionId)
 
-        updateRepository(repository, transactionId, performUpdate)
+        updateRepositoryOrCheckForUpdates(repository, transactionId, performUpdate)
 
         return UpdateRepositoryResponse(transactionId)
     }
 
-    /**
-     * Updates the repository by fetching and processing the latest snapshot, commits, issues,
-     * pull requests, and saving them in the repository.
-     *
-     * @param githubRepository The connection object for the GitHub repository to be updated.
-     * @param transactionId The unique identifier for the transaction to track the update process.
-     */
-    private fun updateRepository(
+    private fun updateRepositoryOrCheckForUpdates(
         githubRepository: GithubRepositoryConnection,
         transactionId: UUID,
         performUpdate: Boolean,
@@ -108,10 +102,7 @@ class GithubUpdatesService(
             ),
         )
 
-        val latestSnapshot = runCatching {
-            repoSnapshotRepository.findLatestByRepository(githubRepository.id)
-                ?: throw RepositoryNotInitializedException(githubRepository.owner, githubRepository.name)
-        }.onFailure { e ->
+        if (githubRepository.snapshot == null) {
             eventPublisher.publishEvent(
                 GithubRepositoryUpdateFailedEvent(
                     transactionId,
@@ -119,8 +110,8 @@ class GithubUpdatesService(
                     githubRepository.name,
                 ),
             )
-            throw e
-        }.getOrNull() ?: return
+            throw RepositoryNotInitializedException(githubRepository.owner, githubRepository.name)
+        }
 
         eventPublisher.publishEvent(
             GithubRepositoryResourcesFetchingStartedEvent(
@@ -130,11 +121,19 @@ class GithubUpdatesService(
             ),
         )
 
+        if (performUpdate) {
+            performRepositoryUpdate(githubRepository, transactionId)
+        } else {
+            checkRepositoryForUpdates(githubRepository, transactionId)
+        }
+    }
+
+    private fun checkRepositoryForUpdates(githubRepository: GithubRepositoryConnection, transactionId: UUID) {
         applicationScope.launch {
-            fileService.fetchAndIngestFileUpdatesIncremental(githubRepository, transactionId, performUpdate)
+            fileService.verifyFileSyncStatus(githubRepository, transactionId)
         }
         applicationScope.launch {
-            commitsService.fetchAndIngestLatestCommitsIfNecessary(latestSnapshot, transactionId, performUpdate)
+            commitsService.verifyCommitSyncStatus(githubRepository, transactionId)
         }
         applicationScope.launch {
             issuesService.fetchAndIngestAllIssues(
@@ -142,8 +141,8 @@ class GithubUpdatesService(
                 githubRepository.owner,
                 githubRepository.name,
                 transactionId,
-                performUpdate,
-                latestSnapshot.lastIssuesSyncAt,
+                false,
+                githubRepository.snapshot!!.lastIssuesSyncAt,
             )
         }
         applicationScope.launch {
@@ -152,15 +151,50 @@ class GithubUpdatesService(
                 githubRepository.owner,
                 githubRepository.name,
                 transactionId,
-                performUpdate,
-                latestSnapshot.lastPullRequestsSyncAt,
+                false,
+                githubRepository.snapshot!!.lastPullRequestsSyncAt,
+            )
+        }
+    }
+
+    /**
+     * Updates the repository by fetching and processing the latest snapshot, commits, issues,
+     * pull requests, and saving them in the repository.
+     *
+     * @param githubRepository The connection object for the GitHub repository to be updated.
+     * @param transactionId The unique identifier for the transaction to track the update process.
+     */
+    private fun performRepositoryUpdate(
+        githubRepository: GithubRepositoryConnection,
+        transactionId: UUID,
+    ) {
+        applicationScope.launch {
+            fileService.fetchAndIngestFileUpdatesIncremental(githubRepository, transactionId)
+        }
+        applicationScope.launch {
+            commitsService.fetchAndIngestLatestCommits(githubRepository.snapshot!!, transactionId)
+        }
+        applicationScope.launch {
+            issuesService.fetchAndIngestAllIssues(
+                githubRepository.id,
+                githubRepository.owner,
+                githubRepository.name,
+                transactionId,
+                true,
+                githubRepository.snapshot!!.lastIssuesSyncAt,
+            )
+        }
+        applicationScope.launch {
+            pullRequestsService.fetchAndIngestAllPullRequests(
+                githubRepository.id,
+                githubRepository.owner,
+                githubRepository.name,
+                transactionId,
+                true,
+                githubRepository.snapshot!!.lastPullRequestsSyncAt,
             )
         }
 
-        // If we didn't update the sources, we don't update timestamps.
-        // If we were to update timestamps nonetheless, on the next actual update all updates from now to then would be lost.
-        if (performUpdate) {
-            repoSnapshotRepository.updateSyncTimestamps(githubRepository.id, Instant.now())
-        }
+        repoSnapshotRepository.updateSyncTimestamps(githubRepository.id, Instant.now())
     }
 }

@@ -134,7 +134,7 @@ class GithubConnectorServiceTest {
             advanceUntilIdle()
 
             coVerify { fileService.fetchAndIngestAllFiles(any(), any(), any(), any()) }
-            coVerify { commitsService.fetchAndIngestLatestCommitsIfNecessary(any(), any(), true) }
+            coVerify { commitsService.fetchAndIngestAllCommits(any(), any(), true) }
             coVerify { issuesService.fetchAndIngestAllIssues(any(), any(), any(), any()) }
             coVerify { pullRequestsService.fetchAndIngestAllPullRequests(any(), any(), any(), any()) }
         }
@@ -150,7 +150,7 @@ class GithubConnectorServiceTest {
             val commitsTransactionId = slot<UUID>()
             coVerify { fileService.fetchAndIngestAllFiles(any(), any(), any(), capture(fileTransactionId)) }
             coVerify {
-                commitsService.fetchAndIngestLatestCommitsIfNecessary(
+                commitsService.fetchAndIngestAllCommits(
                     any(),
                     capture(commitsTransactionId),
                     any(),
@@ -234,7 +234,7 @@ class GithubConnectorServiceTest {
             advanceUntilIdle()
 
             coVerify { fileService.fetchAndIngestFileUpdatesIncremental(any(), any()) }
-            coVerify { commitsService.fetchAndIngestLatestCommitsIfNecessary(any(), any(), false) }
+            coVerify { commitsService.fetchAndIngestAllCommits(any(), any(), false) }
             coVerify { issuesService.fetchAndIngestAllIssues(any(), any(), any(), any(), any()) }
             coVerify { pullRequestsService.fetchAndIngestAllPullRequests(any(), any(), any(), any(), any()) }
         }
@@ -451,7 +451,7 @@ class GithubConnectorServiceTest {
         coEvery { githubClient.repositoryExists(any()) } returns true
         every { repoConnectionRepository.save(any()) } answers { firstArg() }
         coJustRun { fileService.fetchAndIngestAllFiles(any(), any(), any(), any()) }
-        coJustRun { commitsService.fetchAndIngestLatestCommitsIfNecessary(any(), any(), any()) }
+        coJustRun { commitsService.fetchAndIngestAllCommits(any(), any(), any()) }
         coJustRun { issuesService.fetchAndIngestAllIssues(any(), any(), any(), any(), any()) }
         coJustRun { pullRequestsService.fetchAndIngestAllPullRequests(any(), any(), any(), any(), any()) }
     }
@@ -460,7 +460,7 @@ class GithubConnectorServiceTest {
         every { repoSnapshotRepository.findLatestByRepository(repo.id) } returns repoSnapshot(repo)
         every { repoSnapshotRepository.updateSyncTimestamps(any(), any()) } just runs
         coJustRun { fileService.fetchAndIngestFileUpdatesIncremental(any(), any()) }
-        coJustRun { commitsService.fetchAndIngestLatestCommitsIfNecessary(any(), any(), any()) }
+        coJustRun { commitsService.fetchAndIngestAllCommits(any(), any(), any()) }
         coJustRun { issuesService.fetchAndIngestAllIssues(any(), any(), any(), any(), any()) }
         coJustRun { pullRequestsService.fetchAndIngestAllPullRequests(any(), any(), any(), any(), any()) }
     }

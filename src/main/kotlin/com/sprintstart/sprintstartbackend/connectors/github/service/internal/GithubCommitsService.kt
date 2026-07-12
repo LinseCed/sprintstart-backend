@@ -39,17 +39,13 @@ class GithubCommitsService(
      * @param latestSnapshot A snapshot of the GitHub repository containing metadata such as the repository's
      * owner, name, and the timestamp of the last synchronization.
      * @param transactionId A unique identifier for the transaction corresponding to this synchronization process.
-     * @param doSyncAll A flag indicating whether to synchronize all commits (`true`) or only new commits
-     * since the last synchronization (`false`). Defaults to `false`.
      * @throws GithubCommitsFetchFailedPartiallyException If one or more commits fail to process during the
      * operation, this exception is thrown with details of the failures.
      */
-    @Tracked("Fetching latest commits from repository")
-    internal suspend fun fetchAndIngestLatestCommitsIfNecessary(
+    @Tracked("Fetching & ingesting all commits from repository")
+    internal suspend fun fetchAndIngestAllCommits(
         latestSnapshot: GithubRepositorySnapshot,
         transactionId: UUID,
-        performUpdate: Boolean,
-        doSyncAll: Boolean = false,
     ) {
         eventPublisher.publishEvent(
             GithubCommitsFetchStartedEvent(
@@ -59,14 +55,67 @@ class GithubCommitsService(
             ),
         )
 
-        if (!performUpdate) {
-            verifyCommitSyncStatus(latestSnapshot.repository)
+        val rawOutput = fetchCommits(latestSnapshot, transactionId, true)
+        ingestCommits(latestSnapshot, transactionId, rawOutput)
+    }
+
+    @Tracked("Fetching & ingesting latest commits from repository")
+    internal suspend fun fetchAndIngestLatestCommits(
+        latestSnapshot: GithubRepositorySnapshot,
+        transactionId: UUID,
+    ) {
+        eventPublisher.publishEvent(
+            GithubCommitsFetchStartedEvent(
+                transactionId,
+                latestSnapshot.repository.owner,
+                latestSnapshot.repository.name,
+            ),
+        )
+
+        val rawOutput = fetchCommits(latestSnapshot, transactionId, false)
+        ingestCommits(latestSnapshot, transactionId, rawOutput)
+    }
+
+    /**
+     * Verifies the sync status of commits of a given GitHub repository.
+     *
+     * Given a GitHub repository connected to this application, this function checks if the local state is outdated,
+     * and if so marks the repository as [ConnectionState.OUT_OF_DATE], but does not update it.
+     *
+     * @param githubRepository The GitHub repository to check.
+     */
+    internal suspend fun verifyCommitSyncStatus(githubRepository: GithubRepositoryConnection, transactionId: UUID) {
+        eventPublisher.publishEvent(
+            GithubCommitsFetchStartedEvent(
+                transactionId,
+                githubRepository.owner,
+                githubRepository.name,
+            ),
+        )
+
+        val localFsPath = customCache.getLocalRepositoryPath(githubRepository)
+
+        if (!isRepositoryUpToDate(localFsPath)) {
+            githubRepository.connectionState = ConnectionState.OUT_OF_DATE
+
+            withContext(Dispatchers.IO) {
+                repoConnectionRepository.save(githubRepository)
+            }
         }
 
-        val rawOutput = fetchCommits(latestSnapshot, doSyncAll, transactionId)
+        eventPublisher.publishEvent(
+            GithubCommitsFetchCompletedEvent(
+                transactionId,
+                githubRepository.owner,
+                githubRepository.name,
+            ),
+        )
+    }
+
+    private suspend fun ingestCommits(latestSnapshot: GithubRepositorySnapshot, transactionId: UUID, rawCommits: String) {
         val failures = mutableListOf<String>()
 
-        rawOutput
+        rawCommits
             .lines()
             .filter { it.isNotBlank() }
             .forEach { line -> processCommitLine(latestSnapshot.repository, line, transactionId, failures) }
@@ -90,26 +139,6 @@ class GithubCommitsService(
                 latestSnapshot.repository.name,
             ),
         )
-    }
-
-    /**
-     * Verifies the sync status of commits of a given GitHub repository.
-     *
-     * Given a GitHub repository connected to this application, this function checks if the local state is outdated,
-     * and if so marks the repository as [ConnectionState.OUT_OF_DATE], but does not update it.
-     *
-     * @param githubRepository The GitHub repository to check.
-     */
-    private suspend fun verifyCommitSyncStatus(githubRepository: GithubRepositoryConnection) {
-        val localFsPath = customCache.getLocalRepositoryPath(githubRepository)
-
-        if (!isRepositoryUpToDate(localFsPath)) {
-            githubRepository.connectionState = ConnectionState.OUT_OF_DATE
-
-            withContext(Dispatchers.IO) {
-                repoConnectionRepository.save(githubRepository)
-            }
-        }
     }
 
     /**
@@ -142,8 +171,8 @@ class GithubCommitsService(
      */
     private suspend fun fetchCommits(
         latestSnapshot: GithubRepositorySnapshot,
-        doSyncAll: Boolean,
         transactionId: UUID,
+        doSyncAll: Boolean,
     ): String = runCatching {
         val localCopyPath = customCache.getLocalRepositoryPath(
             latestSnapshot.repository,

@@ -157,7 +157,6 @@ class GithubFileService(
     suspend fun fetchAndIngestFileUpdatesIncremental(
         githubRepository: GithubRepositoryConnection,
         transactionId: UUID,
-        performUpdate: Boolean,
     ) {
         eventPublisher.publishEvent(
             GithubFilesFetchStartedEvent(
@@ -174,7 +173,7 @@ class GithubFileService(
                 )
                 throw RepositoryNotInitializedException(githubRepository.owner, githubRepository.name)
             }
-            fetchAndIngestFileUpdatesIfNecessary(githubRepository, transactionId, performUpdate)
+            fetchAndIngestFileUpdatesIfNecessary(githubRepository, transactionId)
         }.onFailure { e ->
             eventPublisher.publishEvent(
                 GithubFilesFetchFailedEvent(
@@ -185,6 +184,43 @@ class GithubFileService(
                 ),
             )
             throw e
+        }
+
+        eventPublisher.publishEvent(
+            GithubFilesFetchCompletedEvent(
+                transactionId,
+                githubRepository.owner,
+                githubRepository.name,
+            ),
+        )
+    }
+
+    /**
+     * Verifies the sync status of files of a given GitHub repository.
+     *
+     * Given a GitHub repository connected to this application, this function checks if the local state is outdated,
+     * and if so marks the repository as [ConnectionState.OUT_OF_DATE], but does not update it.
+     *
+     * @param githubRepository The GitHub repository to check.
+     * @param transactionId The id of the overall transaction this sub-action belongs to.
+     */
+    internal suspend fun verifyFileSyncStatus(githubRepository: GithubRepositoryConnection, transactionId: UUID) {
+        eventPublisher.publishEvent(
+            GithubFilesFetchStartedEvent(
+                transactionId,
+                githubRepository.owner,
+                githubRepository.name,
+            ),
+        )
+
+        val localFsPath = customCache.getLocalRepositoryPath(githubRepository)
+
+        if (!isRepositoryUpToDate(localFsPath)) {
+            githubRepository.connectionState = ConnectionState.OUT_OF_DATE
+
+            withContext(Dispatchers.IO) {
+                repoConnectionRepository.save(githubRepository)
+            }
         }
 
         eventPublisher.publishEvent(
@@ -465,21 +501,12 @@ class GithubFileService(
      *
      * @param githubRepository The connection details of the GitHub repository, including owner and name.
      * @param transactionId The unique identifier for the current transaction or operation.
-     * @param performUpdate A flag for deciding whether to only check for updates or automatically apply them.
      */
     private suspend fun fetchAndIngestFileUpdatesIfNecessary(
         githubRepository: GithubRepositoryConnection,
         transactionId: UUID,
-        performUpdate: Boolean,
     ) {
         val localFsPath = customCache.getLocalRepositoryPath(githubRepository)
-
-        // Early-exit to avoid actually updating the repository if autoUpdate is not wanted
-        if (!performUpdate) {
-            verifyFileSyncStatus(githubRepository, localFsPath)
-            return
-        }
-
         val latestSha = updateLocalRepository(localFsPath)
 
         if (githubRepository.lastSha == latestSha) {
@@ -487,25 +514,6 @@ class GithubFileService(
         }
 
         fetchAndIngestFileUpdates(localFsPath, githubRepository, latestSha, transactionId)
-    }
-
-    /**
-     * Verifies the sync status of files of a given GitHub repository.
-     *
-     * Given a GitHub repository connected to this application, this function checks if the local state is outdated,
-     * and if so marks the repository as [ConnectionState.OUT_OF_DATE], but does not update it.
-     *
-     * @param githubRepository The GitHub repository to check.
-     * @param localFsPath The path to the local copy of the given [githubRepository].
-     */
-    private suspend fun verifyFileSyncStatus(githubRepository: GithubRepositoryConnection, localFsPath: Path) {
-        if (!isRepositoryUpToDate(localFsPath)) {
-            githubRepository.connectionState = ConnectionState.OUT_OF_DATE
-
-            withContext(Dispatchers.IO) {
-                repoConnectionRepository.save(githubRepository)
-            }
-        }
     }
 
     /**

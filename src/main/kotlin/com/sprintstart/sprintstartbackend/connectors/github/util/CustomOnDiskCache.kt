@@ -52,7 +52,6 @@ class DefaultGitOperationRunner : GitOperationRunner {
 class CustomOnDiskCache(
     @Value("\${sprintstart.github.cache-path:/repos}")
     private val cacheBasePath: String,
-    private val applicationConfig: ApplicationConfig,
     private val onDiskOperations: OnDiskOperations,
     private val gitRunner: GitOperationRunner,
 ) {

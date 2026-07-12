@@ -12,8 +12,8 @@ import java.time.Instant
 import java.util.UUID
 
 @Entity
-@Table(name = "gh_configs")
-data class GithubConfig(
+@Table(name = "gh_repository_configs")
+class GithubRepositoryConfig(
     @Id
     var id: UUID = UUID.randomUUID(),
     @OneToOne(fetch = FetchType.LAZY)
@@ -25,6 +25,5 @@ data class GithubConfig(
     @Column(nullable = false)
     var schedule: String = "0 0 2 * * *",
     @Column("next_sync_at")
-    var nextSyncAt: Instant? = null
+    var nextSyncAt: Instant? = null,
 )
-

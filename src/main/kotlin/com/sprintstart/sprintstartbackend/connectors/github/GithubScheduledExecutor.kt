@@ -23,6 +23,8 @@ class GithubScheduledExecutor(
         val now = Instant.now()
         val repositoriesToUpdate = githubConfigService.findAllRepositoriesDueForSync(now)
 
+        println(repositoriesToUpdate)
+
         repositoriesToUpdate.forEach { repository ->
             val repoConfig = githubConfigService
                 .findConfigById(repository.id)

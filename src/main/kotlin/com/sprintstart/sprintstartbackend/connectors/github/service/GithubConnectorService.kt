@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.GithubClient
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.GithubRepositoryResourcesFetchingStartedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.initial.GithubRepositoryConnectionInitiatedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.initial.GithubRepositoryConnectionInitiationFailedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConfig
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
@@ -11,6 +12,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.UserWithAuthIdNotFoundException
+import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubConfigRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubCommitsService
@@ -39,6 +41,7 @@ import java.util.UUID
 class GithubConnectorService(
     private val applicationScope: CoroutineScope,
     private val repoConnectionRepository: GithubRepositoryConnectionRepository,
+    private val repoConfigRepository: GithubConfigRepository,
     private val githubUserRepository: GithubUserRepository,
     private val fileService: GithubFileService,
     private val commitsService: GithubCommitsService,
@@ -148,10 +151,15 @@ class GithubConnectorService(
         val repoSnapshot = GithubRepositorySnapshot(
             repository = repository,
         )
+        val config = GithubRepositoryConfig(
+            id = repository.id,
+            repository = repository,
+        )
 
         repository.snapshot = repoSnapshot
         withContext(Dispatchers.IO) {
             repoConnectionRepository.save(repository)
+            repoConfigRepository.save(config)
         }
 
         eventPublisher.publishEvent(
@@ -172,7 +180,7 @@ class GithubConnectorService(
             )
         }
         applicationScope.launch {
-            commitsService.fetchAndIngestLatestCommitsIfNecessary(repoSnapshot, transactionId, true)
+            commitsService.fetchAndIngestAllCommits(repoSnapshot, transactionId)
         }
         applicationScope.launch {
             issuesService.fetchAndIngestAllIssues(

@@ -1,6 +1,8 @@
 package com.sprintstart.sprintstartbackend.connectors.github.controller
 
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConfigureRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.GetRepositoryConfigRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.GetRepositoryConfigResponse
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConfigService
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
@@ -33,8 +35,8 @@ class GithubConfigController(
 
     @PutMapping("/{owner}/{name}")
     fun configureRepository(
-        @PathVariable("owner") owner: String,
-        @PathVariable("name") name: String,
+        @PathVariable owner: String,
+        @PathVariable name: String,
         @Valid @RequestBody request: ConfigureRepositoryRequest,
     ): ResponseEntity<Unit> {
         configService.configure(owner, name, request)
@@ -43,9 +45,10 @@ class GithubConfigController(
 
     @GetMapping("/{owner}/{name}")
     fun getConfigOfRepository(
-        @PathVariable("owner") owner: String,
-        @PathVariable("name") name: String,
-    ): ReponseEntity<Unit> {
-        val result = configService.findConfigByRepositoryOwnerAndName(owner, name)
+        @PathVariable owner: String,
+        @PathVariable name: String,
+    ): ResponseEntity<GetRepositoryConfigResponse> {
+        val result = configService.getConfigOfRepository(GetRepositoryConfigRequest(owner, name))
+        return ResponseEntity.ok(result)
     }
 }

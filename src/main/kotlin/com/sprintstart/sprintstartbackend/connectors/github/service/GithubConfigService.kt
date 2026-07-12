@@ -1,15 +1,20 @@
 package com.sprintstart.sprintstartbackend.connectors.github.service
 
-import com.sprintstart.sprintstartbackend.connectors.github.models.GithubConfig
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConfig
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConfigureRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.GetRepositoryConfigRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateSchedule
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.GetRepositoryConfigResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryConfigNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubConfigRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
+import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorConfiguration
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import jakarta.annotation.PostConstruct
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.Optional
@@ -18,7 +23,7 @@ import java.util.UUID
 @Service
 class GithubConfigService(
     private val configRepository: GithubConfigRepository,
-    private val githubRepoRepository: GithubRepositoryConnectionRepository
+    private val githubRepoRepository: GithubRepositoryConnectionRepository,
 ) {
     @Tracked("Configuring all GitHub repositories")
     fun configureGlobal(request: ConfigureRepositoryRequest) {
@@ -26,20 +31,16 @@ class GithubConfigService(
 
         configs.forEach {
             it.autoUpdate = request.autoUpdate
-            it.schedule = parseSchedule(request.schedule)
+            it.schedule = request.schedule.parseToString()
         }
 
         configRepository.saveAll(configs)
     }
 
     @Tracked("Retrieving config of GitHub repository")
-    fun findConfigByRepositoryOwnerAndName(owner: String, name: String): GithubConfig {
-        val repository = githubRepoRepository.findByOwnerAndName(owner, name)
-            ?: throw RepositoryNotConnectedException(owner, name)
-
-        return configRepository.findById(repository.id).orElseThrow {
-            RepositoryConfigNotFoundException(owner, name)
-        }
+    fun getConfigOfRepository(request: GetRepositoryConfigRequest): GetRepositoryConfigResponse {
+        val config = findConfigByRepositoryOwnerAndName(request.owner, request.name)
+        return GetRepositoryConfigResponse.of(config)
     }
 
     @Tracked("Configuring GitHub repository")
@@ -47,7 +48,7 @@ class GithubConfigService(
         val config = findConfigByRepositoryOwnerAndName(owner, name)
 
         config.autoUpdate = request.autoUpdate
-        config.schedule = parseSchedule(request.schedule)
+        config.schedule = request.schedule.parseToString()
 
         configRepository.save(config)
     }
@@ -63,16 +64,26 @@ class GithubConfigService(
         }
     }
 
-    fun findConfigById(id: UUID): Optional<GithubConfig> = configRepository.findById(id)
+    @Tracked("Retrieving GitHub repository config")
+    fun findConfigById(id: UUID): Optional<GithubRepositoryConfig> = configRepository.findById(id)
 
-    private fun parseSchedule(schedule: UpdateSchedule): String {
+    private fun findConfigByRepositoryOwnerAndName(owner: String, name: String): GithubRepositoryConfig {
+        val repository = githubRepoRepository.findByOwnerAndName(owner, name)
+            ?: throw RepositoryNotConnectedException(owner, name)
+
+        return configRepository.findById(repository.id).orElseThrow {
+            RepositoryConfigNotFoundException(owner, name)
+        }
+    }
+
+    private fun UpdateSchedule.parseToString(): String {
         return StringBuilder()
-            .append(schedule.seconds + " ")
-            .append(schedule.minutes + " ")
-            .append(schedule.hour + " ")
-            .append(schedule.dayOfMonth + " ")
-            .append(schedule.monthOfYear + " ")
-            .append(schedule.dayOfWeek)
+            .append(this.seconds + " ")
+            .append(this.minutes + " ")
+            .append(this.hour + " ")
+            .append(this.dayOfMonth + " ")
+            .append(this.monthOfYear + " ")
+            .append(this.dayOfWeek)
             .toString()
     }
 }
