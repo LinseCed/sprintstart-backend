@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.JwtDecoder
@@ -35,6 +36,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @WebMvcTest(AdminProjectController::class)
@@ -82,6 +84,15 @@ class AdminProjectControllerTest(
     }
 
     @Test
+    fun `admin project endpoints reject unauthenticated users`() {
+        mockMvc
+            .perform(get("/api/v1/admin/projects"))
+            .andExpect(status().isUnauthorized)
+
+        verify(exactly = 0) { adminProjectService.getAllProjects() }
+    }
+
+    @Test
     fun `getProjectById returns detailed project users with global and project roles`() {
         val projectId = UUID.randomUUID()
         every { adminProjectService.getProjectById(projectId) } returns projectDetailResponse(projectId)
@@ -92,6 +103,18 @@ class AdminProjectControllerTest(
             .andExpect(jsonPath("$.users[0].roles[0]").value("USER"))
             .andExpect(jsonPath("$.users[0].projectRoles[0]").value("MANAGER"))
             .andExpect(jsonPath("$.users[0].enabled").value(true))
+
+        verify(exactly = 1) { adminProjectService.getProjectById(projectId) }
+    }
+
+    @Test
+    fun `getProjectById returns 404 when project does not exist`() {
+        val projectId = UUID.randomUUID()
+        every { adminProjectService.getProjectById(projectId) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(get("/api/v1/admin/projects/$projectId").with(adminJwt))
+            .andExpect(status().isNotFound)
 
         verify(exactly = 1) { adminProjectService.getProjectById(projectId) }
     }
@@ -112,6 +135,37 @@ class AdminProjectControllerTest(
                     .content(objectMapper.writeValueAsString(request)),
             ).andExpect(status().isCreated)
             .andExpect(jsonPath("$.name").value("SprintStart Frontend"))
+
+        verify(exactly = 1) { adminProjectService.createProject(request) }
+    }
+
+    @Test
+    fun `createProject returns 400 when name is blank`() {
+        val request = CreateAdminProjectRequest(name = "")
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/projects")
+                    .with(adminJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isBadRequest)
+
+        verify(exactly = 0) { adminProjectService.createProject(request) }
+    }
+
+    @Test
+    fun `createProject returns 400 when service rejects request`() {
+        val request = CreateAdminProjectRequest(name = "SprintStart Frontend")
+        every { adminProjectService.createProject(request) } throws ResponseStatusException(HttpStatus.BAD_REQUEST)
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/projects")
+                    .with(adminJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isBadRequest)
 
         verify(exactly = 1) { adminProjectService.createProject(request) }
     }
@@ -138,6 +192,42 @@ class AdminProjectControllerTest(
     }
 
     @Test
+    fun `patchProject returns 400 when service rejects request`() {
+        val projectId = UUID.randomUUID()
+        val request = PatchAdminProjectRequest(name = "")
+        every { adminProjectService.patchProject(projectId, request) } throws
+            ResponseStatusException(HttpStatus.BAD_REQUEST)
+
+        mockMvc
+            .perform(
+                patch("/api/v1/admin/projects/$projectId")
+                    .with(adminJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isBadRequest)
+
+        verify(exactly = 1) { adminProjectService.patchProject(projectId, request) }
+    }
+
+    @Test
+    fun `patchProject returns 404 when project does not exist`() {
+        val projectId = UUID.randomUUID()
+        val request = PatchAdminProjectRequest(description = "Updated frontend web application")
+        every { adminProjectService.patchProject(projectId, request) } throws
+            ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(
+                patch("/api/v1/admin/projects/$projectId")
+                    .with(adminJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isNotFound)
+
+        verify(exactly = 1) { adminProjectService.patchProject(projectId, request) }
+    }
+
+    @Test
     fun `deleteProject returns deleted response`() {
         val projectId = UUID.randomUUID()
         every { adminProjectService.deleteProject(projectId) } returns DeleteProjectResponse(projectId)
@@ -152,6 +242,18 @@ class AdminProjectControllerTest(
     }
 
     @Test
+    fun `deleteProject returns 404 when project does not exist`() {
+        val projectId = UUID.randomUUID()
+        every { adminProjectService.deleteProject(projectId) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(delete("/api/v1/admin/projects/$projectId").with(adminJwt))
+            .andExpect(status().isNotFound)
+
+        verify(exactly = 1) { adminProjectService.deleteProject(projectId) }
+    }
+
+    @Test
     fun `getProjectUsers returns project-specific users`() {
         val projectId = UUID.randomUUID()
         every { adminProjectService.getProjectUsers(projectId) } returns listOf(projectUserResponse())
@@ -161,6 +263,18 @@ class AdminProjectControllerTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$[0].roles[0]").value("USER"))
             .andExpect(jsonPath("$[0].projectRoles[0]").value("MANAGER"))
+
+        verify(exactly = 1) { adminProjectService.getProjectUsers(projectId) }
+    }
+
+    @Test
+    fun `getProjectUsers returns 404 when project does not exist`() {
+        val projectId = UUID.randomUUID()
+        every { adminProjectService.getProjectUsers(projectId) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(get("/api/v1/admin/projects/$projectId/users").with(adminJwt))
+            .andExpect(status().isNotFound)
 
         verify(exactly = 1) { adminProjectService.getProjectUsers(projectId) }
     }
@@ -185,6 +299,40 @@ class AdminProjectControllerTest(
     }
 
     @Test
+    fun `assignUsers returns 400 when user id list is empty`() {
+        val projectId = UUID.randomUUID()
+        val request = AssignProjectUsersRequest(userIds = emptySet())
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/projects/$projectId/users")
+                    .with(adminJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isBadRequest)
+
+        verify(exactly = 0) { adminProjectService.assignUsers(projectId, request) }
+    }
+
+    @Test
+    fun `assignUsers returns 404 when project or user does not exist`() {
+        val projectId = UUID.randomUUID()
+        val request = AssignProjectUsersRequest(userIds = setOf(UUID.randomUUID()))
+        every { adminProjectService.assignUsers(projectId, request) } throws
+            ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(
+                post("/api/v1/admin/projects/$projectId/users")
+                    .with(adminJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isNotFound)
+
+        verify(exactly = 1) { adminProjectService.assignUsers(projectId, request) }
+    }
+
+    @Test
     fun `removeUser returns 204 with no body`() {
         val projectId = UUID.randomUUID()
         val userId = UUID.randomUUID()
@@ -194,6 +342,20 @@ class AdminProjectControllerTest(
             .perform(delete("/api/v1/admin/projects/$projectId/users/$userId").with(adminJwt))
             .andExpect(status().isNoContent)
             .andExpect(content().string(""))
+
+        verify(exactly = 1) { adminProjectService.removeUser(projectId, userId) }
+    }
+
+    @Test
+    fun `removeUser returns 404 when project or assignment does not exist`() {
+        val projectId = UUID.randomUUID()
+        val userId = UUID.randomUUID()
+        every { adminProjectService.removeUser(projectId, userId) } throws
+            ResponseStatusException(HttpStatus.NOT_FOUND)
+
+        mockMvc
+            .perform(delete("/api/v1/admin/projects/$projectId/users/$userId").with(adminJwt))
+            .andExpect(status().isNotFound)
 
         verify(exactly = 1) { adminProjectService.removeUser(projectId, userId) }
     }
