@@ -10,6 +10,7 @@ import com.sprintstart.sprintstartbackend.chat.models.requests.CreateChatRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.GetChatMessagesRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.GetChatsRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.PromptRequest
+import com.sprintstart.sprintstartbackend.chat.models.requests.toAiChatFilters
 import com.sprintstart.sprintstartbackend.chat.models.requests.toAiContextEntry
 import com.sprintstart.sprintstartbackend.chat.models.responses.AiStreamMessage
 import com.sprintstart.sprintstartbackend.chat.models.responses.ChatResponse
@@ -20,6 +21,9 @@ import com.sprintstart.sprintstartbackend.chat.models.responses.toChatMessageRes
 import com.sprintstart.sprintstartbackend.chat.models.responses.toChatResponse
 import com.sprintstart.sprintstartbackend.chat.repository.ChatMessageRepository
 import com.sprintstart.sprintstartbackend.chat.repository.ChatRepository
+import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorDisabledException
+import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorNotFoundException
+import com.sprintstart.sprintstartbackend.connectors.overview.service.ConnectorConfigurationService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import jakarta.validation.Valid
 import kotlinx.coroutines.flow.Flow
@@ -41,6 +45,7 @@ import java.util.UUID
 internal class ChatService(
     private val chatRepository: ChatRepository,
     private val messageRepository: ChatMessageRepository,
+    private val connectorConfigurationService: ConnectorConfigurationService,
     private val chatAiClient: ChatAiClient,
     private val userApi: UserApi,
 ) {
@@ -167,6 +172,28 @@ internal class ChatService(
             ).map { it.toAiContextEntry() }
             .toList()
 
+        // Check if source filters are valid
+        val connectorsByName = connectorConfigurationService.findAllConnectors().associateBy { it.name }
+
+        request.filters?.sourceSystems?.forEach { sourceSystem ->
+            val connector = connectorsByName[sourceSystem.name]
+                ?: throw ConnectorNotFoundException("Connector '${sourceSystem.name}' not found")
+
+            if (!connector.enabled) {
+                throw ConnectorDisabledException("Connector '${sourceSystem.name}' is disabled")
+            }
+        }
+
+        // Check for valid time range
+        val from = request.filters?.from
+        val to = request.filters?.to
+
+        if (from != null && to != null && to.isBefore(from)) {
+            throw HttpClientErrorException(HttpStatus.BAD_REQUEST, "Invalid time range.")
+        }
+
+        val filters = request.filters?.toAiChatFilters()
+
         messageRepository.save(msg)
 
         val sb = StringBuilder()
@@ -175,7 +202,7 @@ internal class ChatService(
         // - On each token we collect the token and emit it to the controller
         // - On completion, we store the entire response as msg in db
         return chatAiClient
-            .streamPrompt(AiPromptRequest(request.msg, context))
+            .streamPrompt(AiPromptRequest(request.msg, context, filters))
             .onEach { msg ->
                 msg.content?.let { sb.append(it) }
             }.onCompletion { cause ->
