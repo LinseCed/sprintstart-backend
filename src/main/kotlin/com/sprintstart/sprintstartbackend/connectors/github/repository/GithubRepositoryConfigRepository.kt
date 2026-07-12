@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.Query
 import java.time.Instant
 import java.util.UUID
 
-interface GithubConfigRepository : JpaRepository<GithubRepositoryConfig, UUID> {
+interface GithubRepositoryConfigRepository : JpaRepository<GithubRepositoryConfig, UUID> {
     @Query(
         """
         SELECT * FROM gh_repository_configs c 

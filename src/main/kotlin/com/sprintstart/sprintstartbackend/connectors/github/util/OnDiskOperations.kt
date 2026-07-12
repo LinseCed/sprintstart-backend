@@ -119,6 +119,17 @@ class OnDiskOperations {
             return output
         }
 
+        /**
+         * Sanitizes a command part by masking sensitive information such as user credentials in a URI.
+         *
+         * If the input string represents a URI containing user information (e.g., `username:password`),
+         * the method replaces the password with a placeholder (`***`). If the username is absent or
+         * empty, the entire user info is replaced with `***`. Other parts of the URI remain unchanged.
+         *
+         * @param value The input string potentially containing sensitive information in URI form.
+         * @return The sanitized string with sensitive information masked, or the original string
+         *         if it does not contain user information.
+         */
         private fun sanitizeCommandPart(value: String): String =
             runCatching {
                 val uri = URI(value)

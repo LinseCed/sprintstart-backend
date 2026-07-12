@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.connectors.github.util
 
-import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -36,7 +35,7 @@ class DefaultGitOperationRunner : GitOperationRunner {
  *
  * Maintains a local clone of each repository under [cacheBasePath], keyed by owner and name
  * (e.g. `/repos/SprintStartProject/sprintstart-backend`). On first access the repository is cloned from GitHub;
- * subsequent accesses return the cached path immediately without any network calls.
+ * later accesses return the cached path immediately without any network calls.
  *
  * Designed to be used alongside [OnDiskOperations], which handles diffing and file reading.
  *
@@ -79,7 +78,7 @@ class CustomOnDiskCache(
      * GitHub repository, caching it if not happened already.
      *
      * @param localFsPath The path to the local copy of the GitHub repository.
-     * @param remoteUri The remote uri of the repository, to clone from if needed.
+     * @param remoteUri The remote uri of the repository to clone from if needed.
      * @param safeUri The remote uri, but safe for printing, e.g. without credentials.
      */
     private suspend fun getLocalRepositoryPath(localFsPath: Path, remoteUri: String, safeUri: String): Path {
@@ -100,7 +99,7 @@ class CustomOnDiskCache(
     /**
      * Checks whether a valid local clone exists at [path].
      *
-     * Presence of the directory alone is not sufficient — a partial or interrupted clone can leave
+     * Presence of the directory alone is not enough — a partial or interrupted clone can leave
      * a broken `.git` directory behind. Validity is confirmed by running `git status`; a non-zero
      * exit code is treated as a cache miss.
      *
@@ -126,7 +125,6 @@ class CustomOnDiskCache(
      * which handles the case of a previously interrupted clone leaving partial state behind.
      *
      * The [remoteUri] contains the auth token inline and is never logged.
-     * Use [safeUri] (token replaced with `***`) for all log output.
      *
      * @param localFsPath The path to the local copy of the GitHub repository.
      * @param remoteUri The uri to clone the repository from, if not already cached.
@@ -142,13 +140,14 @@ class CustomOnDiskCache(
     }
 
     /**
-     * Repairs clones whose remote default branch is invalid by checking out the first available remote branch.
+     * Ensures that the provided Git repository at [localFsPath] is correctly checked out.
      *
-     * Some repositories are non-empty but advertise a stale remote `HEAD`, which leaves the clone
-     * without a resolvable local `HEAD`. In that state `git status` still succeeds, so cache validation
-     * must do a stronger check than repository presence alone.
+     * This method verifies the state of the local Git repository by executing a `git rev-parse` command.
+     * If the repository is in an inconsistent or broken state, it attempts to repair it by checking out the
+     * first remote branch found (if available) and running the necessary commands to re-establish the repository's
+     * validity.
      *
-     * Empty repositories are treated as valid even though `HEAD` cannot be resolved yet.
+     * @param localFsPath The path to the local copy of the Git repository.
      */
     private fun ensureRepositoryCheckout(localFsPath: Path) {
         try {
@@ -162,6 +161,12 @@ class CustomOnDiskCache(
         }
     }
 
+    /**
+     * Finds the first available remote Git branch for the given local file system path.
+     *
+     * @param localFsPath the local file system path where the Git repository is located.
+     * @return the name of the first remote branch found, or null if no branches are available.
+     */
     private fun findFirstRemoteBranch(localFsPath: Path): String? {
         val branches = gitRunner
             .exec(localFsPath, onDiskOperations.gitRemoteBranches())
@@ -175,6 +180,14 @@ class CustomOnDiskCache(
         return branches.firstOrNull()
     }
 
+    /**
+     * Constructs a remote URI for accessing a GitHub repository using a personal access token.
+     *
+     * @param owner The owner of the GitHub repository.
+     * @param name The name of the GitHub repository.
+     * @param token The personal access token used for authentication.
+     * @return A string representing the constructed remote URI in ASCII format.
+     */
     private fun buildRemoteUri(owner: String, name: String, token: String): String =
         URI(
             "https",

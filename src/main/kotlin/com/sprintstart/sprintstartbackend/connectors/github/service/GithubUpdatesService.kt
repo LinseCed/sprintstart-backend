@@ -5,7 +5,6 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.upda
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateStartedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
-import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
@@ -23,7 +22,7 @@ import kotlinx.coroutines.launch
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import java.time.Instant
-import java.util.*
+import java.util.UUID
 
 @Service
 class GithubUpdatesService(
@@ -89,19 +88,19 @@ class GithubUpdatesService(
         return UpdateRepositoryResponse(transactionId)
     }
 
+    /**
+     * Updates a given GitHub repository or checks for updates depending on the given [performUpdate] flag.
+     *
+     * @param githubRepository the connection details of the GitHub repository to be updated or checked
+     * @param transactionId the unique identifier of the transaction initiating this process
+     * @param performUpdate a flag determining whether to update the repository (true) or just check for updates (false)
+     * @throws RepositoryNotInitializedException (400) if the repository snapshot is not initialized
+     */
     private fun updateRepositoryOrCheckForUpdates(
         githubRepository: GithubRepositoryConnection,
         transactionId: UUID,
         performUpdate: Boolean,
     ) {
-        eventPublisher.publishEvent(
-            GithubRepositoryUpdateStartedEvent(
-                transactionId,
-                githubRepository.owner,
-                githubRepository.name,
-            ),
-        )
-
         if (githubRepository.snapshot == null) {
             eventPublisher.publishEvent(
                 GithubRepositoryUpdateFailedEvent(
@@ -128,6 +127,12 @@ class GithubUpdatesService(
         }
     }
 
+    /**
+     * Initiates asynchronous update checks for various components of a GitHub repository.
+     *
+     * @param githubRepository The connection object representing the GitHub repository to be updated.
+     * @param transactionId A unique identifier for the current transaction.
+     */
     private fun checkRepositoryForUpdates(githubRepository: GithubRepositoryConnection, transactionId: UUID) {
         applicationScope.launch {
             fileService.verifyFileSyncStatus(githubRepository, transactionId)
@@ -158,11 +163,13 @@ class GithubUpdatesService(
     }
 
     /**
-     * Updates the repository by fetching and processing the latest snapshot, commits, issues,
-     * pull requests, and saving them in the repository.
+     * Performs an update on the specified GitHub repository by fetching and processing
+     * incremental file updates, the latest commits, all issues, and pull requests, and then
+     * updates the synchronization timestamps.
      *
-     * @param githubRepository The connection object for the GitHub repository to be updated.
-     * @param transactionId The unique identifier for the transaction to track the update process.
+     * @param githubRepository The connection information for the GitHub repository that is to
+     * be updated, including metadata and snapshot details.
+     * @param transactionId A unique identifier for the transaction to track the update process.
      */
     private fun performRepositoryUpdate(
         githubRepository: GithubRepositoryConnection,

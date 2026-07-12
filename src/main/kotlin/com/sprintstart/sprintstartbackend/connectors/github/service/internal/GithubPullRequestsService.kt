@@ -20,7 +20,7 @@ import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import java.time.Instant
-import java.util.*
+import java.util.UUID
 
 @Service
 class GithubPullRequestsService(
@@ -106,10 +106,12 @@ class GithubPullRequestsService(
     }
 
     /**
-     * Extension function to [PullRequest] providing an easy way of constructing a [GithubPullRequestFetchedEvent] out of it.
+     * Extension function to [PullRequest] providing an easy way of constructing a [GithubPullRequestFetchedEvent]
+     * out of it.
      *
-     * This function parses its values and the given [transactionId], [owner] and [name] to a [GithubPullRequestFetchedEvent].
-     * This event indicates, that a pull request was fetched successfully from GitHub.
+     * This function parses its values and the given [transactionId], [owner] and [name] to a
+     * [GithubPullRequestFetchedEvent].
+     * This event indicates that a pull request was fetched successfully from GitHub.
      *
      * This function has no side effects, it's simple input -> output.
      *

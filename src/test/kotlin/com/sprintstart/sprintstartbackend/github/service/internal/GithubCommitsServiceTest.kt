@@ -4,11 +4,13 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.comm
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitFetchedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitsFetchCompletedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitsFetchStartedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.models.ConnectionState
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubCommitsFetchFailedPartiallyException
+import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubCommitsService
 import com.sprintstart.sprintstartbackend.connectors.github.util.CustomOnDiskCache
 import com.sprintstart.sprintstartbackend.connectors.github.util.GitOperationRunner
@@ -30,6 +32,7 @@ import java.time.Instant
 import java.util.UUID
 
 class GithubCommitsServiceTest {
+    private val repoConnectionRepository = mockk<GithubRepositoryConnectionRepository>()
     private val onDiskOperations = OnDiskOperations()
     private val customCache = mockk<CustomOnDiskCache>()
     private val eventPublisher = mockk<ApplicationEventPublisher>(relaxed = true)
@@ -48,6 +51,7 @@ class GithubCommitsServiceTest {
     @BeforeEach
     fun setUp() {
         service = GithubCommitsService(
+            repoConnectionRepository = repoConnectionRepository,
             onDiskOperations = onDiskOperations,
             customCache = customCache,
             eventPublisher = eventPublisher,
@@ -61,7 +65,7 @@ class GithubCommitsServiceTest {
     @Nested
     inner class GitCommandRouting {
         @Test
-        fun `uses gitCommits when doSyncAll is true`() = runTest {
+        fun `fetchAndIngestAllCommits uses git log without --after`() = runTest {
             every {
                 gitRunner.exec(
                     repoPath,
@@ -72,7 +76,7 @@ class GithubCommitsServiceTest {
                 )
             } returns ""
 
-            service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestAllCommits(snapshot(), transactionId)
 
             verify {
                 gitRunner.exec(
@@ -85,16 +89,15 @@ class GithubCommitsServiceTest {
         }
 
         @Test
-        fun `uses gitCommitsAfter when doSyncAll is false`() = runTest {
+        fun `fetchAndIngestLatestCommits uses git log --after`() = runTest {
             val syncAt = Instant.parse("2024-01-01T00:00:00Z")
             every {
                 gitRunner.exec(repoPath, match { it.command().any { arg -> arg.contains("--after") } })
             } returns ""
 
-            service.fetchAndIngestAllCommits(
+            service.fetchAndIngestLatestCommits(
                 snapshot(lastCommitsSyncAt = syncAt),
                 transactionId,
-                doSyncAll = false,
             )
 
             verify {
@@ -108,13 +111,13 @@ class GithubCommitsServiceTest {
         }
 
         @Test
-        fun `passes lastCommitsSyncAt timestamp to gitCommitsAfter`() = runTest {
+        fun `passes lastCommitsSyncAt timestamp to git log --after`() = runTest {
             val syncAt = Instant.parse("2024-06-15T10:00:00Z")
             every {
                 gitRunner.exec(repoPath, match { it.command().any { arg -> arg.contains("--after") } })
             } returns ""
 
-            service.fetchAndIngestAllCommits(snapshot(lastCommitsSyncAt = syncAt), transactionId)
+            service.fetchAndIngestLatestCommits(snapshot(lastCommitsSyncAt = syncAt), transactionId)
 
             verify {
                 gitRunner.exec(
@@ -132,7 +135,7 @@ class GithubCommitsServiceTest {
     @Nested
     inner class EventPublishing {
         @Test
-        fun `publishes one event per commit line plus summary`() = runTest {
+        fun `publishes one commit event per commit line plus summary`() = runTest {
             every {
                 gitRunner.exec(repoPath, any())
             } returns
@@ -142,7 +145,7 @@ class GithubCommitsServiceTest {
                 2024-01-03T00:00:00Z - ghi789 - carol - refactor
                 """.trimIndent()
 
-            service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestAllCommits(snapshot(), transactionId)
 
             verify(exactly = 5) { eventPublisher.publishEvent(any<GithubCommitFetchedEvent>()) }
         }
@@ -151,7 +154,7 @@ class GithubCommitsServiceTest {
         fun `publishes lifecycle events when output is empty`() = runTest {
             every { gitRunner.exec(repoPath, any()) } returns ""
 
-            service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestAllCommits(snapshot(), transactionId)
 
             val events = mutableListOf<Any>()
             verify(exactly = 2) { eventPublisher.publishEvent(capture(events)) }
@@ -163,7 +166,7 @@ class GithubCommitsServiceTest {
         fun `publishes lifecycle events when output contains only blank lines`() = runTest {
             every { gitRunner.exec(repoPath, any()) } returns "\n\n\n"
 
-            service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestAllCommits(snapshot(), transactionId)
 
             val events = mutableListOf<Any>()
             verify(exactly = 2) { eventPublisher.publishEvent(capture(events)) }
@@ -175,7 +178,7 @@ class GithubCommitsServiceTest {
         fun `publishes GithubCommitsFetchingStartedEvent on start`() = runTest {
             every { gitRunner.exec(repoPath, any()) } returns ""
 
-            service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestAllCommits(snapshot(), transactionId)
 
             verify { eventPublisher.publishEvent(any<GithubCommitsFetchStartedEvent>()) }
         }
@@ -184,7 +187,7 @@ class GithubCommitsServiceTest {
         fun `publishes GithubCommitsFetchingCompletedEvent on completion`() = runTest {
             every { gitRunner.exec(repoPath, any()) } returns ""
 
-            service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestAllCommits(snapshot(), transactionId)
 
             verify { eventPublisher.publishEvent(any<GithubCommitsFetchCompletedEvent>()) }
         }
@@ -197,7 +200,6 @@ class GithubCommitsServiceTest {
                 service.fetchAndIngestAllCommits(
                     snapshot(),
                     transactionId,
-                    doSyncAll = true,
                 )
             }
 
@@ -214,7 +216,7 @@ class GithubCommitsServiceTest {
                 """.trimIndent()
 
             assertThrows<GithubCommitsFetchFailedPartiallyException> {
-                service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+                service.fetchAndIngestAllCommits(snapshot(), transactionId)
             }
 
             val events = mutableListOf<Any>()
@@ -233,7 +235,7 @@ class GithubCommitsServiceTest {
             every { gitRunner.exec(repoPath, any()) } returns
                 "2024-01-15T10:30:00Z - abc123def456 - alice - fix authentication bug"
 
-            service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestAllCommits(snapshot(), transactionId)
 
             val eventSlot = slot<GithubCommitFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
@@ -257,7 +259,7 @@ class GithubCommitsServiceTest {
                 2024-01-02T00:00:00Z - sha2 - bob - commit two
                 """.trimIndent()
 
-            service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestAllCommits(snapshot(), transactionId)
 
             val capturedEvents = mutableListOf<GithubCommitFetchedEvent>()
             verify(exactly = 2) { eventPublisher.publishEvent(capture(capturedEvents)) }
@@ -275,7 +277,7 @@ class GithubCommitsServiceTest {
             every { gitRunner.exec(repoPath, any()) } returns "malformed-line-without-separators"
 
             assertThrows<GithubCommitsFetchFailedPartiallyException> {
-                service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+                service.fetchAndIngestAllCommits(snapshot(), transactionId)
             }
         }
 
@@ -284,7 +286,7 @@ class GithubCommitsServiceTest {
             every { gitRunner.exec(repoPath, any()) } returns "2024-01-01T00:00:00Z - sha123"
 
             assertThrows<GithubCommitsFetchFailedPartiallyException> {
-                service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+                service.fetchAndIngestAllCommits(snapshot(), transactionId)
             }
         }
 
@@ -293,7 +295,7 @@ class GithubCommitsServiceTest {
             every { gitRunner.exec(repoPath, any()) } returns "not-a-date - sha123 - alice - message"
 
             assertThrows<GithubCommitsFetchFailedPartiallyException> {
-                service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+                service.fetchAndIngestAllCommits(snapshot(), transactionId)
             }
         }
 
@@ -302,12 +304,95 @@ class GithubCommitsServiceTest {
             every { gitRunner.exec(repoPath, any()) } returns
                 "2024-01-01T00:00:00Z - sha123 - alice - fix bug - with dash in message"
 
-            service.fetchAndIngestAllCommits(snapshot(), transactionId, doSyncAll = true)
+            service.fetchAndIngestAllCommits(snapshot(), transactionId)
 
             val eventSlot = slot<GithubCommitFetchedEvent>()
             verify { eventPublisher.publishEvent(capture(eventSlot)) }
 
             assertThat(eventSlot.captured.msg).isEqualTo("fix bug - with dash in message")
+        }
+    }
+
+    // ── verifyCommitSyncStatus ─────────────────────────────────────────────────
+
+    @Nested
+    inner class VerifyCommitSyncStatus {
+        @Test
+        fun `marks repository OUT_OF_DATE when local and remote HEAD differ`() = runTest {
+            every {
+                gitRunner.exec(repoPath, match { it.command() == listOf("git", "rev-parse", "HEAD") })
+            } returns "local-sha\n"
+            every {
+                gitRunner.exec(repoPath, match { it.command() == listOf("git", "ls-remote", "origin", "HEAD") })
+            } returns "remote-sha\n"
+            every { repoConnectionRepository.save(any()) } answers { firstArg() }
+
+            service.verifyCommitSyncStatus(repo, transactionId)
+
+            assertThat(repo.connectionState).isEqualTo(ConnectionState.OUT_OF_DATE)
+            verify { repoConnectionRepository.save(repo) }
+        }
+
+        @Test
+        fun `does NOT mark repository OUT_OF_DATE when local and remote HEAD match`() = runTest {
+            every {
+                gitRunner.exec(repoPath, match { it.command() == listOf("git", "rev-parse", "HEAD") })
+            } returns "same-sha\n"
+            every {
+                gitRunner.exec(repoPath, match { it.command() == listOf("git", "ls-remote", "origin", "HEAD") })
+            } returns "same-sha\n"
+
+            service.verifyCommitSyncStatus(repo, transactionId)
+
+            assertThat(repo.connectionState).isEqualTo(ConnectionState.UP_TO_DATE)
+            verify(exactly = 0) { repoConnectionRepository.save(any()) }
+        }
+
+        @Test
+        fun `publishes lifecycle events`() = runTest {
+            every {
+                gitRunner.exec(repoPath, match { it.command() == listOf("git", "rev-parse", "HEAD") })
+            } returns "local-sha\n"
+            every {
+                gitRunner.exec(repoPath, match { it.command() == listOf("git", "ls-remote", "origin", "HEAD") })
+            } returns "same-sha\n"
+            every { repoConnectionRepository.save(any()) } answers { firstArg() }
+
+            service.verifyCommitSyncStatus(repo, transactionId)
+
+            verify { eventPublisher.publishEvent(any<GithubCommitsFetchStartedEvent>()) }
+            verify { eventPublisher.publishEvent(any<GithubCommitsFetchCompletedEvent>()) }
+        }
+
+        @Test
+        fun `parses git ls-remote output with tab and ref correctly`() = runTest {
+            every {
+                gitRunner.exec(repoPath, match { it.command() == listOf("git", "rev-parse", "HEAD") })
+            } returns "abc123def\n"
+            every {
+                gitRunner.exec(repoPath, match { it.command() == listOf("git", "ls-remote", "origin", "HEAD") })
+            } returns "abc123def\tHEAD\n"
+            every { repoConnectionRepository.save(any()) } answers { firstArg() }
+
+            service.verifyCommitSyncStatus(repo, transactionId)
+
+            assertThat(repo.connectionState).isEqualTo(ConnectionState.UP_TO_DATE)
+            verify(exactly = 0) { repoConnectionRepository.save(any()) }
+        }
+
+        @Test
+        fun `strips trailing whitespace from git output`() = runTest {
+            every {
+                gitRunner.exec(repoPath, match { it.command() == listOf("git", "rev-parse", "HEAD") })
+            } returns "abc123  \n"
+            every {
+                gitRunner.exec(repoPath, match { it.command() == listOf("git", "ls-remote", "origin", "HEAD") })
+            } returns "abc123\tHEAD\n"
+
+            service.verifyCommitSyncStatus(repo, transactionId)
+
+            assertThat(repo.connectionState).isEqualTo(ConnectionState.UP_TO_DATE)
+            verify(exactly = 0) { repoConnectionRepository.save(any()) }
         }
     }
 

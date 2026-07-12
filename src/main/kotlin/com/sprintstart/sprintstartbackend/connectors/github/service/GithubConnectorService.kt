@@ -12,7 +12,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.UserWithAuthIdNotFoundException
-import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubConfigRepository
+import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConfigRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubCommitsService
@@ -41,7 +41,7 @@ import java.util.UUID
 class GithubConnectorService(
     private val applicationScope: CoroutineScope,
     private val repoConnectionRepository: GithubRepositoryConnectionRepository,
-    private val repoConfigRepository: GithubConfigRepository,
+    private val repoConfigRepository: GithubRepositoryConfigRepository,
     private val githubUserRepository: GithubUserRepository,
     private val fileService: GithubFileService,
     private val commitsService: GithubCommitsService,
@@ -67,7 +67,7 @@ class GithubConnectorService(
      * Patches a 'source' in the connector overview sense.
      *
      * For the connector overview, sources are GitHub repositories.
-     * Patching a GitHub repository means changing it's status, eg. enabling or disabling it.
+     * Patching a GitHub repository means changing its status, e.g., enabling or disabling it.
      *
      * @param source The 'source' (GitHub repository) to patch.
      * @param newStatus The new status of the 'source'.
@@ -140,11 +140,13 @@ class GithubConnectorService(
     }
 
     /**
-     * Establishes a connection to a GitHub repository and initiates data collection processes.
+     * Establishes a connection to the provided GitHub repository, initializes its configuration
+     * and snapshot, and triggers data collection processes such as fetching files, commits, issues,
+     * and pull requests associated with the repository.
      *
-     * @param transactionId The transaction id.
-     * @param repository The GitHub repository connection object containing connection details.
-     * @return A unique identifier (UUID) representing the transaction associated with this operation.
+     * @param repository The GitHub repository connection containing details about the repository being connected.
+     * @param transactionId A unique identifier for the transaction or operation being performed.
+     * @return Returns the transaction ID associated with the repository connection process.
      */
     private suspend fun connectRepository(repository: GithubRepositoryConnection, transactionId: UUID): UUID {
         // Save an initial snapshot of the repository
@@ -155,6 +157,7 @@ class GithubConnectorService(
             id = repository.id,
             repository = repository,
         )
+        config.nextSyncAt = GithubRepositoryConfigService.calculateNextSyncAt(config.schedule)
 
         repository.snapshot = repoSnapshot
         withContext(Dispatchers.IO) {

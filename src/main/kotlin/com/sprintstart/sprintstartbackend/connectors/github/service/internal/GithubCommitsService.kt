@@ -59,6 +59,18 @@ class GithubCommitsService(
         ingestCommits(latestSnapshot, transactionId, rawOutput)
     }
 
+    /**
+     * Fetches the latest commits from a GitHub repository and ingests them into the system.
+     *
+     * This method triggers the publication of an event to signal the start of the process,
+     * retrieves the commit data from the repository, and processes the data to integrate
+     * it into the system.
+     *
+     * @param latestSnapshot The current snapshot of the GitHub repository, containing information
+     * about the repository's state and metadata such as the owner and name.
+     * @param transactionId The unique identifier for the ongoing transaction to track and log
+     * operations performed during the commit-fetching process.
+     */
     @Tracked("Fetching & ingesting latest commits from repository")
     internal suspend fun fetchAndIngestLatestCommits(
         latestSnapshot: GithubRepositorySnapshot,
@@ -84,6 +96,7 @@ class GithubCommitsService(
      *
      * @param githubRepository The GitHub repository to check.
      */
+    @Tracked("Verifying commit sync status")
     internal suspend fun verifyCommitSyncStatus(githubRepository: GithubRepositoryConnection, transactionId: UUID) {
         eventPublisher.publishEvent(
             GithubCommitsFetchStartedEvent(
@@ -112,7 +125,19 @@ class GithubCommitsService(
         )
     }
 
-    private suspend fun ingestCommits(latestSnapshot: GithubRepositorySnapshot, transactionId: UUID, rawCommits: String) {
+    /**
+     * Processes a list of raw commit lines and updates the repository snapshot.
+     * Publishes appropriate events based on the success or failure of commit ingestion.
+     *
+     * @param latestSnapshot The latest snapshot of the GitHub repository to update with commit data.
+     * @param transactionId A unique identifier for the transaction processing the commits.
+     * @param rawCommits A string containing raw commit data, with each line representing a commit.
+     */
+    private suspend fun ingestCommits(
+        latestSnapshot: GithubRepositorySnapshot,
+        transactionId: UUID,
+        rawCommits: String,
+    ) {
         val failures = mutableListOf<String>()
 
         rawCommits
@@ -142,14 +167,17 @@ class GithubCommitsService(
     }
 
     /**
-     * Checks the remote, if this local copy of the repository is still up to date.
+     * Checks the remote if this local copy of the repository is still up to date.
      *
      * @param localFsPath The path to the local copy of the GitHub repository.
      * @return true, if the repository is up to date with remote, otherwise false.
      */
     private suspend fun isRepositoryUpToDate(localFsPath: Path): Boolean {
-        val localHead = gitRunner.exec(localFsPath, onDiskOperations.gitRevParse())
-        val remoteHead = gitRunner.exec(localFsPath, onDiskOperations.gitLsRemote())
+        val localHead = gitRunner.exec(localFsPath, onDiskOperations.gitRevParse()).trim()
+        val remoteHead = gitRunner
+            .exec(localFsPath, onDiskOperations.gitLsRemote())
+            .trim()
+            .substringBefore('\t')
         return localHead == remoteHead
     }
 

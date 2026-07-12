@@ -523,8 +523,11 @@ class GithubFileService(
      * @return true, if the repository is up to date with remote, otherwise false.
      */
     private suspend fun isRepositoryUpToDate(localFsPath: Path): Boolean {
-        val localHead = gitRunner.exec(localFsPath, onDiskOperations.gitRevParse())
-        val remoteHead = gitRunner.exec(localFsPath, onDiskOperations.gitLsRemote())
+        val localHead = gitRunner.exec(localFsPath, onDiskOperations.gitRevParse()).trim()
+        val remoteHead = gitRunner
+            .exec(localFsPath, onDiskOperations.gitLsRemote())
+            .trim()
+            .substringBefore('\t')
         return localHead == remoteHead
     }
 
