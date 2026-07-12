@@ -15,7 +15,7 @@ import java.util.UUID
 @Table(name = "gh_repository_configs")
 class GithubRepositoryConfig(
     @Id
-    var id: UUID = UUID.randomUUID(),
+    var id: UUID? = null,
     @OneToOne(fetch = FetchType.LAZY)
     @MapsId
     @JoinColumn(name = "repository_id")

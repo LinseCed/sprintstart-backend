@@ -120,7 +120,7 @@ class GithubRepositoryConfigService(
         val dueConfigs = configRepository.findAllDue(now)
 
         return dueConfigs.map {
-            githubRepoRepository.findById(it.id).orElseThrow {
+            githubRepoRepository.findById(it.id!!).orElseThrow {
                 RepositoryNotFoundException("", "", "Repository with id ${it.id} not found")
             }
         }
@@ -136,6 +136,14 @@ class GithubRepositoryConfigService(
     @Transactional(readOnly = true)
     @Tracked("Retrieving GitHub repository config")
     fun findConfigById(id: UUID): Optional<GithubRepositoryConfig> = configRepository.findById(id)
+
+    /**
+     * Saves the given GitHub repository configuration to the repository.
+     *
+     * @param config the GitHub repository configuration to be saved
+     */
+    @Tracked("Saving a GitHub repository config")
+    fun saveRepositoryConfig(config: GithubRepositoryConfig) = configRepository.save(config)
 
     /**
      * Finds the configuration for a GitHub repository based on the repository owner's username

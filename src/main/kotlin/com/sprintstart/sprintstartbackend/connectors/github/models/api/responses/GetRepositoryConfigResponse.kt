@@ -15,7 +15,7 @@ data class GetRepositoryConfigResponse(
     companion object {
         internal fun of(config: GithubRepositoryConfig): GetRepositoryConfigResponse {
             return GetRepositoryConfigResponse(
-                id = config.id,
+                id = config.id!!,
                 repositoryOwner = config.repository.owner,
                 repositoryName = config.repository.name,
                 autoUpdate = config.autoUpdate,

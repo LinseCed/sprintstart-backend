@@ -59,6 +59,7 @@ class GithubScheduledExecutor(
             }
 
             repoConfig.nextSyncAt = GithubRepositoryConfigService.calculateNextSyncAt(repoConfig.schedule)
+            githubRepositoryConfigService.saveRepositoryConfig(repoConfig)
         }
     }
 }

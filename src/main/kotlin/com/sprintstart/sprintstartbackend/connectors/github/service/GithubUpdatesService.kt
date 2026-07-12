@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.Gith
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubAllRepositoriesUpdateStartedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateStartedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.models.ConnectionState
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateAllRepositoriesResponse
@@ -203,5 +204,7 @@ class GithubUpdatesService(
         }
 
         repoSnapshotRepository.updateSyncTimestamps(githubRepository.id, Instant.now())
+        githubRepository.connectionState = ConnectionState.UP_TO_DATE
+        repoConnectionRepository.save(githubRepository)
     }
 }
