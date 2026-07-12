@@ -1,10 +1,10 @@
 package com.sprintstart.sprintstartbackend.user.controller
 
-import com.sprintstart.sprintstartbackend.user.model.dto.DeleteUserResponse
-import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
-import com.sprintstart.sprintstartbackend.user.model.dto.PatchMeRequest
-import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserRequest
-import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserEnabledRequest
+import com.sprintstart.sprintstartbackend.user.model.request.user.PatchMeRequest
+import com.sprintstart.sprintstartbackend.user.model.request.user.PatchUserRequest
+import com.sprintstart.sprintstartbackend.user.model.request.user.UpdateUserEnabledRequest
+import com.sprintstart.sprintstartbackend.user.model.response.user.DeleteUserResponse
+import com.sprintstart.sprintstartbackend.user.model.response.user.GetUserResponse
 import com.sprintstart.sprintstartbackend.user.service.UserService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter

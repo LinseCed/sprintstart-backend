@@ -8,6 +8,7 @@ data class UserDto(
     val firstname: String,
     val lastname: String,
     val avatarUrl: String?,
+    val profileIcon: String?,
     val projects: Set<ProjectDto>,
     val skills: List<UserSkillDto>,
     val projectRoles: List<ProjectRoleDto>,

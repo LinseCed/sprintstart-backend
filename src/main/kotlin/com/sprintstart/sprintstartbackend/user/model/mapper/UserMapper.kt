@@ -1,9 +1,9 @@
 package com.sprintstart.sprintstartbackend.user.model.mapper
 
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
-import com.sprintstart.sprintstartbackend.user.model.dto.GetUserResponse
-import com.sprintstart.sprintstartbackend.user.model.dto.ProjectRoleSummary
 import com.sprintstart.sprintstartbackend.user.model.entity.User
+import com.sprintstart.sprintstartbackend.user.model.response.user.GetUserResponse
+import com.sprintstart.sprintstartbackend.user.model.response.user.ProjectRoleSummary
 
 fun User.toGetResponse(): GetUserResponse =
     GetUserResponse(

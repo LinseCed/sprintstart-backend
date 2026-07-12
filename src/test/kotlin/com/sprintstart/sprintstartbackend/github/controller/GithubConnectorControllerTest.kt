@@ -2,16 +2,18 @@ package com.sprintstart.sprintstartbackend.github.controller
 
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.github.models.GithubUser
-import com.sprintstart.sprintstartbackend.github.models.GithubUserPat
-import com.sprintstart.sprintstartbackend.github.models.api.requests.ConnectRepositoryRequest
-import com.sprintstart.sprintstartbackend.github.models.api.requests.UpdateRepositoryRequest
-import com.sprintstart.sprintstartbackend.github.models.api.responses.UpdateRepositoryResponse
-import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotConnectedException
-import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotFoundException
-import com.sprintstart.sprintstartbackend.github.models.exceptions.RepositoryNotInitializedException
-import com.sprintstart.sprintstartbackend.github.repository.GithubUserRepository
-import com.sprintstart.sprintstartbackend.github.service.GithubConnectorService
+import com.sprintstart.sprintstartbackend.connectors.github.controller.GithubConnectorController
+import com.sprintstart.sprintstartbackend.connectors.github.controller.GithubExceptionHandler
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
+import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
+import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
 import io.mockk.coEvery
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -35,7 +37,7 @@ import java.util.UUID
 
 @WebMvcTest(controllers = [GithubConnectorController::class])
 @AutoConfigureMockMvc
-@Import(ExceptionHandler::class, SecurityConfig::class)
+@Import(GithubExceptionHandler::class, SecurityConfig::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class GithubConnectorControllerTest {
     @Autowired

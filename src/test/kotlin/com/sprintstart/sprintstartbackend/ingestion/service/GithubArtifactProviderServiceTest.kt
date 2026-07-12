@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.github.external.GithubRepositoryApi
-import com.sprintstart.sprintstartbackend.github.external.events.files.GithubFileDeletedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
+import com.sprintstart.sprintstartbackend.connectors.github.external.events.files.GithubFileDeletedEvent
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.GithubArtifactCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact

@@ -13,6 +13,7 @@ fun User.toUserApiDto(): UserDto {
         firstname = this.firstname,
         lastname = this.lastname,
         avatarUrl = this.avatarUrl,
+        profileIcon = this.profileIcon,
         projects = this.projects
             .map {
                 ProjectDto(

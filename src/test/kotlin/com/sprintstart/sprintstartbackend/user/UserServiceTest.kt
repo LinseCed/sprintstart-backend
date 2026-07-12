@@ -2,10 +2,10 @@ package com.sprintstart.sprintstartbackend.user
 
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.external.events.UserCreatedEvent
-import com.sprintstart.sprintstartbackend.user.model.dto.PatchMeRequest
-import com.sprintstart.sprintstartbackend.user.model.dto.PatchUserRequest
-import com.sprintstart.sprintstartbackend.user.model.dto.UpdateUserEnabledRequest
 import com.sprintstart.sprintstartbackend.user.model.entity.User
+import com.sprintstart.sprintstartbackend.user.model.request.user.PatchMeRequest
+import com.sprintstart.sprintstartbackend.user.model.request.user.PatchUserRequest
+import com.sprintstart.sprintstartbackend.user.model.request.user.UpdateUserEnabledRequest
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import com.sprintstart.sprintstartbackend.user.service.KeycloakAdminClient
 import com.sprintstart.sprintstartbackend.user.service.UserService
