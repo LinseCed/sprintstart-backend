@@ -68,7 +68,9 @@ class KnowledgeGapsControllerTest(
         component = "auth-service",
         missingTypes = listOf("runbook", "adr"),
         presentTypes = listOf("readme"),
-        lastUpdated = Instant.parse("2025-05-01T00:00:00Z"),
+        lastIngested = Instant.parse("2025-05-01T00:00:00Z"),
+        firstIngested = Instant.parse("2025-01-10T00:00:00Z"),
+        refreshedAt = Instant.parse("2025-05-02T00:00:00Z"),
         owners = emptyList(),
         severity = "high",
     )

@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.insights.service
 
+import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.insights.KnowledgeGapsAiClient
 import com.sprintstart.sprintstartbackend.insights.model.ai.AiKnowledgeGap
 import com.sprintstart.sprintstartbackend.insights.model.ai.AiKnowledgeGapsResponse
@@ -39,6 +40,7 @@ class KnowledgeGapsServiceTest {
     private val aiKnowledgeGapMapper = AiKnowledgeGapMapper()
     private val knowledgeGapResponseMapper = KnowledgeGapResponseMapper()
     private val userApi = mockk<UserApi>()
+    private val artifactIngestionApi = mockk<ArtifactIngestionApi>()
 
     private val service = KnowledgeGapsService(
         knowledgeGapRepository = knowledgeGapRepository,
@@ -47,6 +49,7 @@ class KnowledgeGapsServiceTest {
         aiKnowledgeGapMapper = aiKnowledgeGapMapper,
         knowledgeGapResponseMapper = knowledgeGapResponseMapper,
         userApi = userApi,
+        artifactIngestionApi = artifactIngestionApi,
     )
 
     private fun buildGap(
@@ -82,6 +85,7 @@ class KnowledgeGapsServiceTest {
         val highA = buildGap("auth-service", KnowledgeGapSeverity.HIGH)
         every { knowledgeGapRepository.findAll() } returns listOf(lowGap, highB, highA)
         every { componentOwnerRepository.findAllByComponentIn(any()) } returns emptyList()
+        every { artifactIngestionApi.getFirstIngestedAt(any<Collection<String>>()) } returns emptyMap()
 
         val overview = service.getKnowledgeGaps()
 
@@ -101,6 +105,8 @@ class KnowledgeGapsServiceTest {
         every { componentOwnerRepository.findAllByComponentIn(listOf("auth-service")) } returns
             listOf(ComponentOwner(component = "auth-service", userId = userId))
         every { userApi.getUsersByIds(listOf(userId)) } returns listOf(buildUser(userId, "Backend Developer"))
+        every { artifactIngestionApi.getFirstIngestedAt("auth-service") } returns
+            Instant.parse("2025-01-10T00:00:00Z")
 
         val detail = service.getKnowledgeGap(gap.id)
 
@@ -108,6 +114,8 @@ class KnowledgeGapsServiceTest {
         assertEquals(listOf("runbook", "adr"), detail.missingTypes)
         assertEquals(listOf("readme"), detail.presentTypes)
         assertEquals("high", detail.severity)
+        assertEquals(Instant.parse("2025-05-01T00:00:00Z"), detail.lastIngested)
+        assertEquals(Instant.parse("2025-01-10T00:00:00Z"), detail.firstIngested)
         assertEquals(1, detail.owners.size)
         assertEquals(userId.toString(), detail.owners.first().id)
         assertEquals("Backend Developer", detail.owners.first().role)
@@ -118,6 +126,7 @@ class KnowledgeGapsServiceTest {
         val gap = buildGap("auth-service", KnowledgeGapSeverity.HIGH)
         every { knowledgeGapRepository.findById(gap.id) } returns Optional.of(gap)
         every { componentOwnerRepository.findAllByComponentIn(listOf("auth-service")) } returns emptyList()
+        every { artifactIngestionApi.getFirstIngestedAt("auth-service") } returns null
 
         val detail = service.getKnowledgeGap(gap.id)
 

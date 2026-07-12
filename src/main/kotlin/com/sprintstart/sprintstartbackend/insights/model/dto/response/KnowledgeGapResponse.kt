@@ -14,8 +14,12 @@ data class KnowledgeGapResponse(
     val missingTypes: List<String>,
     @field:Schema(description = "Document types the component already has.")
     val presentTypes: List<String>,
-    @field:Schema(description = "Timestamp of the component's most recent activity.")
-    val lastUpdated: Instant,
+    @field:Schema(description = "When the component was last written into the AI index (most recent ingestion).")
+    val lastIngested: Instant,
+    @field:Schema(description = "When the component was first ingested. Null when it has no ingested artifacts.")
+    val firstIngested: Instant?,
+    @field:Schema(description = "When this gap was last (re)analyzed by a knowledge-gaps refresh.")
+    val refreshedAt: Instant,
     @field:Schema(
         description = "People responsible for the component. Enriched by the backend; empty until owners are assigned.",
     )

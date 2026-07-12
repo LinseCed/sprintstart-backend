@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.insights.service
 
+import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.insights.KnowledgeGapsAiClient
 import com.sprintstart.sprintstartbackend.insights.model.ai.AiKnowledgeGapsRequest
 import com.sprintstart.sprintstartbackend.insights.model.dto.request.SetComponentOwnersRequest
@@ -36,6 +37,7 @@ class KnowledgeGapsService(
     private val aiKnowledgeGapMapper: AiKnowledgeGapMapper,
     private val knowledgeGapResponseMapper: KnowledgeGapResponseMapper,
     private val userApi: UserApi,
+    private val artifactIngestionApi: ArtifactIngestionApi,
 ) {
     /**
      * Returns all cached knowledge gaps, most severe first and then by component name.
@@ -45,8 +47,10 @@ class KnowledgeGapsService(
         val gaps = knowledgeGapRepository
             .findAll()
             .sortedWith(compareBy({ it.severity.ordinal }, { it.component }))
-        val ownersByComponent = resolveOwners(gaps.map { it.component }.distinct())
-        return knowledgeGapResponseMapper.toOverviewResponse(gaps, ownersByComponent)
+        val components = gaps.map { it.component }.distinct()
+        val ownersByComponent = resolveOwners(components)
+        val firstIngestedByComponent = artifactIngestionApi.getFirstIngestedAt(components)
+        return knowledgeGapResponseMapper.toOverviewResponse(gaps, ownersByComponent, firstIngestedByComponent)
     }
 
     /**
@@ -60,7 +64,8 @@ class KnowledgeGapsService(
             ResponseStatusException(HttpStatus.NOT_FOUND, "Knowledge gap with id $gapId not found")
         }
         val owners = resolveOwners(listOf(gap.component))[gap.component] ?: emptyList()
-        return knowledgeGapResponseMapper.toResponse(gap, owners)
+        val firstIngested = artifactIngestionApi.getFirstIngestedAt(gap.component)
+        return knowledgeGapResponseMapper.toResponse(gap, owners, firstIngested)
     }
 
     /**
