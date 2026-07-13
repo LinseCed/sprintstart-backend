@@ -113,7 +113,7 @@ class GithubConnectorService(
 
         val user = withContext(Dispatchers.IO) {
             githubUserRepository
-                .findById(GithubUserPat(authId = userId.toString(), name = request.tokenName))
+                .findById(GithubUserPat(authId = authId, name = request.tokenName))
         }.orElseThrow {
             GithubUserPatNotFoundException(request.tokenName, userId.toString())
         }
