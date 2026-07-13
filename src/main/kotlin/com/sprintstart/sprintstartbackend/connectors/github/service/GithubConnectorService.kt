@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.init
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.initial.GithubRepositoryConnectionInitiationFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateStartedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConfig
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
@@ -16,6 +17,8 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.Gi
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.UserWithAuthIdNotFoundException
+import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConfigRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositorySnapshotRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
@@ -48,6 +51,7 @@ import java.util.UUID
 class GithubConnectorService(
     private val applicationScope: CoroutineScope,
     private val repoConnectionRepository: GithubRepositoryConnectionRepository,
+    private val repoConfigRepository: GithubRepositoryConfigRepository,
     private val repoSnapshotRepository: GithubRepositorySnapshotRepository,
     private val githubUserRepository: GithubUserRepository,
     private val fileService: GithubFileService,
@@ -58,9 +62,28 @@ class GithubConnectorService(
     private val eventPublisher: ApplicationEventPublisher,
     private val userApi: UserApi,
 ) {
+    /**
+     * Retrieves all 'sources' in the connector overview sense.
+     *
+     * For the connector overview, sources are GitHub repositories.
+     * Therefore, this function retrieves a list of all connected GitHub repositories.
+     *
+     * @return a list of all connected GitHub repositories.
+     */
+    @Tracked("Retrieving all GitHub repositories for overview")
     fun getAllSources(): List<GithubRepositoryConnection> =
         repoConnectionRepository.findAll()
 
+    /**
+     * Patches a 'source' in the connector overview sense.
+     *
+     * For the connector overview, sources are GitHub repositories.
+     * Patching a GitHub repository means changing its status, e.g., enabling or disabling it.
+     *
+     * @param source The 'source' (GitHub repository) to patch.
+     * @param newStatus The new status of the 'source'.
+     */
+    @Tracked("Patching a GitHub repository from overview")
     fun patchSource(source: ConnectorSource, newStatus: Boolean) {
         val source = getAllSources().find { "${it.owner}/${it.name}" == source.id } ?: throw RuntimeException("")
         source.sourceEnabled = newStatus
@@ -76,11 +99,11 @@ class GithubConnectorService(
      *
      * Tasks started for background execution include:
      *
-     * * Fetching the repository code
-     * * Fetching the repository commits
-     * * Fetching the repository issues
-     * * Fetching the repository pull requests
-     * * Starting a CRON job that checks for upates every night.
+     * - Fetching the repository code
+     * - Fetching the repository commits
+     * - Fetching the repository issues
+     * - Fetching the repository pull requests
+     * - Starting a CRON job that checks for updates every night.
      *
      * _**Schema:** `https://github.com/{owner}/{name}`_
      *
@@ -100,12 +123,17 @@ class GithubConnectorService(
         }
 
         val transactionId = UUID.randomUUID()
+        val userId = userApi.getUserIdByAuthId(authId).orElseThrow { UserWithAuthIdNotFoundException(authId) }
+
         eventPublisher.publishEvent(
             GithubRepositoryConnectionInitiatedEvent(transactionId, request.owner, request.name),
         )
 
-        val user = githubUserRepository.findById(GithubUserPat(authId = authId, name = request.tokenName)).orElseThrow {
-            GithubUserPatNotFoundException(request.tokenName, authId)
+        val user = withContext(Dispatchers.IO) {
+            githubUserRepository
+                .findById(GithubUserPat(authId = userId.toString(), name = request.tokenName))
+        }.orElseThrow {
+            GithubUserPatNotFoundException(request.tokenName, userId.toString())
         }
 
         val projectIds = mutableSetOf(request.projectId)
@@ -133,11 +161,9 @@ class GithubConnectorService(
     }
 
     /**
-     * Updates all connected GitHub repositories by synchronizing their latest state.
-     *
-     * This method iterates through all repositories stored in the database and triggers
-     * an update for each, ensuring that related resources (files, commits, issues, pull requests)
-     * are synchronized. A unique transaction ID is generated to track the overall update process.
+     * Establishes a connection to the provided GitHub repository, initializes its configuration
+     * and snapshot, and triggers data collection processes such as fetching files, commits, issues,
+     * and pull requests associated with the repository.
      *
      * @return One update response per connected repository, each containing its own transaction id.
      */
@@ -237,7 +263,8 @@ class GithubConnectorService(
                 githubRepository.owner,
                 githubRepository.name,
                 transactionId,
-                latestSnapshot.lastPullRequestsSyncAt,
+                performUpdate = true,
+                since = latestSnapshot.lastPullRequestsSyncAt,
             )
         }
 
@@ -251,15 +278,25 @@ class GithubConnectorService(
      * @param repository The GitHub repository connection object containing connection details and
      * linked project ids.
      * @return A unique identifier (UUID) representing the transaction associated with this operation.
+     * @param repository The GitHub repository connection containing details about the repository being connected.
+     * @param transactionId A unique identifier for the transaction or operation being performed.
+     * @return Returns the transaction ID associated with the repository connection process.
      */
     private suspend fun connectRepository(repository: GithubRepositoryConnection, transactionId: UUID): UUID {
         // Save an initial snapshot of the repository
         val repoSnapshot = GithubRepositorySnapshot(
             repository = repository,
         )
+        val config = GithubRepositoryConfig(
+            repository = repository,
+        )
+        config.nextSyncAt = GithubRepositoryConfigService.calculateNextSyncAt(config.schedule)
 
         repository.snapshot = repoSnapshot
-        repoConnectionRepository.save(repository)
+        withContext(Dispatchers.IO) {
+            repoConnectionRepository.save(repository)
+            repoConfigRepository.save(config)
+        }
 
         eventPublisher.publishEvent(
             GithubRepositoryResourcesFetchingStartedEvent(
@@ -279,7 +316,7 @@ class GithubConnectorService(
             )
         }
         applicationScope.launch {
-            commitsService.fetchAndIngestLatestCommits(repoSnapshot, transactionId, true)
+            commitsService.fetchAndIngestAllCommits(repoSnapshot, transactionId)
         }
         applicationScope.launch {
             issuesService.fetchAndIngestAllIssues(

@@ -8,13 +8,16 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
+import com.sprintstart.sprintstartbackend.connectors.github.service.GithubUpdatesService
 import io.mockk.coEvery
+import io.mockk.every
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -45,6 +48,9 @@ class GithubConnectorControllerTest {
 
     @MockkBean
     private lateinit var githubConnectorService: GithubConnectorService
+
+    @MockkBean
+    private lateinit var githubUpdateService: GithubUpdatesService
 
     @MockkBean
     private lateinit var githubUserRepository: GithubUserRepository
@@ -175,7 +181,7 @@ class GithubConnectorControllerTest {
     inner class UpdateAllRepositories {
         @Test
         fun `should return 400 when one of the repositories is not initialized`() {
-            coEvery { githubConnectorService.updateAllRepositories() } throws RepositoryNotInitializedException(
+            every { githubUpdateService.updateAllRepositories() } throws RepositoryNotInitializedException(
                 "owner",
                 "name",
             )
@@ -196,9 +202,7 @@ class GithubConnectorControllerTest {
         @Test
         fun `should return 202 Accepted when all repositories are initialized`() {
             val transactionId = UUID.randomUUID()
-            coEvery { githubConnectorService.updateAllRepositories() } returns listOf(
-                UpdateRepositoryResponse(transactionId),
-            )
+            every { githubUpdateService.updateAllRepositories() } returns UpdateAllRepositoriesResponse(transactionId)
 
             val asyncResult = mockMvc
                 .perform(
@@ -210,7 +214,7 @@ class GithubConnectorControllerTest {
             mockMvc
                 .perform(asyncDispatch(asyncResult))
                 .andExpect(status().isAccepted)
-                .andExpect(jsonPath("$[0].transactionId").value(transactionId.toString()))
+                .andExpect(jsonPath("$.transactionId").value(transactionId.toString()))
         }
     }
 
@@ -219,7 +223,7 @@ class GithubConnectorControllerTest {
         @Test
         fun `should return 400 when repository not connected`() {
             val request = UpdateRepositoryRequest(owner = "owner", name = "name")
-            coEvery { githubConnectorService.updateRepository(request) } throws RepositoryNotConnectedException(
+            every { githubUpdateService.updateRepository(request, true) } throws RepositoryNotConnectedException(
                 "owner",
                 "name",
             )
@@ -242,7 +246,7 @@ class GithubConnectorControllerTest {
         @Test
         fun `should return 400 when repository not initialized`() {
             val request = UpdateRepositoryRequest(owner = "owner", name = "name")
-            coEvery { githubConnectorService.updateRepository(request) } throws RepositoryNotInitializedException(
+            every { githubUpdateService.updateRepository(request, true) } throws RepositoryNotInitializedException(
                 "owner",
                 "name",
             )
@@ -266,7 +270,12 @@ class GithubConnectorControllerTest {
         fun `should return 202 Accepted when repository is connected and initialized`() {
             val transactionId = UUID.randomUUID()
             val request = UpdateRepositoryRequest(owner = "owner", name = "name")
-            coEvery { githubConnectorService.updateRepository(request) } returns UpdateRepositoryResponse(transactionId)
+            every {
+                githubUpdateService.updateRepository(
+                    request,
+                    true,
+                )
+            } returns UpdateRepositoryResponse(transactionId)
 
             val asyncResult = mockMvc
                 .perform(
