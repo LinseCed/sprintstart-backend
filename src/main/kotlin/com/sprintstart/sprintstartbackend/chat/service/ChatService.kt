@@ -24,6 +24,7 @@ import com.sprintstart.sprintstartbackend.chat.repository.ChatRepository
 import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorDisabledException
 import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.overview.service.ConnectorConfigurationService
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import jakarta.validation.Valid
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +38,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.client.HttpClientErrorException
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -172,25 +174,8 @@ internal class ChatService(
             ).map { it.toAiContextEntry() }
             .toList()
 
-        // Check if source filters are valid
-        val connectorsByName = connectorConfigurationService.findAllConnectors().associateBy { it.name }
-
-        request.filters?.sourceSystems?.forEach { sourceSystem ->
-            val connector = connectorsByName[sourceSystem.name]
-                ?: throw ConnectorNotFoundException("Connector '${sourceSystem.name}' not found")
-
-            if (!connector.enabled) {
-                throw ConnectorDisabledException("Connector '${sourceSystem.name}' is disabled")
-            }
-        }
-
-        // Check for valid time range
-        val from = request.filters?.from
-        val to = request.filters?.to
-
-        if (from != null && to != null && to.isBefore(from)) {
-            throw HttpClientErrorException(HttpStatus.BAD_REQUEST, "Invalid time range.")
-        }
+        validateSourceSystems(request.filters?.sourceSystems)
+        validateTimestamps(request.filters?.from, request.filters?.to)
 
         val filters = request.filters?.toAiChatFilters()
 
@@ -218,5 +203,39 @@ internal class ChatService(
                     println("Stream either got killed or experienced an error: ${cause.message}")
                 }
             }
+    }
+
+    /**
+     * Checks if the source systems are valid.
+     *
+     * Checks if all the provided source systems exist and are enabled.
+     *
+     * @param sourceSystems The systems used by the AI to generate responses.
+     */
+    internal fun validateSourceSystems(sourceSystems: List<SourceSystem>?) {
+        val connectorsByName = connectorConfigurationService.findAllConnectors().associateBy { it.name }
+
+        sourceSystems?.forEach { sourceSystem ->
+            val connector = connectorsByName[sourceSystem.name]
+                ?: throw ConnectorNotFoundException("Connector '${sourceSystem.name}' not found")
+
+            if (!connector.enabled) {
+                throw ConnectorDisabledException("Connector '${sourceSystem.name}' is disabled")
+            }
+        }
+    }
+
+    /**
+     * Checks if the time stamps are valid.
+     *
+     * Checks if the 'from' timestamp is before the 'to' timestamp.
+     *
+     * @param from The start of the time period transferred to the AI.
+     * @param to The end of the time period transferred to the AI.
+     */
+    internal fun validateTimestamps(from: Instant?, to: Instant?) {
+        if (from != null && to != null && to.isBefore(from)) {
+            throw HttpClientErrorException(HttpStatus.BAD_REQUEST, "Start time must be before end time.")
+        }
     }
 }

@@ -34,8 +34,8 @@ internal fun ChatMessage.toAiContextEntry(): ContextEntry {
 
 internal fun ChatFilters.toAiChatFilters(): AiChatFilters {
     return AiChatFilters(
-        source_systems = this.sourceSystems,
-        time_from = this.from.toString(),
-        time_to = this.to.toString(),
+        sourceSystems = this.sourceSystems,
+        from = this.from?.toString(),
+        to = this.to?.toString(),
     )
 }

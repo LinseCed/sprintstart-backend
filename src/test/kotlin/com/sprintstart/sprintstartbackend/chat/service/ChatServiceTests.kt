@@ -402,7 +402,7 @@ class ChatServiceTests {
             every {
                 chatAiClient.streamPrompt(
                     match {
-                        it.filters?.source_systems == listOf("GITHUB")
+                        it.filters?.sourceSystems == listOf("GITHUB")
                     },
                 )
             } returns flowOf(AiStreamMessage("done"))
@@ -422,7 +422,7 @@ class ChatServiceTests {
             every {
                 chatAiClient.streamPrompt(
                     match {
-                        it.filters?.source_systems == listOf(SourceSystem.GITHUB)
+                        it.filters?.sourceSystems == listOf(SourceSystem.GITHUB)
                     },
                 )
             } returns flowOf(AiStreamMessage("done"))
