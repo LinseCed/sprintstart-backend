@@ -25,8 +25,9 @@ import com.sprintstart.sprintstartbackend.chat.repository.CitationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import jakarta.validation.Valid
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
-import kotlinx.coroutines.flow.onEach
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
 import org.springframework.data.domain.Sort
@@ -179,6 +180,8 @@ internal class ChatService(
         data class PendingCitation(
             val id: UUID,
             val artifactId: UUID,
+            val filename: String,
+            val sourceUrl: String?,
             val startLine: Int?,
             val startPage: Int?,
         )
@@ -188,25 +191,42 @@ internal class ChatService(
 
         // Define stream handler
         // - On each token we collect the token and emit it to the controller
+        // - On each citation we resolve filename/sourceUrl (the AI service only sends
+        //   the artifact id + position) so the client sees a complete citation live,
+        //   not only once the chat is reloaded from persisted history
         // - On completion, we store the entire response as msg in db
         return chatAiClient
             .streamPrompt(AiPromptRequest(request.msg, context))
-            .onEach { event ->
+            .map { event ->
                 when (event.type) {
                     "token" -> {
                         event.content?.let(sb::append)
+                        event
                     }
 
                     "citation" -> {
-                        citations += PendingCitation(
-                            id = UUID.randomUUID(),
-                            artifactId = UUID.fromString(event.artifactId!!),
-                            startLine = event.startLine,
-                            startPage = event.startPage,
-                        )
+                        val artifactId = UUID.fromString(event.artifactId!!)
+                        val resolved = artifactLookupService.resolve(artifactId)
+                        if (resolved == null) {
+                            logger.warn("Could not resolve artifact {} for citation", artifactId)
+                            null
+                        } else {
+                            citations += PendingCitation(
+                                id = UUID.randomUUID(),
+                                artifactId = artifactId,
+                                filename = resolved.filename,
+                                sourceUrl = resolved.sourceUrl,
+                                startLine = event.startLine,
+                                startPage = event.startPage,
+                            )
+                            event.copy(filename = resolved.filename, sourceUrl = resolved.sourceUrl)
+                        }
                     }
+
+                    else -> event
                 }
-            }.onCompletion { cause ->
+            }.filterNotNull()
+            .onCompletion { cause ->
                 if (cause == null) {
                     val msg = ChatMessage(
                         role = ChatRole.ASSISTANT,
@@ -217,17 +237,12 @@ internal class ChatService(
 
                     messageRepository.save(msg)
 
-                    val citationEntities = citations.mapNotNull { pending ->
-                        val resolved = artifactLookupService.resolve(pending.artifactId)
-                        if (resolved == null) {
-                            logger.warn("Could not resolve artifact {} for citation", pending.artifactId)
-                            return@mapNotNull null
-                        }
+                    val citationEntities = citations.map { pending ->
                         Citation(
                             id = pending.id,
                             artifactId = pending.artifactId,
-                            filename = resolved.filename,
-                            sourceUrl = resolved.sourceUrl,
+                            filename = pending.filename,
+                            sourceUrl = pending.sourceUrl,
                             startLine = pending.startLine,
                             startPage = pending.startPage,
                             message = msg,

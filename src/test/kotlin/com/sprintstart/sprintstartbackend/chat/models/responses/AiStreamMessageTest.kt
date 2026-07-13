@@ -77,6 +77,23 @@ class AiStreamMessageTest {
     }
 
     @Test
+    fun `serializes a backend-enriched citation event with filename and source_url`() {
+        val message = AiStreamMessage(
+            type = "citation",
+            artifactId = "artifact-1",
+            filename = "retro.md",
+            sourceUrl = "https://github.com/example/retro.md",
+            startLine = 12,
+        )
+
+        assertEquals(
+            """{"type":"citation","artifact_id":"artifact-1","filename":"retro.md",""" +
+                """"source_url":"https://github.com/example/retro.md","start_line":12}""",
+            json.encodeToString(message),
+        )
+    }
+
+    @Test
     fun `serializes a token event without the unrelated fields`() {
         val message = AiStreamMessage("token", "The main")
 

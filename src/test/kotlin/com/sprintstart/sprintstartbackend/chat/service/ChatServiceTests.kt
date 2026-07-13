@@ -428,7 +428,13 @@ class ChatServiceTests {
             coEvery { chatAiClient.streamPrompt(any()) } returns flowOf(*stream.toTypedArray())
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
 
-            chatService.prompt(PromptRequest(chatId, "Hello")).toList()
+            val emitted = chatService.prompt(PromptRequest(chatId, "Hello")).toList()
+
+            val emittedCitations = emitted.filter { it.type == "citation" }
+            assertEquals(2, emittedCitations.size)
+            assertEquals("architecture.md", emittedCitations[0].filename)
+            assertEquals("backend.md", emittedCitations[1].filename)
+            assertEquals("https://github.com/example/backend.md", emittedCitations[1].sourceUrl)
 
             assertEquals(2, savedMessages.size)
             assertEquals(ChatRole.ASSISTANT, savedMessages[1].role)
@@ -478,8 +484,9 @@ class ChatServiceTests {
             coEvery { chatAiClient.streamPrompt(any()) } returns flowOf(*stream.toTypedArray())
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
 
-            chatService.prompt(PromptRequest(chatId, "Hello")).toList()
+            val emitted = chatService.prompt(PromptRequest(chatId, "Hello")).toList()
 
+            assertEquals(0, emitted.count { it.type == "citation" })
             assertEquals(0, citationSlot.captured.toList().size)
         }
     }
