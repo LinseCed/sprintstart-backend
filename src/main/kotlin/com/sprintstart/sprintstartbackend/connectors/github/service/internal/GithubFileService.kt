@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.file
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.files.GithubFilesFetchCompletedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.files.GithubFilesFetchFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.files.GithubFilesFetchStartedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.models.ConnectionState
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubFileSnapshot
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubFileSnapshotSharedId
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
@@ -183,6 +184,43 @@ class GithubFileService(
                 ),
             )
             throw e
+        }
+
+        eventPublisher.publishEvent(
+            GithubFilesFetchCompletedEvent(
+                transactionId,
+                githubRepository.owner,
+                githubRepository.name,
+            ),
+        )
+    }
+
+    /**
+     * Verifies the sync status of files of a given GitHub repository.
+     *
+     * Given a GitHub repository connected to this application, this function checks if the local state is outdated,
+     * and if so marks the repository as [ConnectionState.OUT_OF_DATE], but does not update it.
+     *
+     * @param githubRepository The GitHub repository to check.
+     * @param transactionId The id of the overall transaction this sub-action belongs to.
+     */
+    internal suspend fun verifyFileSyncStatus(githubRepository: GithubRepositoryConnection, transactionId: UUID) {
+        eventPublisher.publishEvent(
+            GithubFilesFetchStartedEvent(
+                transactionId,
+                githubRepository.owner,
+                githubRepository.name,
+            ),
+        )
+
+        val localFsPath = customCache.getLocalRepositoryPath(githubRepository)
+
+        if (!isRepositoryUpToDate(localFsPath)) {
+            githubRepository.connectionState = ConnectionState.OUT_OF_DATE
+
+            withContext(Dispatchers.IO) {
+                repoConnectionRepository.save(githubRepository)
+            }
         }
 
         eventPublisher.publishEvent(
@@ -476,6 +514,21 @@ class GithubFileService(
         }
 
         fetchAndIngestFileUpdates(localFsPath, githubRepository, latestSha, transactionId)
+    }
+
+    /**
+     * Checks the remote, if this local copy of the repository is still up to date.
+     *
+     * @param localFsPath The path to the local copy of the GitHub repository.
+     * @return true, if the repository is up to date with remote, otherwise false.
+     */
+    private suspend fun isRepositoryUpToDate(localFsPath: Path): Boolean {
+        val localHead = gitRunner.exec(localFsPath, onDiskOperations.gitRevParse()).trim()
+        val remoteHead = gitRunner
+            .exec(localFsPath, onDiskOperations.gitLsRemote())
+            .trim()
+            .substringBefore('\t')
+        return localHead == remoteHead
     }
 
     /**
