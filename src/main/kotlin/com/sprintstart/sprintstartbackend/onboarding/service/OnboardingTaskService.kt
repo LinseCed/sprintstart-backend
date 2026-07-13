@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTask
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toCreateResponse
@@ -90,6 +91,8 @@ class OnboardingTaskService(
             title = request.title,
             description = request.description,
         )
+
+        reopenStepIfFinished(step)
 
         return onboardingTaskRepository.save(onboardingTask).toCreateResponse()
     }
@@ -214,6 +217,8 @@ class OnboardingTaskService(
             description = request.description,
         )
 
+        reopenStepIfFinished(step)
+
         return onboardingTaskRepository.save(onboardingTask).toCreateResponse()
     }
 
@@ -279,6 +284,22 @@ class OnboardingTaskService(
     }
 
 //  ========================== Helper Methods ==========================
+
+    /**
+     * Reopens a completed step when new work is added to it.
+     *
+     * A step may only remain [StepStatus.FINISHED] while all of its tasks are done. Adding a
+     * new (unfinished) task therefore reverts a finished step back to [StepStatus.IN_PROGRESS]
+     * and clears its completion timestamp. This keeps the step's status consistent with its
+     * tasks — without it a step added to via the team-management view would stay "done" despite
+     * having open work, and there is no separate PM endpoint to reset another user's step status.
+     */
+    private fun reopenStepIfFinished(step: OnboardingStep) {
+        if (step.status == StepStatus.FINISHED) {
+            step.status = StepStatus.IN_PROGRESS
+            step.completedAt = null
+        }
+    }
 
     /**
      * Makes room for a new task at the requested position by shifting all existing
