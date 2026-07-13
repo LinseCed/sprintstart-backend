@@ -134,6 +134,9 @@ class PhaseCheckControllerTest(
             phaseId = phaseId,
             passed = true,
             createdAt = Instant.parse("2026-07-02T16:00:00Z"),
+            correctCount = 1,
+            questionCount = 1,
+            requiredPercent = 80,
             phaseCheckSummary = summary().copy(passed = true),
             nextPhaseUnlocked = true,
             results = listOf(

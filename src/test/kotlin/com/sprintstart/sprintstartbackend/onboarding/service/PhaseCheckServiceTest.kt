@@ -86,6 +86,36 @@ class PhaseCheckServiceTest {
     private fun textQuestionId(phase: OnboardingPhase) =
         phase.checkQuestions.first { it.type == CheckQuestionType.SHORT_TEXT }.id
 
+    /** A phase whose check consists of [count] multiple-choice questions, each with one correct option. */
+    private fun makePhaseWithMcQuestions(count: Int): OnboardingPhase {
+        val phase = OnboardingPhase(id = phaseId, path = makePath(), position = 0, title = "Setup", description = "d")
+        repeat(count) { index ->
+            val question = PhaseCheckQuestion(
+                phase = phase,
+                position = index,
+                type = CheckQuestionType.MULTIPLE_CHOICE,
+                question = "q$index",
+            )
+            question.options += PhaseCheckOption(question = question, position = 0, label = "right", correct = true)
+            question.options += PhaseCheckOption(question = question, position = 1, label = "wrong", correct = false)
+            phase.checkQuestions += question
+        }
+        return phase
+    }
+
+    /** Answers the first [correctCount] questions correctly and the rest incorrectly. */
+    private fun answersFor(phase: OnboardingPhase, correctCount: Int): SubmitPhaseCheckAttemptRequest {
+        val answers = phase.checkQuestions.sortedBy { it.position }.mapIndexed { index, question ->
+            val option = if (index < correctCount) {
+                question.options.first { it.correct }
+            } else {
+                question.options.first { !it.correct }
+            }
+            SubmitCheckAnswerRequest(questionId = question.id, selectedOptionIds = listOf(option.id))
+        }
+        return SubmitPhaseCheckAttemptRequest(answers = answers)
+    }
+
     @Nested
     inner class GetPhaseCheckForMe {
         @Test
@@ -249,6 +279,36 @@ class PhaseCheckServiceTest {
 
             assertTrue(result.passed)
             assertTrue(result.nextPhaseUnlocked)
+        }
+
+        @Test
+        fun `passes when at least 80 percent of the questions are correct`() {
+            val phase = makePhaseWithMcQuestions(count = 5)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingPhaseRepository.findByIdAndPathUserId(phaseId, userId) } returns Optional.of(phase)
+            every { phaseCheckAttemptRepository.save(any()) } answers { firstArg() }
+
+            // 4 of 5 correct = 80%.
+            val result = service.submitPhaseCheckAttemptForMe(authId, phaseId, answersFor(phase, correctCount = 4))
+
+            assertTrue(result.passed)
+            assertEquals(4, result.correctCount)
+            assertEquals(5, result.questionCount)
+            assertEquals(80, result.requiredPercent)
+        }
+
+        @Test
+        fun `fails when fewer than 80 percent of the questions are correct`() {
+            val phase = makePhaseWithMcQuestions(count = 5)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingPhaseRepository.findByIdAndPathUserId(phaseId, userId) } returns Optional.of(phase)
+            every { phaseCheckAttemptRepository.save(any()) } answers { firstArg() }
+
+            // 3 of 5 correct = 60%.
+            val result = service.submitPhaseCheckAttemptForMe(authId, phaseId, answersFor(phase, correctCount = 3))
+
+            assertFalse(result.passed)
+            assertEquals(3, result.correctCount)
         }
 
         @Test

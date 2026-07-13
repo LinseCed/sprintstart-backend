@@ -43,6 +43,12 @@ class PhaseCheckService(
     private val phaseCheckAttemptRepository: PhaseCheckAttemptRepository,
     private val userApi: UserApi,
 ) {
+    private companion object {
+        /** Minimum percentage of correct questions required to pass a phase check. */
+        const val PASS_PERCENT = 80
+        const val PERCENT = 100
+    }
+
 //  ========================== Methods for users ==========================
 
     /**
@@ -93,7 +99,10 @@ class PhaseCheckService(
         val results = questions.map { question ->
             question.toResultResponse(correct = gradeAnswer(question, answersByQuestionId[question.id]))
         }
-        val passed = results.all { it.correct }
+        val correctCount = results.count { it.correct }
+        // A phase check passes once at least PASS_PERCENT percent of its questions are
+        // answered correctly. Integer math avoids floating-point comparison surprises.
+        val passed = correctCount * PERCENT >= questions.size * PASS_PERCENT
 
         val attempt = PhaseCheckAttempt(phase = phase, userId = userId, passed = passed)
         questions.zip(results).forEach { (question, result) ->
@@ -115,6 +124,9 @@ class PhaseCheckService(
             phaseId = phase.id,
             passed = passed,
             createdAt = attempt.createdAt,
+            correctCount = correctCount,
+            questionCount = questions.size,
+            requiredPercent = PASS_PERCENT,
             phaseCheckSummary = phase.toCheckSummaryResponse(),
             nextPhaseUnlocked = passed && phase.stepsCompleted() && phase.hasNextPhase(),
             results = results,
