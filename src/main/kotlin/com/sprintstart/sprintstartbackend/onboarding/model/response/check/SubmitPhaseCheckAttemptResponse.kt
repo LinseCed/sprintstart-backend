@@ -26,4 +26,9 @@ data class CheckAnswerResultResponse(
     val correctOptionIds: List<UUID> = emptyList(),
     val correctAnswer: String? = null,
     val explanation: String? = null,
+    // AI-generated feedback for short-text answers; null for multiple choice.
+    val feedback: String? = null,
+    // True when this result is for a carried-over repeat question from an earlier phase.
+    val review: Boolean = false,
+    val reviewSourcePhaseTitle: String? = null,
 )

@@ -1,11 +1,16 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.PhaseCheckAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeAnswerItem
+import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeAnswerResult
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhase
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckAnswer
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckAttempt
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckOption
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckQuestion
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckReviewItem
 import com.sprintstart.sprintstartbackend.onboarding.model.request.check.SubmitCheckAnswerRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.check.SubmitPhaseCheckAttemptRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.check.UpdateCheckOptionRequest
@@ -13,10 +18,14 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.check.UpdateC
 import com.sprintstart.sprintstartbackend.onboarding.model.request.check.UpdatePhaseCheckRequest
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPhaseRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.PhaseCheckAttemptRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.PhaseCheckQuestionRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.PhaseCheckReviewItemRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -31,12 +40,52 @@ import kotlin.test.assertTrue
 class PhaseCheckServiceTest {
     private val onboardingPhaseRepository: OnboardingPhaseRepository = mockk()
     private val phaseCheckAttemptRepository: PhaseCheckAttemptRepository = mockk()
+    private val phaseCheckQuestionRepository: PhaseCheckQuestionRepository = mockk()
+    private val phaseCheckReviewItemRepository: PhaseCheckReviewItemRepository = mockk()
     private val userApi: UserApi = mockk()
-    private val service = PhaseCheckService(onboardingPhaseRepository, phaseCheckAttemptRepository, userApi)
+    private val phaseCheckAiClient: PhaseCheckAiClient = mockk()
+    private val service =
+        PhaseCheckService(
+            onboardingPhaseRepository,
+            phaseCheckAttemptRepository,
+            phaseCheckQuestionRepository,
+            phaseCheckReviewItemRepository,
+            userApi,
+            phaseCheckAiClient,
+        )
 
     private val userId = UUID.randomUUID()
     private val phaseId = UUID.randomUUID()
     private val authId = "auth|test-user"
+
+    @BeforeEach
+    fun setUp() {
+        // Default: the AI grades short text like a trimmed, case-insensitive exact match,
+        // so existing assertions hold. Individual tests override this for semantic grading.
+        coEvery { phaseCheckAiClient.gradeAnswers(any()) } answers {
+            firstArg<List<GradeAnswerItem>>().map { item ->
+                GradeAnswerResult(
+                    id = item.id,
+                    correct = item.userAnswer.trim().equals(item.referenceAnswer.trim(), ignoreCase = true),
+                    feedback = "",
+                )
+            }
+        }
+        // Default: no carried-over repeat questions. Carry-over tests override these.
+        every {
+            phaseCheckReviewItemRepository.findAllByUserIdAndTargetPhaseIdAndResolvedFalseOrderByCreatedAtAsc(
+                any(),
+                any(),
+            )
+        } returns mutableListOf()
+        every { phaseCheckReviewItemRepository.findAllByUserIdAndQuestionIdAndResolvedFalse(any(), any()) } returns
+            mutableListOf()
+        every { phaseCheckReviewItemRepository.save(any()) } answers { firstArg() }
+        every { phaseCheckReviewItemRepository.saveAll(any<List<PhaseCheckReviewItem>>()) } answers { firstArg() }
+        every { phaseCheckQuestionRepository.findAllById(any()) } returns mutableListOf()
+        every { phaseCheckAttemptRepository.findAllByPhaseIdAndUserIdOrderByCreatedAtDesc(any(), any()) } returns
+            mutableListOf()
+    }
 
     private fun makePath(vararg phasePositions: Int): OnboardingPath {
         val path = OnboardingPath(userId = userId)
@@ -312,6 +361,57 @@ class PhaseCheckServiceTest {
         }
 
         @Test
+        fun `accepts a semantically correct short text answer and passes through AI feedback`() {
+            val phase = makePhaseWithCheck()
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingPhaseRepository.findByIdAndPathUserId(phaseId, userId) } returns Optional.of(phase)
+            every { phaseCheckAttemptRepository.save(any()) } answers { firstArg() }
+            // The AI accepts a paraphrase that a plain exact match would have rejected.
+            coEvery { phaseCheckAiClient.gradeAnswers(any()) } answers {
+                firstArg<List<GradeAnswerItem>>().map {
+                    GradeAnswerResult(id = it.id, correct = true, feedback = "Right idea.")
+                }
+            }
+
+            val request = SubmitPhaseCheckAttemptRequest(
+                answers = listOf(
+                    SubmitCheckAnswerRequest(mcQuestionId(phase), selectedOptionIds = listOf(correctOptionId(phase))),
+                    SubmitCheckAnswerRequest(
+                        textQuestionId(phase),
+                        textAnswer = "you run the gradle wrapper boot task",
+                    ),
+                ),
+            )
+
+            val result = service.submitPhaseCheckAttemptForMe(authId, phaseId, request)
+
+            val textResult = result.results.first { it.questionId == textQuestionId(phase) }
+            assertTrue(textResult.correct)
+            assertEquals("Right idea.", textResult.feedback)
+        }
+
+        @Test
+        fun `falls back to exact match when the AI grading service is unavailable`() {
+            val phase = makePhaseWithCheck()
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingPhaseRepository.findByIdAndPathUserId(phaseId, userId) } returns Optional.of(phase)
+            every { phaseCheckAttemptRepository.save(any()) } answers { firstArg() }
+            coEvery { phaseCheckAiClient.gradeAnswers(any()) } throws RuntimeException("AI down")
+
+            val request = SubmitPhaseCheckAttemptRequest(
+                answers = listOf(
+                    SubmitCheckAnswerRequest(mcQuestionId(phase), selectedOptionIds = listOf(correctOptionId(phase))),
+                    // Exact reference answer -> fallback comparison still marks it correct.
+                    SubmitCheckAnswerRequest(textQuestionId(phase), textAnswer = "gradlew bootRun"),
+                ),
+            )
+
+            val result = service.submitPhaseCheckAttemptForMe(authId, phaseId, request)
+
+            assertTrue(result.results.first { it.questionId == textQuestionId(phase) }.correct)
+        }
+
+        @Test
         fun `throws 404 when the phase has no knowledge check`() {
             val phase = OnboardingPhase(id = phaseId, path = makePath(), position = 0, title = "t", description = "d")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
@@ -493,6 +593,171 @@ class PhaseCheckServiceTest {
                     .options
                     .firstOrNull(),
             )
+        }
+    }
+
+    @Nested
+    inner class CarryOver {
+        private fun addMcQuestion(phase: OnboardingPhase, position: Int): PhaseCheckQuestion {
+            val question = PhaseCheckQuestion(
+                phase = phase,
+                position = position,
+                type = CheckQuestionType.MULTIPLE_CHOICE,
+                question = "q$position",
+            )
+            question.options += PhaseCheckOption(question = question, position = 0, label = "ok", correct = true)
+            question.options += PhaseCheckOption(question = question, position = 1, label = "no", correct = false)
+            phase.checkQuestions += question
+            return question
+        }
+
+        private fun answerCorrect(question: PhaseCheckQuestion) =
+            SubmitCheckAnswerRequest(question.id, selectedOptionIds = listOf(question.options.first { it.correct }.id))
+
+        private fun answerWrong(question: PhaseCheckQuestion) =
+            SubmitCheckAnswerRequest(question.id, selectedOptionIds = listOf(question.options.first { !it.correct }.id))
+
+        @Test
+        fun `carries an own question wrong in an earlier attempt to the next phase even if now correct`() {
+            val path = makePath(0, 1)
+            val phase = path.phases.first { it.position == 0 }
+            val nextPhase = path.phases.first { it.position == 1 }
+            val questions = (0 until 5).map { addMcQuestion(phase, it) }
+
+            // An earlier attempt got question index 2 wrong; the current attempt is all-correct.
+            val priorAttempt = PhaseCheckAttempt(phase = phase, userId = userId, passed = false)
+            questions.forEachIndexed { index, question ->
+                priorAttempt.answers += PhaseCheckAnswer(
+                    attempt = priorAttempt,
+                    questionId = question.id,
+                    correct = index != 2,
+                )
+            }
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingPhaseRepository.findByIdAndPathUserId(phase.id, userId) } returns Optional.of(phase)
+            every { phaseCheckAttemptRepository.save(any()) } answers { firstArg() }
+            every {
+                phaseCheckAttemptRepository.findAllByPhaseIdAndUserIdOrderByCreatedAtDesc(
+                    phase.id,
+                    userId,
+                )
+            } returns
+                mutableListOf(priorAttempt)
+            val saved = mutableListOf<PhaseCheckReviewItem>()
+            every { phaseCheckReviewItemRepository.save(capture(saved)) } answers { firstArg() }
+
+            val request = SubmitPhaseCheckAttemptRequest(answers = questions.map { answerCorrect(it) })
+            val result = service.submitPhaseCheckAttemptForMe(authId, phase.id, request)
+
+            assertTrue(result.passed)
+            assertEquals(1, saved.size)
+            assertEquals(questions[2].id, saved.single().questionId)
+            assertEquals(nextPhase.id, saved.single().targetPhaseId)
+            assertEquals(phase.id, saved.single().sourcePhaseId)
+        }
+
+        @Test
+        fun `shows a carried-over question and resolves it when answered correctly`() {
+            val path = makePath(0, 1)
+            val sourcePhase = path.phases.first { it.position == 0 }
+            val targetPhase = path.phases.first { it.position == 1 }
+            val ownQuestion = addMcQuestion(targetPhase, 0)
+            val carriedQuestion = addMcQuestion(sourcePhase, 0)
+            val reviewItem = PhaseCheckReviewItem(
+                userId = userId,
+                questionId = carriedQuestion.id,
+                sourcePhaseId = sourcePhase.id,
+                targetPhaseId = targetPhase.id,
+            )
+
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingPhaseRepository.findByIdAndPathUserId(targetPhase.id, userId) } returns
+                Optional.of(targetPhase)
+            every { phaseCheckAttemptRepository.save(any()) } answers { firstArg() }
+            every {
+                phaseCheckReviewItemRepository
+                    .findAllByUserIdAndTargetPhaseIdAndResolvedFalseOrderByCreatedAtAsc(userId, targetPhase.id)
+            } returns mutableListOf(reviewItem)
+            every { phaseCheckQuestionRepository.findAllById(listOf(carriedQuestion.id)) } returns
+                mutableListOf(carriedQuestion)
+
+            val request = SubmitPhaseCheckAttemptRequest(
+                answers = listOf(answerCorrect(ownQuestion), answerCorrect(carriedQuestion)),
+            )
+            val result = service.submitPhaseCheckAttemptForMe(authId, targetPhase.id, request)
+
+            assertTrue(result.passed)
+            assertTrue(reviewItem.resolved)
+            val reviewResult = result.results.first { it.review }
+            assertEquals(carriedQuestion.id, reviewResult.questionId)
+            assertEquals("P0", reviewResult.reviewSourcePhaseTitle)
+        }
+
+        @Test
+        fun `advances a carried-over question to the following phase when answered wrong`() {
+            val path = makePath(0, 1, 2)
+            val sourcePhase = path.phases.first { it.position == 0 }
+            val targetPhase = path.phases.first { it.position == 1 }
+            val phaseAfter = path.phases.first { it.position == 2 }
+            val ownQuestion = addMcQuestion(targetPhase, 0)
+            val carriedQuestion = addMcQuestion(sourcePhase, 0)
+            val reviewItem = PhaseCheckReviewItem(
+                userId = userId,
+                questionId = carriedQuestion.id,
+                sourcePhaseId = sourcePhase.id,
+                targetPhaseId = targetPhase.id,
+            )
+
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingPhaseRepository.findByIdAndPathUserId(targetPhase.id, userId) } returns
+                Optional.of(targetPhase)
+            every { phaseCheckAttemptRepository.save(any()) } answers { firstArg() }
+            every {
+                phaseCheckReviewItemRepository
+                    .findAllByUserIdAndTargetPhaseIdAndResolvedFalseOrderByCreatedAtAsc(userId, targetPhase.id)
+            } returns mutableListOf(reviewItem)
+            every { phaseCheckQuestionRepository.findAllById(listOf(carriedQuestion.id)) } returns
+                mutableListOf(carriedQuestion)
+
+            val request = SubmitPhaseCheckAttemptRequest(
+                answers = listOf(answerCorrect(ownQuestion), answerWrong(carriedQuestion)),
+            )
+            service.submitPhaseCheckAttemptForMe(authId, targetPhase.id, request)
+
+            assertFalse(reviewItem.resolved)
+            assertEquals(phaseAfter.id, reviewItem.targetPhaseId)
+        }
+
+        @Test
+        fun `getPhaseCheckForMe appends carried-over repeat questions`() {
+            val path = makePath(0, 1)
+            val sourcePhase = path.phases.first { it.position == 0 }
+            val targetPhase = path.phases.first { it.position == 1 }
+            addMcQuestion(targetPhase, 0)
+            val carriedQuestion = addMcQuestion(sourcePhase, 0)
+            val reviewItem = PhaseCheckReviewItem(
+                userId = userId,
+                questionId = carriedQuestion.id,
+                sourcePhaseId = sourcePhase.id,
+                targetPhaseId = targetPhase.id,
+            )
+
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingPhaseRepository.findByIdAndPathUserId(targetPhase.id, userId) } returns
+                Optional.of(targetPhase)
+            every {
+                phaseCheckReviewItemRepository
+                    .findAllByUserIdAndTargetPhaseIdAndResolvedFalseOrderByCreatedAtAsc(userId, targetPhase.id)
+            } returns mutableListOf(reviewItem)
+            every { phaseCheckQuestionRepository.findAllById(listOf(carriedQuestion.id)) } returns
+                mutableListOf(carriedQuestion)
+
+            val result = service.getPhaseCheckForMe(authId, targetPhase.id)
+
+            assertEquals(2, result.questions.size)
+            val review = result.questions.first { it.review }
+            assertEquals(carriedQuestion.id, review.id)
+            assertEquals("P0", review.reviewSourcePhaseTitle)
         }
     }
 }

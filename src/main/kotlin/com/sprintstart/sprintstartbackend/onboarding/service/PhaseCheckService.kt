@@ -1,15 +1,20 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.PhaseCheckAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeAnswerItem
+import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeAnswerResult
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhase
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckAnswer
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckAttempt
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckOption
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckQuestion
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckReviewItem
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.stepsCompleted
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toCheckForUserResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toCheckResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toCheckSummaryResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toForUserResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toGetResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.request.check.SubmitCheckAnswerRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.check.SubmitPhaseCheckAttemptRequest
@@ -21,7 +26,11 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.check.GetPha
 import com.sprintstart.sprintstartbackend.onboarding.model.response.check.SubmitPhaseCheckAttemptResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPhaseRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.PhaseCheckAttemptRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.PhaseCheckQuestionRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.PhaseCheckReviewItemRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
+import kotlinx.coroutines.runBlocking
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -41,13 +50,24 @@ import java.util.UUID
 class PhaseCheckService(
     private val onboardingPhaseRepository: OnboardingPhaseRepository,
     private val phaseCheckAttemptRepository: PhaseCheckAttemptRepository,
+    private val phaseCheckQuestionRepository: PhaseCheckQuestionRepository,
+    private val phaseCheckReviewItemRepository: PhaseCheckReviewItemRepository,
     private val userApi: UserApi,
+    private val phaseCheckAiClient: PhaseCheckAiClient,
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
+
     private companion object {
         /** Minimum percentage of correct questions required to pass a phase check. */
         const val PASS_PERCENT = 80
         const val PERCENT = 100
     }
+
+    /** Grading outcome of one question: whether it was correct plus optional AI feedback. */
+    private data class Graded(
+        val correct: Boolean,
+        val feedback: String? = null,
+    )
 
 //  ========================== Methods for users ==========================
 
@@ -63,8 +83,14 @@ class PhaseCheckService(
     @Transactional(readOnly = true)
     fun getPhaseCheckForMe(authId: String, phaseId: UUID): GetPhaseCheckForUserResponse {
         val userId = resolveUserId(authId)
+        val phase = findPhaseForUser(phaseId, userId)
 
-        return findPhaseForUser(phaseId, userId).toCheckForUserResponse()
+        val base = phase.toCheckForUserResponse()
+        val reviewQuestions = loadOpenReviewQuestions(userId, phaseId).map { (_, question) ->
+            question.toForUserResponse().copy(review = true, reviewSourcePhaseTitle = question.phase.title)
+        }
+
+        return base.copy(questions = base.questions + reviewQuestions)
     }
 
     /**
@@ -95,41 +121,59 @@ class PhaseCheckService(
         }
 
         val answersByQuestionId = request.answers.associateBy { it.questionId }
-        val questions = phase.checkQuestions.sortedBy { it.position }
-        val results = questions.map { question ->
-            question.toResultResponse(correct = gradeAnswer(question, answersByQuestionId[question.id]))
+        val ownQuestions = phase.checkQuestions.sortedBy { it.position }
+        // Carried-over repeat questions from earlier phases the user must also answer here.
+        val reviewPairs = loadOpenReviewQuestions(userId, phaseId)
+        val graded = gradeQuestions(ownQuestions + reviewPairs.map { it.second }, answersByQuestionId)
+
+        val ownResults = ownQuestions.map { question ->
+            val outcome = graded.getValue(question.id)
+            question.toResultResponse(correct = outcome.correct, feedback = outcome.feedback)
         }
-        val correctCount = results.count { it.correct }
-        // A phase check passes once at least PASS_PERCENT percent of its questions are
-        // answered correctly. Integer math avoids floating-point comparison surprises.
-        val passed = correctCount * PERCENT >= questions.size * PASS_PERCENT
+        val reviewResults = reviewPairs.map { (_, question) ->
+            val outcome = graded.getValue(question.id)
+            question
+                .toResultResponse(correct = outcome.correct, feedback = outcome.feedback)
+                .copy(review = true, reviewSourcePhaseTitle = question.phase.title)
+        }
+
+        // Only the phase's own questions count toward the pass threshold; repeats are
+        // an extra verification and never block passing (integer math avoids float surprises).
+        val correctCount = ownResults.count { it.correct }
+        val passed = correctCount * PERCENT >= ownQuestions.size * PASS_PERCENT
 
         val attempt = PhaseCheckAttempt(phase = phase, userId = userId, passed = passed)
-        questions.zip(results).forEach { (question, result) ->
+        (ownQuestions + reviewPairs.map { it.second }).forEach { question ->
             val submitted = answersByQuestionId[question.id]
             attempt.answers += PhaseCheckAnswer(
                 attempt = attempt,
                 questionId = question.id,
                 selectedOptionIds = submitted?.selectedOptionIds?.toMutableList() ?: mutableListOf(),
                 textAnswer = submitted?.textAnswer,
-                correct = result.correct,
+                correct = graded.getValue(question.id).correct,
             )
         }
-        phaseCheckAttemptRepository.save(attempt)
-        // Keep the entity graph in sync so the summary below sees the new attempt.
-        phase.checkAttempts += attempt
+        // save() merges (the id is client-assigned), so use the returned managed instance.
+        // The attempt is NOT added to phase.checkAttempts by hand: that would put a detached
+        // copy into a cascade collection and fail the flush with a NonUniqueObjectException.
+        // toCheckSummaryResponse() below lazily reloads the collection, which includes this attempt.
+        val savedAttempt = phaseCheckAttemptRepository.save(attempt)
+
+        if (passed) {
+            applyCarryOver(phase, userId, ownQuestions, reviewPairs, graded)
+        }
 
         return SubmitPhaseCheckAttemptResponse(
-            attemptId = attempt.id,
+            attemptId = savedAttempt.id,
             phaseId = phase.id,
             passed = passed,
-            createdAt = attempt.createdAt,
+            createdAt = savedAttempt.createdAt,
             correctCount = correctCount,
-            questionCount = questions.size,
+            questionCount = ownQuestions.size,
             requiredPercent = PASS_PERCENT,
             phaseCheckSummary = phase.toCheckSummaryResponse(),
             nextPhaseUnlocked = passed && phase.stepsCompleted() && phase.hasNextPhase(),
-            results = results,
+            results = ownResults + reviewResults,
         )
     }
 
@@ -240,41 +284,196 @@ class PhaseCheckService(
     }
 
     /**
-     * Grades one submitted answer against its question. A missing answer counts as
-     * incorrect. Multiple choice requires the exact set of correct options; short
-     * text is compared trimmed and case-insensitive.
+     * Grades every question of an attempt, keyed by question id.
+     *
+     * Multiple choice is graded deterministically in process (exact set of correct
+     * options). Short text is delegated to the AI service for semantic grading in a
+     * single batch call, because users rarely type the reference answer verbatim.
      */
-    private fun gradeAnswer(question: PhaseCheckQuestion, answer: SubmitCheckAnswerRequest?): Boolean {
-        if (answer == null) return false
+    private fun gradeQuestions(
+        questions: List<PhaseCheckQuestion>,
+        answersByQuestionId: Map<UUID, SubmitCheckAnswerRequest>,
+    ): Map<UUID, Graded> {
+        val multipleChoice = questions
+            .filter { it.type == CheckQuestionType.MULTIPLE_CHOICE }
+            .associate { it.id to Graded(gradeMultipleChoice(it, answersByQuestionId[it.id])) }
 
-        return when (question.type) {
-            CheckQuestionType.MULTIPLE_CHOICE -> {
-                val correctOptionIds = question.options
-                    .filter { it.correct }
-                    .map { it.id }
-                    .toSet()
-                answer.selectedOptionIds.toSet() == correctOptionIds
-            }
+        val shortText = gradeShortText(
+            questions.filter { it.type == CheckQuestionType.SHORT_TEXT },
+            answersByQuestionId,
+        )
 
-            CheckQuestionType.SHORT_TEXT -> {
-                val expected = question.correctAnswer?.trim() ?: return false
-                answer.textAnswer?.trim()?.equals(expected, ignoreCase = true) == true
-            }
-        }
+        return multipleChoice + shortText
     }
 
-    private fun PhaseCheckQuestion.toResultResponse(correct: Boolean): CheckAnswerResultResponse {
+    /** A multiple choice answer is correct when it selects exactly the correct options. */
+    private fun gradeMultipleChoice(question: PhaseCheckQuestion, answer: SubmitCheckAnswerRequest?): Boolean {
+        if (answer == null) return false
+        val correctOptionIds = question.options
+            .filter { it.correct }
+            .map { it.id }
+            .toSet()
+        return answer.selectedOptionIds.toSet() == correctOptionIds
+    }
+
+    /**
+     * Grades short-text answers semantically via the AI service in one batch.
+     *
+     * Blank answers (or questions without a reference answer) are marked incorrect
+     * without calling the AI. If the AI service is unavailable, grading falls back to
+     * a trimmed, case-insensitive comparison so that submitting an attempt never fails
+     * on grading alone.
+     */
+    private fun gradeShortText(
+        questions: List<PhaseCheckQuestion>,
+        answersByQuestionId: Map<UUID, SubmitCheckAnswerRequest>,
+    ): Map<UUID, Graded> {
+        if (questions.isEmpty()) return emptyMap()
+
+        val graded = mutableMapOf<UUID, Graded>()
+        val toGrade = mutableListOf<GradeAnswerItem>()
+        questions.forEach { question ->
+            val answer = answersByQuestionId[question.id]?.textAnswer?.trim()
+            val reference = question.correctAnswer?.trim()
+            if (answer.isNullOrBlank() || reference.isNullOrBlank()) {
+                graded[question.id] = Graded(correct = false)
+            } else {
+                toGrade += GradeAnswerItem(
+                    id = question.id.toString(),
+                    question = question.question,
+                    referenceAnswer = reference,
+                    userAnswer = answer,
+                )
+            }
+        }
+        if (toGrade.isEmpty()) return graded
+
+        val aiResults = gradeWithAi(toGrade)
+        toGrade.forEach { item ->
+            val questionId = UUID.fromString(item.id)
+            val ai = aiResults?.get(item.id)
+            graded[questionId] = if (ai != null) {
+                Graded(correct = ai.correct, feedback = ai.feedback.ifBlank { null })
+            } else {
+                // AI unavailable: fall back to a deterministic comparison.
+                Graded(correct = item.userAnswer.equals(item.referenceAnswer, ignoreCase = true))
+            }
+        }
+        return graded
+    }
+
+    /**
+     * Calls the AI grading service, returning results keyed by correlation id, or
+     * `null` when the service is unavailable so the caller can fall back.
+     */
+    private fun gradeWithAi(items: List<GradeAnswerItem>): Map<String, GradeAnswerResult>? =
+        try {
+            runBlocking { phaseCheckAiClient.gradeAnswers(items) }.associateBy { it.id }
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            logger.warn("AI short-text grading unavailable, falling back to exact match: {}", e.message)
+            null
+        }
+
+    private fun PhaseCheckQuestion.toResultResponse(
+        correct: Boolean,
+        feedback: String? = null,
+    ): CheckAnswerResultResponse {
         return CheckAnswerResultResponse(
             questionId = this.id,
             correct = correct,
             correctOptionIds = options.filter { it.correct }.map { it.id },
             correctAnswer = this.correctAnswer,
             explanation = this.explanation,
+            feedback = feedback,
         )
     }
 
     private fun OnboardingPhase.hasNextPhase(): Boolean {
         return path.phases.any { it.position > this.position }
+    }
+
+    /** The phase directly after this one by position, or null when this is the last phase. */
+    private fun OnboardingPhase.nextPhase(): OnboardingPhase? =
+        path.phases.filter { it.position > this.position }.minByOrNull { it.position }
+
+    /**
+     * Loads the open (unresolved) carried-over questions the user must re-answer in the
+     * given phase, paired with their original [PhaseCheckQuestion]. Items whose question
+     * no longer exists are skipped.
+     */
+    private fun loadOpenReviewQuestions(
+        userId: UUID,
+        phaseId: UUID,
+    ): List<Pair<PhaseCheckReviewItem, PhaseCheckQuestion>> {
+        val items = phaseCheckReviewItemRepository
+            .findAllByUserIdAndTargetPhaseIdAndResolvedFalseOrderByCreatedAtAsc(userId, phaseId)
+        if (items.isEmpty()) return emptyList()
+
+        val questionsById = phaseCheckQuestionRepository
+            .findAllById(items.map { it.questionId })
+            .associateBy { it.id }
+
+        return items.mapNotNull { item -> questionsById[item.questionId]?.let { item to it } }
+    }
+
+    /**
+     * Updates carry-over state after a phase was passed.
+     *
+     * Repeat questions shown in this attempt are resolved when answered correctly and
+     * advanced to the next phase when answered incorrectly. The phase's own questions
+     * answered incorrectly in any attempt (so understanding is verified even after a
+     * lucky retry) are carried over to the next phase. When there is no next phase,
+     * nothing new is carried and any remaining repeats are dropped.
+     */
+    private fun applyCarryOver(
+        phase: OnboardingPhase,
+        userId: UUID,
+        ownQuestions: List<PhaseCheckQuestion>,
+        reviewPairs: List<Pair<PhaseCheckReviewItem, PhaseCheckQuestion>>,
+        graded: Map<UUID, Graded>,
+    ) {
+        val nextPhase = phase.nextPhase()
+
+        reviewPairs.forEach { (item, question) ->
+            when {
+                graded[question.id]?.correct == true -> item.resolved = true
+                nextPhase != null -> item.targetPhaseId = nextPhase.id
+                else -> item.resolved = true
+            }
+        }
+        phaseCheckReviewItemRepository.saveAll(reviewPairs.map { it.first })
+
+        if (nextPhase == null) return
+        everWrongOwnQuestionIds(phase.id, userId, ownQuestions).forEach { questionId ->
+            val alreadyOpen = phaseCheckReviewItemRepository
+                .findAllByUserIdAndQuestionIdAndResolvedFalse(userId, questionId)
+                .isNotEmpty()
+            if (!alreadyOpen) {
+                phaseCheckReviewItemRepository.save(
+                    PhaseCheckReviewItem(
+                        userId = userId,
+                        questionId = questionId,
+                        sourcePhaseId = phase.id,
+                        targetPhaseId = nextPhase.id,
+                    ),
+                )
+            }
+        }
+    }
+
+    /** Ids of the phase's own questions answered incorrectly in at least one of the user's attempts. */
+    private fun everWrongOwnQuestionIds(
+        phaseId: UUID,
+        userId: UUID,
+        ownQuestions: List<PhaseCheckQuestion>,
+    ): Set<UUID> {
+        val ownIds = ownQuestions.map { it.id }.toSet()
+        return phaseCheckAttemptRepository
+            .findAllByPhaseIdAndUserIdOrderByCreatedAtDesc(phaseId, userId)
+            .flatMap { it.answers }
+            .filter { !it.correct && it.questionId in ownIds }
+            .map { it.questionId }
+            .toSet()
     }
 
     private fun badRequest(message: String): Nothing =

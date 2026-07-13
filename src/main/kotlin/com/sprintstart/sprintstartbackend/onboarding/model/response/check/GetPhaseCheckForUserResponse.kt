@@ -20,6 +20,9 @@ data class CheckQuestionForUserResponse(
     val type: CheckQuestionType,
     val question: String,
     val options: List<CheckOptionForUserResponse> = emptyList(),
+    // True when this question is a carried-over repeat from an earlier phase.
+    val review: Boolean = false,
+    val reviewSourcePhaseTitle: String? = null,
 )
 
 data class CheckOptionForUserResponse(
