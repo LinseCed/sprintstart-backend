@@ -29,8 +29,11 @@ class GetChatMessagesResponseTest {
         val citation = Citation(
             UUID.randomUUID(),
             chatMessage,
-            "chunk-1",
+            UUID.randomUUID(),
             "document.pdf",
+            "https://example.com/document.pdf",
+            null,
+            3,
         )
         chatMessage.citations = listOf(citation)
 
@@ -41,7 +44,10 @@ class GetChatMessagesResponseTest {
 
         assertEquals(1, request.citations.size)
         assertEquals(citation.id, request.citations[0].id)
-        assertEquals(citation.chunkId, request.citations[0].chunkId)
+        assertEquals(citation.artifactId, request.citations[0].artifactId)
         assertEquals(citation.filename, request.citations[0].filename)
+        assertEquals(citation.sourceUrl, request.citations[0].sourceUrl)
+        assertEquals(citation.startLine, request.citations[0].startLine)
+        assertEquals(citation.startPage, request.citations[0].startPage)
     }
 }

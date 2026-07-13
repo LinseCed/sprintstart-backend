@@ -15,6 +15,9 @@ internal data class Citation(
     @ManyToOne
     @JoinColumn(name = "message_id")
     var message: ChatMessage,
-    var chunkId: String,
+    var artifactId: UUID,
     var filename: String,
+    var sourceUrl: String? = null,
+    var startLine: Int? = null,
+    var startPage: Int? = null,
 )

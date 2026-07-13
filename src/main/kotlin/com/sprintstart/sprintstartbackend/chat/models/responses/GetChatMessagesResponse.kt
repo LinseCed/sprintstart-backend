@@ -16,8 +16,11 @@ internal data class GetChatMessagesResponse(
 
 internal data class CitationResponse(
     val id: UUID,
-    val chunkId: String,
+    val artifactId: UUID,
     val filename: String,
+    val sourceUrl: String?,
+    val startLine: Int?,
+    val startPage: Int?,
 )
 
 internal data class ChatMessageResponse(
@@ -29,8 +32,11 @@ internal data class ChatMessageResponse(
 internal fun Citation.toResponse() =
     CitationResponse(
         id = id,
-        chunkId = chunkId,
+        artifactId = artifactId,
         filename = filename,
+        sourceUrl = sourceUrl,
+        startLine = startLine,
+        startPage = startPage,
     )
 
 internal fun ChatMessage.toChatMessageResponse(): ChatMessageResponse {

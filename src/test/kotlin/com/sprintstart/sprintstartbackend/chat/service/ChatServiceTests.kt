@@ -47,12 +47,14 @@ class ChatServiceTests {
     private val citationRepository: CitationRepository = mockk()
     private val chatAiClient: ChatAiClient = mockk()
     private val userApi: UserApi = mockk()
+    private val artifactLookupService: ArtifactLookupService = mockk()
     private val chatService = ChatService(
         chatRepository,
         chatMessageRepository,
         citationRepository,
         chatAiClient,
         userApi,
+        artifactLookupService,
     )
 
     private val userId = UUID.randomUUID()
@@ -390,6 +392,9 @@ class ChatServiceTests {
                 createdAt = OffsetDateTime.now(),
             )
 
+            val artifactId1 = UUID.randomUUID()
+            val artifactId2 = UUID.randomUUID()
+
             val stream = listOf(
                 AiStreamMessage(
                     type = "token",
@@ -397,13 +402,13 @@ class ChatServiceTests {
                 ),
                 AiStreamMessage(
                     type = "citation",
-                    chunkId = "chunk-123",
-                    filename = "architecture.md",
+                    artifactId = artifactId1.toString(),
+                    startLine = 12,
                 ),
                 AiStreamMessage(
                     type = "citation",
-                    chunkId = "chunk-456",
-                    filename = "backend.md",
+                    artifactId = artifactId2.toString(),
+                    startPage = 3,
                 ),
                 AiStreamMessage(type = "done"),
             )
@@ -415,6 +420,10 @@ class ChatServiceTests {
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(capture(savedMessages)) } answers { firstArg() }
             every { citationRepository.saveAll(capture(citationSlot)) } answers { firstArg() }
+            every { artifactLookupService.resolve(artifactId1) } returns
+                ResolvedArtifact(filename = "architecture.md", sourceUrl = null)
+            every { artifactLookupService.resolve(artifactId2) } returns
+                ResolvedArtifact(filename = "backend.md", sourceUrl = "https://github.com/example/backend.md")
 
             coEvery { chatAiClient.streamPrompt(any()) } returns flowOf(*stream.toTypedArray())
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
@@ -428,13 +437,50 @@ class ChatServiceTests {
 
             assertEquals(2, savedCitations.size)
 
-            assertEquals("chunk-123", savedCitations[0].chunkId)
+            assertEquals(artifactId1, savedCitations[0].artifactId)
             assertEquals("architecture.md", savedCitations[0].filename)
+            assertEquals(12, savedCitations[0].startLine)
 
-            assertEquals("chunk-456", savedCitations[1].chunkId)
+            assertEquals(artifactId2, savedCitations[1].artifactId)
             assertEquals("backend.md", savedCitations[1].filename)
+            assertEquals("https://github.com/example/backend.md", savedCitations[1].sourceUrl)
+            assertEquals(3, savedCitations[1].startPage)
             assertEquals(savedMessages[1], savedCitations[0].message)
             assertEquals(savedMessages[1], savedCitations[1].message)
+        }
+
+        @Test
+        fun `skips citations whose artifact cannot be resolved`() = runTest {
+            val chat = Chat(
+                id = chatId,
+                userId = userId,
+                title = "Existing title",
+                createdAt = OffsetDateTime.now(),
+            )
+            val unknownArtifactId = UUID.randomUUID()
+
+            val stream = listOf(
+                AiStreamMessage(
+                    type = "citation",
+                    artifactId = unknownArtifactId.toString(),
+                ),
+                AiStreamMessage(type = "done"),
+            )
+
+            val citationSlot = slot<Iterable<Citation>>()
+
+            every { chatRepository.findById(chatId) } returns Optional.of(chat)
+            every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
+            every { chatMessageRepository.save(any()) } answers { firstArg() }
+            every { citationRepository.saveAll(capture(citationSlot)) } answers { firstArg() }
+            every { artifactLookupService.resolve(unknownArtifactId) } returns null
+
+            coEvery { chatAiClient.streamPrompt(any()) } returns flowOf(*stream.toTypedArray())
+            every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
+
+            chatService.prompt(PromptRequest(chatId, "Hello")).toList()
+
+            assertEquals(0, citationSlot.captured.toList().size)
         }
     }
 }

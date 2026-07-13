@@ -34,6 +34,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.validation.annotation.Validated
+import org.slf4j.LoggerFactory
 import org.springframework.web.client.HttpClientErrorException
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -46,7 +47,10 @@ internal class ChatService(
     private val citationRepository: CitationRepository,
     private val chatAiClient: ChatAiClient,
     private val userApi: UserApi,
+    private val artifactLookupService: ArtifactLookupService,
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
+
     /**
      * Retrieves the n latest chats without their messages. N is determined by `request.limit`.
      *
@@ -174,8 +178,9 @@ internal class ChatService(
 
         data class PendingCitation(
             val id: UUID,
-            val chunkId: String,
-            val filename: String,
+            val artifactId: UUID,
+            val startLine: Int?,
+            val startPage: Int?,
         )
 
         val sb = StringBuilder()
@@ -195,8 +200,9 @@ internal class ChatService(
                     "citation" -> {
                         citations += PendingCitation(
                             id = UUID.randomUUID(),
-                            chunkId = event.chunkId!!,
-                            filename = event.filename!!,
+                            artifactId = UUID.fromString(event.artifactId!!),
+                            startLine = event.startLine,
+                            startPage = event.startPage,
                         )
                     }
                 }
@@ -211,11 +217,19 @@ internal class ChatService(
 
                     messageRepository.save(msg)
 
-                    val citationEntities = citations.map {
+                    val citationEntities = citations.mapNotNull { pending ->
+                        val resolved = artifactLookupService.resolve(pending.artifactId)
+                        if (resolved == null) {
+                            logger.warn("Could not resolve artifact {} for citation", pending.artifactId)
+                            return@mapNotNull null
+                        }
                         Citation(
-                            id = it.id,
-                            chunkId = it.chunkId,
-                            filename = it.filename,
+                            id = pending.id,
+                            artifactId = pending.artifactId,
+                            filename = resolved.filename,
+                            sourceUrl = resolved.sourceUrl,
+                            startLine = pending.startLine,
+                            startPage = pending.startPage,
                             message = msg,
                         )
                     }
