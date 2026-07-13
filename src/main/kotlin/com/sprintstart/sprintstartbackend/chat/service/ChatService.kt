@@ -38,6 +38,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.client.HttpClientErrorException
+import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -235,7 +236,7 @@ internal class ChatService(
      */
     internal fun validateTimestamps(from: Instant?, to: Instant?) {
         if (from != null && to != null && to.isBefore(from)) {
-            throw HttpClientErrorException(HttpStatus.BAD_REQUEST, "Start time must be before end time.")
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Start time must be before end time.")
         }
     }
 }
