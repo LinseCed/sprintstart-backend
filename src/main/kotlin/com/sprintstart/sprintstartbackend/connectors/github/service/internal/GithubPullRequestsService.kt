@@ -84,7 +84,9 @@ class GithubPullRequestsService(
 
         if (performUpdate) {
             pullRequests.forEach { pr ->
-                eventPublisher.publishEvent(pr.asFetchedEvent(transactionId, repositoryOwner, repositoryName, githubRepositoryId))
+                eventPublisher.publishEvent(
+                    pr.asFetchedEvent(transactionId, repositoryOwner, repositoryName, githubRepositoryId),
+                )
             }
         } else {
             if (githubRepository != null && pullRequests.isNotEmpty()) {
