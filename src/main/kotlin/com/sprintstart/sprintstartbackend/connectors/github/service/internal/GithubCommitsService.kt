@@ -279,7 +279,7 @@ class GithubCommitsService(
      * @return A Commit object containing the parsed date, sha, author, and message.
      * @throws IllegalArgumentException if the input string does not conform to the expected format.
      */
-    @Suppress("DestructuringDeclarationWithTooManyEntries", "MagicNumber")
+    @Suppress("DestructuringDeclarationWithTooManyEntries")
     private fun parseCommit(raw: String): Commit {
         val parts = raw.split(" - ")
         require(parts.size >= 4) { "Invalid commit format: $raw" }

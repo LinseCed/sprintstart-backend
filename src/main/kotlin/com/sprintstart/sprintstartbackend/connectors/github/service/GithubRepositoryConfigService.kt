@@ -4,7 +4,6 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.GithubReposit
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConfigureRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.GetRepositoryConfigRequest
-import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateSchedule
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.GetRepositoryConfigResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryConfigNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
@@ -24,6 +23,7 @@ import java.util.UUID
 class GithubRepositoryConfigService(
     private val configRepository: GithubRepositoryConfigRepository,
     private val githubRepoRepository: GithubRepositoryConnectionRepository,
+    private val cronBuilder: CronBuilder,
 ) {
     companion object {
         /**
@@ -56,7 +56,8 @@ class GithubRepositoryConfigService(
 
         configs.forEach {
             it.autoUpdate = request.autoUpdate
-            it.schedule = request.schedule.parseToString()
+            it.spec = request.schedule
+            it.schedule = cronBuilder.build(request.schedule)
             it.nextSyncAt = calculateNextSyncAt(it.schedule)
         }
 
@@ -95,7 +96,8 @@ class GithubRepositoryConfigService(
         val config = findConfigByRepositoryOwnerAndName(owner, name)
 
         config.autoUpdate = request.autoUpdate
-        config.schedule = request.schedule.parseToString()
+        config.spec = request.schedule
+        config.schedule = cronBuilder.build(request.schedule)
         config.nextSyncAt = calculateNextSyncAt(config.schedule)
 
         configRepository.save(config)
@@ -162,23 +164,5 @@ class GithubRepositoryConfigService(
         return configRepository.findById(repository.id).orElseThrow {
             RepositoryConfigNotFoundException(owner, name)
         }
-    }
-
-    /**
-     * Converts the schedule represented by the UpdateSchedule instance into a formatted string.
-     * The string contains the values of seconds, minutes, hours, days of the month, months of the year,
-     * and days of the week, joined by commas and separated by spaces.
-     *
-     * @return A string representation of the UpdateSchedule instance.
-     */
-    private fun UpdateSchedule.parseToString(): String {
-        return StringBuilder()
-            .append(this.seconds.joinToString(",") + " ")
-            .append(this.minutes.joinToString(",") + " ")
-            .append(this.hour.joinToString(",") + " ")
-            .append(this.dayOfMonth.joinToString(",") + " ")
-            .append(this.monthOfYear.joinToString(",") + " ")
-            .append(this.dayOfWeek.joinToString(","))
-            .toString()
     }
 }

@@ -4,9 +4,9 @@ import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.connectors.github.controller.GithubExceptionHandler
 import com.sprintstart.sprintstartbackend.connectors.github.controller.GithubRepositoryConfigController
+import com.sprintstart.sprintstartbackend.connectors.github.models.ScheduleSpec
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConfigureRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.GetRepositoryConfigRequest
-import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateSchedule
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.GetRepositoryConfigResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryConfigNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
@@ -32,6 +32,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.time.Instant
+import java.time.LocalTime
 import java.util.UUID
 
 @WebMvcTest(controllers = [GithubRepositoryConfigController::class])
@@ -173,11 +174,13 @@ class GithubConfigControllerTest {
     inner class GetConfigOfRepository {
         @Test
         fun `returns 200 with config for connected repository`() {
+            val spec = ScheduleSpec.Daily(time = LocalTime.of(2, 0))
             val response = GetRepositoryConfigResponse(
                 id = UUID.randomUUID(),
                 repositoryOwner = "owner",
                 repositoryName = "repo",
                 autoUpdate = true,
+                spec = spec,
                 schedule = "0 0 2 * * *",
                 nextSyncAt = Instant.parse("2026-01-01T02:00:00Z"),
             )
@@ -193,6 +196,8 @@ class GithubConfigControllerTest {
                 .andExpect(jsonPath("$.repositoryOwner").value("owner"))
                 .andExpect(jsonPath("$.repositoryName").value("repo"))
                 .andExpect(jsonPath("$.autoUpdate").value(true))
+                .andExpect(jsonPath("$.spec.type").value("DAILY"))
+                .andExpect(jsonPath("$.spec.time").value("02:00:00"))
                 .andExpect(jsonPath("$.schedule").value("0 0 2 * * *"))
                 .andExpect(jsonPath("$.nextSyncAt").value("2026-01-01T02:00:00Z"))
         }
@@ -239,17 +244,88 @@ class GithubConfigControllerTest {
         }
     }
 
+    @Nested
+    inner class ScheduleValidation {
+        @Test
+        fun `returns 400 for Interval with 0 minutes`() {
+            mockMvc
+                .perform(
+                    put("/api/v1/github/config/global")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"autoUpdate": true, "schedule": {"type": "INTERVAL", "everyMinutes": 0}}""")
+                        .with(adminJwt),
+                ).andExpect(status().isBadRequest)
+        }
+
+        @Test
+        fun `returns 400 for Interval with negative minutes`() {
+            mockMvc
+                .perform(
+                    put("/api/v1/github/config/global")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"autoUpdate": true, "schedule": {"type": "INTERVAL", "everyMinutes": -1}}""")
+                        .with(adminJwt),
+                ).andExpect(status().isBadRequest)
+        }
+
+        @Test
+        fun `returns 400 for Monthly with dayOfMonth 0`() {
+            mockMvc
+                .perform(
+                    put("/api/v1/github/config/global")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                            """
+                            {"autoUpdate": true, "schedule": {"type": "MONTHLY", "time": "10:00:00", "dayOfMonth": 0}}
+                            """.trimIndent(),
+                        ).with(adminJwt),
+                ).andExpect(status().isBadRequest)
+        }
+
+        @Test
+        fun `returns 400 for Monthly with dayOfMonth 32`() {
+            mockMvc
+                .perform(
+                    put("/api/v1/github/config/global")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                            """
+                            {"autoUpdate": true, "schedule": {"type": "MONTHLY", "time": "10:00:00", "dayOfMonth": 32}}
+                            """.trimIndent(),
+                        ).with(adminJwt),
+                ).andExpect(status().isBadRequest)
+        }
+
+        @Test
+        fun `returns 400 for Weekly with empty daysOfWeek`() {
+            mockMvc
+                .perform(
+                    put("/api/v1/github/config/global")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                            """
+                            {"autoUpdate": true, "schedule": {"type": "WEEKLY", "time": "10:00:00", "daysOfWeek": []}}
+                            """.trimIndent(),
+                        ).with(adminJwt),
+                ).andExpect(status().isBadRequest)
+        }
+
+        @Test
+        fun `returns 400 for unknown schedule type`() {
+            mockMvc
+                .perform(
+                    put("/api/v1/github/config/global")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""{"autoUpdate": true, "schedule": {"type": "UNKNOWN"}}""")
+                        .with(adminJwt),
+                ).andExpect(status().isBadRequest)
+        }
+    }
+
     private fun validConfigBody(): String = objectMapper.writeValueAsString(
         ConfigureRepositoryRequest(
             autoUpdate = true,
-            schedule = UpdateSchedule(
-                seconds = listOf("0"),
-                minutes = listOf("30"),
-                hour = listOf("2"),
-                dayOfWeek = listOf("*"),
-                dayOfMonth = listOf("*"),
-                monthOfYear = listOf("*"),
-            ),
+            schedule = ScheduleSpec.Interval(everyMinutes = 60),
         ),
     )
 }

@@ -107,6 +107,8 @@ class GithubUpdatesServiceTest {
                 snapshot = GithubRepositorySnapshot(repository = this)
             }
             every { repoConnectionRepository.findAll() } returns listOf(repo1, repo2)
+            every { repoConnectionRepository.save(repo1) } returns repo1
+            every { repoConnectionRepository.save(repo2) } returns repo2
             coJustRun { fileService.fetchAndIngestFileUpdatesIncremental(any(), any()) }
             coJustRun { commitsService.fetchAndIngestLatestCommits(any(), any()) }
             coJustRun { issuesService.fetchAndIngestAllIssues(any(), any(), any(), any(), any(), any()) }
@@ -158,6 +160,7 @@ class GithubUpdatesServiceTest {
                 snapshot = GithubRepositorySnapshot(repository = this)
             }
             every { repoConnectionRepository.findByOwnerAndName("owner", "repo") } returns repo
+            every { repoConnectionRepository.save(any()) } returns repo
             coJustRun { fileService.fetchAndIngestFileUpdatesIncremental(any(), any()) }
             coJustRun { commitsService.fetchAndIngestLatestCommits(any(), any()) }
             coJustRun { issuesService.fetchAndIngestAllIssues(any(), any(), any(), any(), any(), any()) }
@@ -175,6 +178,7 @@ class GithubUpdatesServiceTest {
                 snapshot = GithubRepositorySnapshot(repository = this)
             }
             every { repoConnectionRepository.findByOwnerAndName("owner", "repo") } returns repo
+            every { repoConnectionRepository.save(any()) } returns repo
             coJustRun { fileService.fetchAndIngestFileUpdatesIncremental(any(), any()) }
             coJustRun { commitsService.fetchAndIngestLatestCommits(any(), any()) }
             coJustRun { issuesService.fetchAndIngestAllIssues(any(), any(), any(), any(), any(), any()) }
@@ -205,6 +209,7 @@ class GithubUpdatesServiceTest {
                 snapshot = GithubRepositorySnapshot(repository = this)
             }
             every { repoConnectionRepository.findByOwnerAndName("owner", "repo") } returns repo
+            every { repoConnectionRepository.save(any()) } returns repo
             coJustRun { fileService.fetchAndIngestFileUpdatesIncremental(any(), any()) }
             coJustRun { commitsService.fetchAndIngestLatestCommits(any(), any()) }
             coJustRun { issuesService.fetchAndIngestAllIssues(any(), any(), any(), any(), any(), any()) }
@@ -269,6 +274,7 @@ class GithubUpdatesServiceTest {
                 snapshot = GithubRepositorySnapshot(repository = this)
             }
             every { repoConnectionRepository.findByOwnerAndName("owner", "repo") } returns repo
+            every { repoConnectionRepository.save(any()) } returns repo
             coJustRun { fileService.fetchAndIngestFileUpdatesIncremental(any(), any()) }
             coJustRun { commitsService.fetchAndIngestLatestCommits(any(), any()) }
             coJustRun { issuesService.fetchAndIngestAllIssues(any(), any(), any(), any(), any(), any()) }

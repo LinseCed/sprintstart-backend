@@ -4,12 +4,13 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.GithubReposit
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
+import com.sprintstart.sprintstartbackend.connectors.github.models.ScheduleSpec
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConfigureRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.GetRepositoryConfigRequest
-import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateSchedule
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryConfigNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConfigRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
+import com.sprintstart.sprintstartbackend.connectors.github.service.CronBuilder
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubRepositoryConfigService
 import io.mockk.every
 import io.mockk.mockk
@@ -20,11 +21,13 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.time.Instant
+import java.time.LocalTime
 import java.util.Optional
 
 class GithubRepositoryConfigServiceTest {
     private val configRepository = mockk<GithubRepositoryConfigRepository>()
     private val githubRepoRepository = mockk<GithubRepositoryConnectionRepository>()
+    private val cronBuilder = mockk<CronBuilder>()
 
     private lateinit var service: GithubRepositoryConfigService
 
@@ -38,6 +41,7 @@ class GithubRepositoryConfigServiceTest {
         service = GithubRepositoryConfigService(
             configRepository = configRepository,
             githubRepoRepository = githubRepoRepository,
+            cronBuilder = cronBuilder,
         )
     }
 
@@ -71,28 +75,24 @@ class GithubRepositoryConfigServiceTest {
     @Nested
     inner class Configure {
         @Test
-        fun `updates autoUpdate and schedule`() {
+        fun `updates autoUpdate, spec, and schedule`() {
             val repo = repoConnection("owner", "repo")
             val config = GithubRepositoryConfig(id = repo.id, repository = repo)
+            val spec = ScheduleSpec.Daily(time = LocalTime.of(6, 30))
             every { githubRepoRepository.findByOwnerAndName("owner", "repo") } returns repo
             every { configRepository.findById(repo.id) } returns Optional.of(config)
+            every { cronBuilder.build(spec) } returns "0 30 6 * * *"
             every { configRepository.save(config) } returns config
 
             val request = ConfigureRepositoryRequest(
                 autoUpdate = true,
-                schedule = UpdateSchedule(
-                    seconds = listOf("0"),
-                    minutes = listOf("30"),
-                    hour = listOf("6"),
-                    dayOfWeek = listOf("*"),
-                    dayOfMonth = listOf("*"),
-                    monthOfYear = listOf("*"),
-                ),
+                schedule = spec,
             )
 
             service.configure("owner", "repo", request)
 
             assertThat(config.autoUpdate).isTrue()
+            assertThat(config.spec).isEqualTo(spec)
             assertThat(config.schedule).isEqualTo("0 30 6 * * *")
             assertThat(config.nextSyncAt).isNotNull
             verify { configRepository.save(config) }
@@ -106,14 +106,7 @@ class GithubRepositoryConfigServiceTest {
 
             val request = ConfigureRepositoryRequest(
                 autoUpdate = true,
-                schedule = UpdateSchedule(
-                    seconds = listOf("0"),
-                    minutes = listOf("30"),
-                    hour = listOf("6"),
-                    dayOfWeek = listOf("*"),
-                    dayOfMonth = listOf("*"),
-                    monthOfYear = listOf("*"),
-                ),
+                schedule = ScheduleSpec.Interval(everyMinutes = 60),
             )
 
             assertThrows<RepositoryConfigNotFoundException> {
@@ -130,27 +123,24 @@ class GithubRepositoryConfigServiceTest {
             val repo2 = repoConnection("owner2", "repo2")
             val config1 = GithubRepositoryConfig(id = repo1.id, repository = repo1)
             val config2 = GithubRepositoryConfig(id = repo2.id, repository = repo2)
+            val spec = ScheduleSpec.Daily(time = LocalTime.of(3, 0))
             every { configRepository.findAll() } returns listOf(config1, config2)
+            every { cronBuilder.build(spec) } returns "0 0 3 * * *"
             every { configRepository.saveAll(any<Iterable<GithubRepositoryConfig>>()) } returns listOf(config1, config2)
 
             val request = ConfigureRepositoryRequest(
                 autoUpdate = false,
-                schedule = UpdateSchedule(
-                    seconds = listOf("0"),
-                    minutes = listOf("0"),
-                    hour = listOf("3"),
-                    dayOfWeek = listOf("*"),
-                    dayOfMonth = listOf("*"),
-                    monthOfYear = listOf("*"),
-                ),
+                schedule = spec,
             )
 
             service.configureGlobal(request)
 
             assertThat(config1.autoUpdate).isFalse()
+            assertThat(config1.spec).isEqualTo(spec)
             assertThat(config1.schedule).isEqualTo("0 0 3 * * *")
             assertThat(config1.nextSyncAt).isNotNull
             assertThat(config2.autoUpdate).isFalse()
+            assertThat(config2.spec).isEqualTo(spec)
             assertThat(config2.schedule).isEqualTo("0 0 3 * * *")
             assertThat(config2.nextSyncAt).isNotNull
             verify { configRepository.saveAll(listOf(config1, config2)) }
@@ -162,8 +152,10 @@ class GithubRepositoryConfigServiceTest {
         @Test
         fun `returns config mapped to response DTO`() {
             val repo = repoConnection("owner", "repo")
+            val spec = ScheduleSpec.Daily(time = LocalTime.of(2, 0))
             val config = GithubRepositoryConfig(id = repo.id, repository = repo).apply {
                 autoUpdate = true
+                this.spec = spec
                 schedule = "0 0 2 * * *"
                 nextSyncAt = Instant.parse("2026-01-01T02:00:00Z")
             }
@@ -175,6 +167,7 @@ class GithubRepositoryConfigServiceTest {
             assertThat(response.repositoryOwner).isEqualTo("owner")
             assertThat(response.repositoryName).isEqualTo("repo")
             assertThat(response.autoUpdate).isTrue()
+            assertThat(response.spec).isEqualTo(spec)
             assertThat(response.schedule).isEqualTo("0 0 2 * * *")
             assertThat(response.nextSyncAt).isEqualTo("2026-01-01T02:00:00Z")
         }

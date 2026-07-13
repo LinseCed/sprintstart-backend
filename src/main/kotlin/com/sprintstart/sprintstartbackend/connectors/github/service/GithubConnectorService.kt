@@ -154,7 +154,6 @@ class GithubConnectorService(
             repository = repository,
         )
         val config = GithubRepositoryConfig(
-            id = repository.id,
             repository = repository,
         )
         config.nextSyncAt = GithubRepositoryConfigService.calculateNextSyncAt(config.schedule)
