@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.ingestion.events.RunFinishedEvent
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.AiSyncStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
@@ -52,12 +53,16 @@ class IngestionRunLifeCycleService(
                 status = status,
                 failureReason = failureReason,
                 finishedAt = if (status == IngestionRunStatus.FAILED) Instant.now() else null,
+                aiSyncStatus = if (status == IngestionRunStatus.FAILED) AiSyncStatus.NOT_APPLICABLE else AiSyncStatus.PENDING,
             )
             ingestionRunRepository.save(ingestionRun)
         } else {
             ingestionRun.status = status
             ingestionRun.finishedAt = if (status == IngestionRunStatus.FAILED) Instant.now() else null
             ingestionRun.failureReason = failureReason
+            if (status == IngestionRunStatus.FAILED) {
+                ingestionRun.aiSyncStatus = AiSyncStatus.NOT_APPLICABLE
+            }
         }
     }
 
@@ -101,6 +106,40 @@ class IngestionRunLifeCycleService(
         run.finishedAt = Instant.now()
         if (run.status in setOf(IngestionRunStatus.COMPLETED, IngestionRunStatus.PARTIAL)) {
             publisher.publishEvent(RunFinishedEvent(run.id))
+        } else {
+            // Nothing was ingested, updated, or deleted, so there is nothing for the AI
+            // sync layer to act on -- it will never run for this id.
+            run.aiSyncStatus = AiSyncStatus.NOT_APPLICABLE
+        }
+    }
+
+    /**
+     * Records that a run's artifacts were successfully synced to the AI service.
+     *
+     * A no-op sync (nothing new to send) also counts as success -- the AI service's index
+     * already correctly reflects this run either way.
+     *
+     * @param runId The ingestion run whose AI sync just completed.
+     */
+    @Transactional
+    fun markAiSyncSucceeded(runId: UUID) {
+        ingestionRunRepository.findByIdOrNull(runId)?.let { run ->
+            run.aiSyncStatus = AiSyncStatus.SUCCEEDED
+        }
+    }
+
+    /**
+     * Records that a run's AI sync attempt failed, so API consumers can tell "saved locally"
+     * apart from "actually searchable in chat" instead of the run appearing complete forever.
+     *
+     * @param runId The ingestion run whose AI sync failed.
+     * @param reason A short description of the failure, surfaced alongside the run.
+     */
+    @Transactional
+    fun markAiSyncFailed(runId: UUID, reason: String?) {
+        ingestionRunRepository.findByIdOrNull(runId)?.let { run ->
+            run.aiSyncStatus = AiSyncStatus.FAILED
+            run.aiSyncFailureReason = reason
         }
     }
 }

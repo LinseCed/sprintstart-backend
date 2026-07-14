@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.ingestion.events.RunFinishedEvent
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.AiSyncStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.FinishedTypes
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
@@ -58,6 +59,7 @@ class IngestionStatusServiceCompletionTest {
         assertThat(run.status).isEqualTo(IngestionRunStatus.COMPLETED)
         assertThat(run.finishedTypes).containsAll(FinishedTypes.entries)
         assertThat(run.finishedAt).isNotNull()
+        assertThat(run.aiSyncStatus).isEqualTo(AiSyncStatus.PENDING)
         verify(exactly = 1) { publisher.publishEvent(RunFinishedEvent(run.id)) }
     }
 
@@ -77,6 +79,7 @@ class IngestionStatusServiceCompletionTest {
         service.markFetchPhaseFinished(run.id, FinishedTypes.PULL_REQUESTS)
 
         assertThat(run.status).isEqualTo(IngestionRunStatus.PARTIAL)
+        assertThat(run.aiSyncStatus).isEqualTo(AiSyncStatus.PENDING)
         verify(exactly = 1) { publisher.publishEvent(RunFinishedEvent(run.id)) }
     }
 
@@ -95,6 +98,7 @@ class IngestionStatusServiceCompletionTest {
         service.markFetchPhaseFinished(run.id, FinishedTypes.PULL_REQUESTS)
 
         assertThat(run.status).isEqualTo(IngestionRunStatus.FAILED)
+        assertThat(run.aiSyncStatus).isEqualTo(AiSyncStatus.NOT_APPLICABLE)
         verify(exactly = 0) { publisher.publishEvent(any()) }
     }
 
