@@ -37,6 +37,11 @@ internal class ArtifactIngestionApiService(
     }
 
     @Transactional(readOnly = true)
+    override fun existsInProject(projectId: UUID, artifactId: UUID): Boolean {
+        return artifactRepository.findById(artifactId).map { it.projectIds.contains(projectId) }.orElse(false)
+    }
+
+    @Transactional(readOnly = true)
     override fun getHash(artifactId: UUID): String? {
         return artifactRepository.findById(artifactId).orElse(null)?.hash
     }

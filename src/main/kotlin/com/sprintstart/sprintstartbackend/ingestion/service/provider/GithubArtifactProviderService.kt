@@ -68,7 +68,10 @@ class GithubArtifactProviderService(
                     if (artifact.hash != command.hash) {
                         artifact.content = command.bodyText
                         artifact.hash = command.hash
-                        ingestionRunRepository.incrementUpdatedCount(runId)
+                        val ingestionRun = ingestionRunRepository.findByIdForUpdate(runId).orElseThrow {
+                            IngestionRunNotFoundException(runId)
+                        }
+                        ingestionRun.updatedCount++
                     }
                     return
                 }
@@ -83,7 +86,10 @@ class GithubArtifactProviderService(
                         artifact.title = command.title
                         artifact.content = command.bodyText
                         artifact.hash = command.hash
-                        ingestionRunRepository.incrementUpdatedCount(runId)
+                        val ingestionRun = ingestionRunRepository.findByIdForUpdate(runId).orElseThrow {
+                            IngestionRunNotFoundException(runId)
+                        }
+                        ingestionRun.updatedCount++
                     }
                     return
                 }
@@ -96,13 +102,18 @@ class GithubArtifactProviderService(
                     artifact.addProjectIds(projectIds)
                     artifact.title = command.title
                     artifact.content = command.bodyText
-                    ingestionRunRepository.incrementUpdatedCount(runId)
+                    val ingestionRun = ingestionRunRepository.findByIdForUpdate(runId).orElseThrow {
+                        IngestionRunNotFoundException(runId)
+                    }
+                    ingestionRun.updatedCount++
                     return
                 }
             }
         }
 
-        val ingestionRun = ingestionRunRepository.getReferenceById(runId)
+        val ingestionRun = ingestionRunRepository.findByIdForUpdate(runId).orElseThrow {
+            IngestionRunNotFoundException(runId)
+        }
         artifact = Artifact(
             sourceSystem = command.sourceSystem,
             sourceId = command.sourceId,
@@ -120,7 +131,7 @@ class GithubArtifactProviderService(
             updatedAtSource = null,
         )
         artifactRepository.save(artifact)
-        ingestionRunRepository.incrementIngestedCount(runId)
+        ingestionRun.ingestedCount++
     }
 
     /**

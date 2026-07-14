@@ -47,11 +47,16 @@ class UploadArtifactProviderService(
             if (artifact.hash != command.hash) {
                 artifact.content = command.content
                 artifact.hash = command.hash
-                ingestionRunRepository.incrementUpdatedCount(runId)
+                val ingestionRun = ingestionRunRepository.findByIdForUpdate(command.ingestionRunId).orElseThrow {
+                    IngestionRunNotFoundException(command.ingestionRunId)
+                }
+                ingestionRun.updatedCount++
             }
             return
         }
-        val ingestionRun = ingestionRunRepository.getReferenceById(command.ingestionRunId)
+        val ingestionRun = ingestionRunRepository.findByIdForUpdate(command.ingestionRunId).orElseThrow {
+            IngestionRunNotFoundException(command.ingestionRunId)
+        }
         artifact = Artifact(
             sourceSystem = command.sourceSystem,
             sourceId = command.sourceId,
@@ -68,7 +73,7 @@ class UploadArtifactProviderService(
             updatedAtSource = null,
         )
         artifactRepository.save(artifact)
-        ingestionRunRepository.incrementIngestedCount(runId)
+        ingestionRun.ingestedCount++
     }
 
     /**
