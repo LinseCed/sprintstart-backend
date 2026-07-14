@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.controller
 
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactContentRedirectResponse
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactContentResponse
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactPageResponse
 import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactQueryService
 import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactService
@@ -10,6 +12,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.net.URI
 import java.util.UUID
 
 private const val DEFAULT_PAGE = "1"
@@ -28,10 +33,10 @@ private const val DEFAULT_SIZE = "20"
 private const val MAX_PAGE_SIZE = 100L
 
 /**
- * Read-only HTTP entry point for retrieving the stored content of one artifact.
+ * Read-only HTTP entry point for opening one artifact.
  *
  * The endpoint is project-scoped so callers must supply both the project identifier used for
- * authorization and the artifact identifier used to locate the payload.
+ * authorization and the artifact identifier used to locate the payload or source URL.
  */
 @RestController
 @Validated
@@ -107,15 +112,16 @@ class ArtifactController(
         )
 
     /**
-     * Returns the raw stored payload of one artifact together with its effective mime type.
+     * Opens one artifact by returning stored bytes or redirecting to its source URL.
      *
      * The caller must have `USER` access to the given project, and the artifact must be linked to
-     * that same project.
+     * that same project. Artifacts with local payloads return `200`; remote artifacts without local
+     * payloads return `302` to their source URL when one is known.
      *
      * @param projectId The SprintStart project that scopes access to the artifact.
      * @param artifactId The artifact whose stored content should be returned.
      * @param jwt The authenticated JWT used to resolve the caller subject.
-     * @return The artifact payload with a response `Content-Type` derived from the stored mime type.
+     * @return The artifact payload with a response `Content-Type`, or a redirect to the source URL.
      */
     @GetMapping("/projects/{projectId}/artifacts/{artifactId}/content")
     @PreAuthorize("hasRole('USER')")
@@ -128,6 +134,7 @@ class ArtifactController(
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "200", description = "Artifact content returned successfully"),
+            ApiResponse(responseCode = "302", description = "Artifact source URL returned for remote content"),
             ApiResponse(responseCode = "403", description = "Caller has no access to the project"),
             ApiResponse(responseCode = "404", description = "Artifact or artifact content not found"),
         ],
@@ -144,11 +151,25 @@ class ArtifactController(
             artifactId = artifactId,
             authId = jwt.subject,
         )
-        val mediaType = runCatching {
-            MediaType.parseMediaType(
-                response.mime,
-            )
-        }.getOrDefault(MediaType.APPLICATION_OCTET_STREAM)
-        return ResponseEntity.ok().contentType(mediaType).body(response.content)
+        return when (response) {
+            is ArtifactContentResponse -> {
+                val mediaType = runCatching {
+                    MediaType.parseMediaType(
+                        response.mime,
+                    )
+                }.getOrDefault(MediaType.APPLICATION_OCTET_STREAM)
+                ResponseEntity
+                    .ok()
+                    .contentType(mediaType)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                    .body(response.content)
+            }
+
+            is ArtifactContentRedirectResponse ->
+                ResponseEntity
+                    .status(HttpStatus.FOUND)
+                    .location(URI.create(response.url))
+                    .build<ByteArray>()
+        }
     }
 }
