@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.Flow
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
@@ -23,7 +25,7 @@ import java.util.UUID
  * Endpoints exposing AI-generated artifact summaries.
  */
 @RestController
-@RequestMapping("/api/v1/artifacts")
+@RequestMapping("/api/v1")
 @Tag(name = "Artifacts", description = "Artifact-related endpoints")
 class ArtifactSummaryController(
     private val artifactSummaryService: ArtifactSummaryService,
@@ -64,11 +66,13 @@ class ArtifactSummaryController(
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/{artifactId}/summary", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    @GetMapping("/projects/{projectId}/artifacts/{artifactId}/summary", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
     @PreAuthorize("hasRole('USER')")
     suspend fun getSummary(
+        @PathVariable projectId: UUID,
         @PathVariable artifactId: UUID,
+        @AuthenticationPrincipal jwt: Jwt,
     ): Flow<AiArtifactSummaryStreamMessage> {
-        return artifactSummaryService.getSummary(artifactId)
+        return artifactSummaryService.getSummary(projectId, artifactId, jwt.subject)
     }
 }

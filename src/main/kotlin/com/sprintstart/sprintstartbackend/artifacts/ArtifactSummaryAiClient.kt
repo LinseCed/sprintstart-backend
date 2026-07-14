@@ -5,9 +5,13 @@ import com.sprintstart.sprintstartbackend.artifacts.model.ai.AiArtifactSummaryRe
 import com.sprintstart.sprintstartbackend.artifacts.model.ai.AiArtifactSummaryStreamMessage
 import com.sprintstart.sprintstartbackend.artifacts.model.exceptions.ArtifactSummaryAiException
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
+import com.sprintstart.sprintstartbackend.shared.web.WebClientException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
+import org.springframework.web.server.ResponseStatusException
 import java.net.URI
 import java.util.UUID
 
@@ -47,7 +51,15 @@ class ArtifactSummaryAiClient(
             .body(request)
             .stream()
             .perform<AiArtifactSummaryStreamMessage>()
-            .map { chunk ->
+            .catch { cause ->
+                if (cause is WebClientException && cause.statusCode == 404) {
+                    throw ResponseStatusException(
+                        HttpStatus.SERVICE_UNAVAILABLE,
+                        "Artifact is still being indexed by the AI service",
+                    )
+                }
+                throw cause
+            }.map { chunk ->
                 when (chunk.type) {
                     "error" -> throw ArtifactSummaryAiException("AI responded with error: ${chunk.message}")
                     else -> chunk // stage, token, citation — pass through

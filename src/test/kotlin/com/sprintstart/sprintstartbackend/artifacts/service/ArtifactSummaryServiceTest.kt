@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.artifacts.model.exceptions.ArtifactSum
 import com.sprintstart.sprintstartbackend.artifacts.repository.ArtifactSummaryRepository
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.upload.external.UploadApi
+import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -29,15 +30,19 @@ class ArtifactSummaryServiceTest {
     private val artifactSummaryAiClient = mockk<ArtifactSummaryAiClient>()
     private val artifactIngestionApi = mockk<ArtifactIngestionApi>()
     private val uploadApi = mockk<UploadApi>()
+    private val userApi = mockk<UserApi>()
 
     private val service = ArtifactSummaryService(
         artifactSummaryRepository = artifactSummaryRepository,
         artifactSummaryAiClient = artifactSummaryAiClient,
         artifactIngestionApi = artifactIngestionApi,
         uploadApi = uploadApi,
+        userApi = userApi,
     )
 
+    private val projectId = UUID.randomUUID()
     private val artifactId = UUID.randomUUID()
+    private val authId = "test-auth-id"
     private val citedArtifactId = UUID.randomUUID()
 
     private fun aiStream(summary: String = "A summary.") = flowOf(
@@ -54,6 +59,8 @@ class ArtifactSummaryServiceTest {
 
     @Test
     fun `getSummary serves a cached summary as a single-shot stream when the hash still matches`() = runTest {
+        every { userApi.userHasAccessToProject(authId, projectId) } returns true
+        every { artifactIngestionApi.existsInProject(projectId, artifactId) } returns true
         every { uploadApi.getHash(artifactId) } returns null
         every { artifactIngestionApi.exists(artifactId) } returns true
         every { artifactIngestionApi.getHash(artifactId) } returns "hash-1"
@@ -69,7 +76,7 @@ class ArtifactSummaryServiceTest {
         )
         every { artifactSummaryRepository.findById(artifactId) } returns Optional.of(cached)
 
-        val events = service.getSummary(artifactId).toList()
+        val events = service.getSummary(projectId, artifactId, authId).toList()
 
         assertEquals("token", events[0].type)
         assertEquals("Cached summary.", events[0].content)
@@ -82,6 +89,8 @@ class ArtifactSummaryServiceTest {
 
     @Test
     fun `getSummary streams a fresh summary and caches it when the hash changed`() = runTest {
+        every { userApi.userHasAccessToProject(authId, projectId) } returns true
+        every { artifactIngestionApi.existsInProject(projectId, artifactId) } returns true
         every { uploadApi.getHash(artifactId) } returns null
         every { artifactIngestionApi.exists(artifactId) } returns true
         every { artifactIngestionApi.getHash(artifactId) } returns "hash-2"
@@ -93,7 +102,7 @@ class ArtifactSummaryServiceTest {
         val savedSlot = slot<ArtifactSummary>()
         every { artifactSummaryRepository.save(capture(savedSlot)) } answers { firstArg() }
 
-        val events = service.getSummary(artifactId).toList()
+        val events = service.getSummary(projectId, artifactId, authId).toList()
 
         val tokenText = events.filter { it.type == "token" }.joinToString("") { it.content ?: "" }
         assertEquals("Fresh summary.", tokenText)
@@ -107,24 +116,28 @@ class ArtifactSummaryServiceTest {
 
     @Test
     fun `getSummary streams a fresh summary from an uploaded artifact via its own hash`() = runTest {
+        every { userApi.userHasAccessToProject(authId, projectId) } returns true
+        every { artifactIngestionApi.existsInProject(projectId, artifactId) } returns true
         every { uploadApi.getHash(artifactId) } returns "uploaded-hash"
         every { artifactSummaryRepository.findById(artifactId) } returns Optional.empty()
         every { artifactSummaryAiClient.summarizeStream(artifactId, any()) } returns aiStream()
         every { artifactSummaryRepository.save(any()) } answers { firstArg() }
 
-        service.getSummary(artifactId).toList()
+        service.getSummary(projectId, artifactId, authId).toList()
 
         verify(exactly = 0) { artifactIngestionApi.exists(any()) }
     }
 
     @Test
     fun `getSummary streams without caching when the artifact has no hash on record`() = runTest {
+        every { userApi.userHasAccessToProject(authId, projectId) } returns true
+        every { artifactIngestionApi.existsInProject(projectId, artifactId) } returns true
         every { uploadApi.getHash(artifactId) } returns null
         every { artifactIngestionApi.exists(artifactId) } returns true
         every { artifactIngestionApi.getHash(artifactId) } returns null
         every { artifactSummaryAiClient.summarizeStream(artifactId, any()) } returns aiStream()
 
-        val events = service.getSummary(artifactId).toList()
+        val events = service.getSummary(projectId, artifactId, authId).toList()
 
         val tokenText = events.filter { it.type == "token" }.joinToString("") { it.content ?: "" }
         assertEquals("A summary.", tokenText)
@@ -133,11 +146,13 @@ class ArtifactSummaryServiceTest {
 
     @Test
     fun `getSummary throws 404 when the artifact does not exist anywhere`() = runTest {
+        every { userApi.userHasAccessToProject(authId, projectId) } returns true
+        every { artifactIngestionApi.existsInProject(projectId, artifactId) } returns true
         every { uploadApi.getHash(artifactId) } returns null
         every { artifactIngestionApi.exists(artifactId) } returns false
 
         assertThrows<ResponseStatusException> {
-            service.getSummary(artifactId)
+            service.getSummary(projectId, artifactId, authId)
         }
 
         verify(exactly = 0) { artifactSummaryAiClient.summarizeStream(any(), any()) }
@@ -145,6 +160,8 @@ class ArtifactSummaryServiceTest {
 
     @Test
     fun `getSummary drops citations whose artifact id is not a valid UUID`() = runTest {
+        every { userApi.userHasAccessToProject(authId, projectId) } returns true
+        every { artifactIngestionApi.existsInProject(projectId, artifactId) } returns true
         every { uploadApi.getHash(artifactId) } returns null
         every { artifactIngestionApi.exists(artifactId) } returns true
         every { artifactIngestionApi.getHash(artifactId) } returns "hash-1"
@@ -158,7 +175,7 @@ class ArtifactSummaryServiceTest {
         val savedSlot = slot<ArtifactSummary>()
         every { artifactSummaryRepository.save(capture(savedSlot)) } answers { firstArg() }
 
-        val events = service.getSummary(artifactId).toList()
+        val events = service.getSummary(projectId, artifactId, authId).toList()
 
         assertTrue(events.none { it.type == "citation" })
         assertTrue(savedSlot.captured.citations.isEmpty())
@@ -166,6 +183,8 @@ class ArtifactSummaryServiceTest {
 
     @Test
     fun `getSummary propagates an AI failure without caching anything`() = runTest {
+        every { userApi.userHasAccessToProject(authId, projectId) } returns true
+        every { artifactIngestionApi.existsInProject(projectId, artifactId) } returns true
         every { uploadApi.getHash(artifactId) } returns null
         every { artifactIngestionApi.exists(artifactId) } returns true
         every { artifactIngestionApi.getHash(artifactId) } returns "hash-1"
@@ -175,7 +194,7 @@ class ArtifactSummaryServiceTest {
         }
 
         assertThrows<ArtifactSummaryAiException> {
-            service.getSummary(artifactId).toList()
+            service.getSummary(projectId, artifactId, authId).toList()
         }
 
         verify(exactly = 0) { artifactSummaryRepository.save(any()) }
