@@ -6,6 +6,5 @@ package com.sprintstart.sprintstartbackend.connectors.github.models.exceptions
 class RepositoryNotFoundException(
     owner: String,
     name: String,
-) : RuntimeException(
-        "Repository $owner/$name not found",
-    )
+    msg: String = "Repository $owner/$name not found",
+) : RuntimeException(msg)

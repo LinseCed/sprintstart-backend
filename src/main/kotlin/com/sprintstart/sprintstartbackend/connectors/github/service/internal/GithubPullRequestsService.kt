@@ -9,6 +9,10 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.pull
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.pullrequests.GithubPullRequestsFetchCompletedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.pullrequests.GithubPullRequestsFetchFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.pullrequests.GithubPullRequestsFetchStartedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.models.ConnectionState
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
+import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphql.PullRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +45,7 @@ class GithubPullRequestsService(
         repositoryOwner: String,
         repositoryName: String,
         transactionId: UUID,
+        performUpdate: Boolean = true,
         since: Instant? = null,
     ) {
         eventPublisher.publishEvent(
@@ -51,9 +56,13 @@ class GithubPullRequestsService(
             ),
         )
 
+        var githubRepository: GithubRepositoryConnection? = null
+
         val pullRequests = runCatching {
-            val githubRepository = withContext(Dispatchers.IO) {
-                repoConnectionRepository.findById(githubRepositoryId).orElseThrow()
+            githubRepository = withContext(Dispatchers.IO) {
+                repoConnectionRepository.findById(githubRepositoryId).orElseThrow {
+                    RepositoryNotFoundException(repositoryOwner, repositoryName)
+                }
             }
 
             if (since == null) {
@@ -73,49 +82,20 @@ class GithubPullRequestsService(
             throw it
         }.getOrNull() ?: return
 
-        pullRequests.forEach { pullRequest ->
-            val event = GithubPullRequestFetchedEvent(
-                transactionId = transactionId,
-                repositoryOwner = repositoryOwner,
-                repositoryName = repositoryName,
-                number = pullRequest.number,
-                title = pullRequest.title,
-                body = pullRequest.body,
-                state = pullRequest.state,
-                createdAt = pullRequest.createdAt,
-                mergedAt = pullRequest.mergedAt,
-                url = pullRequest.url,
-                author = pullRequest.author?.login,
-                labels = pullRequest.labels?.nodes?.map { it.name },
-                reviews = pullRequest.reviews?.nodes?.map {
-                    GithubPullRequestReview(
-                        it.body,
-                        it.state,
-                        it.author?.login,
-                    )
-                },
-                comments = pullRequest.comments?.nodes?.map {
-                    GithubPullRequestComment(
-                        it.body,
-                        it.author?.login,
-                        it.createdAt,
-                    )
-                },
-                reviewThreads = pullRequest.reviewThreads?.nodes?.map { reviewThread ->
-                    GithubPullRequestReviewThread(
-                        reviewThread.comments?.nodes?.map {
-                            GithubPullRequestReviewThreadComment(
-                                it.body,
-                                it.author?.login,
-                                it.path,
-                            )
-                        } ?: emptyList(),
-                    )
-                },
-                repositoryId = githubRepositoryId,
-            )
+        if (performUpdate) {
+            pullRequests.forEach { pr ->
+                eventPublisher.publishEvent(
+                    pr.asFetchedEvent(transactionId, githubRepositoryId, repositoryOwner, repositoryName),
+                )
+            }
+        } else {
+            if (githubRepository != null && pullRequests.isNotEmpty()) {
+                githubRepository.connectionState = ConnectionState.OUT_OF_DATE
 
-            eventPublisher.publishEvent(event)
+                withContext(Dispatchers.IO) {
+                    repoConnectionRepository.save(githubRepository)
+                }
+            }
         }
 
         eventPublisher.publishEvent(
@@ -124,6 +104,70 @@ class GithubPullRequestsService(
                 repositoryOwner,
                 repositoryName,
             ),
+        )
+    }
+
+    /**
+     * Extension function to [PullRequest] providing an easy way of constructing a [GithubPullRequestFetchedEvent]
+     * out of it.
+     *
+     * This function parses its values and the given [transactionId], [owner] and [name] to a
+     * [GithubPullRequestFetchedEvent].
+     * This event indicates that a pull request was fetched successfully from GitHub.
+     *
+     * This function has no side effects, it's simple input -> output.
+     *
+     * @param transactionId The [UUID] of the overall transaction this belongs to.
+     * @param repositoryId The internal id of the GitHub repository this pull request belongs to.
+     * @param owner The owner of the GitHub repository this pull request belongs to.
+     * @param name The name of the GitHub repository this pull request belongs to.
+     * @return The constructed [GithubPullRequestFetchedEvent].
+     */
+    private fun PullRequest.asFetchedEvent(
+        transactionId: UUID,
+        repositoryId: UUID,
+        owner: String,
+        name: String,
+    ): GithubPullRequestFetchedEvent {
+        return GithubPullRequestFetchedEvent(
+            transactionId = transactionId,
+            repositoryId = repositoryId,
+            repositoryOwner = owner,
+            repositoryName = name,
+            number = this.number,
+            title = this.title,
+            body = this.body,
+            state = this.state,
+            createdAt = this.createdAt,
+            mergedAt = this.mergedAt,
+            url = this.url,
+            author = this.author?.login,
+            labels = this.labels?.nodes?.map { it.name },
+            reviews = this.reviews?.nodes?.map {
+                GithubPullRequestReview(
+                    it.body,
+                    it.state,
+                    it.author?.login,
+                )
+            },
+            comments = this.comments?.nodes?.map {
+                GithubPullRequestComment(
+                    it.body,
+                    it.author?.login,
+                    it.createdAt,
+                )
+            },
+            reviewThreads = this.reviewThreads?.nodes?.map { reviewThread ->
+                GithubPullRequestReviewThread(
+                    reviewThread.comments?.nodes?.map {
+                        GithubPullRequestReviewThreadComment(
+                            it.body,
+                            it.author?.login,
+                            it.path,
+                        )
+                    } ?: emptyList(),
+                )
+            },
         )
     }
 }

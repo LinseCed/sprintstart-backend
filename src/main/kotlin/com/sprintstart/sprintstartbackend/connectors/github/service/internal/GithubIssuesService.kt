@@ -6,6 +6,9 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.issu
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.issues.GithubIssuesFetchCompletedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.issues.GithubIssuesFetchFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.issues.GithubIssuesFetchStartedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.models.ConnectionState
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
+import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphql.Issue
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import kotlinx.coroutines.Dispatchers
@@ -38,12 +41,15 @@ class GithubIssuesService(
         repositoryOwner: String,
         repositoryName: String,
         transactionId: UUID,
+        performUpdate: Boolean = true,
         since: Instant? = null,
     ) {
         eventPublisher.publishEvent(GithubIssuesFetchStartedEvent(transactionId, repositoryOwner, repositoryName))
 
+        var githubRepository: GithubRepositoryConnection? = null
+
         val issues = runCatching {
-            val githubRepository = withContext(Dispatchers.IO) {
+            githubRepository = withContext(Dispatchers.IO) {
                 repoConnectionRepository.findById(githubRepositoryId).orElseThrow()
             }
 
@@ -64,33 +70,53 @@ class GithubIssuesService(
             throw it
         }.getOrNull() ?: return
 
-        issues.forEach { issue ->
-            val event = GithubIssueFetchedEvent(
-                transactionId = transactionId,
-                repositoryOwner = repositoryOwner,
-                repositoryName = repositoryName,
-                number = issue.number,
-                title = issue.title,
-                body = issue.body,
-                state = issue.state,
-                createdAt = issue.createdAt,
-                closedAt = issue.closedAt,
-                url = issue.url,
-                author = issue.author?.login,
-                labels = issue.labels?.nodes?.map { it.name } ?: emptyList(),
-                assignees = issue.assignees?.nodes?.map { it.login } ?: emptyList(),
-                comments = issue.comments?.nodes?.map { node ->
-                    GithubIssueComment(
-                        body = node.body,
-                        author = node.author?.login,
-                        createdAt = node.createdAt,
-                    )
-                } ?: emptyList(),
-                repositoryId = githubRepositoryId,
-            )
-            eventPublisher.publishEvent(event)
+        if (performUpdate) {
+            issues.forEach { issue ->
+                eventPublisher.publishEvent(
+                    issue.toFetchedEvent(transactionId, githubRepositoryId, repositoryOwner, repositoryName),
+                )
+            }
+        } else {
+            if (githubRepository != null && issues.isNotEmpty()) {
+                githubRepository.connectionState = ConnectionState.OUT_OF_DATE
+
+                withContext(Dispatchers.IO) {
+                    repoConnectionRepository.save(githubRepository)
+                }
+            }
         }
 
         eventPublisher.publishEvent(GithubIssuesFetchCompletedEvent(transactionId, repositoryOwner, repositoryName))
+    }
+
+    private fun Issue.toFetchedEvent(
+        transactionId: UUID,
+        repositoryId: UUID,
+        owner: String,
+        name: String,
+    ): GithubIssueFetchedEvent {
+        return GithubIssueFetchedEvent(
+            transactionId = transactionId,
+            repositoryId = repositoryId,
+            repositoryOwner = owner,
+            repositoryName = name,
+            number = this.number,
+            title = this.title,
+            body = this.body,
+            state = this.state,
+            createdAt = this.createdAt,
+            closedAt = this.closedAt,
+            url = this.url,
+            author = this.author?.login,
+            labels = this.labels?.nodes?.map { it.name } ?: emptyList(),
+            assignees = this.assignees?.nodes?.map { it.login } ?: emptyList(),
+            comments = this.comments?.nodes?.map { node ->
+                GithubIssueComment(
+                    body = node.body,
+                    author = node.author?.login,
+                    createdAt = node.createdAt,
+                )
+            } ?: emptyList(),
+        )
     }
 }

@@ -50,7 +50,6 @@ class GithubClient(
      * @throws WebClientException if the server returns a non-2xx status
      * @throws kotlinx.serialization.SerializationException if the response body cannot be deserialized
      */
-    @Suppress("MagicNumber")
     suspend fun repositoryExists(repository: GithubRepositoryConnection): Boolean {
         val baseUrl = applicationConfig.github.repoBaseUrl
         return try {

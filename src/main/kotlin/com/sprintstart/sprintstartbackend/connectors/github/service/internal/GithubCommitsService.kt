@@ -5,21 +5,27 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.comm
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitsFetchCompletedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitsFetchFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.commits.GithubCommitsFetchStartedEvent
+import com.sprintstart.sprintstartbackend.connectors.github.models.ConnectionState
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
 import com.sprintstart.sprintstartbackend.connectors.github.models.client.dto.Commit
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubCommitsFetchFailedPartiallyException
+import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.connectors.github.util.CustomOnDiskCache
 import com.sprintstart.sprintstartbackend.connectors.github.util.GitOperationRunner
 import com.sprintstart.sprintstartbackend.connectors.github.util.OnDiskOperations
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
+import java.nio.file.Path
 import java.time.Instant
 import java.util.UUID
 
 @Service
 class GithubCommitsService(
+    private val repoConnectionRepository: GithubRepositoryConnectionRepository,
     private val onDiskOperations: OnDiskOperations,
     private val customCache: CustomOnDiskCache,
     private val eventPublisher: ApplicationEventPublisher,
@@ -33,16 +39,13 @@ class GithubCommitsService(
      * @param latestSnapshot A snapshot of the GitHub repository containing metadata such as the repository's
      * owner, name, and the timestamp of the last synchronization.
      * @param transactionId A unique identifier for the transaction corresponding to this synchronization process.
-     * @param doSyncAll A flag indicating whether to synchronize all commits (`true`) or only new commits
-     * since the last synchronization (`false`). Defaults to `false`.
      * @throws GithubCommitsFetchFailedPartiallyException If one or more commits fail to process during the
      * operation, this exception is thrown with details of the failures.
      */
-    @Tracked("Fetching latest commits from repository")
-    internal suspend fun fetchAndIngestLatestCommits(
+    @Tracked("Fetching & ingesting all commits from repository")
+    internal suspend fun fetchAndIngestAllCommits(
         latestSnapshot: GithubRepositorySnapshot,
         transactionId: UUID,
-        doSyncAll: Boolean = false,
     ) {
         eventPublisher.publishEvent(
             GithubCommitsFetchStartedEvent(
@@ -52,10 +55,92 @@ class GithubCommitsService(
             ),
         )
 
-        val rawOutput = fetchCommits(latestSnapshot, doSyncAll, transactionId)
+        val rawOutput = fetchCommits(latestSnapshot, transactionId, true)
+        ingestCommits(latestSnapshot, transactionId, rawOutput)
+    }
+
+    /**
+     * Fetches the latest commits from a GitHub repository and ingests them into the system.
+     *
+     * This method triggers the publication of an event to signal the start of the process,
+     * retrieves the commit data from the repository, and processes the data to integrate
+     * it into the system.
+     *
+     * @param latestSnapshot The current snapshot of the GitHub repository, containing information
+     * about the repository's state and metadata such as the owner and name.
+     * @param transactionId The unique identifier for the ongoing transaction to track and log
+     * operations performed during the commit-fetching process.
+     */
+    @Tracked("Fetching & ingesting latest commits from repository")
+    internal suspend fun fetchAndIngestLatestCommits(
+        latestSnapshot: GithubRepositorySnapshot,
+        transactionId: UUID,
+    ) {
+        eventPublisher.publishEvent(
+            GithubCommitsFetchStartedEvent(
+                transactionId,
+                latestSnapshot.repository.owner,
+                latestSnapshot.repository.name,
+            ),
+        )
+
+        val rawOutput = fetchCommits(latestSnapshot, transactionId, false)
+        ingestCommits(latestSnapshot, transactionId, rawOutput)
+    }
+
+    /**
+     * Verifies the sync status of commits of a given GitHub repository.
+     *
+     * Given a GitHub repository connected to this application, this function checks if the local state is outdated,
+     * and if so marks the repository as [ConnectionState.OUT_OF_DATE], but does not update it.
+     *
+     * @param githubRepository The GitHub repository to check.
+     */
+    @Tracked("Verifying commit sync status")
+    internal suspend fun verifyCommitSyncStatus(githubRepository: GithubRepositoryConnection, transactionId: UUID) {
+        eventPublisher.publishEvent(
+            GithubCommitsFetchStartedEvent(
+                transactionId,
+                githubRepository.owner,
+                githubRepository.name,
+            ),
+        )
+
+        val localFsPath = customCache.getLocalRepositoryPath(githubRepository)
+
+        if (!isRepositoryUpToDate(localFsPath)) {
+            githubRepository.connectionState = ConnectionState.OUT_OF_DATE
+
+            withContext(Dispatchers.IO) {
+                repoConnectionRepository.save(githubRepository)
+            }
+        }
+
+        eventPublisher.publishEvent(
+            GithubCommitsFetchCompletedEvent(
+                transactionId,
+                githubRepository.owner,
+                githubRepository.name,
+            ),
+        )
+    }
+
+    /**
+     * Processes a list of raw commit lines and updates the repository snapshot.
+     * Publishes appropriate events based on the success or failure of commit ingestion.
+     *
+     * @param latestSnapshot The latest snapshot of the GitHub repository to update with commit data.
+     * @param transactionId A unique identifier for the transaction processing the commits.
+     * @param rawCommits A string containing raw commit data, with each line representing a commit.
+     */
+    private suspend fun ingestCommits(
+        latestSnapshot: GithubRepositorySnapshot,
+        transactionId: UUID,
+        rawCommits: String,
+    ) {
         val failures = mutableListOf<String>()
 
-        rawOutput
+        rawCommits
             .lines()
             .filter { it.isNotBlank() }
             .forEach { line -> processCommitLine(latestSnapshot.repository, line, transactionId, failures) }
@@ -82,6 +167,21 @@ class GithubCommitsService(
     }
 
     /**
+     * Checks the remote if this local copy of the repository is still up to date.
+     *
+     * @param localFsPath The path to the local copy of the GitHub repository.
+     * @return true, if the repository is up to date with remote, otherwise false.
+     */
+    private suspend fun isRepositoryUpToDate(localFsPath: Path): Boolean {
+        val localHead = gitRunner.exec(localFsPath, onDiskOperations.gitRevParse()).trim()
+        val remoteHead = gitRunner
+            .exec(localFsPath, onDiskOperations.gitLsRemote())
+            .trim()
+            .substringBefore('\t')
+        return localHead == remoteHead
+    }
+
+    /**
      * Fetches commit data from a GitHub repository using the local repository cache and returns the raw output.
      * The method utilizes `gitRunner` for fetching either all commits or commits after a specific timestamp,
      * based on the value of `doSyncAll`.
@@ -99,8 +199,8 @@ class GithubCommitsService(
      */
     private suspend fun fetchCommits(
         latestSnapshot: GithubRepositorySnapshot,
-        doSyncAll: Boolean,
         transactionId: UUID,
+        doSyncAll: Boolean,
     ): String = runCatching {
         val localCopyPath = customCache.getLocalRepositoryPath(
             latestSnapshot.repository,
@@ -181,7 +281,7 @@ class GithubCommitsService(
      * @return A Commit object containing the parsed date, sha, author, and message.
      * @throws IllegalArgumentException if the input string does not conform to the expected format.
      */
-    @Suppress("DestructuringDeclarationWithTooManyEntries", "MagicNumber")
+    @Suppress("DestructuringDeclarationWithTooManyEntries")
     private fun parseCommit(raw: String): Commit {
         val parts = raw.split(" - ")
         require(parts.size >= 4) { "Invalid commit format: $raw" }

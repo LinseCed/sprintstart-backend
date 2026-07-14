@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.connectors.github.controller
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNameAlreadyExistsException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatStillInUseException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryConfigNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
@@ -74,6 +75,12 @@ class GithubExceptionHandler {
      */
     @ExceptionHandler(GithubUserPatNotFoundException::class)
     fun handleGithubUserPatNotFound(ex: GithubUserPatNotFoundException): ResponseEntity<ErrorResponse> =
+        ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(ErrorResponse(ex.message))
+
+    @ExceptionHandler(RepositoryConfigNotFoundException::class)
+    fun handleRepositoryConfigNotFound(ex: RepositoryConfigNotFoundException): ResponseEntity<ErrorResponse> =
         ResponseEntity
             .status(HttpStatus.NOT_FOUND)
             .body(ErrorResponse(ex.message))
