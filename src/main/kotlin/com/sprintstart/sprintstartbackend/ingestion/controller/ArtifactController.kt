@@ -12,8 +12,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
-import org.springframework.http.HttpStatus
 import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
@@ -113,10 +113,10 @@ class ArtifactController(
 
     /**
      * Opens one artifact by returning stored bytes or redirecting to its source URL.
- *
- * The caller must have `USER` access to the given project, and the artifact must be linked to
- * that same project. Artifacts with local payloads return `200`; remote artifacts without local
- * payloads return `302` to their source URL when one is known.
+     *
+     * The caller must have `USER` access to the given project, and the artifact must be linked to
+     * that same project. Artifacts with local payloads return `200`; remote artifacts without local
+     * payloads return `302` to their source URL when one is known.
      *
      * @param projectId The SprintStart project that scopes access to the artifact.
      * @param artifactId The artifact whose stored content should be returned.
@@ -165,10 +165,11 @@ class ArtifactController(
                     .body(response.content)
             }
 
-            is ArtifactContentRedirectResponse -> ResponseEntity
-                .status(HttpStatus.FOUND)
-                .location(URI.create(response.url))
-                .build<ByteArray>()
+            is ArtifactContentRedirectResponse ->
+                ResponseEntity
+                    .status(HttpStatus.FOUND)
+                    .location(URI.create(response.url))
+                    .build<ByteArray>()
         }
     }
 }

@@ -61,7 +61,6 @@ class ArtifactService(
             )
         }
 
-
         when (artifact.sourceSystem) {
             SourceSystem.UPLOAD -> {
                 readUploadedBytes(artifact)?.let {

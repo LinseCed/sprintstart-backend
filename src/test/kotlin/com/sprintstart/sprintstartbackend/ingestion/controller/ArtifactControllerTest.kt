@@ -48,8 +48,7 @@ class ArtifactControllerTest(
             .perform(
                 get("/api/v1/admin/artifacts")
                     .with(jwt().authorities(SimpleGrantedAuthority("ROLE_ADMIN"))),
-            )
-            .andExpect(status().isOk)
+            ).andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.APPLICATION_JSON))
             .andExpect(jsonPath("$.items[0].metadata").value("""{"repositoryFullName":"owner/repo"}"""))
             .andExpect(jsonPath("$.items[0].ingestedAt").value("2026-01-02T03:04:05Z"))
@@ -66,9 +65,8 @@ class ArtifactControllerTest(
         mockMvc
             .perform(
                 get("/api/v1/admin/artifacts?page=2&size=10&filter=github")
-                    .with(jwt().authorities(SimpleGrantedAuthority("ROLE_ADMIN")))
-            )
-            .andExpect(status().isOk)
+                    .with(jwt().authorities(SimpleGrantedAuthority("ROLE_ADMIN"))),
+            ).andExpect(status().isOk)
 
         verify(exactly = 1) { artifactQueryService.getAllArtifacts(2, 10, "github") }
     }
@@ -92,8 +90,7 @@ class ArtifactControllerTest(
                             .jwt { it.subject("auth-user") }
                             .authorities(SimpleGrantedAuthority("ROLE_USER")),
                     ),
-            )
-            .andExpect(status().isOk)
+            ).andExpect(status().isOk)
             .andExpect(content().contentType(MediaType.IMAGE_PNG))
             .andExpect(header().string("Content-Disposition", "inline"))
             .andExpect(content().bytes(byteArrayOf(1, 2, 3)))
@@ -120,8 +117,7 @@ class ArtifactControllerTest(
                             .jwt { it.subject("auth-user") }
                             .authorities(SimpleGrantedAuthority("ROLE_USER")),
                     ),
-            )
-            .andExpect(status().isFound)
+            ).andExpect(status().isFound)
             .andExpect(redirectedUrl(sourceUrl))
 
         verify(exactly = 1) {

@@ -80,11 +80,12 @@ class UploadValidationService(
     private fun extensionFor(filename: String): String {
         return when (filename.lowercase()) {
             "dockerfile" -> "dockerfile"
-            else -> filename
-                .substringAfterLast(
-                    delimiter = ".",
-                    missingDelimiterValue = "",
-                ).lowercase()
+            else ->
+                filename
+                    .substringAfterLast(
+                        delimiter = ".",
+                        missingDelimiterValue = "",
+                    ).lowercase()
         }
     }
 }
