@@ -70,7 +70,7 @@ class KnowledgeGapsServiceTest {
         lastname = "Doe",
         avatarUrl = null,
         profileIcon = null,
-        project = null,
+        projects = emptySet(),
         skills = emptyList(),
         projectRoles = if (role == null) {
             emptyList()
