@@ -57,9 +57,9 @@ class GithubConnectorControllerTest {
 
     private val objectMapper = jacksonObjectMapper()
 
-    private val userJwt = jwt()
+    private val pmJwt = jwt()
         .jwt { it.subject("mockId") }
-        .authorities(SimpleGrantedAuthority("ROLE_USER"))
+        .authorities(SimpleGrantedAuthority("ROLE_PM"))
 
     private val validTokenName = "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
     private val projectId = UUID.randomUUID()
@@ -88,7 +88,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -129,7 +129,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -154,7 +154,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(status().isBadRequest)
         }
 
@@ -172,7 +172,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(status().isBadRequest)
         }
     }
@@ -189,7 +189,7 @@ class GithubConnectorControllerTest {
             val asyncResult = mockMvc
                 .perform(
                     post("/api/v1/github/update-all")
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -207,7 +207,7 @@ class GithubConnectorControllerTest {
             val asyncResult = mockMvc
                 .perform(
                     post("/api/v1/github/update-all")
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -233,7 +233,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -256,7 +256,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -282,7 +282,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -301,7 +301,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(status().isBadRequest)
         }
 
@@ -314,7 +314,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(status().isBadRequest)
         }
     }
