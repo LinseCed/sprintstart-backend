@@ -11,7 +11,6 @@ import com.sprintstart.sprintstartbackend.user.model.request.user.PatchUserReque
 import com.sprintstart.sprintstartbackend.user.model.request.user.UpdateUserEnabledRequest
 import com.sprintstart.sprintstartbackend.user.model.response.user.DeleteUserResponse
 import com.sprintstart.sprintstartbackend.user.model.response.user.GetUserResponse
-import com.sprintstart.sprintstartbackend.user.model.response.user.ProjectRoleSummary
 import com.sprintstart.sprintstartbackend.user.service.UserService
 import io.mockk.every
 import io.mockk.verify
@@ -64,7 +63,7 @@ class UserControllerTest(
             .perform(get("/api/v1/users/me").with(userJwt))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.firstName").value("Alice"))
-            .andExpect(jsonPath("$.projectRoles[0].name").value("Backend Developer"))
+            .andExpect(jsonPath("$.roles[0]").value("USER"))
             .andExpect(jsonPath("$.permissionGroup").value("USER"))
 
         verify(exactly = 1) { userService.getMe(any()) }
@@ -76,6 +75,7 @@ class UserControllerTest(
             email = "new@mail.de",
             firstName = "Alicia",
             profileIcon = "icon-star",
+            projectsId = emptySet(),
         )
         every { userService.patchMe("user", request) } returns userResponse(email = "new@mail.de", firstName = "Alicia")
 
@@ -120,6 +120,7 @@ class UserControllerTest(
             email = "new@mail.de",
             firstName = "Alicia",
             permissionGroup = Role.ADMIN,
+            projectsId = emptySet(),
         )
         every {
             userService.patchAdminUserById(id, request)
@@ -176,9 +177,8 @@ class UserControllerTest(
         id: UUID = UUID.randomUUID(),
         email: String = "alice@mail.de",
         firstName: String = "Alice",
-        projectRoles: List<ProjectRoleSummary> = listOf(
-            ProjectRoleSummary(id = UUID.randomUUID(), name = "Backend Developer"),
-        ),
+        projectIds: Set<UUID> = emptySet(),
+        roles: Set<Role> = setOf(Role.USER),
         enabled: Boolean = true,
         permissionGroup: Role = Role.USER,
     ) = GetUserResponse(
@@ -188,7 +188,8 @@ class UserControllerTest(
         email = email,
         firstName = firstName,
         lastName = "Developer",
-        projectRoles = projectRoles,
+        projectIds = projectIds,
+        roles = roles,
         permissionGroup = permissionGroup,
         enabled = enabled,
         profileIcon = "icon-star",

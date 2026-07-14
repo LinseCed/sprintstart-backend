@@ -19,6 +19,8 @@ import com.sprintstart.sprintstartbackend.connectors.github.service.internal.Git
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubPullRequestsService
 import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorSource
 import com.sprintstart.sprintstartbackend.user.external.UserApi
+import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
+import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import io.mockk.coEvery
 import io.mockk.coJustRun
 import io.mockk.coVerify
@@ -42,6 +44,7 @@ import kotlin.test.assertFailsWith
 @OptIn(ExperimentalCoroutinesApi::class)
 class GithubConnectorServiceTest {
     private val testScope = TestScope()
+    private val testProjectId = UUID.randomUUID()
 
     private val repoConnectionRepository = mockk<GithubRepositoryConnectionRepository>()
     private val repoConfigRepository = mockk<GithubRepositoryConfigRepository>()
@@ -58,6 +61,8 @@ class GithubConnectorServiceTest {
 
     @BeforeEach
     fun setUp() {
+        every { userApi.getUserByAuthId(any()) } returns userDto()
+
         service = GithubConnectorService(
             applicationScope = testScope,
             repoConnectionRepository = repoConnectionRepository,
@@ -277,6 +282,25 @@ class GithubConnectorServiceTest {
         owner = "owner",
         name = "repo",
         tokenName = "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+        projectId = testProjectId,
+    )
+
+    private fun userDto() = UserDto(
+        id = UUID.randomUUID(),
+        username = "test-user",
+        firstname = "Test",
+        lastname = "User",
+        avatarUrl = null,
+        profileIcon = null,
+        projects = setOf(
+            ProjectDto(
+                projectId = testProjectId,
+                name = "Test Project",
+                description = null,
+            ),
+        ),
+        skills = emptyList(),
+        projectRoles = emptyList(),
     )
 
     private fun repoConnection(owner: String, name: String, user: GithubUser) = GithubRepositoryConnection(

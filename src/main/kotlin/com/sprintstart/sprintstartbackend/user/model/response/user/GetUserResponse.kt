@@ -10,14 +10,10 @@ data class GetUserResponse(
     val email: String? = null,
     val firstName: String,
     val lastName: String,
-    val projectRoles: List<ProjectRoleSummary>,
+    val projectIds: Set<UUID>,
+    val roles: Set<Role>,
     val permissionGroup: Role,
     val enabled: Boolean,
     val profileIcon: String? = null,
     val hasCompletedOnboarding: Boolean,
-)
-
-data class ProjectRoleSummary(
-    val id: UUID,
-    val name: String,
 )
