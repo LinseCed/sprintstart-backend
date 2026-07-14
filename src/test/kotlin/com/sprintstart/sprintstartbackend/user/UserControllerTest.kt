@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.user.model.request.user.PatchUserReque
 import com.sprintstart.sprintstartbackend.user.model.request.user.UpdateUserEnabledRequest
 import com.sprintstart.sprintstartbackend.user.model.response.user.DeleteUserResponse
 import com.sprintstart.sprintstartbackend.user.model.response.user.GetUserResponse
+import com.sprintstart.sprintstartbackend.user.model.response.user.ProjectRoleSummary
 import com.sprintstart.sprintstartbackend.user.service.UserService
 import io.mockk.every
 import io.mockk.verify
@@ -179,6 +180,7 @@ class UserControllerTest(
         firstName: String = "Alice",
         projectIds: Set<UUID> = emptySet(),
         roles: Set<Role> = setOf(Role.USER),
+        projectRoles: List<ProjectRoleSummary> = emptyList(),
         enabled: Boolean = true,
         permissionGroup: Role = Role.USER,
     ) = GetUserResponse(
@@ -190,6 +192,7 @@ class UserControllerTest(
         lastName = "Developer",
         projectIds = projectIds,
         roles = roles,
+        projectRoles = projectRoles,
         permissionGroup = permissionGroup,
         enabled = enabled,
         profileIcon = "icon-star",
