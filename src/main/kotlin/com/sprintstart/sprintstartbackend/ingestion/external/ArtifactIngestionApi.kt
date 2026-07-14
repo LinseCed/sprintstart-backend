@@ -35,4 +35,9 @@ interface ArtifactIngestionApi {
      * [exists] first.
      */
     fun getHash(artifactId: UUID): String?
+
+    /**
+     * Returns whether the artifact exists and belongs to the specified project.
+     */
+    fun existsInProject(projectId: UUID, artifactId: UUID): Boolean
 }

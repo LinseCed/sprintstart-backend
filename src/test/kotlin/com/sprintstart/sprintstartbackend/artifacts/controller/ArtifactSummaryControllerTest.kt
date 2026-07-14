@@ -39,6 +39,7 @@ class ArtifactSummaryControllerTest(
     @MockkBean
     private lateinit var jwtDecoder: JwtDecoder
 
+    private val projectId = UUID.randomUUID()
     private val artifactId = UUID.randomUUID()
 
     private fun jwtWithRoles(vararg roles: String): JwtRequestPostProcessor {
@@ -63,10 +64,12 @@ class ArtifactSummaryControllerTest(
             ),
             AiArtifactSummaryStreamMessage(type = "done"),
         )
-        every { artifactSummaryService.getSummary(artifactId) } returns flowOf(*messages.toTypedArray())
+        every {
+            artifactSummaryService.getSummary(projectId, artifactId, "test-auth-id")
+        } returns flowOf(*messages.toTypedArray())
 
         val asyncResult = mockMvc
-            .perform(get("/api/v1/artifacts/$artifactId/summary").with(userJwt))
+            .perform(get("/api/v1/projects/$projectId/artifacts/$artifactId/summary").with(userJwt))
             .andExpect(request().asyncStarted())
             .andReturn()
 
@@ -82,16 +85,17 @@ class ArtifactSummaryControllerTest(
         val expected = messages.joinToString("") { Json.encodeToString(it) }
         assertEquals(expected, actual)
 
-        verify(exactly = 1) { artifactSummaryService.getSummary(artifactId) }
+        verify(exactly = 1) { artifactSummaryService.getSummary(projectId, artifactId, "test-auth-id") }
     }
 
     @Test
     fun `getSummary returns 404 when the artifact does not exist`() {
-        every { artifactSummaryService.getSummary(artifactId) } throws
-            ResponseStatusException(HttpStatus.NOT_FOUND, "Artifact $artifactId not found")
+        every {
+            artifactSummaryService.getSummary(projectId, artifactId, "test-auth-id")
+        } throws ResponseStatusException(HttpStatus.NOT_FOUND, "Artifact $artifactId not found")
 
         val asyncResult = mockMvc
-            .perform(get("/api/v1/artifacts/$artifactId/summary").with(userJwt))
+            .perform(get("/api/v1/projects/$projectId/artifacts/$artifactId/summary").with(userJwt))
             .andExpect(request().asyncStarted())
             .andReturn()
 
@@ -103,18 +107,20 @@ class ArtifactSummaryControllerTest(
     @Test
     fun `getSummary returns 401 when not authenticated`() {
         mockMvc
-            .perform(get("/api/v1/artifacts/$artifactId/summary"))
+            .perform(get("/api/v1/projects/$projectId/artifacts/$artifactId/summary"))
             .andExpect(status().isUnauthorized)
     }
 
     @Test
     fun `getSummary forwards an error event from the service untouched`() {
-        every { artifactSummaryService.getSummary(artifactId) } returns flowOf(
+        every {
+            artifactSummaryService.getSummary(projectId, artifactId, "test-auth-id")
+        } returns flowOf(
             AiArtifactSummaryStreamMessage(type = "error", message = "LLM backend unreachable"),
         )
 
         val asyncResult = mockMvc
-            .perform(get("/api/v1/artifacts/$artifactId/summary").with(userJwt))
+            .perform(get("/api/v1/projects/$projectId/artifacts/$artifactId/summary").with(userJwt))
             .andExpect(request().asyncStarted())
             .andReturn()
 

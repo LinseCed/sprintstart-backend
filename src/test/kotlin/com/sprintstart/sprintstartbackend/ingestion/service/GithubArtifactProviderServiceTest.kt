@@ -52,10 +52,9 @@ class GithubArtifactProviderServiceTest {
     fun `persistArtifact saves new artifact and increments ingested count`() {
         val run = ingestionRun()
         val savedArtifact = slot<Artifact>()
-        every { ingestionRunRepository.getReferenceById(runId) } returns run
+        every { ingestionRunRepository.findByIdForUpdate(runId) } returns Optional.of(run)
         every { artifactRepository.findBySourceId("github:owner/repo:FILE:src/main/App.kt") } returns null
         every { artifactRepository.save(capture(savedArtifact)) } answers { savedArtifact.captured }
-        every { ingestionRunRepository.incrementIngestedCount(runId) } returns Unit
 
         service.persistArtifact(artifactCommand())
 
@@ -67,7 +66,7 @@ class GithubArtifactProviderServiceTest {
         assertThat(savedArtifact.captured.content).isEqualTo("content")
         assertThat(savedArtifact.captured.hash).isEqualTo("hash-1")
         assertThat(savedArtifact.captured.ingestionRun).isSameAs(run)
-        verify(exactly = 1) { ingestionRunRepository.incrementIngestedCount(runId) }
+        assertThat(run.ingestedCount).isEqualTo(1)
     }
 
     @Test
@@ -102,8 +101,9 @@ class GithubArtifactProviderServiceTest {
     @Test
     fun `persistArtifact updates changed file and increments updated count`() {
         val existing = artifact(hash = "old-hash")
+        val run = existing.ingestionRun
         every { artifactRepository.findBySourceId(existing.sourceId) } returns existing
-        every { ingestionRunRepository.incrementUpdatedCount(runId) } returns Unit
+        every { ingestionRunRepository.findByIdForUpdate(runId) } returns Optional.of(run)
 
         service.persistArtifact(
             artifactCommand(
@@ -116,7 +116,7 @@ class GithubArtifactProviderServiceTest {
         assertThat(existing.content).isEqualTo("new content")
         assertThat(existing.hash).isEqualTo("new-hash")
         assertThat(existing.projectIds).containsExactly(projectId)
-        verify(exactly = 1) { ingestionRunRepository.incrementUpdatedCount(runId) }
+        assertThat(run.updatedCount).isEqualTo(1)
         verify(exactly = 0) { artifactRepository.save(any()) }
     }
 

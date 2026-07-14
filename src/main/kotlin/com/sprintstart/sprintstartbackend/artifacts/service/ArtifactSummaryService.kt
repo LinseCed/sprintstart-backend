@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.artifacts.model.entity.ArtifactSummary
 import com.sprintstart.sprintstartbackend.artifacts.repository.ArtifactSummaryRepository
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.upload.external.UploadApi
+import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flow
@@ -39,6 +40,7 @@ class ArtifactSummaryService(
     private val artifactSummaryAiClient: ArtifactSummaryAiClient,
     private val artifactIngestionApi: ArtifactIngestionApi,
     private val uploadApi: UploadApi,
+    private val userApi: UserApi,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -52,7 +54,15 @@ class ArtifactSummaryService(
      *   if the AI service fails mid-stream (surfaces as an `error` SSE event, since the response
      *   has already committed to 200 by then).
      */
-    fun getSummary(artifactId: UUID): Flow<AiArtifactSummaryStreamMessage> {
+    fun getSummary(projectId: UUID, artifactId: UUID, authId: String): Flow<AiArtifactSummaryStreamMessage> {
+        if (!userApi.userHasAccessToProject(authId, projectId)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project")
+        }
+
+        if (!artifactIngestionApi.existsInProject(projectId, artifactId)) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Artifact $artifactId not found in project $projectId")
+        }
+
         val currentHash = resolveHash(artifactId)
 
         val cached = currentHash?.let { hash ->
