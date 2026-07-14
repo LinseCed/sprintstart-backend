@@ -53,27 +53,27 @@ class GithubConfigControllerTest {
         .authorities(SimpleGrantedAuthority("ROLE_ADMIN"))
 
     @Nested
-    inner class ConfigureGlobal {
+    inner class ConfigureAll {
         @Test
         fun `returns 204 No Content when configuration is applied`() {
-            every { configService.configureGlobal(any()) } just runs
+            every { configService.configureAll(any()) } just runs
 
             mockMvc
                 .perform(
-                    put("/api/v1/github/config/global")
+                    put("/api/v1/github/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validConfigBody())
                         .with(adminJwt),
                 ).andExpect(status().isNoContent)
 
-            verify { configService.configureGlobal(any()) }
+            verify { configService.configureAll(any()) }
         }
 
         @Test
         fun `returns 400 when schedule is invalid`() {
             mockMvc
                 .perform(
-                    put("/api/v1/github/config/global")
+                    put("/api/v1/github/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""{"schedule": {}, "autoUpdate": true}""")
                         .with(adminJwt),
@@ -88,7 +88,7 @@ class GithubConfigControllerTest {
 
             mockMvc
                 .perform(
-                    put("/api/v1/github/config/global")
+                    put("/api/v1/github/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validConfigBody())
                         .with(userJwt),
@@ -245,12 +245,94 @@ class GithubConfigControllerTest {
     }
 
     @Nested
+    inner class GetAllConfigs {
+        @Test
+        fun `returns 200 with all configs`() {
+            val response1 = GetRepositoryConfigResponse(
+                id = UUID.randomUUID(),
+                repositoryOwner = "owner1",
+                repositoryName = "repo1",
+                autoUpdate = true,
+                spec = ScheduleSpec.Daily(time = LocalTime.of(2, 0)),
+                schedule = "0 0 2 * * *",
+                nextSyncAt = Instant.parse("2026-01-01T02:00:00Z"),
+            )
+            val response2 = GetRepositoryConfigResponse(
+                id = UUID.randomUUID(),
+                repositoryOwner = "owner2",
+                repositoryName = "repo2",
+                autoUpdate = false,
+                spec = ScheduleSpec.Interval(everyMinutes = 60),
+                schedule = "0 */60 * * * *",
+                nextSyncAt = null,
+            )
+            every { configService.getAll() } returns listOf(response1, response2)
+
+            mockMvc
+                .perform(
+                    get("/api/v1/github/config")
+                        .with(adminJwt),
+                ).andExpect(status().isOk)
+                .andExpect(jsonPath("$").isArray)
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].repositoryOwner").value("owner1"))
+                .andExpect(jsonPath("$[0].repositoryName").value("repo1"))
+                .andExpect(jsonPath("$[0].autoUpdate").value(true))
+                .andExpect(jsonPath("$[0].spec.type").value("DAILY"))
+                .andExpect(jsonPath("$[0].spec.time").value("02:00:00"))
+                .andExpect(jsonPath("$[0].schedule").value("0 0 2 * * *"))
+                .andExpect(jsonPath("$[0].nextSyncAt").value("2026-01-01T02:00:00Z"))
+                .andExpect(jsonPath("$[1].repositoryOwner").value("owner2"))
+                .andExpect(jsonPath("$[1].repositoryName").value("repo2"))
+                .andExpect(jsonPath("$[1].autoUpdate").value(false))
+                .andExpect(jsonPath("$[1].spec.type").value("INTERVAL"))
+                .andExpect(jsonPath("$[1].spec.everyMinutes").value(60))
+                .andExpect(jsonPath("$[1].schedule").value("0 */60 * * * *"))
+                .andExpect(jsonPath("$[1].nextSyncAt").doesNotExist())
+        }
+
+        @Test
+        fun `returns 200 with empty list when no configs exist`() {
+            every { configService.getAll() } returns emptyList()
+
+            mockMvc
+                .perform(
+                    get("/api/v1/github/config")
+                        .with(adminJwt),
+                ).andExpect(status().isOk)
+                .andExpect(jsonPath("$").isArray)
+                .andExpect(jsonPath("$.length()").value(0))
+        }
+
+        @Test
+        fun `returns 403 when user has insufficient role`() {
+            val userJwt = jwt()
+                .jwt { it.subject("mockId") }
+                .authorities(SimpleGrantedAuthority("ROLE_USER"))
+
+            mockMvc
+                .perform(
+                    get("/api/v1/github/config")
+                        .with(userJwt),
+                ).andExpect(status().isForbidden)
+        }
+
+        @Test
+        fun `returns 401 when not authenticated`() {
+            mockMvc
+                .perform(
+                    get("/api/v1/github/config"),
+                ).andExpect(status().isUnauthorized)
+        }
+    }
+
+    @Nested
     inner class ScheduleValidation {
         @Test
         fun `returns 400 for Interval with 0 minutes`() {
             mockMvc
                 .perform(
-                    put("/api/v1/github/config/global")
+                    put("/api/v1/github/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""{"autoUpdate": true, "schedule": {"type": "INTERVAL", "everyMinutes": 0}}""")
                         .with(adminJwt),
@@ -261,7 +343,7 @@ class GithubConfigControllerTest {
         fun `returns 400 for Interval with negative minutes`() {
             mockMvc
                 .perform(
-                    put("/api/v1/github/config/global")
+                    put("/api/v1/github/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""{"autoUpdate": true, "schedule": {"type": "INTERVAL", "everyMinutes": -1}}""")
                         .with(adminJwt),
@@ -272,7 +354,7 @@ class GithubConfigControllerTest {
         fun `returns 400 for Monthly with dayOfMonth 0`() {
             mockMvc
                 .perform(
-                    put("/api/v1/github/config/global")
+                    put("/api/v1/github/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
                             """
@@ -286,7 +368,7 @@ class GithubConfigControllerTest {
         fun `returns 400 for Monthly with dayOfMonth 32`() {
             mockMvc
                 .perform(
-                    put("/api/v1/github/config/global")
+                    put("/api/v1/github/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
                             """
@@ -300,7 +382,7 @@ class GithubConfigControllerTest {
         fun `returns 400 for Weekly with empty daysOfWeek`() {
             mockMvc
                 .perform(
-                    put("/api/v1/github/config/global")
+                    put("/api/v1/github/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(
                             """
@@ -314,7 +396,7 @@ class GithubConfigControllerTest {
         fun `returns 400 for unknown schedule type`() {
             mockMvc
                 .perform(
-                    put("/api/v1/github/config/global")
+                    put("/api/v1/github/config")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""{"autoUpdate": true, "schedule": {"type": "UNKNOWN"}}""")
                         .with(adminJwt),

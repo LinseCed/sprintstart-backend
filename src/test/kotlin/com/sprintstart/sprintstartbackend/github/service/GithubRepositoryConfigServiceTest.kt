@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.connectors.github.models.ScheduleSpec
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConfigureRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.GetRepositoryConfigRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.GetRepositoryConfigResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryConfigNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConfigRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
@@ -73,6 +74,35 @@ class GithubRepositoryConfigServiceTest {
     }
 
     @Nested
+    inner class RetrieveAll {
+        @Test
+        fun `retrieves all github repositories`() {
+            val repo1 = repoConnection("owner1", "repo1")
+            val config1 = GithubRepositoryConfig(id = repo1.id, repository = repo1)
+            val repo2 = repoConnection("owner2", "repo2")
+            val config2 = GithubRepositoryConfig(id = repo2.id, repository = repo2)
+
+            every { configRepository.findAll() } returns listOf(config1, config2)
+
+            val result = service.getAll()
+            assertThat(result.size).isEqualTo(2)
+            assertThat(result[0]).isEqualTo(GetRepositoryConfigResponse.of(config1))
+            assertThat(result[1]).isEqualTo(GetRepositoryConfigResponse.of(config2))
+            verify { configRepository.findAll() }
+        }
+
+        @Test
+        fun `retrieves all github repositories with empty list`() {
+            every { configRepository.findAll() } returns emptyList()
+
+            val result = service.getAll()
+
+            assertThat(result).isEmpty()
+            verify { configRepository.findAll() }
+        }
+    }
+
+    @Nested
     inner class Configure {
         @Test
         fun `updates autoUpdate, spec, and schedule`() {
@@ -116,7 +146,7 @@ class GithubRepositoryConfigServiceTest {
     }
 
     @Nested
-    inner class ConfigureGlobal {
+    inner class ConfigureAll {
         @Test
         fun `updates all configs with given settings`() {
             val repo1 = repoConnection("owner1", "repo1")
@@ -133,7 +163,7 @@ class GithubRepositoryConfigServiceTest {
                 schedule = spec,
             )
 
-            service.configureGlobal(request)
+            service.configureAll(request)
 
             assertThat(config1.autoUpdate).isFalse()
             assertThat(config1.spec).isEqualTo(spec)
