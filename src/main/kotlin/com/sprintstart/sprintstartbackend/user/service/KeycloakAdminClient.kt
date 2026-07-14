@@ -70,7 +70,9 @@ class HttpKeycloakAdminClient(
     override fun setPermissionGroup(authId: String, permissionGroup: Role) {
         val token = tokenProvider.accessToken()
         val currentRoles = roleClient.getRealmRoleMappings(authId, token)
-        val managedCurrentRoles = currentRoles.filter { it["name"]?.asText() in KeycloakRoleMapper.managedRealmRoles() }
+        val managedCurrentRoles = currentRoles.filter {
+            it["name"]?.textValue() in KeycloakRoleMapper.managedRealmRoles()
+        }
 
         if (managedCurrentRoles.isNotEmpty()) {
             transport.send(
@@ -103,7 +105,7 @@ class HttpKeycloakAdminClient(
         }
 
         return KeycloakRoleMapper.mapRealmRoles(
-            roleMappings.mapNotNull { it["name"]?.asText() },
+            roleMappings.mapNotNull { it["name"]?.textValue() },
         )
     }
 
@@ -191,7 +193,7 @@ class KeycloakAdminTokenProvider(
             )
         }
 
-        return objectMapper.readTree(response.body())["access_token"]?.asText()
+        return objectMapper.readTree(response.body())["access_token"]?.textValue()
             ?: throw ResponseStatusException(
                 HttpStatus.BAD_GATEWAY,
                 "Keycloak admin token response did not contain access_token",
