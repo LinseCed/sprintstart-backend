@@ -29,8 +29,12 @@ class UploadArtifactMapper(
             "dockerfile" -> "dockerfile"
             else -> event.filename.substringAfterLast(".", "").lowercase()
         }
-        val bodyText = uploadedArtifactReader.readText(event.artifactId)
         val language = FileMetaDataResolver.languageFor(extension)
+        val bodyText = if (language != null) {
+            uploadedArtifactReader.readText(event.artifactId)
+        } else {
+            null
+        }
         return UploadArtifactCommand(
             ingestionRunId = event.transactionId,
             projectId = event.projectId,

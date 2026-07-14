@@ -13,9 +13,22 @@ class UploadedArtifactReaderImpl(
     private val uploadedArtifactRepository: UploadedArtifactRepository,
 ) : UploadedArtifactReader {
     override fun readText(artifactId: UUID): String {
+        return Files.readString(
+            Path.of(storagePathFor(artifactId)),
+            StandardCharset.UTF_8,
+        )
+    }
+
+    override fun readBytes(artifactId: UUID): ByteArray {
+        return Files.readAllBytes(
+            Path.of(storagePathFor(artifactId)),
+        )
+    }
+
+    private fun storagePathFor(artifactId: UUID): String {
         val uploadedArtifact = uploadedArtifactRepository.findByIdOrNull(artifactId)
         uploadedArtifact ?: throw IllegalArgumentException("Artifact with id $artifactId not found")
 
-        return Files.readString(Path.of(uploadedArtifact.storagePath), StandardCharset.UTF_8)
+        return uploadedArtifact.storagePath
     }
 }

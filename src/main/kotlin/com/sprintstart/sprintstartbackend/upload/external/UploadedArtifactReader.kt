@@ -6,4 +6,8 @@ interface UploadedArtifactReader {
     fun readText(
         artifactId: UUID,
     ): String
+
+    fun readBytes(
+        artifactId: UUID,
+    ): ByteArray
 }
