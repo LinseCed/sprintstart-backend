@@ -61,10 +61,6 @@ class GithubConnectorControllerTest {
         .jwt { it.subject("mockId") }
         .authorities(SimpleGrantedAuthority("ROLE_PM"))
 
-    private val userJwt = jwt()
-        .jwt { it.subject("mockId") }
-        .authorities(SimpleGrantedAuthority("ROLE_USER"))
-
     private val validTokenName = "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
     private val projectId = UUID.randomUUID()
 
@@ -193,7 +189,7 @@ class GithubConnectorControllerTest {
             val asyncResult = mockMvc
                 .perform(
                     post("/api/v1/github/update-all")
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -213,7 +209,7 @@ class GithubConnectorControllerTest {
             val asyncResult = mockMvc
                 .perform(
                     post("/api/v1/github/update-all")
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 

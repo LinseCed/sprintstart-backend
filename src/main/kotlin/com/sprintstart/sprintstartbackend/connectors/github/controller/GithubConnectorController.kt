@@ -114,7 +114,7 @@ internal class GithubConnectorController(
     )
     @PostMapping("/update-all")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasRole('PM')")
     suspend fun updateAllRepositories(): ResponseEntity<UpdateAllRepositoriesResponse> {
         val response = githubUpdateService.updateAllRepositories()
         return ResponseEntity.accepted().body(response)
