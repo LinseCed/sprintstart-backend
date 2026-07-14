@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.chat.models.requests.CreateChatRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.GetChatMessagesRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.GetChatsRequest
 import com.sprintstart.sprintstartbackend.chat.models.requests.PromptRequest
+import com.sprintstart.sprintstartbackend.chat.models.requests.toAiChatFilters
 import com.sprintstart.sprintstartbackend.chat.models.requests.toAiContextEntry
 import com.sprintstart.sprintstartbackend.chat.models.responses.AiStreamMessage
 import com.sprintstart.sprintstartbackend.chat.models.responses.ChatResponse
@@ -22,6 +23,10 @@ import com.sprintstart.sprintstartbackend.chat.models.responses.toChatResponse
 import com.sprintstart.sprintstartbackend.chat.repository.ChatMessageRepository
 import com.sprintstart.sprintstartbackend.chat.repository.ChatRepository
 import com.sprintstart.sprintstartbackend.chat.repository.CitationRepository
+import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorDisabledException
+import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorNotFoundException
+import com.sprintstart.sprintstartbackend.connectors.overview.service.ConnectorConfigurationService
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import jakarta.validation.Valid
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +42,8 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.validation.annotation.Validated
 import org.springframework.web.client.HttpClientErrorException
+import org.springframework.web.server.ResponseStatusException
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -46,6 +53,7 @@ internal class ChatService(
     private val chatRepository: ChatRepository,
     private val messageRepository: ChatMessageRepository,
     private val citationRepository: CitationRepository,
+    private val connectorConfigurationService: ConnectorConfigurationService,
     private val chatAiClient: ChatAiClient,
     private val userApi: UserApi,
     private val artifactLookupService: ArtifactLookupService,
@@ -175,6 +183,11 @@ internal class ChatService(
             ).map { it.toAiContextEntry() }
             .toList()
 
+        validateSourceSystems(request.filters?.sourceSystems)
+        validateTimestamps(request.filters?.from, request.filters?.to)
+
+        val filters = request.filters?.toAiChatFilters()
+
         messageRepository.save(msg)
 
         data class PendingCitation(
@@ -196,7 +209,7 @@ internal class ChatService(
         //   not only once the chat is reloaded from persisted history
         // - On completion, we store the entire response as msg in db
         return chatAiClient
-            .streamPrompt(AiPromptRequest(request.msg, context))
+            .streamPrompt(AiPromptRequest(request.msg, context, filters))
             .map { event ->
                 when (event.type) {
                     "token" -> {
@@ -205,10 +218,10 @@ internal class ChatService(
                     }
 
                     "citation" -> {
-                        val artifactId = UUID.fromString(event.artifactId!!)
-                        val resolved = artifactLookupService.resolve(artifactId)
-                        if (resolved == null) {
-                            logger.warn("Could not resolve artifact {} for citation", artifactId)
+                        val artifactId = event.artifactId?.let(::parseUuidOrNull)
+                        val resolved = artifactId?.let(artifactLookupService::resolve)
+                        if (artifactId == null || resolved == null) {
+                            logger.warn("Could not resolve artifact {} for citation", event.artifactId)
                             null
                         } else {
                             citations += PendingCitation(
@@ -255,4 +268,51 @@ internal class ChatService(
                 }
             }
     }
+
+    /**
+     * Checks if the source systems are valid.
+     *
+     * Checks if all the provided source systems exist and are enabled.
+     *
+     * @param sourceSystems The systems used by the AI to generate responses.
+     */
+    internal fun validateSourceSystems(sourceSystems: List<SourceSystem>?) {
+        val connectorsByName = connectorConfigurationService.findAllConnectors().associateBy { it.name }
+
+        sourceSystems?.forEach { sourceSystem ->
+            val connector = connectorsByName[sourceSystem.name]
+                ?: throw ConnectorNotFoundException("Connector '${sourceSystem.name}' not found")
+
+            if (!connector.enabled) {
+                throw ConnectorDisabledException("Connector '${sourceSystem.name}' is disabled")
+            }
+        }
+    }
+
+    /**
+     * Checks if the time stamps are valid.
+     *
+     * Checks if the 'from' timestamp is before the 'to' timestamp.
+     *
+     * @param from The start of the time period transferred to the AI.
+     * @param to The end of the time period transferred to the AI.
+     */
+    internal fun validateTimestamps(from: Instant?, to: Instant?) {
+        if (from != null && to != null && to.isBefore(from)) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Start time must be before end time.")
+        }
+    }
 }
+
+/**
+ * Parses [value] as a [UUID], or null if it isn't one.
+ *
+ * A malformed citation artifact id from the AI service should degrade that one citation,
+ * not kill the whole chat stream the way [UUID.fromString]'s thrown exception would.
+ */
+private fun parseUuidOrNull(value: String): UUID? =
+    try {
+        UUID.fromString(value)
+    } catch (_: IllegalArgumentException) {
+        null
+    }

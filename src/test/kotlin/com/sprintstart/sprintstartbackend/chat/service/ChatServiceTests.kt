@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.chat.service
 import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.chat.ChatAiClient
 import com.sprintstart.sprintstartbackend.chat.models.Chat
+import com.sprintstart.sprintstartbackend.chat.models.ChatFilters
 import com.sprintstart.sprintstartbackend.chat.models.ChatMessage
 import com.sprintstart.sprintstartbackend.chat.models.ChatRole
 import com.sprintstart.sprintstartbackend.chat.models.Citation
@@ -18,6 +19,10 @@ import com.sprintstart.sprintstartbackend.chat.models.responses.toChatResponse
 import com.sprintstart.sprintstartbackend.chat.repository.ChatMessageRepository
 import com.sprintstart.sprintstartbackend.chat.repository.ChatRepository
 import com.sprintstart.sprintstartbackend.chat.repository.CitationRepository
+import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.ConnectorDto
+import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorDisabledException
+import com.sprintstart.sprintstartbackend.connectors.overview.service.ConnectorConfigurationService
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -39,12 +44,14 @@ import java.time.OffsetDateTime
 import java.util.Optional
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class ChatServiceTests {
     private val applicationConfig: ApplicationConfig = mockk()
     private val chatRepository: ChatRepository = mockk()
     private val chatMessageRepository: ChatMessageRepository = mockk()
     private val citationRepository: CitationRepository = mockk()
+    private val connectorConfigurationService: ConnectorConfigurationService = mockk()
     private val chatAiClient: ChatAiClient = mockk()
     private val userApi: UserApi = mockk()
     private val artifactLookupService: ArtifactLookupService = mockk()
@@ -52,6 +59,7 @@ class ChatServiceTests {
         chatRepository,
         chatMessageRepository,
         citationRepository,
+        connectorConfigurationService,
         chatAiClient,
         userApi,
         artifactLookupService,
@@ -258,6 +266,7 @@ class ChatServiceTests {
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(any()) } answers { firstArg() }
             every { citationRepository.saveAll(any<List<Citation>>()) } answers { firstArg() }
+            every { connectorConfigurationService.findAllConnectors() } returns emptyList()
             coEvery { chatAiClient.streamPrompt(aiPromptRequest) } returns flowOf(*tokens.toTypedArray())
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
 
@@ -281,6 +290,7 @@ class ChatServiceTests {
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(capture(savedMessages)) } answers { firstArg() }
             every { citationRepository.saveAll(any<List<Citation>>()) } answers { firstArg() }
+            every { connectorConfigurationService.findAllConnectors() } returns emptyList()
             every { chatAiClient.streamPrompt(aiPromptRequest) } returns flowOf(*stream.toTypedArray())
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
 
@@ -307,6 +317,7 @@ class ChatServiceTests {
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(capture(savedMessages)) } answers { firstArg() }
             every { citationRepository.saveAll(any<List<Citation>>()) } answers { firstArg() }
+            every { connectorConfigurationService.findAllConnectors() } returns emptyList()
             every { chatAiClient.streamPrompt(aiPromptRequest) } returns flowOf(*tokens.toTypedArray())
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
 
@@ -327,6 +338,7 @@ class ChatServiceTests {
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(any()) } answers { firstArg() }
             every { citationRepository.saveAll(any<List<Citation>>()) } answers { firstArg() }
+            every { connectorConfigurationService.findAllConnectors() } returns emptyList()
             coEvery { chatAiClient.getChatTitle(any()) } returns AiGenerateChatTitleResponse("Sprint planning")
             every { chatAiClient.streamPrompt(aiPromptRequest) } returns flowOf()
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
@@ -344,6 +356,7 @@ class ChatServiceTests {
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(any()) } answers { firstArg() }
             every { citationRepository.saveAll(any<List<Citation>>()) } answers { firstArg() }
+            every { connectorConfigurationService.findAllConnectors() } returns emptyList()
             every { chatAiClient.streamPrompt(any()) } returns flowOf()
             every { applicationConfig.ai.baseUrl } returns "http://localhost:8080"
 
@@ -368,6 +381,7 @@ class ChatServiceTests {
             every { chatRepository.findById(chatId) } returns Optional.of(chat)
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(any()) } answers { firstArg() }
+            every { connectorConfigurationService.findAllConnectors() } returns emptyList()
             every { chatAiClient.streamPrompt(any()) } returns flow {
                 emit(AiStreamMessage("token", "Hello"))
                 @Suppress("TooGenericExceptionThrown")
@@ -420,6 +434,7 @@ class ChatServiceTests {
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(capture(savedMessages)) } answers { firstArg() }
             every { citationRepository.saveAll(capture(citationSlot)) } answers { firstArg() }
+            every { connectorConfigurationService.findAllConnectors() } returns emptyList()
             every { artifactLookupService.resolve(artifactId1) } returns
                 ResolvedArtifact(filename = "architecture.md", sourceUrl = null)
             every { artifactLookupService.resolve(artifactId2) } returns
@@ -479,6 +494,7 @@ class ChatServiceTests {
             every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
             every { chatMessageRepository.save(any()) } answers { firstArg() }
             every { citationRepository.saveAll(capture(citationSlot)) } answers { firstArg() }
+            every { connectorConfigurationService.findAllConnectors() } returns emptyList()
             every { artifactLookupService.resolve(unknownArtifactId) } returns null
 
             coEvery { chatAiClient.streamPrompt(any()) } returns flowOf(*stream.toTypedArray())
@@ -488,6 +504,97 @@ class ChatServiceTests {
 
             assertEquals(0, emitted.count { it.type == "citation" })
             assertEquals(0, citationSlot.captured.toList().size)
+        }
+
+        @Test
+        fun `forwards chat filters to ai`() = runTest {
+            val chat = Chat(
+                id = chatId,
+                userId = userId,
+                title = "Existing",
+                createdAt = OffsetDateTime.now(),
+            )
+
+            every { chatRepository.findById(chatId) } returns Optional.of(chat)
+            every { chatMessageRepository.findAllByChat(any(), any()) } returns PageImpl(emptyList())
+            every { chatMessageRepository.save(any()) } answers { firstArg() }
+            every { citationRepository.saveAll(any<List<Citation>>()) } answers { firstArg() }
+
+            every {
+                chatAiClient.streamPrompt(
+                    match {
+                        it.filters?.sourceSystems == listOf(SourceSystem.GITHUB)
+                    },
+                )
+            } returns flowOf(AiStreamMessage("done"))
+
+            every {
+                connectorConfigurationService.findAllConnectors()
+            } returns listOf(
+                ConnectorDto(
+                    id = "github",
+                    name = "GITHUB",
+                    enabled = true,
+                    firstConfiguredAt = null,
+                    lastConfiguredAt = null,
+                ),
+            )
+
+            chatService
+                .prompt(
+                    PromptRequest(
+                        chatId = chatId,
+                        msg = "Hello",
+                        filters = ChatFilters(
+                            sourceSystems = listOf(SourceSystem.GITHUB),
+                            from = null,
+                            to = null,
+                        ),
+                    ),
+                ).toList()
+        }
+
+        @Test
+        fun `throws when requested connector is disabled`() = runTest {
+            val chat = Chat(
+                id = chatId,
+                userId = userId,
+                title = "Existing",
+                createdAt = OffsetDateTime.now(),
+            )
+
+            every { chatRepository.findById(chatId) } returns Optional.of(chat)
+
+            every {
+                chatMessageRepository.findAllByChat(any(), any())
+            } returns PageImpl(emptyList())
+
+            every {
+                connectorConfigurationService.findAllConnectors()
+            } returns listOf(
+                ConnectorDto(
+                    id = "github",
+                    name = "GITHUB",
+                    enabled = false,
+                    firstConfiguredAt = null,
+                    lastConfiguredAt = null,
+                ),
+            )
+
+            assertFailsWith<ConnectorDisabledException> {
+                chatService
+                    .prompt(
+                        PromptRequest(
+                            chatId = chatId,
+                            msg = "Hello",
+                            filters = ChatFilters(
+                                sourceSystems = listOf(SourceSystem.GITHUB),
+                                from = null,
+                                to = null,
+                            ),
+                        ),
+                    ).toList()
+            }
         }
     }
 }
