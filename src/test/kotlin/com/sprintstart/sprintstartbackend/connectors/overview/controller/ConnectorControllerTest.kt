@@ -315,8 +315,7 @@ class ConnectorControllerTest {
                     get("/api/v1/connectors/{id}/sources", githubId)
                         .param("projectId", projectId.toString())
                         .with(pmJwt),
-                )
-                .andExpect(status().isOk)
+                ).andExpect(status().isOk)
                 .andExpect(jsonPath("$.sources[0].id").value("spring-projects/spring-boot"))
         }
 
