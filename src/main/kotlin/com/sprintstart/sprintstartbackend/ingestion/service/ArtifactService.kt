@@ -2,7 +2,9 @@ package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactContentResponse
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
+import com.sprintstart.sprintstartbackend.shared.ArtifactContentCodec
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -47,12 +49,19 @@ class ArtifactService(
                 "This artifact does not belong to project with id $projectId.",
             )
         }
-        val bodyText = artifact.content?.toByteArray(Charsets.UTF_8)
+        val storedContent = artifact.content
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Artifact content not found")
+        val mime = artifact.mime ?: MediaType.APPLICATION_OCTET_STREAM_VALUE
+
+        val bodyBytes = if (artifact.sourceSystem == SourceSystem.UPLOAD) {
+            ArtifactContentCodec.decode(storedContent, mime)
+        } else {
+            storedContent.toByteArray(Charsets.UTF_8)
+        }
 
         return ArtifactContentResponse(
-            content = bodyText,
-            mime = artifact.mime ?: MediaType.APPLICATION_OCTET_STREAM_VALUE,
+            content = bodyBytes,
+            mime = mime,
         )
     }
 

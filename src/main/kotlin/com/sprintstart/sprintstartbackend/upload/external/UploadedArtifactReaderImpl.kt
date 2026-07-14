@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.upload.external
 
-import com.nimbusds.jose.util.StandardCharset
+import com.sprintstart.sprintstartbackend.shared.ArtifactContentCodec
 import com.sprintstart.sprintstartbackend.upload.repository.UploadedArtifactRepository
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
@@ -16,6 +16,7 @@ class UploadedArtifactReaderImpl(
         val uploadedArtifact = uploadedArtifactRepository.findByIdOrNull(artifactId)
         uploadedArtifact ?: throw IllegalArgumentException("Artifact with id $artifactId not found")
 
-        return Files.readString(Path.of(uploadedArtifact.storagePath), StandardCharset.UTF_8)
+        val bytes = Files.readAllBytes(Path.of(uploadedArtifact.storagePath))
+        return ArtifactContentCodec.encode(bytes, uploadedArtifact.mime)
     }
 }
