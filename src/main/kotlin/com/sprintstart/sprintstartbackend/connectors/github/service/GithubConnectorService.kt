@@ -4,23 +4,16 @@ import com.sprintstart.sprintstartbackend.connectors.github.GithubClient
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.GithubRepositoryResourcesFetchingStartedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.initial.GithubRepositoryConnectionInitiatedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.initial.GithubRepositoryConnectionInitiationFailedEvent
-import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateFailedEvent
-import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateStartedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConfig
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
-import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateRepositoryRequest
-import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNotFoundException
-import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
-import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.UserWithAuthIdNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConfigRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
-import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositorySnapshotRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubCommitsService
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubFileService
@@ -38,7 +31,6 @@ import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
-import java.time.Instant
 import java.util.UUID
 
 /**
@@ -52,7 +44,6 @@ class GithubConnectorService(
     private val applicationScope: CoroutineScope,
     private val repoConnectionRepository: GithubRepositoryConnectionRepository,
     private val repoConfigRepository: GithubRepositoryConfigRepository,
-    private val repoSnapshotRepository: GithubRepositorySnapshotRepository,
     private val githubUserRepository: GithubUserRepository,
     private val fileService: GithubFileService,
     private val commitsService: GithubCommitsService,
@@ -73,6 +64,16 @@ class GithubConnectorService(
     @Tracked("Retrieving all GitHub repositories for overview")
     fun getAllSources(): List<GithubRepositoryConnection> =
         repoConnectionRepository.findAll()
+
+    /**
+     * Retrieves all GitHub repositories linked to the given project.
+     *
+     * @param projectId The project whose connected GitHub repositories should be returned.
+     * @return a list of connected GitHub repositories linked to the project.
+     */
+    @Tracked("Retrieving project-scoped GitHub repositories for overview")
+    fun getSourcesByProjectId(projectId: UUID): List<GithubRepositoryConnection> =
+        repoConnectionRepository.findAllByProjectId(projectId)
 
     /**
      * Patches a 'source' in the connector overview sense.
@@ -116,9 +117,7 @@ class GithubConnectorService(
     @Tracked("Connecting GitHub repository")
     @Transactional
     suspend fun connectRepositoryIfExists(authId: String, request: ConnectRepositoryRequest): UUID {
-        val userInRepo = userApi.getUserByAuthId(authId)
-
-        if (request.projectId !in userInRepo.projects.map { it.projectId }) {
+        if (!userApi.userHasAccessToProject(authId, request.projectId)) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project")
         }
 
@@ -131,7 +130,7 @@ class GithubConnectorService(
 
         val user = withContext(Dispatchers.IO) {
             githubUserRepository
-                .findById(GithubUserPat(authId = userId.toString(), name = request.tokenName))
+                .findById(GithubUserPat(authId = authId, name = request.tokenName))
         }.orElseThrow {
             GithubUserPatNotFoundException(request.tokenName, userId.toString())
         }
@@ -165,119 +164,6 @@ class GithubConnectorService(
      * and snapshot, and triggers data collection processes such as fetching files, commits, issues,
      * and pull requests associated with the repository.
      *
-     * @return One update response per connected repository, each containing its own transaction id.
-     */
-    @Tracked("Updating all GitHub repositories")
-    suspend fun updateAllRepositories(): List<UpdateRepositoryResponse> {
-        val allRepositories = repoConnectionRepository.findAll()
-        val responses = mutableListOf<UpdateRepositoryResponse>()
-        allRepositories.forEach { repo ->
-            val uuid = UUID.randomUUID()
-            updateRepository(repo, uuid)
-            responses.add(UpdateRepositoryResponse(uuid))
-        }
-
-        return responses.toList()
-    }
-
-    /**
-     * Updates the state of a specific connected GitHub repository.
-     *
-     * This method is responsible for synchronizing all resources of the GitHub repository
-     * (e.g., files, commits, issues, pull requests) to their latest state. A unique transaction
-     * ID is generated to track the update operation.
-     *
-     * @param request The request containing the details of the repository to update, including the owner and name.
-     * @return A UUID representing the transaction ID assigned to this update operation.
-     * @throws RepositoryNotConnectedException If the repository specified in the request is not connected.
-     */
-    @Tracked("Updating GitHub repository")
-    suspend fun updateRepository(request: UpdateRepositoryRequest): UpdateRepositoryResponse {
-        val transactionId = UUID.randomUUID()
-
-        val repository = withContext(Dispatchers.IO) {
-            repoConnectionRepository.findByOwnerAndName(request.owner, request.name)
-        }
-            ?: throw RepositoryNotConnectedException(request.owner, request.name)
-
-        updateRepository(repository, transactionId)
-
-        return UpdateRepositoryResponse(transactionId)
-    }
-
-    /**
-     * Updates the repository by fetching and processing the latest snapshot, commits, issues,
-     * pull requests, and saving them in the repository.
-     *
-     * @param githubRepository The connection object for the GitHub repository to be updated.
-     * @param transactionId The unique identifier for the transaction to track the update process.
-     */
-    private suspend fun updateRepository(githubRepository: GithubRepositoryConnection, transactionId: UUID) {
-        eventPublisher.publishEvent(
-            GithubRepositoryUpdateStartedEvent(
-                transactionId,
-                githubRepository.owner,
-                githubRepository.name,
-            ),
-        )
-
-        val latestSnapshot = runCatching {
-            repoSnapshotRepository.findLatestByRepository(githubRepository.id)
-                ?: throw RepositoryNotInitializedException(githubRepository.owner, githubRepository.name)
-        }.onFailure { e ->
-            eventPublisher.publishEvent(
-                GithubRepositoryUpdateFailedEvent(
-                    transactionId,
-                    githubRepository.owner,
-                    githubRepository.name,
-                ),
-            )
-            throw e
-        }.getOrNull() ?: return
-
-        eventPublisher.publishEvent(
-            GithubRepositoryResourcesFetchingStartedEvent(
-                transactionId,
-                githubRepository.owner,
-                githubRepository.name,
-            ),
-        )
-
-        applicationScope.launch {
-            fileService.fetchAndIngestFileUpdatesIncremental(githubRepository, transactionId)
-        }
-        applicationScope.launch {
-            commitsService.fetchAndIngestLatestCommits(latestSnapshot, transactionId)
-        }
-        applicationScope.launch {
-            issuesService.fetchAndIngestAllIssues(
-                githubRepository.id,
-                githubRepository.owner,
-                githubRepository.name,
-                transactionId,
-            )
-        }
-        applicationScope.launch {
-            pullRequestsService.fetchAndIngestAllPullRequests(
-                githubRepository.id,
-                githubRepository.owner,
-                githubRepository.name,
-                transactionId,
-                performUpdate = true,
-                since = latestSnapshot.lastPullRequestsSyncAt,
-            )
-        }
-
-        repoSnapshotRepository.updateSyncTimestamps(githubRepository.id, Instant.now())
-    }
-
-    /**
-     * Establishes a connection to a GitHub repository and initiates data collection processes.
-     *
-     * @param transactionId The transaction id.
-     * @param repository The GitHub repository connection object containing connection details and
-     * linked project ids.
-     * @return A unique identifier (UUID) representing the transaction associated with this operation.
      * @param repository The GitHub repository connection containing details about the repository being connected.
      * @param transactionId A unique identifier for the transaction or operation being performed.
      * @return Returns the transaction ID associated with the repository connection process.

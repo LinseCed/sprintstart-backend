@@ -40,7 +40,7 @@ class RunArtifactsIngestionService(
     suspend fun ingestRunArtifacts(runId: UUID) {
         val request = withContext(Dispatchers.IO) {
             val run = ingestionRunRepository
-                .findById(runId)
+                .findWithArtifactIdsToDeindexById(runId)
                 .getOrElse { throw IngestionRunNotFoundException(runId) }
 
             val artifactsToIngest = artifactRepository.findAllByIngestionRunId(runId)

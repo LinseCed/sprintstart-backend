@@ -37,9 +37,8 @@ class UploadArtifactProviderServiceTest {
         val run = ingestionRun()
         val savedArtifact = slot<Artifact>()
         every { artifactRepository.findBySourceId(uploadArtifactId.toString()) } returns null
-        every { ingestionRunRepository.getReferenceById(runId) } returns run
+        every { ingestionRunRepository.findByIdForUpdate(runId) } returns Optional.of(run)
         every { artifactRepository.save(capture(savedArtifact)) } answers { savedArtifact.captured }
-        every { ingestionRunRepository.incrementIngestedCount(runId) } returns Unit
 
         service.persistArtifact(uploadCommand())
 
@@ -50,21 +49,22 @@ class UploadArtifactProviderServiceTest {
         assertThat(savedArtifact.captured.content).isEqualTo("# Notes")
         assertThat(savedArtifact.captured.hash).isEqualTo("hash")
         assertThat(savedArtifact.captured.ingestionRun).isSameAs(run)
-        verify(exactly = 1) { ingestionRunRepository.incrementIngestedCount(runId) }
+        assertThat(run.ingestedCount).isEqualTo(1)
     }
 
     @Test
     fun `persistArtifact updates changed upload artifact and increments updated count`() {
         val existing = artifact(hash = "old-hash")
+        val run = existing.ingestionRun
         every { artifactRepository.findBySourceId(uploadArtifactId.toString()) } returns existing
-        every { ingestionRunRepository.incrementUpdatedCount(runId) } returns Unit
+        every { ingestionRunRepository.findByIdForUpdate(runId) } returns Optional.of(run)
 
         service.persistArtifact(uploadCommand(content = "# Updated", hash = "new-hash"))
 
         assertThat(existing.content).isEqualTo("# Updated")
         assertThat(existing.hash).isEqualTo("new-hash")
         assertThat(existing.projectIds).containsExactly(projectId)
-        verify(exactly = 1) { ingestionRunRepository.incrementUpdatedCount(runId) }
+        assertThat(run.updatedCount).isEqualTo(1)
         verify(exactly = 0) { artifactRepository.save(any()) }
     }
 
