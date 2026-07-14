@@ -85,7 +85,7 @@ class GithubPullRequestsService(
         if (performUpdate) {
             pullRequests.forEach { pr ->
                 eventPublisher.publishEvent(
-                    pr.asFetchedEvent(transactionId, repositoryOwner, repositoryName, githubRepositoryId),
+                    pr.asFetchedEvent(transactionId, githubRepositoryId, repositoryOwner, repositoryName),
                 )
             }
         } else {
@@ -118,18 +118,20 @@ class GithubPullRequestsService(
      * This function has no side effects, it's simple input -> output.
      *
      * @param transactionId The [UUID] of the overall transaction this belongs to.
+     * @param repositoryId The internal id of the GitHub repository this pull request belongs to.
      * @param owner The owner of the GitHub repository this pull request belongs to.
      * @param name The name of the GitHub repository this pull request belongs to.
      * @return The constructed [GithubPullRequestFetchedEvent].
      */
     private fun PullRequest.asFetchedEvent(
         transactionId: UUID,
+        repositoryId: UUID,
         owner: String,
         name: String,
-        repositoryId: UUID,
     ): GithubPullRequestFetchedEvent {
         return GithubPullRequestFetchedEvent(
             transactionId = transactionId,
+            repositoryId = repositoryId,
             repositoryOwner = owner,
             repositoryName = name,
             number = this.number,
@@ -166,7 +168,6 @@ class GithubPullRequestsService(
                     } ?: emptyList(),
                 )
             },
-            repositoryId = repositoryId,
         )
     }
 }

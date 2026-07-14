@@ -202,7 +202,9 @@ class GithubConnectorControllerTest {
         @Test
         fun `should return 202 Accepted when all repositories are initialized`() {
             val transactionId = UUID.randomUUID()
-            every { githubUpdateService.updateAllRepositories() } returns UpdateAllRepositoriesResponse(transactionId)
+            every { githubUpdateService.updateAllRepositories() } returns UpdateAllRepositoriesResponse(
+                transactionId,
+            )
 
             val asyncResult = mockMvc
                 .perform(

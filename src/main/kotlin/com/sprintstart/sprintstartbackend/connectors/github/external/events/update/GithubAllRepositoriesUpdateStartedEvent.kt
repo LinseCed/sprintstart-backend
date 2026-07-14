@@ -3,10 +3,10 @@ package com.sprintstart.sprintstartbackend.connectors.github.external.events.upd
 import java.util.UUID
 
 /**
- * Emitted when updating all connected GitHub repositories starts.
+ * Emitted when the update of all GitHub repositories has started.
  *
  * @property transactionId Unique identifier for the update transaction, used for tracking
- * the progress and status of the batch update.
+ * updates and logging.
  */
 data class GithubAllRepositoriesUpdateStartedEvent(
     val transactionId: UUID,
