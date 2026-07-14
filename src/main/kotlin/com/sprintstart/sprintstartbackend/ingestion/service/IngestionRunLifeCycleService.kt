@@ -47,13 +47,15 @@ class IngestionRunLifeCycleService(
     ) {
         val ingestionRun = ingestionRunRepository.findByIdOrNull(transactionId)
         if (ingestionRun == null) {
+            val initialAiSyncStatus =
+                if (status == IngestionRunStatus.FAILED) AiSyncStatus.NOT_APPLICABLE else AiSyncStatus.PENDING
             val ingestionRun = IngestionRun(
                 id = transactionId,
                 sourceSystem = sourceSystem,
                 status = status,
                 failureReason = failureReason,
                 finishedAt = if (status == IngestionRunStatus.FAILED) Instant.now() else null,
-                aiSyncStatus = if (status == IngestionRunStatus.FAILED) AiSyncStatus.NOT_APPLICABLE else AiSyncStatus.PENDING,
+                aiSyncStatus = initialAiSyncStatus,
             )
             ingestionRunRepository.save(ingestionRun)
         } else {
