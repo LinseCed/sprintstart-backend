@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
@@ -59,6 +60,10 @@ class GithubConnectorControllerTest {
     private val pmJwt = jwt()
         .jwt { it.subject("mockId") }
         .authorities(SimpleGrantedAuthority("ROLE_PM"))
+
+    private val userJwt = jwt()
+        .jwt { it.subject("mockId") }
+        .authorities(SimpleGrantedAuthority("ROLE_USER"))
 
     private val validTokenName = "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
     private val projectId = UUID.randomUUID()
@@ -188,7 +193,7 @@ class GithubConnectorControllerTest {
             val asyncResult = mockMvc
                 .perform(
                     post("/api/v1/github/update-all")
-                        .with(pmJwt),
+                        .with(userJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -208,14 +213,14 @@ class GithubConnectorControllerTest {
             val asyncResult = mockMvc
                 .perform(
                     post("/api/v1/github/update-all")
-                        .with(pmJwt),
+                        .with(userJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
             mockMvc
                 .perform(asyncDispatch(asyncResult))
                 .andExpect(status().isAccepted)
-                .andExpect(jsonPath("$[0].transactionId").value(transactionId.toString()))
+                .andExpect(jsonPath("$.transactionId").value(transactionId.toString()))
         }
     }
 
