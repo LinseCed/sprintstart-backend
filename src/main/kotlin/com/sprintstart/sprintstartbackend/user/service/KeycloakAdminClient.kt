@@ -17,6 +17,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 
 interface KeycloakAdminClient {
     fun updateUserProfile(
@@ -24,6 +25,7 @@ interface KeycloakAdminClient {
         email: String? = null,
         firstName: String? = null,
         lastName: String? = null,
+        projectIds: Set<UUID>,
     )
 
     fun setUserEnabled(authId: String, enabled: Boolean)
@@ -44,7 +46,13 @@ class HttpKeycloakAdminClient(
 ) : KeycloakAdminClient {
     private val objectMapper = jacksonObjectMapper()
 
-    override fun updateUserProfile(authId: String, email: String?, firstName: String?, lastName: String?) {
+    override fun updateUserProfile(
+        authId: String,
+        email: String?,
+        firstName: String?,
+        lastName: String?,
+        projectIds: Set<UUID>,
+    ) {
         val payload = mutableMapOf<String, Any>()
         email?.let { payload["email"] = it }
         firstName?.let { payload["firstName"] = it }
@@ -62,7 +70,9 @@ class HttpKeycloakAdminClient(
     override fun setPermissionGroup(authId: String, permissionGroup: Role) {
         val token = tokenProvider.accessToken()
         val currentRoles = roleClient.getRealmRoleMappings(authId, token)
-        val managedCurrentRoles = currentRoles.filter { it["name"]?.asText() in KeycloakRoleMapper.managedRealmRoles() }
+        val managedCurrentRoles = currentRoles.filter {
+            it["name"]?.textValue() in KeycloakRoleMapper.managedRealmRoles()
+        }
 
         if (managedCurrentRoles.isNotEmpty()) {
             transport.send(
@@ -95,7 +105,7 @@ class HttpKeycloakAdminClient(
         }
 
         return KeycloakRoleMapper.mapRealmRoles(
-            roleMappings.mapNotNull { it["name"]?.asText() },
+            roleMappings.mapNotNull { it["name"]?.textValue() },
         )
     }
 
@@ -183,7 +193,7 @@ class KeycloakAdminTokenProvider(
             )
         }
 
-        return objectMapper.readTree(response.body())["access_token"]?.asText()
+        return objectMapper.readTree(response.body())["access_token"]?.textValue()
             ?: throw ResponseStatusException(
                 HttpStatus.BAD_GATEWAY,
                 "Keycloak admin token response did not contain access_token",
