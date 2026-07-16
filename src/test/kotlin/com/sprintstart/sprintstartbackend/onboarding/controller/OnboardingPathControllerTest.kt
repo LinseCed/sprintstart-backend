@@ -93,6 +93,7 @@ class OnboardingPathControllerTest(
                 ),
             ),
             edges = emptyList(),
+            graphVersion = 1,
         )
 
         every { competencyPathService.getPathForMe(authId) } returns response

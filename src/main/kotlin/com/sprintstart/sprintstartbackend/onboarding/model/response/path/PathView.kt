@@ -20,8 +20,12 @@ data class PathEdge(
  * A hire's personalized competency path: [nodes] to be reached and the [PathEdge] prerequisite
  * (and related) relationships between them, computed by
  * [com.sprintstart.sprintstartbackend.onboarding.service.PathProjectionService].
+ *
+ * [graphVersion] pins the competency graph version this path was projected against (see
+ * [com.sprintstart.sprintstartbackend.onboarding.service.CompetencyGraphVersionService]).
  */
 data class PathView(
     val nodes: List<PathNode>,
     val edges: List<PathEdge>,
+    val graphVersion: Int,
 )

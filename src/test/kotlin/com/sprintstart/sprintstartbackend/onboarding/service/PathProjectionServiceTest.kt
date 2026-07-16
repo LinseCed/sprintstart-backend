@@ -35,6 +35,7 @@ class PathProjectionServiceTest {
                 edges = emptyList(),
                 targetKeys = setOf("git"),
                 ledger = emptyMap(),
+                graphVersion = 1,
             )
 
             assertThat(stateOf(result, "git")).isEqualTo(NodeState.AVAILABLE)
@@ -47,6 +48,7 @@ class PathProjectionServiceTest {
                 edges = listOf(prerequisite("git", "kotlin")),
                 targetKeys = setOf("kotlin"),
                 ledger = emptyMap(),
+                graphVersion = 1,
             )
 
             assertThat(stateOf(result, "kotlin")).isEqualTo(NodeState.LOCKED)
@@ -59,6 +61,7 @@ class PathProjectionServiceTest {
                 edges = listOf(prerequisite("git", "kotlin")),
                 targetKeys = setOf("kotlin"),
                 ledger = mapOf("git" to 3),
+                graphVersion = 1,
             )
 
             assertThat(stateOf(result, "kotlin")).isEqualTo(NodeState.AVAILABLE)
@@ -71,6 +74,7 @@ class PathProjectionServiceTest {
                 edges = listOf(prerequisite("git", "kotlin")),
                 targetKeys = setOf("kotlin"),
                 ledger = mapOf("kotlin" to 1),
+                graphVersion = 1,
             )
 
             assertThat(stateOf(result, "kotlin")).isEqualTo(NodeState.MASTERED)
@@ -83,6 +87,7 @@ class PathProjectionServiceTest {
                 edges = listOf(related("git", "kotlin")),
                 targetKeys = setOf("git", "kotlin"),
                 ledger = emptyMap(),
+                graphVersion = 1,
             )
 
             assertThat(stateOf(result, "kotlin")).isEqualTo(NodeState.AVAILABLE)
@@ -103,8 +108,8 @@ class PathProjectionServiceTest {
             val seniorLedger = mapOf("git" to 3, "kotlin" to 3, "spring-boot" to 2)
             val juniorLedger = mapOf("git" to 1)
 
-            val seniorPath = service.project(competencies, edges, targetKeys, seniorLedger)
-            val juniorPath = service.project(competencies, edges, targetKeys, juniorLedger)
+            val seniorPath = service.project(competencies, edges, targetKeys, seniorLedger, graphVersion = 1)
+            val juniorPath = service.project(competencies, edges, targetKeys, juniorLedger, graphVersion = 1)
 
             fun keysInState(path: PathView, state: NodeState) =
                 path.nodes
@@ -125,6 +130,22 @@ class PathProjectionServiceTest {
     }
 
     @Nested
+    inner class GraphVersion {
+        @Test
+        fun `echoes the given graph version onto the result`() {
+            val result = service.project(
+                competencies = listOf(node("git")),
+                edges = emptyList(),
+                targetKeys = setOf("git"),
+                ledger = emptyMap(),
+                graphVersion = 42,
+            )
+
+            assertThat(result.graphVersion).isEqualTo(42)
+        }
+    }
+
+    @Nested
     inner class NodeAndEdgeSet {
         @Test
         fun `includes a target's transitive prerequisites even when they are not themselves targets`() {
@@ -133,6 +154,7 @@ class PathProjectionServiceTest {
                 edges = listOf(prerequisite("git", "kotlin"), prerequisite("kotlin", "domain-model")),
                 targetKeys = setOf("domain-model"),
                 ledger = emptyMap(),
+                graphVersion = 1,
             )
 
             assertThat(result.nodes.map { it.key }).containsExactlyInAnyOrder("git", "kotlin", "domain-model")
@@ -148,6 +170,7 @@ class PathProjectionServiceTest {
                 ),
                 targetKeys = setOf("domain-model", "kotlin"),
                 ledger = emptyMap(),
+                graphVersion = 1,
             )
 
             assertThat(result.edges).containsExactly(
