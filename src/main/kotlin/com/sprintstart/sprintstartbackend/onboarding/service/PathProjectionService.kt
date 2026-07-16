@@ -27,6 +27,8 @@ class PathProjectionService(
      * @param edges All known competency edges.
      * @param targetKeys The competency keys this path should terminate in.
      * @param ledger The hire's durable progress: competency key -> assessed/verified level (0..4).
+     * @param graphVersion The competency graph version being projected against; echoed onto the
+     * returned [PathView] as-is (this function stays pure -- the caller looks the version up).
      * @return [targetKeys] plus their transitive prerequisites, topologically ordered, each
      * annotated with its [NodeState]; edges are restricted to pairs where both ends are returned.
      */
@@ -35,6 +37,7 @@ class PathProjectionService(
         edges: List<CompetencyEdge>,
         targetKeys: Set<String>,
         ledger: Map<String, Int>,
+        graphVersion: Int,
     ): PathView {
         val competenciesByKey = competencies.associateBy { it.key }
         val relevantKeys = linkedSetOf<String>()
@@ -76,6 +79,6 @@ class PathProjectionService(
             .filter { it.fromKey in relevantKeys && it.toKey in relevantKeys }
             .map { PathEdge(from = it.fromKey, to = it.toKey) }
 
-        return PathView(nodes = nodes, edges = resultEdges)
+        return PathView(nodes = nodes, edges = resultEdges, graphVersion = graphVersion)
     }
 }

@@ -25,12 +25,14 @@ class CompetencyPathServiceTest {
     private val competencyEdgeRepository: CompetencyEdgeRepository = mockk()
     private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
     private val pathProjectionService: PathProjectionService = PathProjectionService(GraphTraversalService())
+    private val competencyGraphVersionService: CompetencyGraphVersionService = mockk()
     private val userApi: UserApi = mockk()
     private val service = CompetencyPathService(
         competencyRepository,
         competencyEdgeRepository,
         userCompetencyStateRepository,
         pathProjectionService,
+        competencyGraphVersionService,
         userApi,
     )
 
@@ -55,10 +57,12 @@ class CompetencyPathServiceTest {
                     source = CompetencySource.ASSESSED,
                 ),
             )
+            every { competencyGraphVersionService.currentVersion() } returns 7
 
             val result = service.getPathForMe(authId)
 
             assertThat(result.nodes.map { it.key }).containsExactlyInAnyOrder("git", "kotlin")
+            assertThat(result.graphVersion).isEqualTo(7)
             verify(exactly = 1) { userCompetencyStateRepository.findAllByUserId(userId) }
         }
 

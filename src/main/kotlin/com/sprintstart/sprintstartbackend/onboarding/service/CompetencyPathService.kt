@@ -23,6 +23,7 @@ class CompetencyPathService(
     private val competencyEdgeRepository: CompetencyEdgeRepository,
     private val userCompetencyStateRepository: UserCompetencyStateRepository,
     private val pathProjectionService: PathProjectionService,
+    private val competencyGraphVersionService: CompetencyGraphVersionService,
     private val userApi: UserApi,
 ) {
     @Transactional(readOnly = true)
@@ -40,6 +41,7 @@ class CompetencyPathService(
             edges = edges,
             targetKeys = competencies.map { it.key }.toSet(),
             ledger = ledger,
+            graphVersion = competencyGraphVersionService.currentVersion(),
         )
     }
 
