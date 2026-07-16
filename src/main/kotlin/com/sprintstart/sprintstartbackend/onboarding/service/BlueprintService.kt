@@ -16,8 +16,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.Pr
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.VersionListResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -40,7 +38,6 @@ class BlueprintService(
     private val txTemplate = TransactionTemplate(transactionManager)
     private val readTxTemplate =
         TransactionTemplate(transactionManager).apply { isReadOnly = true }
-    private val ensureMutex = Mutex()
     private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
@@ -262,26 +259,6 @@ class BlueprintService(
         proposed.status = BlueprintStatus.ARCHIVED
         logger.info("Rejected proposed blueprint {} v{} (reason: {})", scope, version, reason ?: "none given")
         return proposed.toResponse()
-    }
-
-    /**
-     * Ensures an ACTIVE blueprint exists for each of [scopes], generating the missing
-     * ones on demand. Scopes that already have an ACTIVE blueprint are left untouched.
-     *
-     * @param scopes The scopes that must have an ACTIVE blueprint.
-     */
-    suspend fun ensureScopesExist(scopes: List<String>) {
-        ensureMutex.withLock {
-            val existing = withContext(Dispatchers.IO) {
-                scopes.filter { scope ->
-                    blueprintRepository.findByScopeAndStatus(scope, BlueprintStatus.ACTIVE) != null
-                }
-            }
-            val missing = scopes.toSet() - existing.toSet()
-            if (missing.isNotEmpty()) {
-                generateBlueprints(missing.toList())
-            }
-        }
     }
 
     private companion object {
