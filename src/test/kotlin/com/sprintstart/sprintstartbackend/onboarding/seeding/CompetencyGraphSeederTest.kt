@@ -23,7 +23,7 @@ class CompetencyGraphSeederTest {
     private val args: ApplicationArguments = mockk()
 
     @Test
-    fun `bumps the graph version when seeding into an empty graph`() {
+    fun `records each insert and bumps the graph version when seeding into an empty graph`() {
         every { competencyRepository.existsByKey(any()) } returns false
         every { competencyRepository.save(any<Competency>()) } answers { firstArg() }
         every { competencyEdgeRepository.existsByFromKeyAndToKeyAndKind(any(), any(), any()) } returns false
@@ -31,11 +31,13 @@ class CompetencyGraphSeederTest {
 
         seeder.run(args)
 
+        verify(exactly = 7) { competencyGraphVersionService.recordNodeAdded(any()) }
+        verify(exactly = 4) { competencyGraphVersionService.recordEdgeAdded(any(), any(), any()) }
         verify(exactly = 1) { competencyGraphVersionService.bump() }
     }
 
     @Test
-    fun `does not bump the version when everything is already seeded`() {
+    fun `does not record changes or bump the version when everything is already seeded`() {
         every { competencyRepository.existsByKey(any()) } returns true
         every { competencyEdgeRepository.existsByFromKeyAndToKeyAndKind(any(), any(), any()) } returns true
 
@@ -43,6 +45,8 @@ class CompetencyGraphSeederTest {
 
         verify(exactly = 0) { competencyRepository.save(any()) }
         verify(exactly = 0) { competencyEdgeRepository.save(any()) }
+        verify(exactly = 0) { competencyGraphVersionService.recordNodeAdded(any()) }
+        verify(exactly = 0) { competencyGraphVersionService.recordEdgeAdded(any(), any(), any()) }
         verify(exactly = 0) { competencyGraphVersionService.bump() }
     }
 }

@@ -19,14 +19,16 @@ import org.springframework.stereotype.Component
  * projection, and (later) traversal have real data to work against locally. The runner is
  * idempotent: it only inserts a node or edge that is not already present, keyed by stable
  * competency key, so repeated restarts and partial prior seeds converge to the same graph without
- * duplicates. When a run actually inserts anything, it bumps the graph version -- a no-op rerun
- * leaves the version untouched.
+ * duplicates. Each insert is recorded via [CompetencyGraphVersionService.recordNodeAdded]/
+ * [CompetencyGraphVersionService.recordEdgeAdded]; when a run actually inserted anything, it
+ * bumps the graph version once at the end, which classifies those recorded changes -- a no-op
+ * rerun leaves the version untouched.
  *
  * Intended for development/local setup only; gated behind `sprintstart.dev-competency-graph.enabled`.
  *
  * @property competencyRepository Repository used to check for and persist competency nodes.
  * @property competencyEdgeRepository Repository used to check for and persist prerequisite edges.
- * @property competencyGraphVersionService Bumped when this run actually changes the graph.
+ * @property competencyGraphVersionService Records this run's changes and bumps the version.
  */
 @Component
 @ConditionalOnProperty(
@@ -87,6 +89,7 @@ class CompetencyGraphSeeder(
                 competencyRepository.save(
                     Competency(key = node.key, label = node.label, kind = node.kind),
                 )
+                competencyGraphVersionService.recordNodeAdded(node.key)
                 changed = true
             }
         }
@@ -101,6 +104,7 @@ class CompetencyGraphSeeder(
                 competencyEdgeRepository.save(
                     CompetencyEdge(fromKey = edge.fromKey, toKey = edge.toKey, kind = edge.kind),
                 )
+                competencyGraphVersionService.recordEdgeAdded(edge.fromKey, edge.toKey, edge.kind)
                 changed = true
             }
         }
