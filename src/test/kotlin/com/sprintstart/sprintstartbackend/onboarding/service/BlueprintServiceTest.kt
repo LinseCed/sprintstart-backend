@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSch
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GeneratedBlueprint
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GeneratedBlueprintStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Blueprint
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintOrigin
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStep
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
@@ -43,7 +44,7 @@ class BlueprintServiceTest {
     @Nested
     inner class GenerateBlueprints {
         @Test
-        fun `maps generated blueprint to ACTIVE and archives previous ACTIVE`() = runTest {
+        fun `maps generated blueprint to PROPOSED and leaves the current ACTIVE untouched`() = runTest {
             val currentActive = makeBlueprint("global", "1", BlueprintStatus.ACTIVE)
             val aiStep = GeneratedBlueprintStep(id = "step-1", title = "Setup")
             val aiBlueprint = GeneratedBlueprint(scope = "global", version = "2", steps = listOf(aiStep))
@@ -54,12 +55,13 @@ class BlueprintServiceTest {
             every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns currentActive
             val savedSlot = slot<Blueprint>()
             every { blueprintRepository.save(capture(savedSlot)) } returns
-                makeBlueprint("global", "2", BlueprintStatus.ACTIVE)
+                makeBlueprint("global", "2", BlueprintStatus.PROPOSED)
 
             val result = service.generateBlueprints(listOf("global"))
 
-            assertEquals(BlueprintStatus.ARCHIVED, currentActive.status)
-            assertEquals(BlueprintStatus.ACTIVE, savedSlot.captured.status)
+            assertEquals(BlueprintStatus.ACTIVE, currentActive.status)
+            assertEquals(BlueprintStatus.PROPOSED, savedSlot.captured.status)
+            assertEquals(BlueprintOrigin.AI_PROPOSED, savedSlot.captured.origin)
             assertEquals("2", savedSlot.captured.version)
             assertEquals(1, result.outcomes.size)
             assertEquals("global", result.outcomes[0].scope)
@@ -67,7 +69,7 @@ class BlueprintServiceTest {
         }
 
         @Test
-        fun `creates ACTIVE when no previous ACTIVE exists`() = runTest {
+        fun `proposes a blueprint when no previous ACTIVE exists`() = runTest {
             val aiStep = GeneratedBlueprintStep(id = "step-1", title = "Setup")
             val aiBlueprint = GeneratedBlueprint(scope = "global", version = "1", steps = listOf(aiStep))
             val outcome = BlueprintOutcome(scope = "global", status = "created", blueprint = aiBlueprint)
@@ -75,11 +77,14 @@ class BlueprintServiceTest {
                 outcomes = listOf(outcome),
             )
             every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns null
-            every { blueprintRepository.save(any()) } returns makeBlueprint("global", "1", BlueprintStatus.ACTIVE)
+            val savedSlot = slot<Blueprint>()
+            every { blueprintRepository.save(capture(savedSlot)) } returns
+                makeBlueprint("global", "1", BlueprintStatus.PROPOSED)
 
             val result = service.generateBlueprints(listOf("global"))
 
             verify(exactly = 1) { blueprintRepository.save(any()) }
+            assertEquals(BlueprintStatus.PROPOSED, savedSlot.captured.status)
             assertEquals(1, result.outcomes.size)
             assertEquals("global", result.outcomes[0].scope)
             assertEquals("created", result.outcomes[0].status)
@@ -99,7 +104,7 @@ class BlueprintServiceTest {
         }
 
         @Test
-        fun `does not activate escalated blueprints`() = runTest {
+        fun `does not propose escalated blueprints`() = runTest {
             val aiStep = GeneratedBlueprintStep(id = "step-1", title = "Setup")
             val aiBlueprint = GeneratedBlueprint(scope = "global", version = "2", steps = listOf(aiStep))
             val outcome = BlueprintOutcome(scope = "global", status = "escalated", blueprint = aiBlueprint)
@@ -192,6 +197,101 @@ class BlueprintServiceTest {
             val ex = assertThrows<ResponseStatusException> { service.rollback("global", "99") }
 
             assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+        }
+    }
+
+    @Nested
+    inner class Approve {
+        @Test
+        fun `activates the proposed version and archives the current ACTIVE`() {
+            val proposed = makeBlueprint("global", "2", BlueprintStatus.PROPOSED)
+            val currentActive = makeBlueprint("global", "1", BlueprintStatus.ACTIVE)
+            every {
+                blueprintRepository.findByScopeAndStatusAndVersion("global", BlueprintStatus.PROPOSED, "2")
+            } returns proposed
+            every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns currentActive
+
+            val result = service.approve("global", "2")
+
+            assertEquals(BlueprintStatus.ACTIVE, proposed.status)
+            assertEquals(BlueprintStatus.ARCHIVED, currentActive.status)
+            assertEquals("2", result.version)
+        }
+
+        @Test
+        fun `activates the proposed version when no ACTIVE exists yet`() {
+            val proposed = makeBlueprint("global", "1", BlueprintStatus.PROPOSED)
+            every {
+                blueprintRepository.findByScopeAndStatusAndVersion("global", BlueprintStatus.PROPOSED, "1")
+            } returns proposed
+            every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns null
+
+            service.approve("global", "1")
+
+            assertEquals(BlueprintStatus.ACTIVE, proposed.status)
+        }
+
+        @Test
+        fun `throws 404 when no proposed version matches`() {
+            every {
+                blueprintRepository.findByScopeAndStatusAndVersion("global", BlueprintStatus.PROPOSED, "9")
+            } returns null
+
+            val ex = assertThrows<ResponseStatusException> { service.approve("global", "9") }
+
+            assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+        }
+    }
+
+    @Nested
+    inner class Reject {
+        @Test
+        fun `archives the proposed version and leaves the current ACTIVE untouched`() {
+            val proposed = makeBlueprint("global", "2", BlueprintStatus.PROPOSED)
+            every {
+                blueprintRepository.findByScopeAndStatusAndVersion("global", BlueprintStatus.PROPOSED, "2")
+            } returns proposed
+
+            service.reject("global", "2", "not aligned with the current onboarding")
+
+            assertEquals(BlueprintStatus.ARCHIVED, proposed.status)
+            verify(exactly = 0) { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) }
+        }
+
+        @Test
+        fun `throws 404 when no proposed version matches`() {
+            every {
+                blueprintRepository.findByScopeAndStatusAndVersion("global", BlueprintStatus.PROPOSED, "9")
+            } returns null
+
+            val ex = assertThrows<ResponseStatusException> { service.reject("global", "9", null) }
+
+            assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+        }
+    }
+
+    @Nested
+    inner class ListProposed {
+        @Test
+        fun `returns proposed blueprints for a scope`() {
+            val proposed = makeBlueprint("global", "2", BlueprintStatus.PROPOSED)
+            every { blueprintRepository.findAllByScopeAndStatus("global", BlueprintStatus.PROPOSED) } returns
+                listOf(proposed)
+
+            val result = service.listProposed("global")
+
+            assertEquals(1, result.blueprints.size)
+            assertEquals("2", result.blueprints[0].version)
+        }
+
+        @Test
+        fun `returns all proposed blueprints when scope is null`() {
+            val proposed = makeBlueprint("global", "2", BlueprintStatus.PROPOSED)
+            every { blueprintRepository.findAllByStatus(BlueprintStatus.PROPOSED) } returns listOf(proposed)
+
+            val result = service.listProposed(null)
+
+            assertEquals(1, result.blueprints.size)
         }
     }
 }

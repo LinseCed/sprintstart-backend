@@ -24,6 +24,15 @@ class Blueprint(
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var status: BlueprintStatus,
+    // Who authored this blueprint. Defaults to AI_PROPOSED since the current generation flow
+    // is the only producer; PM-authored blueprints set this explicitly.
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    val origin: BlueprintOrigin = BlueprintOrigin.AI_PROPOSED,
+    // The PM who owns/authored this blueprint, when known. Null for AI-generated proposals
+    // that have not been claimed by a specific owner.
+    @Column(name = "owner_id", nullable = true)
+    val ownerId: UUID? = null,
     // Corpus fingerprint the AI generated this blueprint from. Round-tripped back to
     // the stateless AI service so an unchanged corpus short-circuits regeneration.
     @Column(nullable = true)
