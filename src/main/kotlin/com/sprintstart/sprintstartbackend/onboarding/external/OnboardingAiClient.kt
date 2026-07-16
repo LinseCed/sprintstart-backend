@@ -1,6 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.external
 
 import com.sprintstart.sprintstartbackend.ApplicationConfig
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsResponse
@@ -81,6 +83,28 @@ class OnboardingAiClient(
                 .perform<GenerateBlueprintsResponse>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
             val msg = "Failed to generate blueprints (HTTP ${e.statusCode}): ${e.body}"
+            throw OnboardingAiException(e.statusCode, e.body, msg)
+        }
+
+    /**
+     * Runs one turn of the stateless adaptive skill-assessment interview.
+     *
+     * The backend owns session state; [request] carries the full transcript so far. A non-2xx
+     * response is wrapped in an [OnboardingAiException] carrying the upstream status/body.
+     *
+     * @param request The candidate competencies, repo signal, transcript, and turn/cap state.
+     * @return Either the next question (`done=false`) or the final placement (`done=true`).
+     */
+    suspend fun assessTurn(request: AssessmentTurnRequest): AssessmentTurnResponse =
+        try {
+            webClient
+                .post()
+                .uri(uri("/api/v1/onboarding/assessment/turn"))
+                .body(request)
+                .sync()
+                .perform<AssessmentTurnResponse>()
+        } catch (@Suppress("SwallowedException") e: WebClientException) {
+            val msg = "Failed to run assessment turn (HTTP ${e.statusCode}): ${e.body}"
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 
