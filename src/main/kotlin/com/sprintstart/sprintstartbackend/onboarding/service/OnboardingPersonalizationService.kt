@@ -32,12 +32,11 @@ class OnboardingPersonalizationService(
     private val onboardingAiClient: OnboardingAiClient,
     private val onboardingPathRepository: OnboardingPathRepository,
     private val blueprintRepository: BlueprintRepository,
-    private val blueprintService: BlueprintService,
     private val userApi: UserApi,
     transactionManager: PlatformTransactionManager,
 ) {
-    // Used for the short DB phase only; blueprint generation (a slow AI call) runs
-    // outside any transaction so a connection is never pinned for its duration.
+    // Used for the short DB phases only (reading blueprints, deleting the previous path).
+    // No AI generation happens here, so no connection is pinned for a slow call.
     private val txTemplate = TransactionTemplate(transactionManager)
 
     /**
@@ -45,12 +44,16 @@ class OnboardingPersonalizationService(
      *
      * The user's profile (assigned project role) is read up front so a missing user
      * fails fast with 404 before any streaming begins. The returned cold [Flow], once
-     * collected, then: auto-generates any missing blueprints for the user's scope
-     * (`global` + `area:<role-slug>`) — a potentially slow AI call made with no
-     * transaction held — opens a short transaction to delete the user's existing path
-     * and read the active blueprints, and finally streams the AI personalization events.
-     * Each event is mapped to an [OnboardingSseEvent]; a `path` event is persisted before
-     * being forwarded.
+     * collected, reads the ACTIVE baseline blueprints for the user's scopes
+     * (`global` + `area:<role-slug>`). Blueprint authoring is an explicit offline action
+     * (propose then PM approve); personalization never generates blueprints on the user's
+     * clock. If a required scope has no ACTIVE blueprint, a single `error` event is emitted
+     * and nothing else happens — the user's existing path is left intact. Otherwise the
+     * previous path (the projection) is deleted and the AI personalization events are
+     * streamed; a `path` event is persisted before being forwarded.
+     *
+     * The path is a disposable projection: this method may delete and rebuild it, but it
+     * never touches the durable `UserCompetencyState` ledger.
      *
      * @param authId External authentication identifier from the JWT subject.
      * @return A cold [Flow] of [OnboardingSseEvent] emitted during path generation.
@@ -71,13 +74,24 @@ class OnboardingPersonalizationService(
         val requiredScopes = listOf("global", "area:$scope")
 
         return flow {
-            blueprintService.ensureScopesExist(requiredScopes)
-
             val blueprints = withContext(Dispatchers.IO) {
-                txTemplate.execute {
-                    onboardingPathRepository.deleteByUserId(profile.id)
-                    loadActiveBlueprints(requiredScopes)
-                }
+                txTemplate.execute { loadActiveBlueprints(requiredScopes) }
+            }.orEmpty()
+
+            val loadedScopes = blueprints.map { it.scope }.toSet()
+            val missingScopes = requiredScopes.filterNot { it in loadedScopes }
+            if (missingScopes.isNotEmpty()) {
+                emit(
+                    OnboardingSseEvent(
+                        type = "error",
+                        message = "Onboarding baseline for ${missingScopes.joinToString(", ")} is not ready yet",
+                    ),
+                )
+                return@flow
+            }
+
+            withContext(Dispatchers.IO) {
+                txTemplate.executeWithoutResult { onboardingPathRepository.deleteByUserId(profile.id) }
             }
 
             emitAll(
