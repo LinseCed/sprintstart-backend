@@ -1,12 +1,16 @@
 package com.sprintstart.sprintstartbackend.onboarding.external
 
 import com.sprintstart.sprintstartbackend.ApplicationConfig
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompetencySchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveEdgeSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsResponse
+import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateCompetencyGraphRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateOnboardingPathRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.model.GraphProposalOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingAiPathEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.SkillAssessmentSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
@@ -105,6 +109,41 @@ class OnboardingAiClient(
                 .perform<AssessmentTurnResponse>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
             val msg = "Failed to run assessment turn (HTTP ${e.statusCode}): ${e.body}"
+            throw OnboardingAiException(e.statusCode, e.body, msg)
+        }
+
+    /**
+     * Runs the AI service's batch competency graph proposal job over the ingested corpus.
+     *
+     * The AI service is stateless: [activeCompetencies]/[activeEdges] (the backend's current
+     * live graph) drive dedup, and [lastFingerprint] drives idempotency -- there is no
+     * "active proposal" object on this side to carry it, unlike blueprint generation. A non-2xx
+     * response is wrapped in an [OnboardingAiException] carrying the upstream status/body.
+     *
+     * @param activeCompetencies The backend's current live competency nodes.
+     * @param activeEdges The backend's current live prerequisite edges.
+     * @param lastFingerprint The corpus fingerprint recorded from the most recent prior proposal, if any.
+     * @return The proposal outcome returned by the AI service.
+     */
+    suspend fun proposeCompetencyGraph(
+        activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
+        activeEdges: List<ActiveEdgeSchema> = emptyList(),
+        lastFingerprint: String? = null,
+    ): GraphProposalOutcome =
+        try {
+            webClient
+                .post()
+                .uri(uri("/api/v1/onboarding/competency-graph/propose"))
+                .body(
+                    GenerateCompetencyGraphRequest(
+                        activeCompetencies = activeCompetencies,
+                        activeEdges = activeEdges,
+                        lastFingerprint = lastFingerprint,
+                    ),
+                ).sync()
+                .perform<GraphProposalOutcome>()
+        } catch (@Suppress("SwallowedException") e: WebClientException) {
+            val msg = "Failed to propose competency graph (HTTP ${e.statusCode}): ${e.body}"
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 
