@@ -11,6 +11,10 @@ sprintstart:
   crypto:
     master-key: ${CRYPTO_MASTER_KEY}
     salt: ${CRYPTO_SALT}
+  session:
+    # Idle gap after which the next authenticated request counts as a new session (backend #7
+    # tiered reconciliation stand-in for a real login boundary -- see SessionActivityService).
+    idle-threshold: ${SPRINTSTART_SESSION_IDLE_THRESHOLD:PT4H}
 
 spring:
   config:

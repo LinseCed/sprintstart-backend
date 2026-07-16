@@ -1,15 +1,22 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ChangeType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphChange
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGraphPin
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphChangeRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphVersionRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.UserGraphPinRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
@@ -26,6 +33,10 @@ class CompetencyPathServiceTest {
     private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
     private val pathProjectionService: PathProjectionService = PathProjectionService(GraphTraversalService())
     private val competencyGraphVersionService: CompetencyGraphVersionService = mockk()
+    private val competencyGraphVersionRepository: CompetencyGraphVersionRepository = mockk()
+    private val competencyGraphChangeRepository: CompetencyGraphChangeRepository = mockk()
+    private val userGraphPinRepository: UserGraphPinRepository = mockk()
+    private val effectiveGraphResolver: EffectiveGraphResolver = EffectiveGraphResolver()
     private val userApi: UserApi = mockk()
     private val service = CompetencyPathService(
         competencyRepository,
@@ -33,6 +44,10 @@ class CompetencyPathServiceTest {
         userCompetencyStateRepository,
         pathProjectionService,
         competencyGraphVersionService,
+        competencyGraphVersionRepository,
+        competencyGraphChangeRepository,
+        userGraphPinRepository,
+        effectiveGraphResolver,
         userApi,
     )
 
@@ -42,7 +57,7 @@ class CompetencyPathServiceTest {
     @Nested
     inner class GetPathForMe {
         @Test
-        fun `resolves the user and projects a path from the full graph and their ledger`() {
+        fun `resolves the user and projects a path from the visible graph and their ledger`() {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { competencyRepository.findAll() } returns listOf(
                 Competency(key = "git", label = "Git", kind = CompetencyKind.SKILL),
@@ -58,12 +73,40 @@ class CompetencyPathServiceTest {
                 ),
             )
             every { competencyGraphVersionService.currentVersion() } returns 7
+            every { userGraphPinRepository.findByUserId(userId) } returns
+                UserGraphPin(userId = userId, pinnedVersion = 7)
+            every { competencyGraphVersionRepository.findAllByVersionGreaterThanOrderByVersionAsc(7) } returns
+                emptyList()
+            every { competencyGraphChangeRepository.findAll() } returns listOf(
+                CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "git"),
+                CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "kotlin"),
+            )
 
             val result = service.getPathForMe(authId)
 
             assertThat(result.nodes.map { it.key }).containsExactlyInAnyOrder("git", "kotlin")
             assertThat(result.graphVersion).isEqualTo(7)
             verify(exactly = 1) { userCompetencyStateRepository.findAllByUserId(userId) }
+        }
+
+        @Test
+        fun `lazily creates the graph pin at the current version on first call`() {
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { competencyRepository.findAll() } returns emptyList()
+            every { competencyEdgeRepository.findAll() } returns emptyList()
+            every { userCompetencyStateRepository.findAllByUserId(userId) } returns emptyList()
+            every { competencyGraphVersionService.currentVersion() } returns 3
+            every { userGraphPinRepository.findByUserId(userId) } returns null
+            val savedSlot = slot<UserGraphPin>()
+            every { userGraphPinRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
+            every { competencyGraphVersionRepository.findAllByVersionGreaterThanOrderByVersionAsc(3) } returns
+                emptyList()
+            every { competencyGraphChangeRepository.findAll() } returns emptyList()
+
+            service.getPathForMe(authId)
+
+            assertThat(savedSlot.captured.userId).isEqualTo(userId)
+            assertThat(savedSlot.captured.pinnedVersion).isEqualTo(3)
         }
 
         @Test

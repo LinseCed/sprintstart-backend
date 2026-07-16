@@ -1,28 +1,37 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.entity
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ChangeClassification
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.Table
 import java.time.Instant
 import java.util.UUID
 
 /**
- * The competency graph's current version, as a single row.
+ * One recorded bump of the competency graph, append-only -- like [Blueprint], each version is its
+ * own row rather than a mutated counter.
  *
- * Bumped only when the graph actually changes (see
- * [com.sprintstart.sprintstartbackend.onboarding.service.CompetencyGraphVersionService]) so a
- * computed path can pin the version it was projected against. Intentionally minimal: no history
- * table or per-change audit trail yet -- there's no real way to edit the graph or classify a
- * change today, so that's left for a later slice.
+ * [classification] is computed by
+ * [GraphChangeClassifier][com.sprintstart.sprintstartbackend.onboarding.service.GraphChangeClassifier]
+ * from the [CompetencyGraphChange] rows recorded for this version, never declared by the caller
+ * that triggered the bump. [GraphReconciliationService]
+ * [com.sprintstart.sprintstartbackend.onboarding.service.GraphReconciliationService] uses it to
+ * decide whether a version's content is safe to show a hire immediately or must wait for their
+ * next session start.
  */
 @Entity
 @Table(name = "competency_graph_version")
 class CompetencyGraphVersion(
     @Id
     val id: UUID = UUID.randomUUID(),
+    @Column(nullable = false, unique = true)
+    val version: Int,
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var version: Int = 1,
-    @Column(name = "updated_at", nullable = false)
-    var updatedAt: Instant = Instant.now(),
+    val classification: ChangeClassification,
+    @Column(name = "created_at", nullable = false)
+    val createdAt: Instant = Instant.now(),
 )

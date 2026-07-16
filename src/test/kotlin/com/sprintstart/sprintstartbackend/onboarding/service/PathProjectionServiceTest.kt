@@ -81,6 +81,21 @@ class PathProjectionServiceTest {
         }
 
         @Test
+        fun `a newly added prerequisite never re-locks a node the ledger already holds`() {
+            // Simulates a structural graph change: "advanced-kotlin" was mastered before "new-tool"
+            // (and its prerequisite edge into "advanced-kotlin") existed in the graph at all.
+            val result = service.project(
+                competencies = listOf(node("advanced-kotlin"), node("new-tool")),
+                edges = listOf(prerequisite("new-tool", "advanced-kotlin")),
+                targetKeys = setOf("advanced-kotlin"),
+                ledger = mapOf("advanced-kotlin" to 3),
+                graphVersion = 2,
+            )
+
+            assertThat(stateOf(result, "advanced-kotlin")).isEqualTo(NodeState.MASTERED)
+        }
+
+        @Test
         fun `a related edge never gates availability`() {
             val result = service.project(
                 competencies = listOf(node("git"), node("kotlin")),

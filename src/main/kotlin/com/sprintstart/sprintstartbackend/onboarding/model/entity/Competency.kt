@@ -37,6 +37,10 @@ class Competency(
     // Optional pointer to the repository artifact this competency is grounded in (e.g. a path or module).
     @Column(nullable = true)
     var repoRef: String? = null,
+    // Compliance/mandate-flagged competencies force any graph change that touches them to
+    // classify as ChangeClassification.INVARIANT, pushing immediately regardless of shape.
+    @Column(nullable = false)
+    var invariant: Boolean = false,
     @Column(nullable = false)
     val createdAt: Instant = Instant.now(),
 )
