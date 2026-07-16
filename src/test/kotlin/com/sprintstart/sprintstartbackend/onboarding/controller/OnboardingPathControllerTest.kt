@@ -2,8 +2,12 @@ package com.sprintstart.sprintstartbackend.onboarding.controller
 
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnboardingPathForUserResponse
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.NodeState
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnboardingPathResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathNode
+import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathView
+import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyPathService
 import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingPathService
 import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingPersonalizationService
 import io.mockk.Runs
@@ -43,6 +47,9 @@ class OnboardingPathControllerTest(
     private lateinit var onboardingPersonalizationService: OnboardingPersonalizationService
 
     @MockkBean
+    private lateinit var competencyPathService: CompetencyPathService
+
+    @MockkBean
     private lateinit var jwtDecoder: JwtDecoder
 
     private val pathId = UUID.randomUUID()
@@ -74,15 +81,21 @@ class OnboardingPathControllerTest(
     // ========================== /me endpoints ==========================
 
     @Test
-    fun `getOnboardingPathForMe should return 200 and path`() {
-        val response = GetOnboardingPathForUserResponse(
-            id = pathId,
-            userId = userId,
-            createdAt = Instant.now(),
-            phases = emptyList(),
+    fun `getOnboardingPathForMe should return 200 and competency path`() {
+        val response = PathView(
+            nodes = listOf(
+                PathNode(
+                    key = "git",
+                    label = "Git",
+                    kind = CompetencyKind.SKILL,
+                    state = NodeState.MASTERED,
+                    level = 3,
+                ),
+            ),
+            edges = emptyList(),
         )
 
-        every { onboardingPathService.getOnboardingPathForMe(authId) } returns response
+        every { competencyPathService.getPathForMe(authId) } returns response
 
         mockMvc
             .perform(
@@ -92,7 +105,7 @@ class OnboardingPathControllerTest(
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
 
         verify(exactly = 1) {
-            onboardingPathService.getOnboardingPathForMe(authId)
+            competencyPathService.getPathForMe(authId)
         }
     }
 
@@ -114,7 +127,7 @@ class OnboardingPathControllerTest(
 
     @Test
     fun `getOnboardingPathForMe should return 404 when not found`() {
-        every { onboardingPathService.getOnboardingPathForMe(authId) } throws
+        every { competencyPathService.getPathForMe(authId) } throws
             ResponseStatusException(HttpStatus.NOT_FOUND)
 
         mockMvc
@@ -124,7 +137,7 @@ class OnboardingPathControllerTest(
             ).andExpect(status().isNotFound)
 
         verify(exactly = 1) {
-            onboardingPathService.getOnboardingPathForMe(authId)
+            competencyPathService.getPathForMe(authId)
         }
     }
 

@@ -1,8 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnboardingPathForUserResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnboardingPathResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.OnboardingSseEvent
+import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathView
+import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyPathService
 import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingPathService
 import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingPersonalizationService
 import io.swagger.v3.oas.annotations.Operation
@@ -38,34 +39,32 @@ import java.util.UUID
 class OnboardingPathController(
     private val onboardingPathService: OnboardingPathService,
     private val onboardingPersonalizationService: OnboardingPersonalizationService,
+    private val competencyPathService: CompetencyPathService,
 ) {
 //  ========================== Endpoints for users (/me/...) ==========================
 
     /**
-     * Returns the authenticated user's onboarding path.
+     * Returns the authenticated user's personalized competency path.
      *
-     * This endpoint returns the root of the onboarding tree at depth 0. The frontend
-     * can treat the returned path as the top-level container for descendants at depths
-     * 1 through 3: phases, steps, and then tasks/resources.
+     * The path is projected from the competency graph and the user's progress ledger: nodes are
+     * `mastered`/`available`/`locked`, and edges express prerequisite (and related) relationships
+     * between them. Regenerating this projection never touches the ledger.
      *
      * @param jwt Authenticated JWT used to resolve the current user.
-     * @return The authenticated user's onboarding path.
+     * @return The authenticated user's personalized competency path.
      */
     @Operation(
-        summary = "Get current user's onboarding path",
-        description = "Returns the onboarding path at hierarchy depth 0 for the authenticated user. " +
-            "This is the root container above phases (depth 1), steps (depth 2), and tasks/resources (depth 3).",
+        summary = "Get current user's competency path",
+        description = "Returns the authenticated user's personalized competency path: nodes " +
+            "(mastered/available/locked) and their prerequisite edges, projected from the " +
+            "competency graph and the user's progress ledger.",
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "Onboarding path returned successfully"),
+            ApiResponse(responseCode = "200", description = "Competency path returned successfully"),
             ApiResponse(responseCode = "401", description = "Authentication required"),
-            ApiResponse(responseCode = "403", description = "Insufficient role to access this onboarding path"),
-            ApiResponse(
-                responseCode = "404",
-                description = "No user or onboarding " +
-                    "path found for the authenticated user",
-            ),
+            ApiResponse(responseCode = "403", description = "Insufficient role to access this path"),
+            ApiResponse(responseCode = "404", description = "No user found for the authenticated user"),
         ],
     )
     @ResponseStatus(HttpStatus.OK)
@@ -74,8 +73,8 @@ class OnboardingPathController(
     fun getPathForMe(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
-    ): GetOnboardingPathForUserResponse {
-        return onboardingPathService.getOnboardingPathForMe(jwt.subject)
+    ): PathView {
+        return competencyPathService.getPathForMe(jwt.subject)
     }
 
     /**
