@@ -10,9 +10,13 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlue
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateCompetencyGraphRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateOnboardingPathRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeKnowledgeRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeResult
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GraphProposalOutcome
+import com.sprintstart.sprintstartbackend.onboarding.external.model.LessonOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingAiPathEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.SkillAssessmentSchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.SynthesizeLessonRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
@@ -144,6 +148,91 @@ class OnboardingAiClient(
                 .perform<GraphProposalOutcome>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
             val msg = "Failed to propose competency graph (HTTP ${e.statusCode}): ${e.body}"
+            throw OnboardingAiException(e.statusCode, e.body, msg)
+        }
+
+    /**
+     * Synthesizes a grounded lesson for one (competency, level) pair (Phase 3, #8).
+     *
+     * Heavyweight/offline, matching [proposeCompetencyGraph]: one retrieval + LLM pass, intended
+     * for an admin-triggered content-authoring action, not the learner's request path.
+     * [lastFingerprint] is whatever fingerprint the caller last recorded for this exact lesson
+     * (idempotency is per-lesson, not corpus-wide). A non-2xx response is wrapped in an
+     * [OnboardingAiException] carrying the upstream status/body.
+     *
+     * @param competencyKey The competency this lesson teaches.
+     * @param competencyLabel The competency's display label.
+     * @param competencyDescription Optional extra context for grounding the lesson.
+     * @param level Target level to teach to (`beginner`/`intermediate`/`advanced`/`expert`).
+     * @param lastFingerprint The corpus fingerprint recorded from the last synthesis of this lesson, if any.
+     * @return The synthesis outcome returned by the AI service.
+     */
+    suspend fun synthesizeLesson(
+        competencyKey: String,
+        competencyLabel: String,
+        competencyDescription: String = "",
+        level: String = "beginner",
+        lastFingerprint: String? = null,
+    ): LessonOutcome =
+        try {
+            webClient
+                .post()
+                .uri(uri("/api/v1/onboarding/lessons/synthesize"))
+                .body(
+                    SynthesizeLessonRequest(
+                        competencyKey = competencyKey,
+                        competencyLabel = competencyLabel,
+                        competencyDescription = competencyDescription,
+                        level = level,
+                        lastFingerprint = lastFingerprint,
+                    ),
+                ).sync()
+                .perform<LessonOutcome>()
+        } catch (@Suppress("SwallowedException") e: WebClientException) {
+            val msg = "Failed to synthesize lesson (HTTP ${e.statusCode}): ${e.body}"
+            throw OnboardingAiException(e.statusCode, e.body, msg)
+        }
+
+    /**
+     * Grades a free-text answer against a rubric via the AI service's LLM judge (Phase 3, #8).
+     *
+     * On the learner's request path, unlike [synthesizeLesson] -- called synchronously per
+     * verification attempt. Only `knowledge`-type grading is delegated to the AI service;
+     * `exact`/`attest` are graded locally in Kotlin (see `VerificationService`), so this method has
+     * no `type` parameter. A non-2xx response is wrapped in an [OnboardingAiException] carrying the
+     * upstream status/body -- callers should treat that as a retryable failure, not a graded fail,
+     * since there is no safe local fallback for rubric-based judging.
+     *
+     * @param question The verification prompt shown to the learner.
+     * @param rubric What a correct answer must demonstrate.
+     * @param evidence Grounded evidence backing the rubric (the step's lesson content).
+     * @param answer The learner's submitted answer.
+     * @param attemptNo The 1-based attempt number, steering hint escalation on fail.
+     * @return The grading result returned by the AI service.
+     */
+    suspend fun gradeKnowledge(
+        question: String,
+        rubric: String,
+        evidence: String,
+        answer: String,
+        attemptNo: Int,
+    ): GradeResult =
+        try {
+            webClient
+                .post()
+                .uri(uri("/api/v1/onboarding/verify"))
+                .body(
+                    GradeKnowledgeRequest(
+                        question = question,
+                        answer = answer,
+                        attemptNo = attemptNo,
+                        rubric = rubric,
+                        evidence = evidence,
+                    ),
+                ).sync()
+                .perform<GradeResult>()
+        } catch (@Suppress("SwallowedException") e: WebClientException) {
+            val msg = "Failed to grade knowledge answer (HTTP ${e.statusCode}): ${e.body}"
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 
