@@ -71,4 +71,11 @@ class OnboardingStep(
     )
     @OrderBy("createdAt ASC")
     val feedback: MutableList<OnboardingFeedback> = mutableListOf(),
+    // Grounded lesson body, synthesized by the AI service (Phase 3, #8). Null until synthesized.
+    @Column(nullable = true, columnDefinition = "TEXT")
+    var content: String? = null,
+    // The AI service's corpus fingerprint for the current `content`, round-tripped on the next
+    // synthesis call so an unchanged corpus doesn't regenerate it.
+    @Column(nullable = true)
+    var lessonFingerprint: String? = null,
 )
