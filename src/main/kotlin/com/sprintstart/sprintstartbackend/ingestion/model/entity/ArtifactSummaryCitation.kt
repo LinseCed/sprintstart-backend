@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.artifacts.model.entity
+package com.sprintstart.sprintstartbackend.ingestion.model.entity
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity

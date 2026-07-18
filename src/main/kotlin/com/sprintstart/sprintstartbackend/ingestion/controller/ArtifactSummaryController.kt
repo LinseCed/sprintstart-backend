@@ -1,8 +1,9 @@
-package com.sprintstart.sprintstartbackend.artifacts.controller
+package com.sprintstart.sprintstartbackend.ingestion.controller
 
-import com.sprintstart.sprintstartbackend.artifacts.model.ai.AiArtifactSummaryStreamMessage
-import com.sprintstart.sprintstartbackend.artifacts.service.ArtifactSummaryService
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.AiArtifactSummaryStreamMessage
+import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactSummaryService
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -62,6 +63,7 @@ class ArtifactSummaryController(
                 ],
             ),
             ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "User has no access to this project"),
             ApiResponse(responseCode = "404", description = "No artifact found for the given id"),
         ],
     )
@@ -71,7 +73,7 @@ class ArtifactSummaryController(
     suspend fun getSummary(
         @PathVariable projectId: UUID,
         @PathVariable artifactId: UUID,
-        @AuthenticationPrincipal jwt: Jwt,
+        @Parameter(hidden = true) @AuthenticationPrincipal jwt: Jwt,
     ): Flow<AiArtifactSummaryStreamMessage> {
         return artifactSummaryService.getSummary(projectId, artifactId, jwt.subject)
     }

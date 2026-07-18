@@ -1,10 +1,10 @@
 package com.sprintstart.sprintstartbackend.ingestion.model.dto.command
 
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.ArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.UploadArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import java.time.Instant
 import java.util.UUID
 

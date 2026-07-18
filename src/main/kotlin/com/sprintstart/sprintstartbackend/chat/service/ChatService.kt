@@ -26,7 +26,7 @@ import com.sprintstart.sprintstartbackend.chat.repository.CitationRepository
 import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorDisabledException
 import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.overview.service.ConnectorConfigurationService
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import jakarta.validation.Valid
 import kotlinx.coroutines.flow.Flow
@@ -236,7 +236,9 @@ internal class ChatService(
                         }
                     }
 
-                    else -> event
+                    else -> {
+                        event
+                    }
                 }
             }.filterNotNull()
             .onCompletion { cause ->
@@ -276,7 +278,7 @@ internal class ChatService(
      *
      * @param sourceSystems The systems used by the AI to generate responses.
      */
-    internal fun validateSourceSystems(sourceSystems: List<SourceSystem>?) {
+    private fun validateSourceSystems(sourceSystems: List<SourceSystem>?) {
         val connectorsByName = connectorConfigurationService.findAllConnectors().associateBy { it.name }
 
         sourceSystems?.forEach { sourceSystem ->
@@ -297,7 +299,7 @@ internal class ChatService(
      * @param from The start of the time period transferred to the AI.
      * @param to The end of the time period transferred to the AI.
      */
-    internal fun validateTimestamps(from: Instant?, to: Instant?) {
+    private fun validateTimestamps(from: Instant?, to: Instant?) {
         if (from != null && to != null && to.isBefore(from)) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Start time must be before end time.")
         }

@@ -42,7 +42,7 @@ interface IConnector {
     val displayName: String
 
     /**
-     * Retrieve all sources of of this connector.
+     * Retrieve all sources of this connector.
      *
      * @return a list of all sources of this connector.
      */

@@ -22,7 +22,7 @@ import com.sprintstart.sprintstartbackend.chat.repository.CitationRepository
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.ConnectorDto
 import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorDisabledException
 import com.sprintstart.sprintstartbackend.connectors.overview.service.ConnectorConfigurationService
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.coEvery
 import io.mockk.coVerify

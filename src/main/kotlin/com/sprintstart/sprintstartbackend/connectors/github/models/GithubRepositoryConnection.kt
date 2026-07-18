@@ -32,7 +32,7 @@ class GithubRepositoryConnection(
         joinColumns = [JoinColumn(name = "repository_connection_id")],
     )
     @Column(name = "project_id", nullable = false)
-    private val projectIdsInternal: MutableSet<UUID> = mutableSetOf(),
+    var projectIdsInternal: MutableSet<UUID> = mutableSetOf(),
     @ManyToOne
     @JoinColumns(
         JoinColumn(name = "user_auth_id", referencedColumnName = "auth_id", nullable = false),

@@ -4,11 +4,11 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.comm
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.files.GithubFileFetchedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.issues.GithubIssueFetchedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.pullrequests.GithubPullRequestFetchedEvent
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.FileMetaDataResolver
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.GithubArtifactCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.GithubSourceUrlFactory.buildCommitUrl
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.SourceIdFactory.buildSourceId
 import com.sprintstart.sprintstartbackend.ingestion.util.sha256

@@ -29,7 +29,7 @@ internal data class ChatMessage(
         cascade = [CascadeType.ALL],
         orphanRemoval = true,
     )
-    var citations: List<Citation> = emptyList(),
+    var citations: MutableList<Citation> = mutableListOf(),
     @Column(nullable = false, columnDefinition = "TEXT")
     var content: String,
     @Column("created_at")

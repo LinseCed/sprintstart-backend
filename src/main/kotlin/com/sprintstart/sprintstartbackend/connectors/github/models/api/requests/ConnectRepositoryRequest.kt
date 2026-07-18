@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.connectors.github.models.api.requests
 
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 import java.util.UUID
 
 /**
@@ -13,5 +14,6 @@ data class ConnectRepositoryRequest(
     val name: String,
     @NotBlank
     val tokenName: String,
-    val projectId: UUID,
+    @NotNull
+    var projectId: UUID,
 )

@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.artifacts.model.ai
+package com.sprintstart.sprintstartbackend.ingestion.model.dto.request
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

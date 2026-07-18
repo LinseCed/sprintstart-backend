@@ -1,12 +1,13 @@
 package com.sprintstart.sprintstartbackend.artifacts.service
 
 import com.sprintstart.sprintstartbackend.artifacts.ArtifactSummaryAiClient
-import com.sprintstart.sprintstartbackend.artifacts.model.ai.AiArtifactSummaryStreamMessage
-import com.sprintstart.sprintstartbackend.artifacts.model.entity.ArtifactSummary
-import com.sprintstart.sprintstartbackend.artifacts.model.entity.ArtifactSummaryCitation
-import com.sprintstart.sprintstartbackend.artifacts.model.exceptions.ArtifactSummaryAiException
-import com.sprintstart.sprintstartbackend.artifacts.repository.ArtifactSummaryRepository
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.AiArtifactSummaryStreamMessage
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactSummary
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactSummaryCitation
+import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.ArtifactSummaryAiException
+import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactSummaryRepository
+import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactSummaryService
 import com.sprintstart.sprintstartbackend.upload.external.UploadApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
@@ -34,7 +35,7 @@ class ArtifactSummaryServiceTest {
 
     private val service = ArtifactSummaryService(
         artifactSummaryRepository = artifactSummaryRepository,
-        artifactSummaryAiClient = artifactSummaryAiClient,
+        artifactIngestionClient = artifactSummaryAiClient,
         artifactIngestionApi = artifactIngestionApi,
         uploadApi = uploadApi,
         userApi = userApi,

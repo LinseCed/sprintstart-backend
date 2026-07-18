@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.chat.models
 
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 

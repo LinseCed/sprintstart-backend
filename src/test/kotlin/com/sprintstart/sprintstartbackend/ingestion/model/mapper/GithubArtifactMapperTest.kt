@@ -4,8 +4,8 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.comm
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.files.GithubFileFetchedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.issues.GithubIssueFetchedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.pullrequests.GithubPullRequestFetchedEvent
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.util.sha256
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test

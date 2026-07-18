@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.artifacts.model.entity
+package com.sprintstart.sprintstartbackend.ingestion.model.entity
 
 import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
@@ -26,7 +26,7 @@ class ArtifactSummary(
     var summary: String,
     @Column(name = "source_hash", length = 64)
     var sourceHash: String?,
-    @Column(nullable = false)
+    @Column(name = "generated_at", nullable = false)
     var generatedAt: Instant = Instant.now(),
     @OneToMany(mappedBy = "artifactSummary", cascade = [CascadeType.ALL], orphanRemoval = true)
     var citations: MutableList<ArtifactSummaryCitation> = mutableListOf(),

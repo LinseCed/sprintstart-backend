@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.artifacts.model.exceptions
+package com.sprintstart.sprintstartbackend.ingestion.model.exceptions
 
 /**
  * Thrown when the AI service fails to deliver an artifact summary.

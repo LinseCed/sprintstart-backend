@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.chat.models
 
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import jakarta.validation.constraints.PastOrPresent
 import org.hibernate.validator.constraints.UniqueElements
 import java.time.Instant
