@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GeneratedBlueprint
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Blueprint
@@ -11,10 +12,12 @@ import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.BlueprintOutcomeResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.BlueprintResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.BlueprintStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.GenerateBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.ProposedBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.VersionListResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintStepRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -24,11 +27,14 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.web.server.ResponseStatusException
+import java.time.Instant
+import java.util.UUID
 
 @Service
 class BlueprintService(
     private val onboardingAiClient: OnboardingAiClient,
     private val blueprintRepository: BlueprintRepository,
+    private val blueprintStepRepository: BlueprintStepRepository,
     transactionManager: PlatformTransactionManager,
 ) {
     // The AI call is a long-running suspend operation, so it must not run inside
@@ -259,6 +265,51 @@ class BlueprintService(
         proposed.status = BlueprintStatus.ARCHIVED
         logger.info("Rejected proposed blueprint {} v{} (reason: {})", scope, version, reason ?: "none given")
         return proposed.toResponse()
+    }
+
+    /**
+     * Approves one [BlueprintStep] within a proposal, independent of the whole blueprint's own
+     * DRAFT/PROPOSED/ACTIVE decision -- this is per-step curation, not activation.
+     *
+     * @throws ResponseStatusException 404 if no step matches [id]; 409 if it was already decided.
+     */
+    @Transactional
+    fun approveStep(id: UUID): BlueprintStepResponse {
+        val step = findPendingStep(id)
+        step.status = ProposalStatus.APPROVED
+        step.decidedAt = Instant.now()
+        return step.toResponse()
+    }
+
+    /**
+     * Rejects one [BlueprintStep] within a proposal. The step stays in the blueprint (audit
+     * trail, same convention as [com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdgeProposal])
+     * but is excluded from [Blueprint.toSchema]'s output from here on.
+     *
+     * @throws ResponseStatusException 404 if no step matches [id]; 409 if it was already decided,
+     * or if the step is [BlueprintStep.invariant] -- an invariant step is protected from removal
+     * by the AI generation side already, so rejecting it here would defeat that guarantee.
+     */
+    @Transactional
+    fun rejectStep(id: UUID, reason: String? = null): BlueprintStepResponse {
+        val step = findPendingStep(id)
+        if (step.invariant) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Cannot reject invariant step: $id")
+        }
+        step.status = ProposalStatus.REJECTED
+        step.decidedAt = Instant.now()
+        step.rejectionReason = reason
+        return step.toResponse()
+    }
+
+    private fun findPendingStep(id: UUID): BlueprintStep {
+        val step = blueprintStepRepository.findById(id).orElseThrow {
+            ResponseStatusException(HttpStatus.NOT_FOUND, "No blueprint step found with id: $id")
+        }
+        if (step.status != ProposalStatus.PROPOSED) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "Blueprint step $id is already ${step.status}")
+        }
+        return step
     }
 
     private companion object {

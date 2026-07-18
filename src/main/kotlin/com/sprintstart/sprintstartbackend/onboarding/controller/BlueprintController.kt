@@ -3,8 +3,10 @@ package com.sprintstart.sprintstartbackend.onboarding.controller
 import com.sprintstart.sprintstartbackend.onboarding.model.request.blueprint.ApproveBlueprintRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.blueprint.GenerateBlueprintsRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.blueprint.RejectBlueprintRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.blueprint.RejectBlueprintStepRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.blueprint.RollbackBlueprintRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.BlueprintResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.BlueprintStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.GenerateBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.ProposedBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.VersionListResponse
@@ -23,6 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1/onboarding/blueprints")
@@ -168,5 +171,60 @@ class BlueprintController(
         @RequestBody request: RejectBlueprintRequest,
     ): BlueprintResponse {
         return blueprintService.reject(scope, request.version, request.reason)
+    }
+
+    /**
+     * Approves one blueprint step within a proposal, independent of the whole blueprint's own
+     * approve/reject decision.
+     */
+    @Operation(
+        summary = "Approve a blueprint step",
+        description = "Approves one step within a proposed blueprint",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Step approved"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "No step found with the given id"),
+            ApiResponse(responseCode = "409", description = "Step was already decided"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/steps/{id}/approve")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun approveStep(
+        @PathVariable id: UUID,
+    ): BlueprintStepResponse {
+        return blueprintService.approveStep(id)
+    }
+
+    /**
+     * Rejects one blueprint step within a proposal, excluding it from the blueprint going forward.
+     */
+    @Operation(
+        summary = "Reject a blueprint step",
+        description = "Rejects one step within a proposed blueprint",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Step rejected"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "No step found with the given id"),
+            ApiResponse(
+                responseCode = "409",
+                description = "Step was already decided, or is invariant and cannot be rejected",
+            ),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/steps/{id}/reject")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun rejectStep(
+        @PathVariable id: UUID,
+        @RequestBody request: RejectBlueprintStepRequest,
+    ): BlueprintStepResponse {
+        return blueprintService.rejectStep(id, request.reason)
     }
 }
