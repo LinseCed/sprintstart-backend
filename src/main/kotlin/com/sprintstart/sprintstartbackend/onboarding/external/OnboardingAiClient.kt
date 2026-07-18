@@ -13,9 +13,15 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateOnbo
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeKnowledgeRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeResult
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GraphProposalOutcome
+import com.sprintstart.sprintstartbackend.onboarding.external.model.HireCompetencySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.LessonOutcome
+import com.sprintstart.sprintstartbackend.onboarding.external.model.MatchHireToPoolRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.model.MineStarterWorkRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingAiPathEvent
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedStarterTaskSchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.RankedStarterTaskSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.SkillAssessmentSchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.SynthesizeLessonRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
@@ -233,6 +239,66 @@ class OnboardingAiClient(
                 .perform<GradeResult>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
             val msg = "Failed to grade knowledge answer (HTTP ${e.statusCode}): ${e.body}"
+            throw OnboardingAiException(e.statusCode, e.body, msg)
+        }
+
+    /**
+     * Runs the AI service's batch starter-work mining job over the ingested corpus (Phase 4, #9).
+     *
+     * The AI service is stateless: [activeSourceIds] (issues already in the backend's pool,
+     * proposed or approved) drive dedup, and [activeCompetencyKeys] (the backend's live graph
+     * keys) ground each proposed task's competency tags -- a tag outside this set is dropped by
+     * the AI service rather than invented. A non-2xx response is wrapped in an
+     * [OnboardingAiException] carrying the upstream status/body.
+     *
+     * @param activeSourceIds Issues already in the backend's starter-work pool.
+     * @param activeCompetencyKeys The backend's current live competency graph keys.
+     * @return The mining outcome returned by the AI service.
+     */
+    suspend fun proposeStarterWork(
+        activeSourceIds: List<String> = emptyList(),
+        activeCompetencyKeys: List<String> = emptyList(),
+    ): StarterWorkOutcome =
+        try {
+            webClient
+                .post()
+                .uri(uri("/api/v1/onboarding/starter-work/mine"))
+                .body(
+                    MineStarterWorkRequest(
+                        activeSourceIds = activeSourceIds,
+                        activeCompetencyKeys = activeCompetencyKeys,
+                    ),
+                ).sync()
+                .perform<StarterWorkOutcome>()
+        } catch (@Suppress("SwallowedException") e: WebClientException) {
+            val msg = "Failed to propose starter work (HTTP ${e.statusCode}): ${e.body}"
+            throw OnboardingAiException(e.statusCode, e.body, msg)
+        }
+
+    /**
+     * Ranks the starter-work pool by fit against one hire's competencies (Phase 4, #9).
+     *
+     * No LLM generation call on the AI side -- competency-key overlap is the primary score,
+     * embeddings only break ties -- so this is cheap enough to call on the hire's request path. A
+     * non-2xx response is wrapped in an [OnboardingAiException] carrying the upstream status/body.
+     *
+     * @param hireCompetencies The hire's freshly-built competencies (ledger).
+     * @param pool The backend's current (PM-approved) starter-work pool.
+     * @return The pool, ranked by fit, most relevant first.
+     */
+    suspend fun matchHireToPool(
+        hireCompetencies: List<HireCompetencySchema>,
+        pool: List<ProposedStarterTaskSchema>,
+    ): List<RankedStarterTaskSchema> =
+        try {
+            webClient
+                .post()
+                .uri(uri("/api/v1/onboarding/starter-work/match"))
+                .body(MatchHireToPoolRequest(hireCompetencies = hireCompetencies, pool = pool))
+                .sync()
+                .perform<List<RankedStarterTaskSchema>>()
+        } catch (@Suppress("SwallowedException") e: WebClientException) {
+            val msg = "Failed to match hire to starter-work pool (HTTP ${e.statusCode}): ${e.body}"
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 
