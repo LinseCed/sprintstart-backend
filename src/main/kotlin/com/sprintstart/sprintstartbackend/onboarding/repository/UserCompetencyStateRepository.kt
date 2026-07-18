@@ -7,5 +7,7 @@ import java.util.UUID
 interface UserCompetencyStateRepository : JpaRepository<UserCompetencyState, UUID> {
     fun findAllByUserId(userId: UUID): List<UserCompetencyState>
 
+    fun findAllByUserIdIn(userIds: Collection<UUID>): List<UserCompetencyState>
+
     fun findByUserIdAndCompetencyKey(userId: UUID, competencyKey: String): UserCompetencyState?
 }
