@@ -1,0 +1,33 @@
+package com.sprintstart.sprintstartbackend.onboarding.external.model
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+/** Request for the AI service's `POST /api/v1/onboarding/buddy` endpoint. */
+@Serializable
+data class BuddyStreamRequest(
+    val question: String,
+    val history: List<AssessmentHistoryEntrySchema> = emptyList(),
+)
+
+/**
+ * One SSE chunk from the AI service's buddy stream -- mirrors `sprintstart-backend`'s own `chat`
+ * module's `AiStreamMessage` shape field-for-field, since `/onboarding/buddy` emits the identical
+ * `sse_event` vocabulary `/chat` does (`tool_use`/`token`/`citation`/`done`/`error`). Kept as its
+ * own type in this module rather than reused from `chat` (that module's `AiStreamMessage` is
+ * `internal` and this module owns its own AI-contract DTOs, same convention every other
+ * `OnboardingAiClient` method follows).
+ */
+@Serializable
+data class BuddyStreamEvent(
+    val type: String,
+    val content: String? = null,
+    val name: String? = null,
+    val kind: String? = null,
+    @SerialName("artifact_id") val artifactId: String? = null,
+    val filename: String? = null,
+    @SerialName("source_url") val sourceUrl: String? = null,
+    @SerialName("start_line") val startLine: Int? = null,
+    @SerialName("start_page") val startPage: Int? = null,
+    val message: String? = null,
+)

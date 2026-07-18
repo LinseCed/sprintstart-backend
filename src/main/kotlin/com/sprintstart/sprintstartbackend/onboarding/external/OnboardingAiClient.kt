@@ -4,9 +4,12 @@ import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompetencySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveEdgeSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ArtifactEvidenceDto
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentHistoryEntrySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateCompetencyGraphRequest
@@ -29,6 +32,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.Onboarding
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.net.URI
@@ -285,6 +289,46 @@ class OnboardingAiClient(
         }
 
     /**
+     * Opens an SSE stream against the AI service's persistent-buddy endpoint (Phase 5, ai#6).
+     *
+     * Stateless like every other onboarding endpoint: the caller (backend) owns conversation
+     * history and passes the full transcript on every call, same contract as [assessTurn]. Each
+     * emitted [BuddyStreamEvent] has already been interpreted for type -- `token`, `citation`, and
+     * `tool_use` chunks pass through; `done` terminates the stream normally; an `error` chunk
+     * terminates the stream with [OnboardingAiException] (status `502`, since this is an in-band
+     * stream failure reported by the AI service, not a rejected HTTP request).
+     *
+     * @param question The hire's message.
+     * @param history The conversation so far, oldest first.
+     * @return A cold [Flow] of [BuddyStreamEvent]s; the connection opens on collection.
+     */
+    fun streamBuddy(
+        question: String,
+        history: List<AssessmentHistoryEntrySchema> = emptyList(),
+    ): Flow<BuddyStreamEvent> =
+        webClient
+            .post()
+            .uri(uri("/api/v1/onboarding/buddy"))
+            .body(BuddyStreamRequest(question = question, history = history))
+            .stream()
+            .perform<BuddyStreamEvent>(
+                terminationMarkers = setOf("[DONE]"),
+                onChunkError = { raw, err ->
+                    logger.warn("Skipping malformed SSE chunk '{}': {}", raw, err.message)
+                    true
+                },
+            ).map { chunk ->
+                if (chunk.type == "error") {
+                    throw OnboardingAiException(
+                        BUDDY_STREAM_ERROR_STATUS,
+                        chunk.message ?: "",
+                        "AI buddy responded with error: ${chunk.message}",
+                    )
+                }
+                chunk
+            }
+
+    /**
      * Runs the AI service's batch starter-work mining job over the ingested corpus (Phase 4, #9).
      *
      * The AI service is stateless: [activeSourceIds] (issues already in the backend's pool,
@@ -346,4 +390,8 @@ class OnboardingAiClient(
 
     /** Builds an absolute URI for [path] against the configured AI service base URL. */
     private fun uri(path: String): URI = URI.create("${applicationConfig.ai.baseUrl}$path")
+
+    private companion object {
+        const val BUDDY_STREAM_ERROR_STATUS = 502
+    }
 }
