@@ -10,6 +10,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathVie
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.util.UUID
 
 class PathProjectionServiceTest {
     private val service = PathProjectionService(GraphTraversalService())
@@ -191,6 +192,39 @@ class PathProjectionServiceTest {
             assertThat(result.edges).containsExactly(
                 PathEdge("kotlin", "domain-model"),
             )
+        }
+    }
+
+    @Nested
+    inner class StepIdAnnotation {
+        @Test
+        fun `annotates a node with its configured step id when one is given`() {
+            val stepId = UUID.randomUUID()
+
+            val result = service.project(
+                competencies = listOf(node("kotlin"), node("git")),
+                edges = emptyList(),
+                targetKeys = setOf("kotlin", "git"),
+                ledger = emptyMap(),
+                graphVersion = 1,
+                stepIdByCompetencyKey = mapOf("kotlin" to stepId),
+            )
+
+            assertThat(result.nodes.first { it.key == "kotlin" }.stepId).isEqualTo(stepId)
+            assertThat(result.nodes.first { it.key == "git" }.stepId).isNull()
+        }
+
+        @Test
+        fun `defaults every node's step id to null when no map is given`() {
+            val result = service.project(
+                competencies = listOf(node("kotlin")),
+                edges = emptyList(),
+                targetKeys = setOf("kotlin"),
+                ledger = emptyMap(),
+                graphVersion = 1,
+            )
+
+            assertThat(result.nodes.single().stepId).isNull()
         }
     }
 }
