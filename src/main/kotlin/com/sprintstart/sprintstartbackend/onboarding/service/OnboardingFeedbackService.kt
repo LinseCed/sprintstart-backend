@@ -22,6 +22,7 @@ class OnboardingFeedbackService(
     private val onboardingFeedbackRepository: OnboardingFeedbackRepository,
     private val onboardingStepRepository: OnboardingStepRepository,
     private val userApi: UserApi,
+    private val contentQualityService: ContentQualityService,
 ) {
 //  ========================== Methods for users ==========================
 
@@ -83,6 +84,10 @@ class OnboardingFeedbackService(
             step.feedback.add(feedback)
         } else {
             onboardingFeedbackRepository.save(feedback)
+        }
+
+        if (step != null && feedback.helpful == false) {
+            contentQualityService.checkAndTriggerRegeneration(step)
         }
 
         return feedback.toGetResponse()

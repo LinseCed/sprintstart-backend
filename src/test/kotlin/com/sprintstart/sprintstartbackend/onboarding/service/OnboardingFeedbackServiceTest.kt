@@ -25,7 +25,13 @@ class OnboardingFeedbackServiceTest {
     private val onboardingFeedbackRepository: OnboardingFeedbackRepository = mockk()
     private val onboardingStepRepository: OnboardingStepRepository = mockk()
     private val userApi: UserApi = mockk()
-    private val service = OnboardingFeedbackService(onboardingFeedbackRepository, onboardingStepRepository, userApi)
+    private val contentQualityService: ContentQualityService = mockk(relaxed = true)
+    private val service = OnboardingFeedbackService(
+        onboardingFeedbackRepository,
+        onboardingStepRepository,
+        userApi,
+        contentQualityService,
+    )
 
     private val userId = UUID.randomUUID()
     private val stepId = UUID.randomUUID()
@@ -58,9 +64,9 @@ class OnboardingFeedbackServiceTest {
             message = "Great step!",
         )
 
-    private fun makeCreateRequest(stepId: UUID? = null) = CreateOnboardingFeedbackRequest(
+    private fun makeCreateRequest(stepId: UUID? = null, helpful: Boolean? = true) = CreateOnboardingFeedbackRequest(
         stepId = stepId,
-        helpful = true,
+        helpful = helpful,
         message = "Great step!",
     )
 
@@ -137,6 +143,30 @@ class OnboardingFeedbackServiceTest {
 
             assertNotNull(result)
             assertEquals(1, step.feedback.size)
+            verify(exactly = 0) { contentQualityService.checkAndTriggerRegeneration(any()) }
+        }
+
+        @Test
+        fun `triggers content-quality check when feedback on a step is unhelpful`() {
+            val step = makeStep()
+            val request = makeCreateRequest(stepId, helpful = false)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingStepRepository.findByIdAndPhasePathUserId(stepId, userId) } returns Optional.of(step)
+
+            service.createFeedbackForMe(authId, request)
+
+            verify(exactly = 1) { contentQualityService.checkAndTriggerRegeneration(step) }
+        }
+
+        @Test
+        fun `does not trigger content-quality check when feedback has no step`() {
+            val request = makeCreateRequest(null, helpful = false)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingFeedbackRepository.save(any()) } returns makeFeedback()
+
+            service.createFeedbackForMe(authId, request)
+
+            verify(exactly = 0) { contentQualityService.checkAndTriggerRegeneration(any()) }
         }
 
         @Test
