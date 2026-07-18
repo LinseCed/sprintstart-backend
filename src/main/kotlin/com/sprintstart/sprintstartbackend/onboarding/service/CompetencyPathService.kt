@@ -62,11 +62,11 @@ class CompetencyPathService(
 
         // First competency-to-step bridge in the codebase (#8): a competency key is expected to be
         // taught/verified by at most one step -- if more than one Verification shares a key,
-        // `associate` keeps the last one encountered, an acceptable simplification until
+        // `associateBy` keeps the last one encountered, an acceptable simplification until
         // graph-authoring (Phase 5) can enforce uniqueness.
-        val stepIdByCompetencyKey = verificationRepository
+        val verificationByCompetencyKey = verificationRepository
             .findAllByCompetencyKeyIn(effectiveGraph.competencies.map { it.key })
-            .associate { it.competencyKey to it.stepId }
+            .associateBy { it.competencyKey }
 
         return pathProjectionService.project(
             competencies = effectiveGraph.competencies,
@@ -74,7 +74,8 @@ class CompetencyPathService(
             targetKeys = effectiveGraph.competencies.map { it.key }.toSet(),
             ledger = ledger,
             graphVersion = currentVersion,
-            stepIdByCompetencyKey = stepIdByCompetencyKey,
+            stepIdByCompetencyKey = verificationByCompetencyKey.mapValues { it.value.stepId },
+            verificationTypeByCompetencyKey = verificationByCompetencyKey.mapValues { it.value.type },
         )
     }
 

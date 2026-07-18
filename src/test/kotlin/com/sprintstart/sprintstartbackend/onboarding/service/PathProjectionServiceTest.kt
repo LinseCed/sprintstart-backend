@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.NodeState
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathEdge
@@ -225,6 +226,38 @@ class PathProjectionServiceTest {
             )
 
             assertThat(result.nodes.single().stepId).isNull()
+        }
+    }
+
+    @Nested
+    inner class VerificationTypeAnnotation {
+        @Test
+        fun `annotates a node with its configured verification type when one is given`() {
+            val result = service.project(
+                competencies = listOf(node("kotlin"), node("git")),
+                edges = emptyList(),
+                targetKeys = setOf("kotlin", "git"),
+                ledger = emptyMap(),
+                graphVersion = 1,
+                verificationTypeByCompetencyKey = mapOf("kotlin" to VerificationType.ARTIFACT),
+            )
+
+            assertThat(result.nodes.first { it.key == "kotlin" }.verificationType)
+                .isEqualTo(VerificationType.ARTIFACT)
+            assertThat(result.nodes.first { it.key == "git" }.verificationType).isNull()
+        }
+
+        @Test
+        fun `defaults every node's verification type to null when no map is given`() {
+            val result = service.project(
+                competencies = listOf(node("kotlin")),
+                edges = emptyList(),
+                targetKeys = setOf("kotlin"),
+                ledger = emptyMap(),
+                graphVersion = 1,
+            )
+
+            assertThat(result.nodes.single().verificationType).isNull()
         }
     }
 }

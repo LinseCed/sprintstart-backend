@@ -162,6 +162,9 @@ class CompetencyPathServiceTest {
 
             assertThat(result.nodes.first { it.key == "kotlin" }.stepId).isEqualTo(stepId)
             assertThat(result.nodes.first { it.key == "git" }.stepId).isNull()
+            assertThat(result.nodes.first { it.key == "kotlin" }.verificationType)
+                .isEqualTo(VerificationType.ATTEST)
+            assertThat(result.nodes.first { it.key == "git" }.verificationType).isNull()
         }
     }
 }
