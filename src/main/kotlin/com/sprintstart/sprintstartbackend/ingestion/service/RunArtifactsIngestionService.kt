@@ -10,6 +10,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import java.util.UUID
 import kotlin.jvm.optionals.getOrElse
 
@@ -26,14 +28,20 @@ class RunArtifactsIngestionService(
     private val artifactRepository: ArtifactRepository,
     private val artifactAiMapper: ArtifactAiMapper,
     private val artifactIngestionClient: ArtifactIngestionClient,
+    transactionManager: PlatformTransactionManager,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
+
+    // Reads plus the artifactAiMapper.toIngestRequest mapping must share one session: Artifact.labels
+    // is lazy, so mapping it after the session closes throws LazyInitializationException.
+    private val readTxTemplate = TransactionTemplate(transactionManager).apply { isReadOnly = true }
 
     /**
      * Loads the run output, skips empty runs, and dispatches the batched ingest/deindex request.
      *
      * Empty runs are intentionally ignored because there is nothing for the AI layer to index or
-     * remove. Repository reads are executed on [Dispatchers.IO] before the outbound HTTP call.
+     * remove. Repository reads (and the lazy-collection mapping they drive) are executed on
+     * [Dispatchers.IO] inside a read-only transaction before the outbound HTTP call.
      *
      * @param runId The completed ingestion run whose artifacts should be synced to AI.
      * @throws IngestionRunNotFoundException when the run id does not exist.
@@ -42,22 +50,7 @@ class RunArtifactsIngestionService(
      */
     suspend fun ingestRunArtifacts(runId: UUID) {
         val request = withContext(Dispatchers.IO) {
-            val run = ingestionRunRepository
-                .findWithArtifactIdsToDeindexById(runId)
-                .getOrElse { throw IngestionRunNotFoundException(runId) }
-
-            val artifactsToIngest = artifactRepository.findAllByIngestionRunId(runId)
-            val artifactsToDeindex = run.artifactIdsToDeindex
-
-            if (artifactsToIngest.isEmpty() && artifactsToDeindex.isEmpty()) {
-                logger.info("Run {} has nothing for AI to sync, skipping", runId)
-                return@withContext null
-            }
-
-            RunArtifactsAiSyncRequest(
-                artifactsToIngest = artifactsToIngest.map { artifactAiMapper.toIngestRequest(it) },
-                artifactsToDeindex = run.artifactIdsToDeindex,
-            )
+            readTxTemplate.execute { buildSyncRequest(runId) }
         } ?: return
 
         logger.info(
@@ -68,5 +61,24 @@ class RunArtifactsIngestionService(
         )
         artifactIngestionClient.ingest(request)
         logger.info("AI sync confirmed for run {}", runId)
+    }
+
+    private fun buildSyncRequest(runId: UUID): RunArtifactsAiSyncRequest? {
+        val run = ingestionRunRepository
+            .findWithArtifactIdsToDeindexById(runId)
+            .getOrElse { throw IngestionRunNotFoundException(runId) }
+
+        val artifactsToIngest = artifactRepository.findAllByIngestionRunId(runId)
+        val artifactsToDeindex = run.artifactIdsToDeindex
+
+        if (artifactsToIngest.isEmpty() && artifactsToDeindex.isEmpty()) {
+            logger.info("Run {} has nothing for AI to sync, skipping", runId)
+            return null
+        }
+
+        return RunArtifactsAiSyncRequest(
+            artifactsToIngest = artifactsToIngest.map { artifactAiMapper.toIngestRequest(it) },
+            artifactsToDeindex = run.artifactIdsToDeindex,
+        )
     }
 }

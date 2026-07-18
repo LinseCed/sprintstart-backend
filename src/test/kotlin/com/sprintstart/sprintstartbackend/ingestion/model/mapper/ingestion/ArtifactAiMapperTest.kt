@@ -44,6 +44,37 @@ class ArtifactAiMapperTest {
     }
 
     @Test
+    fun `toIngestRequest copies labels out instead of referencing the entity's live collection`() {
+        // Regression test: a real Hibernate-managed Artifact.labels is a lazy PersistentBag, not
+        // a plain List. Handing that reference straight to the DTO throws
+        // LazyInitializationException whenever it's serialized after the session that loaded it
+        // has closed (confirmed in a real ingestion run). Mutating the source after mapping and
+        // asserting the DTO is unaffected proves toIngestRequest copies rather than references.
+        val sourceLabels = mutableListOf("bug")
+        val artifact = Artifact(
+            sourceSystem = SourceSystem.GITHUB,
+            sourceId = "github:owner/repo:ISSUE:43",
+            sourceUrl = "https://github.com/owner/repo/issues/43",
+            artifactType = ArtifactType.ISSUE,
+            title = "Issue #43",
+            content = "Body",
+            mime = null,
+            language = null,
+            state = "OPEN",
+            labels = sourceLabels,
+            ingestionRun = ingestionRun(),
+            hash = "hash",
+            createdAtSource = null,
+            updatedAtSource = null,
+        )
+
+        val result = mapper.toIngestRequest(artifact)
+        sourceLabels.add("added after mapping")
+
+        assertThat(result.labels).containsExactly("bug")
+    }
+
+    @Test
     fun `toIngestRequest defaults to null state and empty labels for a non-issue artifact`() {
         val artifact = Artifact(
             sourceSystem = SourceSystem.GITHUB,
