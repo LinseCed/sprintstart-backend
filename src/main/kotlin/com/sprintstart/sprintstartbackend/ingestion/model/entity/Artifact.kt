@@ -32,6 +32,10 @@ class Artifact(
     var content: String?,
     val mime: String?,
     val language: String?,
+    // GitHub issue state (e.g. "OPEN"/"CLOSED"); null for non-issue artifact types. Refreshed
+    // unconditionally on every re-fetch by GithubArtifactProviderService, independent of the
+    // content hash, since a state change alone doesn't move title/body.
+    var state: String? = null,
     @Column(nullable = false)
     val metadata: String = "{}",
     @ElementCollection
@@ -43,6 +47,16 @@ class Artifact(
     // Add companion obj to Artifact to have Artifact.create
     // to keep internal state hidden
     private val projectIdsInternal: MutableSet<UUID> = mutableSetOf(),
+    // GitHub issue labels (e.g. "good first issue"); empty for non-issue artifact types.
+    // Replaced wholesale (clear + addAll) on re-fetch, not unioned -- a removed label must
+    // disappear.
+    @ElementCollection
+    @CollectionTable(
+        name = "artifact_labels",
+        joinColumns = [JoinColumn(name = "artifact_id")],
+    )
+    @Column(name = "label", nullable = false)
+    val labels: MutableList<String> = mutableListOf(),
     val createdAtSource: Instant?,
     val updatedAtSource: Instant?,
     @Column(nullable = false)

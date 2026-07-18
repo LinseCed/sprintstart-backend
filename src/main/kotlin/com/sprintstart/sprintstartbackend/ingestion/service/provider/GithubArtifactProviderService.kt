@@ -35,7 +35,9 @@ class GithubArtifactProviderService(
      * Business rules:
      * - commits are idempotent by `sourceId`; an already-known commit is ignored
      * - files are updated only when the incoming content hash changes
-     * - issues are updated only when the computed issue hash changes
+     * - issues are updated only when the computed issue hash changes; `state`/`labels` are the
+     *   exception -- they refresh on every fetch regardless of the hash, since a label or
+     *   open/closed change doesn't move title/body
      * - pull requests are always treated as mutable and overwrite title/body on re-fetch
      *
      * Counter side effects happen inside the same transaction:
@@ -82,6 +84,13 @@ class GithubArtifactProviderService(
                 artifact = artifactRepository.findBySourceId(command.sourceId)
                 if (artifact != null) {
                     artifact.addProjectIds(projectIds)
+                    // State/labels are refreshed unconditionally, independent of the content
+                    // hash: an issue being closed or re-labeled doesn't change its title/body, so
+                    // gating this on hash equality (like title/content below) would silently miss
+                    // exactly the updates this exists for.
+                    artifact.state = command.state
+                    artifact.labels.clear()
+                    artifact.labels.addAll(command.labels)
                     if (artifact.hash != command.hash) {
                         artifact.title = command.title
                         artifact.content = command.bodyText
@@ -123,6 +132,8 @@ class GithubArtifactProviderService(
             content = command.bodyText,
             mime = command.mime,
             language = command.language,
+            state = command.state,
+            labels = command.labels.toMutableList(),
             projectIdsInternal = projectIds,
             ingestionRun = ingestionRun,
             hash = command.hash,
