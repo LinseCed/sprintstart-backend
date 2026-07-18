@@ -61,11 +61,20 @@ data class AssessmentResultSchema(
     val evidence: String = "",
 )
 
+/**
+ * [targets], [coverage], and [assessments] are nullable because the AI service's own schema
+ * (`AssessmentTurnResponse` in `sprintstart-ai`) declares them `list[...] | None` by design --
+ * `targets`/`coverage` are set only when `done=false` (still interviewing) and `assessments` only
+ * when `done=true` (final placement). kotlinx.serialization's field defaults only apply when a key
+ * is *absent*, not when it's explicitly `null`, so a non-nullable type here throws
+ * `JsonDecodingException` on a real, valid response instead of quietly defaulting (confirmed via
+ * a real assessment turn where `assessments` was explicitly `null`).
+ */
 @Serializable
 data class AssessmentTurnResponse(
     val done: Boolean = false,
     val question: String? = null,
-    val targets: List<String> = emptyList(),
-    val coverage: List<AssessmentCoverageSchema> = emptyList(),
-    val assessments: List<AssessmentResultSchema> = emptyList(),
+    val targets: List<String>? = null,
+    val coverage: List<AssessmentCoverageSchema>? = null,
+    val assessments: List<AssessmentResultSchema>? = null,
 )

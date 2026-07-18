@@ -136,7 +136,7 @@ class AssessmentService(
 
                 if (aiResponse.done) {
                     val validKeys = candidates.map { it.key }.toSet()
-                    for (result in aiResponse.assessments) {
+                    for (result in aiResponse.assessments.orEmpty()) {
                         if (result.key !in validKeys) continue
                         writeCompetencyState(userId, result.key, result.level)
                     }
