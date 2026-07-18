@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphV
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGraphPinRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -36,6 +37,7 @@ class CompetencyPathService(
     private val competencyGraphChangeRepository: CompetencyGraphChangeRepository,
     private val userGraphPinRepository: UserGraphPinRepository,
     private val effectiveGraphResolver: EffectiveGraphResolver,
+    private val verificationRepository: VerificationRepository,
     private val userApi: UserApi,
 ) {
     @Transactional
@@ -58,12 +60,21 @@ class CompetencyPathService(
             .findAllByUserId(userId)
             .associate { it.competencyKey to it.level }
 
+        // First competency-to-step bridge in the codebase (#8): a competency key is expected to be
+        // taught/verified by at most one step -- if more than one Verification shares a key,
+        // `associate` keeps the last one encountered, an acceptable simplification until
+        // graph-authoring (Phase 5) can enforce uniqueness.
+        val stepIdByCompetencyKey = verificationRepository
+            .findAllByCompetencyKeyIn(effectiveGraph.competencies.map { it.key })
+            .associate { it.competencyKey to it.stepId }
+
         return pathProjectionService.project(
             competencies = effectiveGraph.competencies,
             edges = effectiveGraph.edges,
             targetKeys = effectiveGraph.competencies.map { it.key }.toSet(),
             ledger = ledger,
             graphVersion = currentVersion,
+            stepIdByCompetencyKey = stepIdByCompetencyKey,
         )
     }
 

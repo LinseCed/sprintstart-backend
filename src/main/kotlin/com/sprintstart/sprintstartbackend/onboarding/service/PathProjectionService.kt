@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathEdg
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathNode
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathView
 import org.springframework.stereotype.Service
+import java.util.UUID
 
 /**
  * Projects a hire's personalized path from the competency graph, a target set of competencies,
@@ -29,6 +30,9 @@ class PathProjectionService(
      * @param ledger The hire's durable progress: competency key -> assessed/verified level (0..4).
      * @param graphVersion The competency graph version being projected against; echoed onto the
      * returned [PathView] as-is (this function stays pure -- the caller looks the version up).
+     * @param stepIdByCompetencyKey The onboarding step configured to teach/verify each competency
+     * key, if any (see [com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification]).
+     * Echoed onto each [PathNode] as-is so a client can open a node as a learn-verify module.
      * @return [targetKeys] plus their transitive prerequisites, topologically ordered, each
      * annotated with its [NodeState]; edges are restricted to pairs where both ends are returned.
      */
@@ -38,6 +42,7 @@ class PathProjectionService(
         targetKeys: Set<String>,
         ledger: Map<String, Int>,
         graphVersion: Int,
+        stepIdByCompetencyKey: Map<String, UUID> = emptyMap(),
     ): PathView {
         val competenciesByKey = competencies.associateBy { it.key }
         val relevantKeys = linkedSetOf<String>()
@@ -72,6 +77,7 @@ class PathProjectionService(
                 kind = competency.kind,
                 state = states.getValue(key),
                 level = ledger[key],
+                stepId = stepIdByCompetencyKey[key],
             )
         }
 
