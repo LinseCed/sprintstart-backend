@@ -624,5 +624,33 @@ class VerificationServiceTest {
             assertEquals("old content", step.content)
             assertEquals("fp-old", step.lessonFingerprint)
         }
+
+        @Test
+        fun `omits the stored fingerprint when forceRegenerate is true`() = runTest {
+            val step = makeStep()
+            step.lessonFingerprint = "fp-old"
+            val verification = makeVerification(VerificationType.KNOWLEDGE, step.id, rubric = "r")
+            val competency = Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL)
+            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
+            every { verificationRepository.findByStepId(step.id) } returns verification
+            every { competencyRepository.findByKey("kotlin") } returns competency
+            coEvery {
+                onboardingAiClient.synthesizeLesson("kotlin", "Kotlin", "", "beginner", null)
+            } returns LessonOutcome(
+                status = "synthesized",
+                lesson = LessonContentSchema(
+                    competencyKey = "kotlin",
+                    level = "beginner",
+                    title = "t",
+                    body = "fresh body",
+                ),
+                provenance = LessonProvenanceSchema(corpusFingerprint = "fp-new"),
+            )
+
+            service.synthesizeContent(step.id, forceRegenerate = true)
+
+            assertEquals("fresh body", step.content)
+            assertEquals("fp-new", step.lessonFingerprint)
+        }
     }
 }

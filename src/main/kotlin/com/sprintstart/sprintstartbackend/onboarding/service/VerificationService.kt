@@ -190,10 +190,13 @@ class VerificationService(
      * [CompetencyProposalService.generate]. A no-op on `"unchanged"`/`"skipped"` outcomes -- the
      * step's existing [OnboardingStep.content] is left untouched.
      *
+     * @param forceRegenerate When true, omits the stored [OnboardingStep.lessonFingerprint] so the
+     * AI service resynthesizes even if the corpus is unchanged -- used by
+     * [ContentQualityService] to bypass idempotency once negative feedback crosses its threshold.
      * @throws ResponseStatusException 404 if the step, its verification, or the referenced
      * competency doesn't exist.
      */
-    suspend fun synthesizeContent(stepId: UUID) {
+    suspend fun synthesizeContent(stepId: UUID, forceRegenerate: Boolean = false) {
         val context = withContext(Dispatchers.IO) {
             readTxTemplate.execute { loadSynthesisContext(stepId) }!!
         }
@@ -202,7 +205,7 @@ class VerificationService(
             competencyLabel = context.competency.label,
             competencyDescription = context.competency.description ?: "",
             level = context.verification.level,
-            lastFingerprint = context.step.lessonFingerprint,
+            lastFingerprint = if (forceRegenerate) null else context.step.lessonFingerprint,
         )
         val lesson = outcome.lesson
         if (outcome.status != "synthesized" || lesson == null) return

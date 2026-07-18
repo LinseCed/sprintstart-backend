@@ -15,4 +15,6 @@ interface OnboardingFeedbackRepository : JpaRepository<OnboardingFeedback, UUID>
     fun findAllByStepIdAndUserIdOrderByCreatedAtAsc(stepId: UUID, userId: UUID): MutableList<OnboardingFeedback>
 
     fun findByIdAndUserId(id: UUID, userId: UUID): Optional<OnboardingFeedback>
+
+    fun countByStepIdAndHelpfulFalse(stepId: UUID): Long
 }
