@@ -113,7 +113,10 @@ class GithubArtifactMapper {
      * Maps a fetched GitHub issue and computes a hash from the visible issue content.
      *
      * The hash currently tracks title and body, which is the change signal used by
-     * `GithubArtifactProviderService` for issue updates.
+     * `GithubArtifactProviderService` for issue updates. `state`/`labels` are intentionally
+     * *not* part of that hash -- a label or open/closed change alone must still be refreshed on
+     * every fetch, so `GithubArtifactProviderService` applies them unconditionally rather than
+     * gating them on hash equality.
      * @throws java.time.format.DateTimeParseException when the issue creation timestamp is malformed.
      */
     fun toCommand(event: GithubIssueFetchedEvent): GithubArtifactCommand {
@@ -149,6 +152,8 @@ class GithubArtifactMapper {
                     name = event.repositoryName,
                 ),
             ),
+            state = event.state,
+            labels = event.labels,
         )
     }
 

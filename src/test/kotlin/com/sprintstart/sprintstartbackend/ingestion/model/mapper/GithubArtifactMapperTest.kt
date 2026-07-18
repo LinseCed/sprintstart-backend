@@ -106,7 +106,7 @@ class GithubArtifactMapperTest {
             closedAt = null,
             url = "https://github.com/owner/repo/issues/42",
             author = "alice",
-            labels = emptyList(),
+            labels = listOf("bug", "good first issue"),
             assignees = emptyList(),
             comments = emptyList(),
         )
@@ -122,6 +122,34 @@ class GithubArtifactMapperTest {
         assertThat(result.bodyText).isEqualTo("Something broke")
         assertThat(result.createdAtSource).isEqualTo(Instant.parse("2024-01-01T00:00:00Z"))
         assertThat(result.hash).isEqualTo("Bug report|Something broke".toByteArray().sha256())
+        assertThat(result.state).isEqualTo("OPEN")
+        assertThat(result.labels).containsExactly("bug", "good first issue")
+    }
+
+    @Test
+    fun `toCommand carries a null issue state through as null`() {
+        val event = GithubIssueFetchedEvent(
+            transactionId = runId,
+            repositoryId = repositoryId,
+            repositoryOwner = "owner",
+            repositoryName = "repo",
+            number = 43,
+            title = "Untitled",
+            body = null,
+            state = null,
+            createdAt = "2024-01-01T00:00:00Z",
+            closedAt = null,
+            url = "https://github.com/owner/repo/issues/43",
+            author = null,
+            labels = emptyList(),
+            assignees = emptyList(),
+            comments = emptyList(),
+        )
+
+        val result = mapper.toCommand(event)
+
+        assertThat(result.state).isNull()
+        assertThat(result.labels).isEmpty()
     }
 
     @Test
