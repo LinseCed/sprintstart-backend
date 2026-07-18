@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintProvenanceSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
@@ -10,7 +11,10 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.Blueprint
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintOrigin
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStep
+import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toSchema
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintStepRepository
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.every
@@ -25,15 +29,19 @@ import org.junit.jupiter.api.assertThrows
 import org.springframework.http.HttpStatus
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.web.server.ResponseStatusException
+import java.util.Optional
+import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsResponse as AiGenerateBlueprintsResponse
 
 class BlueprintServiceTest {
     private val onboardingAiClient: OnboardingAiClient = mockk()
     private val blueprintRepository: BlueprintRepository = mockk()
+    private val blueprintStepRepository: BlueprintStepRepository = mockk()
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
     private val service =
-        BlueprintService(onboardingAiClient, blueprintRepository, transactionManager)
+        BlueprintService(onboardingAiClient, blueprintRepository, blueprintStepRepository, transactionManager)
 
     private fun makeBlueprint(scope: String, version: String, status: BlueprintStatus): Blueprint =
         Blueprint(scope = scope, version = version, status = status)
@@ -292,6 +300,120 @@ class BlueprintServiceTest {
             val result = service.listProposed(null)
 
             assertEquals(1, result.blueprints.size)
+        }
+    }
+
+    @Nested
+    inner class ApproveStep {
+        @Test
+        fun `approves a pending step`() {
+            val blueprint = makeBlueprint("global", "2", BlueprintStatus.PROPOSED)
+            val step = makeStep(blueprint, "step-1", "Setup", 0)
+            every { blueprintStepRepository.findById(step.id) } returns Optional.of(step)
+
+            val result = service.approveStep(step.id)
+
+            assertEquals(ProposalStatus.APPROVED, step.status)
+            assertNotNull(step.decidedAt)
+            assertEquals(ProposalStatus.APPROVED, result.status)
+        }
+
+        @Test
+        fun `throws 404 when the step does not exist`() {
+            val id = UUID.randomUUID()
+            every { blueprintStepRepository.findById(id) } returns Optional.empty()
+
+            val ex = assertThrows<ResponseStatusException> { service.approveStep(id) }
+
+            assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+        }
+
+        @Test
+        fun `throws 409 when the step was already decided`() {
+            val blueprint = makeBlueprint("global", "2", BlueprintStatus.PROPOSED)
+            val step = makeStep(blueprint, "step-1", "Setup", 0)
+            step.status = ProposalStatus.APPROVED
+            every { blueprintStepRepository.findById(step.id) } returns Optional.of(step)
+
+            val ex = assertThrows<ResponseStatusException> { service.approveStep(step.id) }
+
+            assertEquals(HttpStatus.CONFLICT, ex.statusCode)
+        }
+    }
+
+    @Nested
+    inner class RejectStep {
+        @Test
+        fun `rejects a pending step and records the reason`() {
+            val blueprint = makeBlueprint("global", "2", BlueprintStatus.PROPOSED)
+            val step = makeStep(blueprint, "step-1", "Setup", 0)
+            every { blueprintStepRepository.findById(step.id) } returns Optional.of(step)
+
+            val result = service.rejectStep(step.id, "duplicates an existing step")
+
+            assertEquals(ProposalStatus.REJECTED, step.status)
+            assertEquals("duplicates an existing step", step.rejectionReason)
+            assertNotNull(step.decidedAt)
+            assertEquals(ProposalStatus.REJECTED, result.status)
+        }
+
+        @Test
+        fun `throws 409 when the step is invariant`() {
+            val blueprint = makeBlueprint("global", "2", BlueprintStatus.PROPOSED)
+            val step = BlueprintStep(
+                blueprint = blueprint,
+                stepId = "step-1",
+                title = "Security review",
+                position = 0,
+                invariant = true,
+            )
+            every { blueprintStepRepository.findById(step.id) } returns Optional.of(step)
+
+            val ex = assertThrows<ResponseStatusException> { service.rejectStep(step.id, null) }
+
+            assertEquals(HttpStatus.CONFLICT, ex.statusCode)
+            assertEquals(ProposalStatus.PROPOSED, step.status)
+        }
+
+        @Test
+        fun `throws 404 when the step does not exist`() {
+            val id = UUID.randomUUID()
+            every { blueprintStepRepository.findById(id) } returns Optional.empty()
+
+            val ex = assertThrows<ResponseStatusException> { service.rejectStep(id, null) }
+
+            assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+        }
+
+        @Test
+        fun `throws 409 when the step was already decided`() {
+            val blueprint = makeBlueprint("global", "2", BlueprintStatus.PROPOSED)
+            val step = makeStep(blueprint, "step-1", "Setup", 0)
+            step.status = ProposalStatus.REJECTED
+            every { blueprintStepRepository.findById(step.id) } returns Optional.of(step)
+
+            val ex = assertThrows<ResponseStatusException> { service.rejectStep(step.id, null) }
+
+            assertEquals(HttpStatus.CONFLICT, ex.statusCode)
+        }
+    }
+
+    @Nested
+    inner class ToSchemaFiltering {
+        @Test
+        fun `excludes rejected steps from the AI-bound schema but keeps them in the API response`() {
+            val blueprint = makeBlueprint("global", "1", BlueprintStatus.ACTIVE)
+            val keptStep = makeStep(blueprint, "step-1", "Setup", 0)
+            val rejectedStep = makeStep(blueprint, "step-2", "Old approach", 1)
+            rejectedStep.status = ProposalStatus.REJECTED
+            blueprint.steps.add(keptStep)
+            blueprint.steps.add(rejectedStep)
+
+            val schema = blueprint.toSchema()
+            val response = blueprint.toResponse()
+
+            assertEquals(listOf("step-1"), schema.steps.map { it.id })
+            assertEquals(setOf("step-1", "step-2"), response.steps.map { it.id }.toSet())
         }
     }
 }
