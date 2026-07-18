@@ -25,6 +25,9 @@ import java.util.UUID
  * [rubric] is required for [VerificationType.KNOWLEDGE] (graded by the AI service against the
  * step's [OnboardingStep.content] as grounded evidence) and [canonicalAnswer] for
  * [VerificationType.EXACT] (graded locally); neither is meaningful for [VerificationType.ATTEST].
+ * [rubric] is also required for [VerificationType.ARTIFACT], alongside [repositoryConnectionId] --
+ * the GitHub repository connection (owned by the `connectors.github` module, referenced by plain
+ * id rather than a cross-module JPA relation) a hire's submitted PR number is resolved against.
  */
 @Entity
 @Table(
@@ -47,6 +50,8 @@ class Verification(
     var rubric: String? = null,
     @Column(name = "canonical_answer", nullable = true, columnDefinition = "TEXT")
     var canonicalAnswer: String? = null,
+    @Column(name = "repository_connection_id", nullable = true)
+    var repositoryConnectionId: UUID? = null,
     @Column(name = "competency_key", nullable = false)
     var competencyKey: String,
     @Column(nullable = false)

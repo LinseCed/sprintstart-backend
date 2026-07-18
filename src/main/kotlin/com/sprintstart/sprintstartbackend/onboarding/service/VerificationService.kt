@@ -1,10 +1,12 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.SkipStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ArtifactEvidenceDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
@@ -41,10 +43,13 @@ import java.util.UUID
  *
  * [VerificationType.EXACT]/[VerificationType.ATTEST] are graded locally in Kotlin, mirroring the
  * AI service's own `grade_exact`/`grade_attest` logic exactly so a step behaves identically
- * regardless of which side happens to grade it. [VerificationType.KNOWLEDGE] is delegated to the
- * AI service (Seam 1) -- unlike [PhaseCheckService]'s fallback-to-exact-match on AI failure, a
- * failed AI call here surfaces a retryable `503` rather than a fabricated grade, since a rubric
- * has no safe local approximation.
+ * regardless of which side happens to grade it. [VerificationType.KNOWLEDGE] and
+ * [VerificationType.ARTIFACT] are delegated to the AI service (Seam 1) -- unlike
+ * [PhaseCheckService]'s fallback-to-exact-match on AI failure, a failed AI call here surfaces a
+ * retryable `503` rather than a fabricated grade, since a rubric has no safe local approximation.
+ * [VerificationType.ARTIFACT] additionally gathers real GitHub state itself (via
+ * [GithubRepositoryApi]) for the PR number a hire submits as their answer, before handing that
+ * evidence to the AI's judge -- the highest-rigor rung of the ladder.
  *
  * Passing writes [UserCompetencyState] with [CompetencySource.VERIFIED] and marks the step
  * [StepStatus.FINISHED] -- no separate "unlock" step is needed, since
@@ -64,6 +69,7 @@ class VerificationService(
     private val userCompetencyStateRepository: UserCompetencyStateRepository,
     private val competencyGraphVersionService: CompetencyGraphVersionService,
     private val onboardingAiClient: OnboardingAiClient,
+    private val githubRepositoryApi: GithubRepositoryApi,
     private val userApi: UserApi,
     transactionManager: PlatformTransactionManager,
 ) {
@@ -92,8 +98,8 @@ class VerificationService(
      * Grades a submitted answer and, on pass, writes the ledger and completes the step.
      *
      * @throws ResponseStatusException 404 if the user, step, or its verification doesn't exist;
-     * 400 if the step is already finished or skipped; 503 if [VerificationType.KNOWLEDGE] grading
-     * needs the AI service and it's unavailable.
+     * 400 if the step is already finished or skipped; 503 if [VerificationType.KNOWLEDGE] or
+     * [VerificationType.ARTIFACT] grading needs the AI service and it's unavailable.
      */
     @Transactional
     fun submitAttemptForMe(
@@ -141,7 +147,8 @@ class VerificationService(
      *
      * @throws ResponseStatusException 404 if the step or referenced competency doesn't exist; 400
      * if a type-required field ([Verification.rubric] for [VerificationType.KNOWLEDGE],
-     * [Verification.canonicalAnswer] for [VerificationType.EXACT]) is missing.
+     * [Verification.canonicalAnswer] for [VerificationType.EXACT], or [Verification.rubric] +
+     * [Verification.repositoryConnectionId] for [VerificationType.ARTIFACT]) is missing.
      */
     @Transactional
     fun upsertVerification(stepId: UUID, request: UpsertVerificationRequest): VerificationResponse {
@@ -159,6 +166,7 @@ class VerificationService(
             prompt = request.prompt
             rubric = request.rubric
             canonicalAnswer = request.canonicalAnswer
+            repositoryConnectionId = request.repositoryConnectionId
             competencyKey = request.competencyKey
             level = request.level
         } ?: Verification(
@@ -167,6 +175,7 @@ class VerificationService(
             prompt = request.prompt,
             rubric = request.rubric,
             canonicalAnswer = request.canonicalAnswer,
+            repositoryConnectionId = request.repositoryConnectionId,
             competencyKey = request.competencyKey,
             level = request.level,
         )
@@ -243,6 +252,7 @@ class VerificationService(
             VerificationType.EXACT -> gradeExact(verification.canonicalAnswer ?: "", answer)
             VerificationType.ATTEST -> gradeAttest(answer)
             VerificationType.KNOWLEDGE -> gradeKnowledge(verification, step, answer, attemptNo)
+            VerificationType.ARTIFACT -> gradeArtifact(verification, answer)
         }
 
     /** Normalized (case/whitespace-insensitive) exact match -- mirrors the AI service's `grade_exact`. */
@@ -310,6 +320,72 @@ class VerificationService(
         )
     }
 
+    /**
+     * Gathers real GitHub state for a hire-submitted PR number, then delegates rubric judgment to
+     * the AI service's `type: "artifact"` judge -- the highest-rigor rung of the ladder. Unlike
+     * [gradeKnowledge], the AI service never sees GitHub itself, so an unparseable answer or a PR
+     * that doesn't exist in the linked repository is graded locally as a fail without an AI call --
+     * those aren't judgment calls, they're facts only Kotlin can observe.
+     */
+    @Suppress("ThrowsCount")
+    private fun gradeArtifact(verification: Verification, answer: String): GradedResult {
+        val prNumber = answer.trim().toIntOrNull()
+            ?: return GradedResult(
+                passed = false,
+                score = 0.0,
+                feedback = "Submit a PR number to verify this task.",
+                hint = "Open a PR that addresses the task, then submit its number.",
+            )
+        val repositoryConnectionId = verification.repositoryConnectionId
+            ?: throw ResponseStatusException(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Verification ${verification.id} is type ARTIFACT but has no repositoryConnectionId configured",
+            )
+        val rubric = verification.rubric
+            ?: throw ResponseStatusException(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Verification ${verification.id} is type ARTIFACT but has no rubric configured",
+            )
+
+        val evidence = runBlocking { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, prNumber) }
+            ?: return GradedResult(
+                passed = false,
+                score = 0.0,
+                feedback = "No PR #$prNumber found in the linked repository.",
+                hint = "Double-check the PR number and that it's on the linked repository.",
+            )
+
+        val result = try {
+            runBlocking {
+                onboardingAiClient.gradeArtifact(
+                    taskDescription = verification.prompt,
+                    rubric = rubric,
+                    evidence = ArtifactEvidenceDto(
+                        prTitle = evidence.title,
+                        prBody = evidence.body,
+                        prState = evidence.state,
+                        filesChanged = evidence.filesChanged,
+                        checksPassed = evidence.checksPassed,
+                        commitMessages = evidence.commitMessages,
+                    ),
+                )
+            }
+        } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
+            logger.warn("AI artifact grading unavailable: {}", e.message)
+            throw ResponseStatusException(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Grading is temporarily unavailable, please try again",
+            )
+        }
+
+        return GradedResult(
+            passed = result.passed,
+            score = result.score,
+            feedback = result.feedback,
+            hint = result.hint,
+        )
+    }
+
     /** Find-or-create write of the durable ledger, mirroring [AssessmentService]'s write pattern. */
     private fun writeVerifiedCompetencyState(userId: UUID, competencyKey: String, level: String) {
         val rank = LEVEL_RANKS[level.trim().lowercase()] ?: 0
@@ -343,12 +419,24 @@ class VerificationService(
         step.status = StepStatus.FINISHED
     }
 
+    @Suppress("ThrowsCount")
     private fun validateGradingConfig(request: UpsertVerificationRequest) {
         if (request.type == VerificationType.KNOWLEDGE && request.rubric.isNullOrBlank()) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "KNOWLEDGE verifications need a rubric")
         }
         if (request.type == VerificationType.EXACT && request.canonicalAnswer.isNullOrBlank()) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "EXACT verifications need a canonicalAnswer")
+        }
+        if (request.type == VerificationType.ARTIFACT) {
+            if (request.rubric.isNullOrBlank()) {
+                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "ARTIFACT verifications need a rubric")
+            }
+            if (request.repositoryConnectionId == null) {
+                throw ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "ARTIFACT verifications need a repositoryConnectionId",
+                )
+            }
         }
     }
 

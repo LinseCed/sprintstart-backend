@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
+import com.sprintstart.sprintstartbackend.connectors.github.external.dto.PullRequestEvidence
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
@@ -57,6 +59,7 @@ class VerificationServiceTest {
     private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
     private val competencyGraphVersionService: CompetencyGraphVersionService = mockk()
     private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val githubRepositoryApi: GithubRepositoryApi = mockk()
     private val userApi: UserApi = mockk()
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
     private val service = VerificationService(
@@ -67,6 +70,7 @@ class VerificationServiceTest {
         userCompetencyStateRepository,
         competencyGraphVersionService,
         onboardingAiClient,
+        githubRepositoryApi,
         userApi,
         transactionManager,
     )
@@ -98,6 +102,7 @@ class VerificationServiceTest {
         stepId: UUID,
         rubric: String? = null,
         canonicalAnswer: String? = null,
+        repositoryConnectionId: UUID? = null,
         competencyKey: String = "kotlin",
         level: String = "beginner",
     ) = Verification(
@@ -106,6 +111,7 @@ class VerificationServiceTest {
         prompt = "Explain it",
         rubric = rubric,
         canonicalAnswer = canonicalAnswer,
+        repositoryConnectionId = repositoryConnectionId,
         competencyKey = competencyKey,
         level = level,
     )
@@ -221,6 +227,137 @@ class VerificationServiceTest {
 
             assertThrows<ResponseStatusException> {
                 service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("ans"))
+            }.also { assertEquals(503, it.statusCode.value()) }
+
+            verify(exactly = 0) { verificationAttemptRepository.save(any()) }
+        }
+
+        @Test
+        fun `ARTIFACT fetches PR evidence and delegates grading to the AI client`() {
+            val repositoryConnectionId = UUID.randomUUID()
+            val step = makeStep()
+            val verification = makeVerification(
+                VerificationType.ARTIFACT,
+                step.id,
+                rubric = "closes the ticket",
+                repositoryConnectionId = repositoryConnectionId,
+            )
+            val evidence = PullRequestEvidence(
+                title = "Fix bug",
+                body = "Closes #42",
+                state = "MERGED",
+                filesChanged = listOf("src/Main.kt"),
+                checksPassed = true,
+                commitMessages = listOf("fix: bug"),
+            )
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
+            every { verificationRepository.findByStepId(step.id) } returns verification
+            every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
+            every { competencyGraphVersionService.currentVersion() } returns 1
+            coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) } returns evidence
+            coEvery { onboardingAiClient.gradeArtifact("Explain it", "closes the ticket", any()) } returns
+                GradeResult(passed = true, score = 1.0, feedback = "Satisfies the rubric.")
+            every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns null
+            every { userCompetencyStateRepository.save(any()) } answers { firstArg() }
+            every { verificationAttemptRepository.save(any()) } answers { firstArg() }
+
+            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("42"))
+
+            assertTrue(result.passed)
+            coVerify(exactly = 1) { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) }
+            coVerify(exactly = 1) { onboardingAiClient.gradeArtifact(any(), any(), any()) }
+        }
+
+        @Test
+        fun `ARTIFACT fails locally without a GitHub or AI call when the answer isn't a PR number`() {
+            val step = makeStep()
+            val verification = makeVerification(
+                VerificationType.ARTIFACT,
+                step.id,
+                rubric = "closes the ticket",
+                repositoryConnectionId = UUID.randomUUID(),
+            )
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
+            every { verificationRepository.findByStepId(step.id) } returns verification
+            every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
+            every { competencyGraphVersionService.currentVersion() } returns 1
+            every { verificationAttemptRepository.save(any()) } answers { firstArg() }
+
+            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("not a number"))
+
+            assertFalse(result.passed)
+            coVerify(exactly = 0) { githubRepositoryApi.getPullRequestEvidence(any(), any()) }
+            coVerify(exactly = 0) { onboardingAiClient.gradeArtifact(any(), any(), any()) }
+        }
+
+        @Test
+        fun `ARTIFACT fails locally without an AI call when the PR isn't found`() {
+            val repositoryConnectionId = UUID.randomUUID()
+            val step = makeStep()
+            val verification = makeVerification(
+                VerificationType.ARTIFACT,
+                step.id,
+                rubric = "closes the ticket",
+                repositoryConnectionId = repositoryConnectionId,
+            )
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
+            every { verificationRepository.findByStepId(step.id) } returns verification
+            every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
+            every { competencyGraphVersionService.currentVersion() } returns 1
+            coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 99) } returns null
+            every { verificationAttemptRepository.save(any()) } answers { firstArg() }
+
+            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("99"))
+
+            assertFalse(result.passed)
+            coVerify(exactly = 0) { onboardingAiClient.gradeArtifact(any(), any(), any()) }
+        }
+
+        @Test
+        fun `ARTIFACT throws 500 when repositoryConnectionId isn't configured`() {
+            val step = makeStep()
+            val verification = makeVerification(VerificationType.ARTIFACT, step.id, rubric = "closes the ticket")
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
+            every { verificationRepository.findByStepId(step.id) } returns verification
+            every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
+
+            assertThrows<ResponseStatusException> {
+                service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("1"))
+            }.also { assertEquals(500, it.statusCode.value()) }
+        }
+
+        @Test
+        fun `ARTIFACT surfaces 503 when the AI service is unavailable, without persisting an attempt`() {
+            val repositoryConnectionId = UUID.randomUUID()
+            val step = makeStep()
+            val verification = makeVerification(
+                VerificationType.ARTIFACT,
+                step.id,
+                rubric = "closes the ticket",
+                repositoryConnectionId = repositoryConnectionId,
+            )
+            val evidence = PullRequestEvidence(
+                title = "Fix bug",
+                body = "",
+                state = "OPEN",
+                filesChanged = emptyList(),
+                checksPassed = null,
+                commitMessages = emptyList(),
+            )
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
+            every { verificationRepository.findByStepId(step.id) } returns verification
+            every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
+            coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 7) } returns evidence
+            coEvery { onboardingAiClient.gradeArtifact(any(), any(), any()) } throws
+                OnboardingAiException(503, "", "AI unavailable")
+
+            assertThrows<ResponseStatusException> {
+                service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("7"))
             }.also { assertEquals(503, it.statusCode.value()) }
 
             verify(exactly = 0) { verificationAttemptRepository.save(any()) }
@@ -377,6 +514,66 @@ class VerificationServiceTest {
             assertThrows<ResponseStatusException> {
                 service.upsertVerification(step.id, request)
             }.also { assertEquals(404, it.statusCode.value()) }
+        }
+
+        @Test
+        fun `throws 400 when ARTIFACT has no rubric`() {
+            val step = makeStep()
+            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
+
+            val request = UpsertVerificationRequest(
+                type = VerificationType.ARTIFACT,
+                prompt = "Ship it",
+                repositoryConnectionId = UUID.randomUUID(),
+                competencyKey = "kotlin",
+                level = "beginner",
+            )
+
+            assertThrows<ResponseStatusException> {
+                service.upsertVerification(step.id, request)
+            }.also { assertEquals(400, it.statusCode.value()) }
+        }
+
+        @Test
+        fun `throws 400 when ARTIFACT has no repositoryConnectionId`() {
+            val step = makeStep()
+            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
+
+            val request = UpsertVerificationRequest(
+                type = VerificationType.ARTIFACT,
+                prompt = "Ship it",
+                rubric = "closes the ticket",
+                competencyKey = "kotlin",
+                level = "beginner",
+            )
+
+            assertThrows<ResponseStatusException> {
+                service.upsertVerification(step.id, request)
+            }.also { assertEquals(400, it.statusCode.value()) }
+        }
+
+        @Test
+        fun `creates an ARTIFACT verification with a repositoryConnectionId`() {
+            val step = makeStep()
+            val repositoryConnectionId = UUID.randomUUID()
+            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
+            every { competencyRepository.existsByKey("kotlin") } returns true
+            every { verificationRepository.findByStepId(step.id) } returns null
+            val saved = slot<Verification>()
+            every { verificationRepository.save(capture(saved)) } answers { saved.captured }
+
+            val request = UpsertVerificationRequest(
+                type = VerificationType.ARTIFACT,
+                prompt = "Ship it",
+                rubric = "closes the ticket",
+                repositoryConnectionId = repositoryConnectionId,
+                competencyKey = "kotlin",
+                level = "beginner",
+            )
+            val result = service.upsertVerification(step.id, request)
+
+            assertEquals(VerificationType.ARTIFACT, result.type)
+            assertEquals(repositoryConnectionId, saved.captured.repositoryConnectionId)
         }
     }
 

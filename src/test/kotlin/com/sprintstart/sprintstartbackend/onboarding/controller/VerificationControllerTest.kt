@@ -156,6 +156,58 @@ class VerificationControllerTest(
     }
 
     @Test
+    fun `upsertVerification should return 200 for ARTIFACT with a repositoryConnectionId`() {
+        val repositoryConnectionId = UUID.randomUUID()
+        val request = UpsertVerificationRequest(
+            type = VerificationType.ARTIFACT,
+            prompt = "Ship it",
+            rubric = "closes the ticket",
+            repositoryConnectionId = repositoryConnectionId,
+            competencyKey = "kotlin",
+            level = "beginner",
+        )
+        every { verificationService.upsertVerification(stepId, request) } returns
+            VerificationResponse(
+                id = UUID.randomUUID(),
+                stepId = stepId,
+                type = VerificationType.ARTIFACT,
+                prompt = "Ship it",
+                competencyKey = "kotlin",
+                level = "beginner",
+            )
+
+        mockMvc
+            .perform(
+                put("/api/v1/onboarding/steps/$stepId/verification")
+                    .with(pmJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.type").value("ARTIFACT"))
+    }
+
+    @Test
+    fun `upsertVerification should return 400 when ARTIFACT has no repositoryConnectionId`() {
+        val request = UpsertVerificationRequest(
+            type = VerificationType.ARTIFACT,
+            prompt = "Ship it",
+            rubric = "closes the ticket",
+            competencyKey = "kotlin",
+            level = "beginner",
+        )
+        every { verificationService.upsertVerification(stepId, request) } throws
+            ResponseStatusException(HttpStatus.BAD_REQUEST, "ARTIFACT verifications need a repositoryConnectionId")
+
+        mockMvc
+            .perform(
+                put("/api/v1/onboarding/steps/$stepId/verification")
+                    .with(pmJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)),
+            ).andExpect(status().isBadRequest)
+    }
+
+    @Test
     fun `upsertVerification should return 403 for a plain user`() {
         val request = UpsertVerificationRequest(
             type = VerificationType.ATTEST,
