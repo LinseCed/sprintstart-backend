@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.NodeState
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathEdge
@@ -33,6 +34,10 @@ class PathProjectionService(
      * @param stepIdByCompetencyKey The onboarding step configured to teach/verify each competency
      * key, if any (see [com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification]).
      * Echoed onto each [PathNode] as-is so a client can open a node as a learn-verify module.
+     * @param verificationTypeByCompetencyKey The grading type of that same
+     * [com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification], keyed the same
+     * way. Echoed onto each [PathNode] so a client can recognize e.g. an artifact-checked node
+     * without fetching each step's verification config individually.
      * @return [targetKeys] plus their transitive prerequisites, topologically ordered, each
      * annotated with its [NodeState]; edges are restricted to pairs where both ends are returned.
      */
@@ -43,6 +48,7 @@ class PathProjectionService(
         ledger: Map<String, Int>,
         graphVersion: Int,
         stepIdByCompetencyKey: Map<String, UUID> = emptyMap(),
+        verificationTypeByCompetencyKey: Map<String, VerificationType> = emptyMap(),
     ): PathView {
         val competenciesByKey = competencies.associateBy { it.key }
         val relevantKeys = linkedSetOf<String>()
@@ -78,6 +84,7 @@ class PathProjectionService(
                 state = states.getValue(key),
                 level = ledger[key],
                 stepId = stepIdByCompetencyKey[key],
+                verificationType = verificationTypeByCompetencyKey[key],
             )
         }
 
