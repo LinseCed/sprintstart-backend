@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.model.response.path
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.NodeState
+import java.util.UUID
 
 data class PathNode(
     val key: String,
@@ -9,6 +10,10 @@ data class PathNode(
     val kind: CompetencyKind,
     val state: NodeState,
     val level: Int? = null,
+    // The onboarding step whose Verification.competencyKey matches this node, if one is
+    // configured -- lets a client open this node as a learn-verify module (#8/#5). Null when no
+    // step has been wired up to teach/verify this competency yet.
+    val stepId: UUID? = null,
 )
 
 data class PathEdge(
