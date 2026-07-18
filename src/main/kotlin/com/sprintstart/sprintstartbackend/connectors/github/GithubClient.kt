@@ -177,6 +177,23 @@ class GithubClient(
     }
 
     /**
+     * Fetches one pull request's full detail (title, body, state, changed files, CI status,
+     * commit messages) on demand, by number -- unlike [fetchAllPullRequests], this doesn't crawl
+     * a repository's whole PR list first. Used by artifact verification to gather live evidence
+     * for a hire-submitted PR number at grading time.
+     *
+     * @param repository the repository containing the pull request.
+     * @param prNumber the number of the pull request to fetch.
+     * @return the pull request's details, or null if it does not exist.
+     * @throws WebClientException if there is an issue with the network or server response.
+     * @throws kotlinx.serialization.SerializationException if the response data cannot be deserialized.
+     */
+    suspend fun fetchPullRequest(repository: GithubRepositoryConnection, prNumber: Int): PullRequest? {
+        val query = queryLoader.load("github/graphql/100-pullrequests-deep.graphql")
+        return fetchSinglePullRequest(repository, prNumber, query)
+    }
+
+    /**
      * Fetches a single pull request from a GitHub repository.
      *
      * This method queries the GitHub API to retrieve details of a specific pull request

@@ -43,6 +43,9 @@ data class PullRequest(
     val reviews: ReviewsConnection?,
     val comments: CommentsConnection?,
     val reviewThreads: ReviewThreadsConnection?,
+    val statusCheckRollup: StatusCheckRollup?,
+    val files: PullRequestFilesConnection?,
+    val commits: PullRequestCommitsConnection?,
 )
 
 @Serializable
@@ -113,4 +116,37 @@ data class ReviewThreadNode(
 @Serializable
 data class ReviewThreadsConnection(
     val nodes: List<ReviewThreadNode>?,
+)
+
+// --- Status checks (CI) ---
+@Serializable
+data class StatusCheckRollup(
+    val state: String,
+)
+
+// --- Changed files ---
+@Serializable
+data class PullRequestFileNode(
+    val path: String,
+)
+
+@Serializable
+data class PullRequestFilesConnection(
+    val nodes: List<PullRequestFileNode>?,
+)
+
+// --- Commits ---
+@Serializable
+data class CommitMessage(
+    val message: String,
+)
+
+@Serializable
+data class PullRequestCommitNode(
+    val commit: CommitMessage,
+)
+
+@Serializable
+data class PullRequestCommitsConnection(
+    val nodes: List<PullRequestCommitNode>?,
 )

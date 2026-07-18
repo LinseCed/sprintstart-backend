@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.onboarding.external
 import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompetencySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveEdgeSchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ArtifactEvidenceDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
@@ -10,6 +11,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlue
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateCompetencyGraphRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateOnboardingPathRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeArtifactRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeKnowledgeRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeResult
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GraphProposalOutcome
@@ -239,6 +241,46 @@ class OnboardingAiClient(
                 .perform<GradeResult>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
             val msg = "Failed to grade knowledge answer (HTTP ${e.statusCode}): ${e.body}"
+            throw OnboardingAiException(e.statusCode, e.body, msg)
+        }
+
+    /**
+     * Grades a hire-submitted PR's real state against a rubric via the AI service's LLM judge
+     * (Phase 4, #9), the highest-rigor rung of the verification ladder.
+     *
+     * On the learner's request path, exactly like [gradeKnowledge] -- called synchronously per
+     * verification attempt, after the backend has already gathered [evidence] from GitHub itself
+     * (see `VerificationService.gradeArtifact`, which sources it via `GithubRepositoryApi`). The AI
+     * service never re-derives facts like merge/CI status; it only judges whether the evidence's
+     * content satisfies the rubric, and already short-circuits to a fail with no LLM call when
+     * there's no evidence or CI is explicitly failing. A non-2xx response is wrapped in an
+     * [OnboardingAiException] carrying the upstream status/body, same retryable-failure contract as
+     * [gradeKnowledge].
+     *
+     * @param taskDescription The verification prompt describing what the PR must accomplish.
+     * @param rubric What the PR's real state must demonstrate.
+     * @param evidence The backend-gathered PR/repo state.
+     * @return The grading result returned by the AI service.
+     */
+    suspend fun gradeArtifact(
+        taskDescription: String,
+        rubric: String,
+        evidence: ArtifactEvidenceDto,
+    ): GradeResult =
+        try {
+            webClient
+                .post()
+                .uri(uri("/api/v1/onboarding/verify"))
+                .body(
+                    GradeArtifactRequest(
+                        question = taskDescription,
+                        rubric = rubric,
+                        artifactEvidence = evidence,
+                    ),
+                ).sync()
+                .perform<GradeResult>()
+        } catch (@Suppress("SwallowedException") e: WebClientException) {
+            val msg = "Failed to grade artifact evidence (HTTP ${e.statusCode}): ${e.body}"
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 
