@@ -13,6 +13,8 @@ fun User.toGetResponse(): GetUserResponse =
         email = this.email,
         firstName = this.firstname,
         lastName = this.lastname,
+        projectIds = this.projects.map { it.id }.toSet(),
+        roles = this.roles.toSet(),
         projectRoles = this.projectRoles.map { ProjectRoleSummary(id = it.id, name = it.name) },
         permissionGroup = this.effectivePermissionGroup(),
         enabled = this.enabled,

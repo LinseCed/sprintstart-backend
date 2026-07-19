@@ -10,6 +10,8 @@ data class GetUserResponse(
     val email: String? = null,
     val firstName: String,
     val lastName: String,
+    val projectIds: Set<UUID>,
+    val roles: Set<Role>,
     val projectRoles: List<ProjectRoleSummary>,
     val permissionGroup: Role,
     val enabled: Boolean,

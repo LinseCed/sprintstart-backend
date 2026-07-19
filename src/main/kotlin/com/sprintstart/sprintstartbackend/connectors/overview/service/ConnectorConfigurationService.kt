@@ -1,12 +1,13 @@
 package com.sprintstart.sprintstartbackend.connectors.overview.service
 
 import com.sprintstart.sprintstartbackend.connectors.overview.SourceClient
+import com.sprintstart.sprintstartbackend.connectors.overview.external.api.ConnectorOverviewApi
+import com.sprintstart.sprintstartbackend.connectors.overview.external.models.ConnectorDto
 import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorConfiguration
 import com.sprintstart.sprintstartbackend.connectors.overview.models.IConnector
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.request.ConfigureConnectorRequest
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.request.PatchSourcesRequest
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.ConfigureConnectorResponse
-import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.ConnectorDto
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.GetSourcesOfConnectorResponse
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.PatchSourcesOfConnectorResponse
 import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.PatchedSource
@@ -21,13 +22,14 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
+import java.util.UUID
 
 @Service
 class ConnectorConfigurationService(
     private val repository: ConnectorConfigurationRepository,
     private val connectors: List<IConnector>,
     private val sourceClient: SourceClient,
-) {
+) : ConnectorOverviewApi {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
@@ -73,7 +75,7 @@ class ConnectorConfigurationService(
      */
     @Tracked("Retrieving all connectors")
     @Transactional(readOnly = true)
-    fun findAllConnectors(): List<ConnectorDto> {
+    override fun findAllConnectors(): List<ConnectorDto> {
         return repository.findAll().map { config ->
             val iConnector = connectors.find { it.id == config.id }
                 ?: throw ConnectorNotFoundException(
@@ -128,14 +130,14 @@ class ConnectorConfigurationService(
      */
     @Tracked("Retrieving all sources of given connector")
     @Transactional(readOnly = true)
-    fun getSourcesOfConnector(connectorId: String): GetSourcesOfConnectorResponse {
+    fun getSourcesOfConnector(connectorId: String, projectId: UUID? = null): GetSourcesOfConnectorResponse {
         val connector = connectors.stream().filter { it.id == connectorId }.findFirst().orElseThrow {
             ConnectorNotFoundException("Unable to load up connector with id $connectorId")
         }
 
         return GetSourcesOfConnectorResponse(
             connectorId = connectorId,
-            sources = connector.getSources(),
+            sources = projectId?.let { connector.getSources(it) } ?: connector.getSources(),
         )
     }
 

@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.AiConfig
 import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.CryptoConfig
 import com.sprintstart.sprintstartbackend.GithubConfig
+import com.sprintstart.sprintstartbackend.UploadConfig
 import com.sprintstart.sprintstartbackend.connectors.github.GithubClient
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
@@ -51,6 +52,7 @@ class GithubClientTest {
                 cron = "0 0 * * *",
             ),
             crypto = CryptoConfig(masterKey = "unused", salt = "unused"),
+            upload = UploadConfig(directory = "/tmp/uploads", maxFileSizeBytes = 100),
         )
 
         queryLoader = mockk {

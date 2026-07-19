@@ -28,7 +28,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 /**
@@ -64,6 +66,16 @@ class GithubConnectorService(
         repoConnectionRepository.findAll()
 
     /**
+     * Retrieves all GitHub repositories linked to the given project.
+     *
+     * @param projectId The project whose connected GitHub repositories should be returned.
+     * @return a list of connected GitHub repositories linked to the project.
+     */
+    @Tracked("Retrieving project-scoped GitHub repositories for overview")
+    fun getSourcesByProjectId(projectId: UUID): List<GithubRepositoryConnection> =
+        repoConnectionRepository.findAllByProjectId(projectId)
+
+    /**
      * Patches a 'source' in the connector overview sense.
      *
      * For the connector overview, sources are GitHub repositories.
@@ -82,9 +94,9 @@ class GithubConnectorService(
     /**
      * Connect a new repository.
      *
-     * Given a `owner` and a `name` of a GitHub repository, this connects the repository
-     * to the SprintStart application and starts all processing jobs in the background,
-     * if the repository exists.
+     * Given an authenticated user and a repository request, this validates project access,
+     * verifies that the named PAT exists for that user, persists the connection, and starts
+     * the initial background ingestion jobs if the repository exists.
      *
      * Tasks started for background execution include:
      *
@@ -92,11 +104,12 @@ class GithubConnectorService(
      * - Fetching the repository commits
      * - Fetching the repository issues
      * - Fetching the repository pull requests
-     * - Starting a CRON job that checks for upates every night.
+     * - Starting a CRON job that checks for updates every night.
      *
      * _**Schema:** `https://github.com/{owner}/{name}`_
      *
-     * @param request The request containing the details of the repository to connect, e.g., owner and name.
+     * @param authId The authenticated user subject used to resolve PAT ownership and project access.
+     * @param request The request containing repository owner/name, PAT alias, and target project.
      * @return A UUID representing the transaction ID assigned to this connection operation.
      * @throws IllegalStateException If on one of the processed file resources, the GitHub api
      * returns malformed responses.
@@ -104,6 +117,10 @@ class GithubConnectorService(
     @Tracked("Connecting GitHub repository")
     @Transactional
     suspend fun connectRepositoryIfExists(authId: String, request: ConnectRepositoryRequest): UUID {
+        if (!userApi.userHasAccessToProject(authId, request.projectId)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project")
+        }
+
         val transactionId = UUID.randomUUID()
         val userId = userApi.getUserIdByAuthId(authId).orElseThrow { UserWithAuthIdNotFoundException(authId) }
 
@@ -113,14 +130,17 @@ class GithubConnectorService(
 
         val user = withContext(Dispatchers.IO) {
             githubUserRepository
-                .findById(GithubUserPat(authId = userId.toString(), name = request.tokenName))
+                .findById(GithubUserPat(authId = authId, name = request.tokenName))
         }.orElseThrow {
             GithubUserPatNotFoundException(request.tokenName, userId.toString())
         }
+
+        val projectIds = mutableSetOf(request.projectId)
         val repoConnection = GithubRepositoryConnection(
             owner = request.owner,
             name = request.name,
             user = user,
+            projectIdsInternal = projectIds,
         )
 
         if (!githubClient.repositoryExists(repoConnection)) {

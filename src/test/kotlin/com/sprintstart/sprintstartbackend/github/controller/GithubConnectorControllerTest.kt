@@ -57,11 +57,16 @@ class GithubConnectorControllerTest {
 
     private val objectMapper = jacksonObjectMapper()
 
-    private val userJwt = jwt()
+    private val pmJwt = jwt()
         .jwt { it.subject("mockId") }
-        .authorities(SimpleGrantedAuthority("ROLE_USER"))
+        .authorities(SimpleGrantedAuthority("ROLE_PM"))
+
+    private val adminJwt = jwt()
+        .jwt { it.subject("adminId") }
+        .authorities(SimpleGrantedAuthority("ROLE_ADMIN"))
 
     private val validTokenName = "ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+    private val projectId = UUID.randomUUID()
 
     @Nested
     inner class ConnectRepository {
@@ -71,6 +76,7 @@ class GithubConnectorControllerTest {
                 owner = "spring-projects",
                 name = "spring-modulith",
                 tokenName = validTokenName,
+                projectId = projectId,
             )
             val expectedTransactionId = UUID.randomUUID()
 
@@ -86,7 +92,39 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
+                ).andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
+                .andExpect(status().isAccepted)
+                .andExpect(jsonPath("$.transactionId").value(expectedTransactionId.toString()))
+        }
+
+        @Test
+        fun `should return 202 Accepted when authenticated as ADMIN`() {
+            val request = ConnectRepositoryRequest(
+                owner = "spring-projects",
+                name = "spring-modulith",
+                tokenName = validTokenName,
+                projectId = projectId,
+            )
+            val expectedTransactionId = UUID.randomUUID()
+
+            coEvery {
+                githubConnectorService.connectRepositoryIfExists(
+                    "adminId",
+                    request,
+                )
+            } returns expectedTransactionId
+
+            val asyncResult = mockMvc
+                .perform(
+                    post("/api/v1/github/connect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -100,7 +138,12 @@ class GithubConnectorControllerTest {
         fun `should return 404 Not Found when repository does not exist`() {
             val owner = "unknown-owner"
             val name = "unknown-repo"
-            val request = ConnectRepositoryRequest(owner = owner, name = name, tokenName = validTokenName)
+            val request = ConnectRepositoryRequest(
+                owner = owner,
+                name = name,
+                tokenName = validTokenName,
+                projectId = projectId,
+            )
 
             coEvery {
                 githubUserRepository.findById(any())
@@ -122,7 +165,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -135,27 +178,37 @@ class GithubConnectorControllerTest {
         // Validation failures are NOT async - they fail before the coroutine starts
         @Test
         fun `should return 400 Bad Request when owner is blank`() {
-            val request = ConnectRepositoryRequest(owner = "", name = "spring-modulith", tokenName = validTokenName)
+            val request = ConnectRepositoryRequest(
+                owner = "",
+                name = "spring-modulith",
+                tokenName = validTokenName,
+                projectId = projectId,
+            )
 
             mockMvc
                 .perform(
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(status().isBadRequest)
         }
 
         @Test
         fun `should return 400 Bad Request when name is blank`() {
-            val request = ConnectRepositoryRequest(owner = "spring-projects", name = "", tokenName = validTokenName)
+            val request = ConnectRepositoryRequest(
+                owner = "spring-projects",
+                name = "",
+                tokenName = validTokenName,
+                projectId = projectId,
+            )
 
             mockMvc
                 .perform(
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(status().isBadRequest)
         }
     }
@@ -172,7 +225,7 @@ class GithubConnectorControllerTest {
             val asyncResult = mockMvc
                 .perform(
                     post("/api/v1/github/update-all")
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -192,7 +245,7 @@ class GithubConnectorControllerTest {
             val asyncResult = mockMvc
                 .perform(
                     post("/api/v1/github/update-all")
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -218,7 +271,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -241,7 +294,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -267,7 +320,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(request().asyncStarted())
                 .andReturn()
 
@@ -286,7 +339,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(status().isBadRequest)
         }
 
@@ -299,7 +352,7 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/update")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
-                        .with(userJwt),
+                        .with(pmJwt),
                 ).andExpect(status().isBadRequest)
         }
     }

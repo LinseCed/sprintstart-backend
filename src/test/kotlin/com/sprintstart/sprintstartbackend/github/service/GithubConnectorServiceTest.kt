@@ -35,6 +35,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.web.server.ResponseStatusException
 import java.util.Optional
 import java.util.UUID
 import kotlin.test.assertFailsWith
@@ -42,6 +43,7 @@ import kotlin.test.assertFailsWith
 @OptIn(ExperimentalCoroutinesApi::class)
 class GithubConnectorServiceTest {
     private val testScope = TestScope()
+    private val testProjectId = UUID.randomUUID()
 
     private val repoConnectionRepository = mockk<GithubRepositoryConnectionRepository>()
     private val repoConfigRepository = mockk<GithubRepositoryConfigRepository>()
@@ -58,6 +60,8 @@ class GithubConnectorServiceTest {
 
     @BeforeEach
     fun setUp() {
+        every { userApi.userHasAccessToProject(any(), any()) } returns true
+
         service = GithubConnectorService(
             applicationScope = testScope,
             repoConnectionRepository = repoConnectionRepository,
@@ -75,6 +79,16 @@ class GithubConnectorServiceTest {
 
     @Nested
     inner class ConnectRepositoryIfExists {
+        @Test
+        fun `connectRepositoryIfExists throws ResponseStatusException when user has no project access`() =
+            runTest {
+                every { userApi.userHasAccessToProject("mock-id", testProjectId) } returns false
+
+                assertFailsWith<ResponseStatusException> {
+                    service.connectRepositoryIfExists("mock-id", connectRequest())
+                }
+            }
+
         @Test
         fun `connectRepositoryIfExists throws GithubUserPatNotFoundException when PAT not found`() =
             runTest {
@@ -277,6 +291,7 @@ class GithubConnectorServiceTest {
         owner = "owner",
         name = "repo",
         tokenName = "ghp_abcdefghijklmnopqrstuvwxyz0123456789",
+        projectId = testProjectId,
     )
 
     private fun repoConnection(owner: String, name: String, user: GithubUser) = GithubRepositoryConnection(
