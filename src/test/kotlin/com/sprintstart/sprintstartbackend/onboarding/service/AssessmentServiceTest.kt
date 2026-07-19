@@ -167,6 +167,61 @@ class AssessmentServiceTest {
         }
 
         @Test
+        fun `never overwrites a VERIFIED ledger entry with a placement result`() = runTest {
+            setUpUser()
+            val session = sessionWithOpenTurn()
+            val verified = UserCompetencyState(
+                userId = userId,
+                competencyKey = "kotlin",
+                level = 2,
+                source = CompetencySource.VERIFIED,
+            )
+            every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
+            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            coEvery { onboardingAiClient.assessTurn(any()) } returns
+                AssessmentTurnResponse(
+                    done = true,
+                    assessments = listOf(
+                        AssessmentResultSchema(key = "kotlin", level = "beginner", confidence = 0.8),
+                    ),
+                )
+            every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns verified
+
+            service.answerAssessment(authId, session.id, "my answer")
+
+            assertEquals(2, verified.level)
+            assertEquals(CompetencySource.VERIFIED, verified.source)
+            verify(exactly = 0) { userCompetencyStateRepository.save(any()) }
+        }
+
+        @Test
+        fun `never lowers an existing assessed level on re-assessment`() = runTest {
+            setUpUser()
+            val session = sessionWithOpenTurn()
+            val assessed = UserCompetencyState(
+                userId = userId,
+                competencyKey = "kotlin",
+                level = 4,
+                source = CompetencySource.ASSESSED,
+            )
+            every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
+            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            coEvery { onboardingAiClient.assessTurn(any()) } returns
+                AssessmentTurnResponse(
+                    done = true,
+                    assessments = listOf(
+                        AssessmentResultSchema(key = "kotlin", level = "beginner", confidence = 0.8),
+                    ),
+                )
+            every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns assessed
+
+            service.answerAssessment(authId, session.id, "my answer")
+
+            assertEquals(4, assessed.level)
+            verify(exactly = 0) { userCompetencyStateRepository.save(any()) }
+        }
+
+        @Test
         fun `drops an assessment key outside the candidate set`() = runTest {
             setUpUser()
             val session = sessionWithOpenTurn()

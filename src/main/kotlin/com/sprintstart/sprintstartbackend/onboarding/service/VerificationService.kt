@@ -26,7 +26,6 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationAtte
 import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -97,47 +96,92 @@ class VerificationService(
     /**
      * Grades a submitted answer and, on pass, writes the ledger and completes the step.
      *
+     * Runs as two short transactions with the grading call in between, matching
+     * [AssessmentService.answerAssessment]'s shape: [VerificationType.KNOWLEDGE]/
+     * [VerificationType.ARTIFACT] grading is an AI (and, for artifacts, GitHub) round-trip, and
+     * holding a DB connection open across it would pin one pool connection per in-flight
+     * submission. The step's status is validated in both phases -- the write phase re-checks it
+     * so a submission racing a concurrent finish/skip fails with the same 400 instead of
+     * double-completing the step.
+     *
      * @throws ResponseStatusException 404 if the user, step, or its verification doesn't exist;
      * 400 if the step is already finished or skipped; 503 if [VerificationType.KNOWLEDGE] or
      * [VerificationType.ARTIFACT] grading needs the AI service and it's unavailable.
      */
-    @Transactional
-    fun submitAttemptForMe(
+    suspend fun submitAttemptForMe(
         authId: String,
         stepId: UUID,
         request: SubmitVerificationAttemptRequest,
     ): SubmitVerificationAttemptResponse {
+        val context = withContext(Dispatchers.IO) {
+            readTxTemplate.execute { loadSubmissionContext(authId, stepId) }!!
+        }
+
+        val graded = grade(context.verification, context.lessonContent, request.answer, context.attemptNo)
+
+        return withContext(Dispatchers.IO) {
+            txTemplate.execute { persistGradedAttempt(context, request.answer, graded) }!!
+        }
+    }
+
+    private data class SubmissionContext(
+        val userId: UUID,
+        val stepId: UUID,
+        val verification: Verification,
+        val lessonContent: String,
+        val attemptNo: Int,
+    )
+
+    private fun loadSubmissionContext(authId: String, stepId: UUID): SubmissionContext {
         val userId = resolveUserId(authId)
         val step = findStepForUser(stepId, userId)
         val verification = findVerification(stepId)
-
-        if (step.status == StepStatus.FINISHED || step.status == StepStatus.SKIPPED) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "A finished or skipped step can't be verified")
-        }
-
+        requireStepNotConcluded(step)
         val attemptNo = verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) + 1
-        val graded = grade(verification, step, request.answer, attemptNo)
+        return SubmissionContext(
+            userId = userId,
+            stepId = stepId,
+            verification = verification,
+            lessonContent = step.content ?: "",
+            attemptNo = attemptNo,
+        )
+    }
+
+    private fun persistGradedAttempt(
+        context: SubmissionContext,
+        answer: String,
+        graded: GradedResult,
+    ): SubmitVerificationAttemptResponse {
+        val step = findStepForUser(context.stepId, context.userId)
+        val verification = findVerification(context.stepId)
+        requireStepNotConcluded(step)
 
         val attempt = verificationAttemptRepository.save(
             VerificationAttempt(
                 verification = verification,
-                userId = userId,
-                answer = request.answer,
+                userId = context.userId,
+                answer = answer,
                 passed = graded.passed,
                 score = graded.score,
                 feedback = graded.feedback,
                 hint = graded.hint,
-                attemptNo = attemptNo,
+                attemptNo = context.attemptNo,
                 graphVersion = competencyGraphVersionService.currentVersion(),
             ),
         )
 
         if (graded.passed) {
-            writeVerifiedCompetencyState(userId, verification.competencyKey, verification.level)
+            writeVerifiedCompetencyState(context.userId, verification.competencyKey, verification.level)
             completeStep(step)
         }
 
         return attempt.toSubmitResponse(stepStatus = step.status)
+    }
+
+    private fun requireStepNotConcluded(step: OnboardingStep) {
+        if (step.status == StepStatus.FINISHED || step.status == StepStatus.SKIPPED) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "A finished or skipped step can't be verified")
+        }
     }
 
 //  ========================== Methods for admins ==========================
@@ -245,16 +289,16 @@ class VerificationService(
         val hint: String? = null,
     )
 
-    private fun grade(
+    private suspend fun grade(
         verification: Verification,
-        step: OnboardingStep,
+        lessonContent: String,
         answer: String,
         attemptNo: Int,
     ): GradedResult =
         when (verification.type) {
             VerificationType.EXACT -> gradeExact(verification.canonicalAnswer ?: "", answer)
             VerificationType.ATTEST -> gradeAttest(answer)
-            VerificationType.KNOWLEDGE -> gradeKnowledge(verification, step, answer, attemptNo)
+            VerificationType.KNOWLEDGE -> gradeKnowledge(verification, lessonContent, answer, attemptNo)
             VerificationType.ARTIFACT -> gradeArtifact(verification, answer)
         }
 
@@ -287,9 +331,9 @@ class VerificationService(
      * failure, there is no safe local approximation for rubric-based judging, so an unavailable
      * AI service surfaces a retryable `503` instead of a fabricated grade.
      */
-    private fun gradeKnowledge(
+    private suspend fun gradeKnowledge(
         verification: Verification,
-        step: OnboardingStep,
+        lessonContent: String,
         answer: String,
         attemptNo: Int,
     ): GradedResult {
@@ -299,15 +343,13 @@ class VerificationService(
                 "Verification ${verification.id} is type KNOWLEDGE but has no rubric configured",
             )
         val result = try {
-            runBlocking {
-                onboardingAiClient.gradeKnowledge(
-                    question = verification.prompt,
-                    rubric = rubric,
-                    evidence = step.content ?: "",
-                    answer = answer,
-                    attemptNo = attemptNo,
-                )
-            }
+            onboardingAiClient.gradeKnowledge(
+                question = verification.prompt,
+                rubric = rubric,
+                evidence = lessonContent,
+                answer = answer,
+                attemptNo = attemptNo,
+            )
         } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
             logger.warn("AI knowledge grading unavailable: {}", e.message)
             throw ResponseStatusException(
@@ -331,7 +373,7 @@ class VerificationService(
      * those aren't judgment calls, they're facts only Kotlin can observe.
      */
     @Suppress("ThrowsCount")
-    private fun gradeArtifact(verification: Verification, answer: String): GradedResult {
+    private suspend fun gradeArtifact(verification: Verification, answer: String): GradedResult {
         val prNumber = answer.trim().toIntOrNull()
             ?: return GradedResult(
                 passed = false,
@@ -350,7 +392,7 @@ class VerificationService(
                 "Verification ${verification.id} is type ARTIFACT but has no rubric configured",
             )
 
-        val evidence = runBlocking { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, prNumber) }
+        val evidence = githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, prNumber)
             ?: return GradedResult(
                 passed = false,
                 score = 0.0,
@@ -359,20 +401,18 @@ class VerificationService(
             )
 
         val result = try {
-            runBlocking {
-                onboardingAiClient.gradeArtifact(
-                    taskDescription = verification.prompt,
-                    rubric = rubric,
-                    evidence = ArtifactEvidenceDto(
-                        prTitle = evidence.title,
-                        prBody = evidence.body,
-                        prState = evidence.state,
-                        filesChanged = evidence.filesChanged,
-                        checksPassed = evidence.checksPassed,
-                        commitMessages = evidence.commitMessages,
-                    ),
-                )
-            }
+            onboardingAiClient.gradeArtifact(
+                taskDescription = verification.prompt,
+                rubric = rubric,
+                evidence = ArtifactEvidenceDto(
+                    prTitle = evidence.title,
+                    prBody = evidence.body,
+                    prState = evidence.state,
+                    filesChanged = evidence.filesChanged,
+                    checksPassed = evidence.checksPassed,
+                    commitMessages = evidence.commitMessages,
+                ),
+            )
         } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
             logger.warn("AI artifact grading unavailable: {}", e.message)
             throw ResponseStatusException(
@@ -389,12 +429,19 @@ class VerificationService(
         )
     }
 
-    /** Find-or-create write of the durable ledger, mirroring [AssessmentService]'s write pattern. */
+    /**
+     * Find-or-create write of the durable ledger, mirroring [AssessmentService]'s write pattern.
+     *
+     * Monotonic: passing a verification whose target level is below what the ledger already
+     * records keeps the higher level ("never un-earns progress" applies to the ledger too) --
+     * only the source still upgrades to [CompetencySource.VERIFIED], since the pass is proof at
+     * at least that level.
+     */
     private fun writeVerifiedCompetencyState(userId: UUID, competencyKey: String, level: String) {
         val rank = LEVEL_RANKS[level.trim().lowercase()] ?: 0
         val existing = userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, competencyKey)
         if (existing != null) {
-            existing.level = rank
+            existing.level = maxOf(existing.level, rank)
             existing.source = CompetencySource.VERIFIED
             existing.updatedAt = Instant.now()
         } else {
@@ -424,6 +471,15 @@ class VerificationService(
 
     @Suppress("ThrowsCount")
     private fun validateGradingConfig(request: UpsertVerificationRequest) {
+        // An unrecognized level would rank to 0 on pass, which the projection never counts as
+        // mastered -- the hire would pass the check without ever unlocking dependents. Reject it
+        // here, at config time, instead of failing silently at grading time.
+        if (LEVEL_RANKS[request.level.trim().lowercase()] == null) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "level must be one of: ${LEVEL_RANKS.keys.joinToString(", ")}",
+            )
+        }
         if (request.type == VerificationType.KNOWLEDGE && request.rubric.isNullOrBlank()) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "KNOWLEDGE verifications need a rubric")
         }

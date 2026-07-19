@@ -1,11 +1,13 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ChangeClassification
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ChangeType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphChange
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphVersion
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGraphPin
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
@@ -97,6 +99,29 @@ class CompetencyPathServiceTest {
             assertThat(result.nodes.map { it.key }).containsExactlyInAnyOrder("git", "kotlin")
             assertThat(result.graphVersion).isEqualTo(7)
             verify(exactly = 1) { userCompetencyStateRepository.findAllByUserId(userId) }
+        }
+
+        @Test
+        fun `echoes the pinned version, not the live head, when structural changes are held back`() {
+            stubNoVerifications()
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { competencyRepository.findAll() } returns listOf(
+                Competency(key = "git", label = "Git", kind = CompetencyKind.SKILL),
+            )
+            every { competencyEdgeRepository.findAll() } returns emptyList()
+            every { userCompetencyStateRepository.findAllByUserId(userId) } returns emptyList()
+            every { competencyGraphVersionService.currentVersion() } returns 8
+            every { userGraphPinRepository.findByUserId(userId) } returns
+                UserGraphPin(userId = userId, pinnedVersion = 7)
+            every { competencyGraphVersionRepository.findAllByVersionGreaterThanOrderByVersionAsc(7) } returns
+                listOf(CompetencyGraphVersion(version = 8, classification = ChangeClassification.STRUCTURAL))
+            every { competencyGraphChangeRepository.findAll() } returns listOf(
+                CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "git"),
+            )
+
+            val result = service.getPathForMe(authId)
+
+            assertThat(result.graphVersion).isEqualTo(7)
         }
 
         @Test

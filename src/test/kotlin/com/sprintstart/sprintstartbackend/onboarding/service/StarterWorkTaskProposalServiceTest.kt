@@ -270,6 +270,41 @@ class StarterWorkTaskProposalServiceTest {
         }
 
         @Test
+        fun `excludes level-0 (unplaced) ledger entries from the hire's competencies`() = runTest {
+            every { userApi.getUserIdByAuthId("auth-1") } returns Optional.of(userId)
+            every { userCompetencyStateRepository.findAllByUserId(userId) } returns
+                listOf(
+                    UserCompetencyState(
+                        userId = userId,
+                        competencyKey = "kotlin",
+                        level = 0,
+                        source = CompetencySource.ASSESSED,
+                    ),
+                    UserCompetencyState(
+                        userId = userId,
+                        competencyKey = "git",
+                        level = 2,
+                        source = CompetencySource.VERIFIED,
+                    ),
+                )
+            every { competencyRepository.findAllByKeyIn(listOf("git")) } returns
+                listOf(Competency(key = "git", label = "Git", kind = CompetencyKind.SKILL))
+            val pooled = StarterWorkTaskProposal(
+                sourceId = "s1",
+                title = "Task",
+                competencyKeys = mutableListOf("git"),
+                status = ProposalStatus.APPROVED,
+            )
+            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED) } returns listOf(pooled)
+            val hireSlot = slot<List<HireCompetencySchema>>()
+            coEvery { onboardingAiClient.matchHireToPool(capture(hireSlot), any()) } returns emptyList()
+
+            service.matchForUser("auth-1")
+
+            assertEquals(listOf("git"), hireSlot.captured.map { it.key })
+        }
+
+        @Test
         fun `skips the AI call when the pool is empty`() = runTest {
             every { userApi.getUserIdByAuthId("auth-1") } returns Optional.of(userId)
             every { userCompetencyStateRepository.findAllByUserId(userId) } returns emptyList()
