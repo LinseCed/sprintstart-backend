@@ -9,8 +9,10 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.GithubReposit
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoverRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.SourceNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.UserWithAuthIdNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConfigRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
@@ -22,7 +24,6 @@ import com.sprintstart.sprintstartbackend.connectors.github.service.internal.Git
 import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorSource
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.UserApi
-import jakarta.transaction.Transactional
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -30,6 +31,7 @@ import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
@@ -83,12 +85,46 @@ class GithubConnectorService(
      *
      * @param source The 'source' (GitHub repository) to patch.
      * @param newStatus The new status of the 'source'.
+     * @throws SourceNotFoundException if the source is not found.
      */
     @Tracked("Patching a GitHub repository from overview")
     fun patchSource(source: ConnectorSource, newStatus: Boolean) {
-        val source = getAllSources().find { "${it.owner}/${it.name}" == source.id } ?: throw RuntimeException("")
+        val source = getAllSources().find { "${it.owner}/${it.name}" == source.id }
+            ?: throw SourceNotFoundException(source.id)
         source.sourceEnabled = newStatus
         repoConnectionRepository.save(source)
+    }
+
+    /**
+     * Discovers and retrieves the repositories of a GitHub organization.
+     *
+     * This method fetches the repositories of the specified organization using the GitHub API, marks
+     * their connection and enabled statuses, and returns the discovery result.
+     *
+     * @param org The name of the GitHub organization whose repositories are to be discovered.
+     * @param authId The ID of the authentication token owner used to authorize the request.
+     * @param tokenName The name of the personal access token used for GitHub API authentication.
+     * @return A `DiscoverRepositoriesResponse` containing information on the discovered repositories,
+     *         including their connection and enabled statuses.
+     */
+    @Transactional(readOnly = true)
+    @Tracked("Discovering GitHub repositories of an organization")
+    suspend fun discoverRepositoriesOfOrg(
+        org: String,
+        authId: String,
+        tokenName: String,
+    ): DiscoverRepositoriesResponse {
+        val token = withContext(Dispatchers.IO) {
+            githubUserRepository.findById(GithubUserPat(authId, tokenName))
+        }.orElseThrow { GithubUserPatNotFoundException(tokenName, authId) }
+
+        val result = githubClient.discoverRepositoriesOfOrg(org, token.token)
+        result.repositories.forEach {
+            val repo = repoConnectionRepository.findByOwnerAndName(org, it.name)
+            it.alreadyConnected = repo != null
+            it.isEnabled = repo?.sourceEnabled
+        }
+        return result
     }
 
     /**

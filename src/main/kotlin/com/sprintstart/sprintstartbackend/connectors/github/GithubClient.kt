@@ -2,6 +2,8 @@ package com.sprintstart.sprintstartbackend.connectors.github
 
 import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoverRepositoriesResponse
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoveredRepository
 import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphql.GithubIssuesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphql.GithubPrSearchResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphql.GithubSinglePrResponse
@@ -91,47 +93,6 @@ class GithubClient(
     }
 
     /**
-     * Fetches all issues from a GitHub repository.
-     *
-     * This method retrieves all the issues for the specified repository, traversing through
-     * paginated results to collect all available issues.
-     *
-     * @param repository the repository to fetch issues from.
-     * @return a list of issues associated with the specified repository.
-     */
-    private suspend fun fetchAllIssues(repository: GithubRepositoryConnection): List<Issue> {
-        val query = queryLoader.load("github/graphql/100-issues.graphql")
-
-        return doFetchAll<Issue, GithubIssuesResponse>(query, repository.user.token) { cursor ->
-            mapOf("owner" to repository.owner, "name" to repository.name, "cursor" to cursor)
-        }
-    }
-
-    /**
-     * Fetches all issues from a GitHub repository updated since a specific timestamp.
-     *
-     * This method retrieves all the issues for the specified repository that have been updated
-     * on or after the given timestamp. It traverses through paginated results to collect all
-     * available issues.
-     *
-     * @param repository the repository to fetch issues from.
-     * @param sinceTimestamp an ISO 8601 formatted timestamp string. Only issues updated
-     * after this timestamp will be fetched.
-     * @return a list of issues associated with the specified repository that have been updated
-     * since the given timestamp.
-     */
-    private suspend fun fetchAllIssuesSince(
-        repository: GithubRepositoryConnection,
-        sinceTimestamp: String,
-    ): List<Issue> {
-        val query = queryLoader.load("github/graphql/issues-since.graphql")
-
-        return doFetchAll<Issue, GithubIssuesResponse>(query, repository.user.token) { cursor ->
-            mapOf("owner" to repository.owner, "name" to repository.name, "cursor" to cursor, "since" to sinceTimestamp)
-        }
-    }
-
-    /**
      * Fetches all pull requests from a GitHub repository.
      *
      * This method retrieves all pull requests for the specified repository, optionally filtering by
@@ -174,6 +135,73 @@ class GithubClient(
         }
 
         return pullRequests
+    }
+
+    /**
+     * Discovers repositories of a given GitHub organization.
+     *
+     * This method fetches the list of repositories belonging to the specified GitHub organization by
+     * querying the GitHub API. Authentication is performed using the provided personal access token (PAT).
+     *
+     * @param org the name of the GitHub organization whose repositories are to be discovered.
+     * @param token the personal access token (PAT) used for authenticating the request to the GitHub API.
+     * @return a [DiscoverRepositoriesResponse] object containing the list of repositories belonging to the organization.
+     * @throws WebClientException if there is an issue with the network or server response, such as a non-2xx status code.
+     */
+    suspend fun discoverRepositoriesOfOrg(org: String, token: String): DiscoverRepositoriesResponse {
+        try {
+            val result = webClient
+                .get()
+                .uri("https://api.github.com/orgs/$org/repos")
+                .header("Authorization", "Bearer $token")
+                .sync()
+                .perform<Array<DiscoveredRepository>>()
+            return DiscoverRepositoriesResponse(result.toList())
+        } catch (e: WebClientException) {
+            println(e.statusCode)
+            throw e
+        }
+    }
+
+    /**
+     * Fetches all issues from a GitHub repository.
+     *
+     * This method retrieves all the issues for the specified repository, traversing through
+     * paginated results to collect all available issues.
+     *
+     * @param repository the repository to fetch issues from.
+     * @return a list of issues associated with the specified repository.
+     */
+    private suspend fun fetchAllIssues(repository: GithubRepositoryConnection): List<Issue> {
+        val query = queryLoader.load("github/graphql/100-issues.graphql")
+
+        return doFetchAll<Issue, GithubIssuesResponse>(query, repository.user.token) { cursor ->
+            mapOf("owner" to repository.owner, "name" to repository.name, "cursor" to cursor)
+        }
+    }
+
+    /**
+     * Fetches all issues from a GitHub repository updated since a specific timestamp.
+     *
+     * This method retrieves all the issues for the specified repository that have been updated
+     * on or after the given timestamp. It traverses through paginated results to collect all
+     * available issues.
+     *
+     * @param repository the repository to fetch issues from.
+     * @param sinceTimestamp an ISO 8601 formatted timestamp string. Only issues updated
+     * after this timestamp will be fetched.
+     * @return a list of issues associated with the specified repository that have been updated
+     * since the given timestamp.
+     */
+    private suspend fun fetchAllIssuesSince(
+        repository: GithubRepositoryConnection,
+        sinceTimestamp: String,
+    ): List<Issue> {
+        val query = queryLoader.load("github/graphql/issues-since.graphql")
+
+        return doFetchAll<Issue, GithubIssuesResponse>(query, repository.user.token) { cursor ->
+            mapOf("owner" to repository.owner, "name" to repository.name, "cursor" to cursor, "since" to sinceTimestamp)
+        }
     }
 
     /**

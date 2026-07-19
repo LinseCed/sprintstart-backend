@@ -3,6 +3,8 @@ package com.sprintstart.sprintstartbackend.connectors.github.controller
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.ConnectRepositoryResponse
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoverRepositoriesResponse
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoveredRepository
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
@@ -19,9 +21,12 @@ import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.validation.annotation.Validated
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
@@ -36,6 +41,19 @@ internal class GithubConnectorController(
     val githubConnectorService: GithubConnectorService,
     val githubUpdateService: GithubUpdatesService,
 ) {
+    @GetMapping("/discover/org/{org}")
+    suspend fun discoverRepositoriesOfOrg(
+        @Parameter(hidden = true) @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable org: String,
+        @RequestParam(required = true) tokenName: String,
+    ): ResponseEntity<DiscoverRepositoriesResponse> {
+        val result = githubConnectorService.discoverRepositoriesOfOrg(org, jwt.subject, tokenName)
+        return ResponseEntity.ok(result)
+    }
+
+    @GetMapping("/discover/user/{user}")
+    fun discoverRepositoriesOfUser() {}
+
     /**
      * Connects a GitHub repository to the SprintStart application.
      *
