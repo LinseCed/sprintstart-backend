@@ -25,4 +25,7 @@ data class GetOnboardingStepResponse(
     val completedAt: Instant?,
     val feedback: GetOnboardingFeedbackResponse? = null,
     val skip: GetOnboardingStepSkipResponse?,
+    // The step rendered as an ordered stepper: Learn -> Practice -> Verify. Derived from the step's
+    // lesson content, tasks, and configured verification (see OnboardingStepMapper.derivePages).
+    val pages: List<StepPageResponse> = emptyList(),
 )

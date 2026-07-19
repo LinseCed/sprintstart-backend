@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.step.CreateOn
 import com.sprintstart.sprintstartbackend.onboarding.model.request.step.UpdateOnboardingStepRequest
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPhaseRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingStepRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
 import io.mockk.just
@@ -30,8 +31,14 @@ import kotlin.test.assertNull
 class OnboardingStepServiceTest {
     private val onboardingPhaseRepository: OnboardingPhaseRepository = mockk()
     private val onboardingStepRepository: OnboardingStepRepository = mockk()
+    private val verificationRepository: VerificationRepository = mockk()
     private val userApi: UserApi = mockk()
-    private val service = OnboardingStepService(onboardingPhaseRepository, onboardingStepRepository, userApi)
+    private val service = OnboardingStepService(
+        onboardingPhaseRepository,
+        onboardingStepRepository,
+        verificationRepository,
+        userApi,
+    )
 
     private val userId = UUID.randomUUID()
     private val phaseId = UUID.randomUUID()
@@ -156,6 +163,7 @@ class OnboardingStepServiceTest {
             val step = makeStep()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { onboardingStepRepository.findByIdAndPhasePathUserId(stepId, userId) } returns Optional.of(step)
+            every { verificationRepository.findByStepId(stepId) } returns null
 
             val result = service.getOnboardingStepForMe(authId, stepId)
 

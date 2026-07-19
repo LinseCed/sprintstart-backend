@@ -16,6 +16,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.step.GetOnbo
 import com.sprintstart.sprintstartbackend.onboarding.model.response.step.UpdateOnboardingStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPhaseRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingStepRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -35,6 +36,7 @@ import kotlin.ranges.contains
 class OnboardingStepService(
     private val onboardingPhaseRepository: OnboardingPhaseRepository,
     private val onboardingStepRepository: OnboardingStepRepository,
+    private val verificationRepository: VerificationRepository,
     private val userApi: UserApi,
 ) {
 //  ========================== Methods for users ==========================
@@ -119,7 +121,10 @@ class OnboardingStepService(
             .findByIdAndPhasePathUserId(stepId, userId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No step found with id: $stepId") }
 
-        return step.toGetResponse()
+        // The VERIFY page only appears when a check is configured; the verification lives in its own
+        // repository keyed by step, so resolve its presence here and let the mapper derive the pages.
+        val hasVerification = verificationRepository.findByStepId(stepId) != null
+        return step.toGetResponse(hasVerification)
     }
 
     /**
