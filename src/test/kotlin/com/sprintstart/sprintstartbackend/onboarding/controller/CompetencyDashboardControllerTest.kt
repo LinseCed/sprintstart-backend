@@ -16,7 +16,9 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.util.UUID
 
 @WebMvcTest(CompetencyDashboardController::class)
 @Import(SecurityConfig::class)
@@ -87,5 +89,23 @@ class CompetencyDashboardControllerTest(
         mockMvc
             .perform(get("/api/v1/onboarding/dashboard/users").with(pmJwt))
             .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `getUserCompetencyStates should return 403 for a plain USER`() {
+        mockMvc
+            .perform(get("/api/v1/onboarding/dashboard/users/${UUID.randomUUID()}").with(userJwt))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `getUserCompetencyStates should return 200 for a PM`() {
+        val userId = UUID.randomUUID()
+        every { competencyDashboardService.getUserCompetencyStates(userId) } returns emptyList()
+
+        mockMvc
+            .perform(get("/api/v1/onboarding/dashboard/users/$userId").with(pmJwt))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$").isArray)
     }
 }

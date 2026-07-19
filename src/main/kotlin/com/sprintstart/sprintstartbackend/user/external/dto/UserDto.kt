@@ -10,7 +10,6 @@ data class UserDto(
     val avatarUrl: String?,
     val profileIcon: String?,
     val projects: Set<ProjectDto>,
-    val skills: List<UserSkillDto>,
     val projectRoles: List<ProjectRoleDto>,
 )
 
@@ -18,12 +17,6 @@ data class ProjectDto(
     val projectId: UUID,
     val name: String,
     val description: String?,
-)
-
-data class UserSkillDto(
-    val skillId: UUID,
-    val name: String,
-    val level: String,
 )
 
 data class ProjectRoleDto(

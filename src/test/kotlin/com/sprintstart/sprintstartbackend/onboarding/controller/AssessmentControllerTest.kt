@@ -9,6 +9,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.assessment.S
 import com.sprintstart.sprintstartbackend.onboarding.service.AssessmentService
 import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -21,6 +22,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -61,6 +63,26 @@ class AssessmentControllerTest(
 
     private val userJwt = jwtWithSubject(authId, "USER")
     private val noUserRoleJwt = jwtWithSubject(authId, "NONE")
+
+    // ========================== /me/assessment/status ==========================
+
+    // Non-suspend handler, so no async dispatch is involved here.
+    @Test
+    fun `getAssessmentStatusForMe should return 200 with the completion flag`() {
+        every { assessmentService.hasCompletedAssessment(authId) } returns true
+
+        mockMvc
+            .perform(get("/api/v1/onboarding/me/assessment/status").with(userJwt))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.completed").value(true))
+    }
+
+    @Test
+    fun `getAssessmentStatusForMe should return 401 when not authenticated`() {
+        mockMvc
+            .perform(get("/api/v1/onboarding/me/assessment/status"))
+            .andExpect(status().isUnauthorized)
+    }
 
     // ========================== /me/assessment/start ==========================
 

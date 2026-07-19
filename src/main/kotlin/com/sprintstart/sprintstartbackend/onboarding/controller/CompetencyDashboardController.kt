@@ -1,9 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
 import com.sprintstart.sprintstartbackend.onboarding.model.response.dashboard.CompetencyAggregateResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.dashboard.UserCompetencyStateResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.dashboard.UserCompetencySummaryResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyDashboardService
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -12,6 +14,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -84,4 +87,30 @@ class CompetencyDashboardController(
         pageable: Pageable,
     ): Page<UserCompetencySummaryResponse> =
         competencyDashboardService.getUserCompetencySummaries(search, roleIds, projectIds, pageable)
+
+    /**
+     * Returns one user's full competency ledger, labeled.
+     *
+     * @param userId Identifier of the user whose ledger should be returned.
+     */
+    @Operation(
+        summary = "Get one user's competency ledger",
+        description = "Returns the user's full competency ledger with labels -- the per-member " +
+            "view for the PM member detail page.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Ledger returned"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "No user found with this id"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/users/{userId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
+    fun getUserCompetencyStates(
+        @Parameter(description = "UUID of the user whose ledger should be returned")
+        @PathVariable userId: UUID,
+    ): List<UserCompetencyStateResponse> = competencyDashboardService.getUserCompetencyStates(userId)
 }

@@ -1,13 +1,20 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingAiPathEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingPath
+import com.sprintstart.sprintstartbackend.onboarding.external.model.SkillAssessmentSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Blueprint
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
@@ -33,6 +40,8 @@ class OnboardingPersonalizationServiceTest {
     private val onboardingAiClient: OnboardingAiClient = mockk()
     private val onboardingPathRepository: OnboardingPathRepository = mockk()
     private val blueprintRepository: BlueprintRepository = mockk()
+    private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
+    private val competencyRepository: CompetencyRepository = mockk()
     private val userApi: UserApi = mockk()
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
 
@@ -40,6 +49,8 @@ class OnboardingPersonalizationServiceTest {
         onboardingAiClient,
         onboardingPathRepository,
         blueprintRepository,
+        userCompetencyStateRepository,
+        competencyRepository,
         userApi,
         transactionManager,
     )
@@ -63,6 +74,11 @@ class OnboardingPersonalizationServiceTest {
         every { blueprintRepository.findByScopeAndStatus("area:backend", BlueprintStatus.ACTIVE) } returns
             activeBlueprint("area:backend")
         every { onboardingPathRepository.deleteByUserId(userId) } just runs
+        stubEmptyLedger()
+    }
+
+    private fun stubEmptyLedger() {
+        every { userCompetencyStateRepository.findAllByUserId(userId) } returns emptyList()
     }
 
     @Nested
@@ -132,8 +148,39 @@ class OnboardingPersonalizationServiceTest {
         }
 
         @Test
+        fun `maps the competency ledger to leveled skills for the AI client, skipping level-0 rows`() = runTest {
+            val skillsSlot = slot<List<SkillAssessmentSchema>>()
+            every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubBaselinesPresent()
+            every { userCompetencyStateRepository.findAllByUserId(userId) } returns listOf(
+                UserCompetencyState(
+                    userId = userId,
+                    competencyKey = "kotlin",
+                    level = 3,
+                    source = CompetencySource.VERIFIED,
+                ),
+                UserCompetencyState(
+                    userId = userId,
+                    competencyKey = "git",
+                    level = 0,
+                    source = CompetencySource.ASSESSED,
+                ),
+            )
+            every { competencyRepository.findAllByKeyIn(listOf("kotlin")) } returns
+                listOf(Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL))
+            every {
+                onboardingAiClient.generatePath(any(), capture(skillsSlot), any())
+            } returns flowOf(OnboardingAiPathEvent(type = "done"))
+
+            service.personalize(authId).toList()
+
+            assertEquals(listOf(SkillAssessmentSchema(name = "Kotlin", level = "advanced")), skillsSlot.captured)
+        }
+
+        @Test
         fun `emits an error and does not generate a path when a required baseline is missing`() = runTest {
             every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubEmptyLedger()
             every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns
                 activeBlueprint("global")
             every { blueprintRepository.findByScopeAndStatus("area:backend", BlueprintStatus.ACTIVE) } returns null

@@ -61,6 +61,35 @@ class AssessmentServiceTest {
     }
 
     @Nested
+    inner class HasCompletedAssessment {
+        @Test
+        fun `returns true when the user has a completed session`() {
+            setUpUser()
+            every {
+                skillAssessmentSessionRepository.existsByUserIdAndStatus(
+                    userId,
+                    SkillAssessmentSessionStatus.COMPLETED,
+                )
+            } returns true
+
+            assertTrue(service.hasCompletedAssessment(authId))
+        }
+
+        @Test
+        fun `returns false when the user has never completed a session`() {
+            setUpUser()
+            every {
+                skillAssessmentSessionRepository.existsByUserIdAndStatus(
+                    userId,
+                    SkillAssessmentSessionStatus.COMPLETED,
+                )
+            } returns false
+
+            assertEquals(false, service.hasCompletedAssessment(authId))
+        }
+    }
+
+    @Nested
     inner class StartAssessment {
         @Test
         fun `creates a new session and first turn when none is in progress`() = runTest {

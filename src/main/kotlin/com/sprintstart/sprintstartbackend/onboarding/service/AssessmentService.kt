@@ -37,6 +37,7 @@ import java.util.UUID
  * empty placeholder for the same reason: nothing in `ingestion` aggregates languages/frameworks
  * today. Both are flagged follow-ups, not oversights.
  */
+@Suppress("TooManyFunctions")
 @Service
 class AssessmentService(
     private val onboardingAiClient: OnboardingAiClient,
@@ -51,6 +52,23 @@ class AssessmentService(
     private val txTemplate = TransactionTemplate(transactionManager)
     private val readTxTemplate =
         TransactionTemplate(transactionManager).apply { isReadOnly = true }
+
+    /**
+     * Whether the authenticated user has ever completed an assessment session.
+     *
+     * The frontend's "needs assessment" gate checks this instead of the retired self-reported
+     * skill-wizard data -- a COMPLETED session is the thing the assessment flow actually produces.
+     *
+     * @param authId The authenticated user's auth (JWT subject) id.
+     * @throws ResponseStatusException 404 if no user exists for [authId].
+     */
+    fun hasCompletedAssessment(authId: String): Boolean {
+        val userId = resolveUserId(authId)
+        return skillAssessmentSessionRepository.existsByUserIdAndStatus(
+            userId,
+            SkillAssessmentSessionStatus.COMPLETED,
+        )
+    }
 
     /**
      * Starts a new assessment for the authenticated user, or resumes their in-progress one.

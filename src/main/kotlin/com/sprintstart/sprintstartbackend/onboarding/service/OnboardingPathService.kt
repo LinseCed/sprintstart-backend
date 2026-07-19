@@ -8,7 +8,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.path.Current
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.CurrentStepDto
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnboardingPathForUserResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnboardingPathResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.SkillDto
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.SkipRequestDto
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.TeamOverviewUserDto
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
@@ -239,15 +238,6 @@ class OnboardingPathService(
             CurrentPhaseDto(title = it)
         }
 
-        val userSkills = userDto.skills.map { skill ->
-            SkillDto(
-                id = skill.skillId.toString(),
-                name = skill.name,
-                roleId = null,
-                level = skill.level,
-            )
-        }
-
         return TeamOverviewUserDto(
             userId = userDto.id.toString(),
             firstname = userDto.firstname,
@@ -255,7 +245,6 @@ class OnboardingPathService(
             profileIcon = userDto.profileIcon,
             projectIds = userDto.projects,
             roles = userDto.projectRoles,
-            skills = userSkills,
             progressPercentage = progressPercentage,
             currentPhase = currentPhaseDto,
             currentStep = currentStepDto,

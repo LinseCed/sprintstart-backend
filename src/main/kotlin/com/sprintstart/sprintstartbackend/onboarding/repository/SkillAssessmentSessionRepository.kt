@@ -10,4 +10,6 @@ interface SkillAssessmentSessionRepository : JpaRepository<SkillAssessmentSessio
         userId: UUID,
         status: SkillAssessmentSessionStatus,
     ): SkillAssessmentSession?
+
+    fun existsByUserIdAndStatus(userId: UUID, status: SkillAssessmentSessionStatus): Boolean
 }

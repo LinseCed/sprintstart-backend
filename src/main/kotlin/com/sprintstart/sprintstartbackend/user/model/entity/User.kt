@@ -83,11 +83,4 @@ class User(
     )
     @org.hibernate.annotations.BatchSize(size = 50)
     var projectRoles: MutableSet<ProjectRole> = mutableSetOf(),
-    @jakarta.persistence.OneToMany(
-        mappedBy = "user",
-        cascade = [jakarta.persistence.CascadeType.ALL],
-        orphanRemoval = true,
-    )
-    @org.hibernate.annotations.BatchSize(size = 50)
-    var skillAssessments: MutableSet<UserSkillAssessment> = mutableSetOf(),
 )

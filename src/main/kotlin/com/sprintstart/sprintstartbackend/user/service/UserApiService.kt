@@ -4,7 +4,6 @@ import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
-import com.sprintstart.sprintstartbackend.user.external.dto.UserSkillDto
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.model.entity.Project
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
@@ -120,13 +119,6 @@ class UserApiService(
                         roleId = role.id,
                         name = role.name,
                         description = role.description,
-                    )
-                },
-                skills = user.skillAssessments.map { assessment ->
-                    UserSkillDto(
-                        skillId = assessment.skill.id,
-                        name = assessment.skill.name,
-                        level = assessment.level.name,
                     )
                 },
             )
