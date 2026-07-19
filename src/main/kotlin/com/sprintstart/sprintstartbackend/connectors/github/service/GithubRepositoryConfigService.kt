@@ -40,6 +40,16 @@ class GithubRepositoryConfigService(
     }
 
     /**
+     * Retrieves a list of all GitHub repository configurations.
+     *
+     * @return a list containing all GitHub repository configurations.
+     */
+    @Transactional(readOnly = true)
+    @Tracked("Retrieving all GitHub repository configs")
+    fun getAll(): List<GetRepositoryConfigResponse> =
+        configRepository.findAll().map { GetRepositoryConfigResponse.of(it) }
+
+    /**
      * Configures global settings for all GitHub repositories stored in the configuration repository.
      *
      * This method updates the configuration of all repositories with the specified settings,
@@ -51,7 +61,7 @@ class GithubRepositoryConfigService(
      *                should be enabled.
      */
     @Tracked("Configuring all GitHub repositories")
-    fun configureGlobal(request: ConfigureRepositoryRequest) {
+    fun configureAll(request: ConfigureRepositoryRequest) {
         val configs = configRepository.findAll()
 
         configs.forEach {
