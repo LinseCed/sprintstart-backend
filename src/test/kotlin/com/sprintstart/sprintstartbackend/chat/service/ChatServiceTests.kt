@@ -146,11 +146,46 @@ class ChatServiceTests {
     inner class GetChat {
         private val chat = Chat(UUID.randomUUID(), "Some test chat", userId, OffsetDateTime.now())
         private val chatMessages = listOf(
-            ChatMessage(UUID.randomUUID(), ChatRole.USER, chat, emptyList(), "First message", OffsetDateTime.now()),
-            ChatMessage(UUID.randomUUID(), ChatRole.USER, chat, emptyList(), "Second message", OffsetDateTime.now()),
-            ChatMessage(UUID.randomUUID(), ChatRole.USER, chat, emptyList(), "Third message", OffsetDateTime.now()),
-            ChatMessage(UUID.randomUUID(), ChatRole.USER, chat, emptyList(), "Fourth message", OffsetDateTime.now()),
-            ChatMessage(UUID.randomUUID(), ChatRole.USER, chat, emptyList(), "Fifth message", OffsetDateTime.now()),
+            ChatMessage(
+                UUID.randomUUID(),
+                ChatRole.USER,
+                chat,
+                mutableListOf(),
+                "First message",
+                OffsetDateTime.now(),
+            ),
+            ChatMessage(
+                UUID.randomUUID(),
+                ChatRole.USER,
+                chat,
+                mutableListOf(),
+                "Second message",
+                OffsetDateTime.now(),
+            ),
+            ChatMessage(
+                UUID.randomUUID(),
+                ChatRole.USER,
+                chat,
+                mutableListOf(),
+                "Third message",
+                OffsetDateTime.now(),
+            ),
+            ChatMessage(
+                UUID.randomUUID(),
+                ChatRole.USER,
+                chat,
+                mutableListOf(),
+                "Fourth message",
+                OffsetDateTime.now(),
+            ),
+            ChatMessage(
+                UUID.randomUUID(),
+                ChatRole.USER,
+                chat,
+                mutableListOf(),
+                "Fifth message",
+                OffsetDateTime.now(),
+            ),
         )
 
         @Test

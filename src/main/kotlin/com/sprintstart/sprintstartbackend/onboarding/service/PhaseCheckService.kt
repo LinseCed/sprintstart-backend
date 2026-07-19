@@ -515,7 +515,7 @@ class PhaseCheckService(
     }
 
     /**
-     * Retrieves the set of IDs corresponding to the user's own questions that were answered incorrectly during their attempts
+     * Returns IDs of the user's own questions that were answered incorrectly
      * in a specific phase.
      *
      * @param phaseId the unique identifier of the phase.

@@ -56,8 +56,8 @@ internal class ArtifactSummaryService(
      * @param authId The identifier of the user requesting access, used for authorization validation.
      * @return A flow stream of [AiArtifactSummaryStreamMessage] representing the artifact's summary,
      *         either retrieved from the cache or generated dynamically.
-     * @throws org.springframework.web.server.ResponseStatusException with status `FORBIDDEN` if the user does not have access to the project.
-     * @throws org.springframework.web.server.ResponseStatusException with status `NOT_FOUND` if the specified artifact does not exist in the project.
+     * @throws ResponseStatusException with status `FORBIDDEN` if the user does not have access to the project.
+     * @throws ResponseStatusException with status `NOT_FOUND` if the artifact does not exist in the project.
      */
     @Transactional(readOnly = true)
     @Tracked("Streaming artifact summary for project")

@@ -11,7 +11,6 @@ import com.sprintstart.sprintstartbackend.user.model.entity.Project
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.model.mapper.toUserApiDto
-import com.sprintstart.sprintstartbackend.user.repository.ProjectRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import jakarta.persistence.criteria.JoinType
 import jakarta.persistence.criteria.Predicate

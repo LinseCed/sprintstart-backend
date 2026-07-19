@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.repository
 
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
 import jakarta.persistence.LockModeType
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.EntityGraph

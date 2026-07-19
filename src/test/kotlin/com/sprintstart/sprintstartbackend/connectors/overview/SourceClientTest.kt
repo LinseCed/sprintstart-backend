@@ -34,6 +34,10 @@ class SourceClientTest {
                 masterKey = "test-master-key",
                 salt = "test-salt",
             ),
+            upload = com.sprintstart.sprintstartbackend.UploadConfig(
+                directory = "/tmp/uploads",
+                maxFileSizeBytes = 100,
+            ),
         )
         client = SourceClient(applicationConfig, webClient)
     }

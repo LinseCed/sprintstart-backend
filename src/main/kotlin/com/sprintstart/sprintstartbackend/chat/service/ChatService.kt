@@ -26,7 +26,6 @@ import com.sprintstart.sprintstartbackend.chat.repository.CitationRepository
 import com.sprintstart.sprintstartbackend.connectors.overview.external.api.ConnectorOverviewApi
 import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorDisabledException
 import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorNotFoundException
-import com.sprintstart.sprintstartbackend.connectors.overview.service.ConnectorConfigurationService
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.UserApi

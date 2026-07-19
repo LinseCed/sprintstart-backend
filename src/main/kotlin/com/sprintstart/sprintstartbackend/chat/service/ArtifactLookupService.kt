@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.chat.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
-import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.upload.external.api.UploadApi
 import org.springframework.stereotype.Service
