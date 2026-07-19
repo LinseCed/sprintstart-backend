@@ -112,7 +112,7 @@ class VerificationController(
     @ResponseStatus(HttpStatus.CREATED)
     @PostMapping("/me/steps/{stepId}/verification/attempts")
     @PreAuthorize("hasRole('USER')")
-    fun submitVerificationAttemptForMe(
+    suspend fun submitVerificationAttemptForMe(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
         @Parameter(description = "UUID of the step being verified")

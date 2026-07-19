@@ -201,11 +201,18 @@ class AssessmentService(
             }
         }
 
+    /**
+     * The ledger write is monotonic: a self-reported placement never overwrites a
+     * [CompetencySource.VERIFIED] entry (proof always outranks a chat placement), and a
+     * re-assessment never lowers an already-recorded level -- reconciliation's "never un-earns
+     * progress" invariant applies to the ledger itself, not just graph changes.
+     */
     private fun writeCompetencyState(userId: UUID, competencyKey: String, level: String) {
         val rank = LEVEL_RANKS[level.trim().lowercase()] ?: 0
         val existing = userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, competencyKey)
         if (existing != null) {
-            existing.level = rank
+            if (existing.source == CompetencySource.VERIFIED) return
+            existing.level = maxOf(existing.level, rank)
             existing.source = CompetencySource.ASSESSED
             existing.updatedAt = Instant.now()
         } else {

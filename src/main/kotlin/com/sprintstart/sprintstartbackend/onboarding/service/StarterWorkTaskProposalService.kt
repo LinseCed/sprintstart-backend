@@ -227,7 +227,9 @@ class StarterWorkTaskProposalService(
         val userId = userApi.getUserIdByAuthId(authId).orElseThrow {
             ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId")
         }
-        val ledger = userCompetencyStateRepository.findAllByUserId(userId)
+        // Level 0 means "unknown/not yet placed" -- such a ledger row is not a competency the
+        // hire has met, so it must not count toward fit.
+        val ledger = userCompetencyStateRepository.findAllByUserId(userId).filter { it.level > 0 }
         val competenciesByKey = competencyRepository
             .findAllByKeyIn(ledger.map { it.competencyKey })
             .associateBy { it.key }

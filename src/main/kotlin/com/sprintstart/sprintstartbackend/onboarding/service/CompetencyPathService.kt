@@ -68,12 +68,17 @@ class CompetencyPathService(
             .findAllByCompetencyKeyIn(effectiveGraph.competencies.map { it.key })
             .associateBy { it.competencyKey }
 
+        // Echo the *pin's* version, not the live head: the projected content is the effective
+        // graph at the pin (STRUCTURAL changes above it are held back), so echoing the head
+        // would claim a version whose content isn't shown -- and clients diffing the version to
+        // detect "your path changed" would fire while the change is still hidden, then miss the
+        // session start where the pin advances and the content actually appears.
         return pathProjectionService.project(
             competencies = effectiveGraph.competencies,
             edges = effectiveGraph.edges,
             targetKeys = effectiveGraph.competencies.map { it.key }.toSet(),
             ledger = ledger,
-            graphVersion = currentVersion,
+            graphVersion = pin.pinnedVersion,
             stepIdByCompetencyKey = verificationByCompetencyKey.mapValues { it.value.stepId },
             verificationTypeByCompetencyKey = verificationByCompetencyKey.mapValues { it.value.type },
         )

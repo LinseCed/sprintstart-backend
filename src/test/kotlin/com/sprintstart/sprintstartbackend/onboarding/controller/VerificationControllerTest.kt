@@ -85,9 +85,12 @@ class VerificationControllerTest(
             .andExpect(status().isUnauthorized)
     }
 
+    // submitAttemptForMe is a suspend handler, so the real (post-authorization) status is only
+    // observable via the two-step asyncStarted() -> asyncDispatch() pattern -- a single-step
+    // andExpect would silently pass through the wrong status (see synthesizeContent's tests).
     @Test
     fun `submitVerificationAttemptForMe should return 201 with the graded result`() {
-        every {
+        coEvery {
             verificationService.submitAttemptForMe(authId, stepId, SubmitVerificationAttemptRequest("chroma"))
         } returns SubmitVerificationAttemptResponse(
             attemptId = UUID.randomUUID(),
@@ -100,30 +103,40 @@ class VerificationControllerTest(
             stepStatus = StepStatus.FINISHED,
         )
 
-        mockMvc
+        val mvcResult = mockMvc
             .perform(
                 post("/api/v1/onboarding/me/steps/$stepId/verification/attempts")
                     .with(userJwt)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(SubmitVerificationAttemptRequest("chroma"))),
-            ).andExpect(status().isCreated)
+            ).andExpect(request().asyncStarted())
+            .andReturn()
+
+        mockMvc
+            .perform(asyncDispatch(mvcResult))
+            .andExpect(status().isCreated)
             .andExpect(jsonPath("$.passed").value(true))
             .andExpect(jsonPath("$.stepStatus").value("FINISHED"))
     }
 
     @Test
     fun `submitVerificationAttemptForMe should return 400 when the step is already finished`() {
-        every {
+        coEvery {
             verificationService.submitAttemptForMe(authId, stepId, SubmitVerificationAttemptRequest("x"))
         } throws ResponseStatusException(HttpStatus.BAD_REQUEST, "already finished")
 
-        mockMvc
+        val mvcResult = mockMvc
             .perform(
                 post("/api/v1/onboarding/me/steps/$stepId/verification/attempts")
                     .with(userJwt)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(SubmitVerificationAttemptRequest("x"))),
-            ).andExpect(status().isBadRequest)
+            ).andExpect(request().asyncStarted())
+            .andReturn()
+
+        mockMvc
+            .perform(asyncDispatch(mvcResult))
+            .andExpect(status().isBadRequest)
     }
 
     @Test

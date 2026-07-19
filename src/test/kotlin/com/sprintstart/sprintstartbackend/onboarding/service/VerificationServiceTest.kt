@@ -119,7 +119,7 @@ class VerificationServiceTest {
     @Nested
     inner class SubmitAttemptForMe {
         @Test
-        fun `EXACT pass writes VERIFIED ledger entry and finishes the step without calling the AI`() {
+        fun `EXACT pass writes VERIFIED ledger entry and finishes the step without calling the AI`() = runTest {
             val step = makeStep()
             val verification = makeVerification(VerificationType.EXACT, step.id, canonicalAnswer = "Chroma")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
@@ -143,7 +143,7 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `EXACT fail logs an attempt with a hint and leaves the step unfinished`() {
+        fun `EXACT fail logs an attempt with a hint and leaves the step unfinished`() = runTest {
             val step = makeStep(status = StepStatus.IN_PROGRESS)
             val verification = makeVerification(VerificationType.EXACT, step.id, canonicalAnswer = "Chroma")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
@@ -164,7 +164,7 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `test-out - passing on a never-started step finishes it directly`() {
+        fun `test-out - passing on a never-started step finishes it directly`() = runTest {
             val step = makeStep(status = StepStatus.WAITING)
             assertNull(step.startedAt)
             val verification = makeVerification(VerificationType.ATTEST, step.id)
@@ -186,7 +186,7 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `KNOWLEDGE delegates grading to the AI client`() {
+        fun `KNOWLEDGE delegates grading to the AI client`() = runTest {
             val step = makeStep(content = "Kotlin is null-safe.")
             val verification = makeVerification(VerificationType.KNOWLEDGE, step.id, rubric = "mentions null-safety")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
@@ -214,7 +214,7 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `KNOWLEDGE surfaces 503 when the AI service is unavailable, without persisting an attempt`() {
+        fun `KNOWLEDGE surfaces 503 when the AI service is unavailable, without persisting an attempt`() = runTest {
             val step = makeStep()
             val verification = makeVerification(VerificationType.KNOWLEDGE, step.id, rubric = "mentions null-safety")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
@@ -233,7 +233,7 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `ARTIFACT fetches PR evidence and delegates grading to the AI client`() {
+        fun `ARTIFACT fetches PR evidence and delegates grading to the AI client`() = runTest {
             val repositoryConnectionId = UUID.randomUUID()
             val step = makeStep()
             val verification = makeVerification(
@@ -270,7 +270,7 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `ARTIFACT fails locally without a GitHub or AI call when the answer isn't a PR number`() {
+        fun `ARTIFACT fails locally without a GitHub or AI call when the answer isn't a PR number`() = runTest {
             val step = makeStep()
             val verification = makeVerification(
                 VerificationType.ARTIFACT,
@@ -293,7 +293,7 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `ARTIFACT fails locally without an AI call when the PR isn't found`() {
+        fun `ARTIFACT fails locally without an AI call when the PR isn't found`() = runTest {
             val repositoryConnectionId = UUID.randomUUID()
             val step = makeStep()
             val verification = makeVerification(
@@ -317,7 +317,7 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `ARTIFACT throws 500 when repositoryConnectionId isn't configured`() {
+        fun `ARTIFACT throws 500 when repositoryConnectionId isn't configured`() = runTest {
             val step = makeStep()
             val verification = makeVerification(VerificationType.ARTIFACT, step.id, rubric = "closes the ticket")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
@@ -331,7 +331,7 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `ARTIFACT surfaces 503 when the AI service is unavailable, without persisting an attempt`() {
+        fun `ARTIFACT surfaces 503 when the AI service is unavailable, without persisting an attempt`() = runTest {
             val repositoryConnectionId = UUID.randomUUID()
             val step = makeStep()
             val verification = makeVerification(
@@ -364,7 +364,7 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `throws 400 when the step is already finished`() {
+        fun `throws 400 when the step is already finished`() = runTest {
             val step = makeStep(status = StepStatus.FINISHED)
             val verification = makeVerification(VerificationType.ATTEST, step.id)
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
@@ -377,7 +377,7 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `throws 404 when the step has no verification configured`() {
+        fun `throws 404 when the step has no verification configured`() = runTest {
             val step = makeStep()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
@@ -389,7 +389,7 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `attemptNo increments across repeated submissions`() {
+        fun `attemptNo increments across repeated submissions`() = runTest {
             val step = makeStep()
             val verification = makeVerification(VerificationType.ATTEST, step.id)
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
@@ -407,7 +407,33 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `passing unlocks a dependent competency on the graph`() {
+        fun `passing a lower-level verification keeps the higher ledger level`() = runTest {
+            val step = makeStep()
+            val verification = makeVerification(VerificationType.ATTEST, step.id, level = "beginner")
+            val existing = UserCompetencyState(
+                userId = userId,
+                competencyKey = "kotlin",
+                level = 4,
+                source = CompetencySource.ASSESSED,
+            )
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
+            every { verificationRepository.findByStepId(step.id) } returns verification
+            every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
+            every { competencyGraphVersionService.currentVersion() } returns 1
+            every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns existing
+            every { verificationAttemptRepository.save(any()) } answers { firstArg() }
+
+            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("done"))
+
+            assertTrue(result.passed)
+            assertEquals(4, existing.level)
+            assertEquals(CompetencySource.VERIFIED, existing.source)
+            verify(exactly = 0) { userCompetencyStateRepository.save(any()) }
+        }
+
+        @Test
+        fun `passing unlocks a dependent competency on the graph`() = runTest {
             // Regression coverage for "pass writes VERIFIED + unlocks dependents": feed the exact
             // ledger state this service writes into the real (pure) PathProjectionService and
             // confirm the dependent flips from LOCKED to AVAILABLE.
@@ -491,6 +517,23 @@ class VerificationServiceTest {
                 prompt = "What?",
                 competencyKey = "kotlin",
                 level = "beginner",
+            )
+
+            assertThrows<ResponseStatusException> {
+                service.upsertVerification(step.id, request)
+            }.also { assertEquals(400, it.statusCode.value()) }
+        }
+
+        @Test
+        fun `throws 400 when level is not a known skill level`() {
+            val step = makeStep()
+            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
+
+            val request = UpsertVerificationRequest(
+                type = VerificationType.ATTEST,
+                prompt = "Confirm?",
+                competencyKey = "kotlin",
+                level = "grandmaster",
             )
 
             assertThrows<ResponseStatusException> {
