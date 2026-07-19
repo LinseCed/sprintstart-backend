@@ -12,9 +12,11 @@ import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
+import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -28,7 +30,7 @@ class CompetencyDashboardServiceTest {
     private val pageable: Pageable = PageRequest.of(0, 20)
 
     private fun user(id: UUID, firstname: String, lastname: String): UserDto =
-        UserDto(id, "u-$firstname", firstname, lastname, null, null, emptySet(), emptyList(), emptyList())
+        UserDto(id, "u-$firstname", firstname, lastname, null, null, emptySet(), emptyList())
 
     @Nested
     inner class GetCompetencyAggregate {
@@ -128,6 +130,59 @@ class CompetencyDashboardServiceTest {
             assertEquals(1, summary.competencies.size)
             assertEquals("kotlin", summary.competencies[0].competencyKey)
             assertEquals("Kotlin", summary.competencies[0].label)
+        }
+    }
+
+    @Nested
+    inner class GetUserCompetencyStates {
+        @Test
+        fun `throws 404 when the user does not exist`() {
+            val userId = UUID.randomUUID()
+            every { userApi.exists(userId) } returns false
+
+            val ex = assertThrows<ResponseStatusException> { service.getUserCompetencyStates(userId) }
+
+            assertEquals(404, ex.statusCode.value())
+        }
+
+        @Test
+        fun `returns the user's labeled ledger, dropping unknown keys`() {
+            val userId = UUID.randomUUID()
+            every { userApi.exists(userId) } returns true
+            every { userCompetencyStateRepository.findAllByUserId(userId) } returns
+                listOf(
+                    UserCompetencyState(
+                        userId = userId,
+                        competencyKey = "kotlin",
+                        level = 2,
+                        source = CompetencySource.VERIFIED,
+                    ),
+                    UserCompetencyState(
+                        userId = userId,
+                        competencyKey = "removed-competency",
+                        level = 1,
+                        source = CompetencySource.DECLARED,
+                    ),
+                )
+            every { competencyRepository.findAllByKeyIn(listOf("kotlin", "removed-competency")) } returns
+                listOf(Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL))
+
+            val result = service.getUserCompetencyStates(userId)
+
+            assertEquals(1, result.size)
+            assertEquals("Kotlin", result[0].label)
+            assertEquals(2, result[0].level)
+        }
+
+        @Test
+        fun `returns an empty list when the user has no ledger rows`() {
+            val userId = UUID.randomUUID()
+            every { userApi.exists(userId) } returns true
+            every { userCompetencyStateRepository.findAllByUserId(userId) } returns emptyList()
+
+            val result = service.getUserCompetencyStates(userId)
+
+            assertTrue(result.isEmpty())
         }
     }
 }

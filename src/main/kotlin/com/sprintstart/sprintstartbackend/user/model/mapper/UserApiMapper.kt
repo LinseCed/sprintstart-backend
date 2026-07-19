@@ -3,7 +3,6 @@ package com.sprintstart.sprintstartbackend.user.model.mapper
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
-import com.sprintstart.sprintstartbackend.user.external.dto.UserSkillDto
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 
 fun User.toUserApiDto(): UserDto {
@@ -22,13 +21,6 @@ fun User.toUserApiDto(): UserDto {
                     description = it.description,
                 )
             }.toSet(),
-        skills = this.skillAssessments.map { assessment ->
-            UserSkillDto(
-                skillId = assessment.skill.id,
-                name = assessment.skill.name,
-                level = assessment.level.name,
-            )
-        },
         projectRoles = this.projectRoles.map { role ->
             ProjectRoleDto(
                 roleId = role.id,

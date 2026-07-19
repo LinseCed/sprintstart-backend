@@ -3,22 +3,16 @@ package com.sprintstart.sprintstartbackend.user.service
 import com.sprintstart.sprintstartbackend.user.external.enums.SkillStatus
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.entity.Skill
-import com.sprintstart.sprintstartbackend.user.model.entity.UserSkillAssessment
 import com.sprintstart.sprintstartbackend.user.model.mapper.toCreateResponse
 import com.sprintstart.sprintstartbackend.user.model.mapper.toGetResponse
 import com.sprintstart.sprintstartbackend.user.model.mapper.toUpdateResponse
-import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillAssessmentRequest
 import com.sprintstart.sprintstartbackend.user.model.request.skill.CreateSkillRequest
 import com.sprintstart.sprintstartbackend.user.model.request.skill.UpdateSkillRequest
-import com.sprintstart.sprintstartbackend.user.model.response.skill.CreateSkillAssessmentResponse
 import com.sprintstart.sprintstartbackend.user.model.response.skill.CreateSkillResponse
-import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillAssessmentResponse
 import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillResponse
 import com.sprintstart.sprintstartbackend.user.model.response.skill.UpdateSkillResponse
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRoleRepository
 import com.sprintstart.sprintstartbackend.user.repository.SkillRepository
-import com.sprintstart.sprintstartbackend.user.repository.UserRepository
-import com.sprintstart.sprintstartbackend.user.repository.UserSkillAssessmentRepository
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -29,8 +23,6 @@ import java.util.UUID
 class SkillService(
     private val skillRepository: SkillRepository,
     private val projectRoleRepository: ProjectRoleRepository,
-    private val userRepository: UserRepository,
-    private val userSkillAssessmentRepository: UserSkillAssessmentRepository,
 ) {
     @Transactional(readOnly = true)
     fun getAllSkills(): List<GetSkillResponse> {
@@ -102,8 +94,7 @@ class SkillService(
     }
 
     /**
-     * Retires a skill so it can no longer be assigned to new users.
-     * Existing assessments referencing this skill are preserved.
+     * Retires a skill so it can no longer be assigned to roles.
      */
     @Transactional
     fun retireSkill(skillId: UUID) {
@@ -113,58 +104,5 @@ class SkillService(
 
         skill.status = SkillStatus.RETIRED
         skillRepository.save(skill)
-    }
-
-    @Transactional(readOnly = true)
-    fun getUserSkillAssessments(userId: UUID): List<GetSkillAssessmentResponse> {
-        if (!userRepository.existsById(userId)) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "User with id $userId not found")
-        }
-        return userSkillAssessmentRepository.findByUserId(userId).map { it.toGetResponse() }
-    }
-
-    @Transactional
-    fun getMySkillAssessments(authId: String): List<GetSkillAssessmentResponse> {
-        val user = userRepository
-            .findByAuthId(authId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with authId $authId not found") }
-
-        val assessments = userSkillAssessmentRepository
-            .findByUserId(user.id)
-            .map { it.toGetResponse() }
-
-        return assessments
-    }
-
-    @Transactional
-    fun assessSkillForMe(authId: String, request: CreateSkillAssessmentRequest): CreateSkillAssessmentResponse {
-        val user = userRepository
-            .findByAuthId(authId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with authId $authId not found") }
-
-        val skill = skillRepository
-            .findById(request.skillId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Skill with id ${request.skillId} not found") }
-
-        if (skill.status == SkillStatus.RETIRED) {
-            throw ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Skill '${skill.name}' is retired and cannot be assigned",
-            )
-        }
-
-        user.skillAssessments.removeIf { it.skill.id == skill.id }
-
-        val assessment = UserSkillAssessment(
-            user = user,
-            skill = skill,
-            level = request.level,
-        )
-
-        user.skillAssessments.add(assessment)
-        userRepository.save(user)
-
-        val savedAssessment = user.skillAssessments.first { it.skill.id == skill.id }
-        return savedAssessment.toCreateResponse()
     }
 }

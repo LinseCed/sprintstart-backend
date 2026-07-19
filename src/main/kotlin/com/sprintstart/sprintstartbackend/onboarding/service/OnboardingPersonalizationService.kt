@@ -10,7 +10,9 @@ import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toGetForUserRe
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.OnboardingSseEvent
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.toAiScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +34,8 @@ class OnboardingPersonalizationService(
     private val onboardingAiClient: OnboardingAiClient,
     private val onboardingPathRepository: OnboardingPathRepository,
     private val blueprintRepository: BlueprintRepository,
+    private val userCompetencyStateRepository: UserCompetencyStateRepository,
+    private val competencyRepository: CompetencyRepository,
     private val userApi: UserApi,
     transactionManager: PlatformTransactionManager,
 ) {
@@ -70,10 +74,15 @@ class OnboardingPersonalizationService(
         }
 
         val scope = profile.projectRoles.single().toAiScope()
-        val skills = profile.skills.map { SkillAssessmentSchema(name = it.name, level = it.level.lowercase()) }
         val requiredScopes = listOf("global", "area:$scope")
 
         return flow {
+            // Proficiency comes from the durable competency ledger (chat placement + passed
+            // verifications), not the retired self-reported skill wizard -- the ledger is the
+            // one skill store the current UI actually writes.
+            val skills = withContext(Dispatchers.IO) {
+                txTemplate.execute { loadLedgerSkills(profile.id) }
+            }.orEmpty()
             val blueprints = withContext(Dispatchers.IO) {
                 txTemplate.execute { loadActiveBlueprints(requiredScopes) }
             }.orEmpty()
@@ -147,4 +156,35 @@ class OnboardingPersonalizationService(
             .mapNotNull { scope ->
                 blueprintRepository.findByScopeAndStatus(scope, BlueprintStatus.ACTIVE)
             }.map { it.toSchema() }
+
+    /**
+     * Maps the user's competency ledger to the AI's skill schema: competency label (falling back
+     * to the stable key) plus the level name. Level 0 rows (unknown/not yet placed) are skipped --
+     * they are not proficiency.
+     */
+    private fun loadLedgerSkills(userId: UUID): List<SkillAssessmentSchema> {
+        val states = userCompetencyStateRepository.findAllByUserId(userId).filter { it.level > 0 }
+        if (states.isEmpty()) return emptyList()
+
+        val labelsByKey = competencyRepository
+            .findAllByKeyIn(states.map { it.competencyKey })
+            .associate { it.key to it.label }
+
+        return states.map { state ->
+            SkillAssessmentSchema(
+                name = labelsByKey[state.competencyKey] ?: state.competencyKey,
+                level = LEVEL_NAMES.getValue(state.level.coerceIn(1, 4)),
+            )
+        }
+    }
+
+    private companion object {
+        // Inverse of AssessmentService.LEVEL_RANKS -- ledger 1..4 back to the AI's level names.
+        val LEVEL_NAMES = mapOf(
+            1 to "beginner",
+            2 to "intermediate",
+            3 to "advanced",
+            4 to "expert",
+        )
+    }
 }

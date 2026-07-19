@@ -10,18 +10,10 @@ data class TeamOverviewUserDto(
     val projectIds: Set<ProjectDto>,
     val profileIcon: String?,
     val roles: List<ProjectRoleDto>,
-    val skills: List<SkillDto>,
     val progressPercentage: Double,
     val currentPhase: CurrentPhaseDto?,
     val currentStep: CurrentStepDto?,
     val hasFeedback: Boolean,
-)
-
-data class SkillDto(
-    val id: String,
-    val name: String,
-    val roleId: String?,
-    val level: String,
 )
 
 data class CurrentPhaseDto(

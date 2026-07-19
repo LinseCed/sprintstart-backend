@@ -11,8 +11,10 @@ import com.sprintstart.sprintstartbackend.user.external.UserApi
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageImpl
 import org.springframework.data.domain.Pageable
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 /**
@@ -105,5 +107,37 @@ class CompetencyDashboardService(
             )
         }
         return PageImpl(summaries, pageable, usersPage.totalElements)
+    }
+
+    /**
+     * Returns one user's full competency ledger, labeled -- the per-member view the PM member
+     * detail page shows now that the legacy self-reported skill assessments are retired.
+     *
+     * @throws ResponseStatusException 404 if no user matches [userId].
+     */
+    @Transactional(readOnly = true)
+    fun getUserCompetencyStates(userId: UUID): List<UserCompetencyStateResponse> {
+        if (!userApi.exists(userId)) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with id: $userId")
+        }
+
+        val states = userCompetencyStateRepository.findAllByUserId(userId)
+        if (states.isEmpty()) return emptyList()
+
+        val competenciesByKey = competencyRepository
+            .findAllByKeyIn(states.map { it.competencyKey })
+            .associateBy { it.key }
+
+        return states.mapNotNull { state ->
+            competenciesByKey[state.competencyKey]?.let { competency ->
+                UserCompetencyStateResponse(
+                    competencyKey = state.competencyKey,
+                    label = competency.label,
+                    level = state.level,
+                    source = state.source,
+                    updatedAt = state.updatedAt,
+                )
+            }
+        }
     }
 }

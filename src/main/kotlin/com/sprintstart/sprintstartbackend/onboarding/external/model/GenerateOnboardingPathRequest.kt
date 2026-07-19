@@ -36,9 +36,10 @@ data class BlueprintSchema(
 )
 
 /**
- * A user's assessed skill with a proficiency [level], mirroring the AI service's
- * `SkillAssessmentSchema` and the frontend `UserSkillAssessment`. Carrying the
- * level (instead of a bare tag) lets proficiency drive AI personalization.
+ * A user's proficiency in one skill, mirroring the AI service's `SkillAssessmentSchema`.
+ * Derived from the durable competency ledger (`UserCompetencyState` mapped to competency
+ * labels); carrying the level (instead of a bare tag) lets proficiency drive AI
+ * personalization.
  *
  * [level] is one of `beginner`, `intermediate`, `advanced`, `expert`
  * (case-insensitive; unknown values are handled gracefully by the AI service).
