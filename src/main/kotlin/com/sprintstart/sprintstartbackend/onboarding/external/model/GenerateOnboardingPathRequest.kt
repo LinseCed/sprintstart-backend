@@ -14,6 +14,10 @@ data class BlueprintStepSchema(
     val minExperience: String? = null,
     val tags: List<String> = emptyList(),
     val invariant: Boolean = false,
+    // Round-tripped so a re-generation preserves the key already assigned to an active step
+    // (it survives the AI's invariant re-injection).
+    @SerialName("competency_key")
+    val competencyKey: String? = null,
 )
 
 @Serializable

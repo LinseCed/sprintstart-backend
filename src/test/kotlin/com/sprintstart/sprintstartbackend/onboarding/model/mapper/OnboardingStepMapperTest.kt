@@ -13,7 +13,7 @@ import java.util.UUID
 
 class OnboardingStepMapperTest {
     private fun step(content: String?, withTask: Boolean): OnboardingStep {
-        val path = OnboardingPath(userId = UUID.randomUUID())
+        val path = OnboardingPath(userId = UUID.randomUUID(), projectId = UUID.randomUUID())
         val phase = OnboardingPhase(path = path, position = 0, title = "Phase", description = "")
         val step = OnboardingStep(
             phase = phase,

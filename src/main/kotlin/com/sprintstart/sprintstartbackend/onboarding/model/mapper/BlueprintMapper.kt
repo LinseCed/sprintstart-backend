@@ -63,6 +63,7 @@ fun Blueprint.toSchema(): BlueprintSchema =
                     minExperience = step.minExperience,
                     requirement = step.requirement,
                     invariant = step.invariant,
+                    competencyKey = step.competencyKey,
                 )
             },
         provenance = corpusFingerprint?.let { BlueprintProvenanceSchema(corpusFingerprint = it) },
