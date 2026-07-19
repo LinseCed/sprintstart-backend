@@ -54,6 +54,7 @@ class OnboardingPathControllerTest(
 
     private val pathId = UUID.randomUUID()
     private val userId = UUID.randomUUID()
+    private val projectId = UUID.randomUUID()
 
     private val authId = "test-auth-id"
     private val adminAuthId = "test-admin-auth-id"
@@ -96,24 +97,25 @@ class OnboardingPathControllerTest(
             graphVersion = 1,
         )
 
-        every { competencyPathService.getPathForMe(authId) } returns response
+        every { competencyPathService.getPathForMe(authId, projectId) } returns response
 
         mockMvc
             .perform(
                 get("/api/v1/onboarding/me/path")
+                    .param("projectId", projectId.toString())
                     .with(userJwt),
             ).andExpect(status().isOk)
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
 
         verify(exactly = 1) {
-            competencyPathService.getPathForMe(authId)
+            competencyPathService.getPathForMe(authId, projectId)
         }
     }
 
     @Test
     fun `getOnboardingPathForMe should return 401 when not authenticated`() {
         mockMvc
-            .perform(get("/api/v1/onboarding/me/path"))
+            .perform(get("/api/v1/onboarding/me/path").param("projectId", projectId.toString()))
             .andExpect(status().isUnauthorized)
     }
 
@@ -122,45 +124,48 @@ class OnboardingPathControllerTest(
         mockMvc
             .perform(
                 get("/api/v1/onboarding/me/path")
+                    .param("projectId", projectId.toString())
                     .with(noUserRoleJwt),
             ).andExpect(status().isForbidden)
     }
 
     @Test
     fun `getOnboardingPathForMe should return 404 when not found`() {
-        every { competencyPathService.getPathForMe(authId) } throws
+        every { competencyPathService.getPathForMe(authId, projectId) } throws
             ResponseStatusException(HttpStatus.NOT_FOUND)
 
         mockMvc
             .perform(
                 get("/api/v1/onboarding/me/path")
+                    .param("projectId", projectId.toString())
                     .with(userJwt),
             ).andExpect(status().isNotFound)
 
         verify(exactly = 1) {
-            competencyPathService.getPathForMe(authId)
+            competencyPathService.getPathForMe(authId, projectId)
         }
     }
 
     @Test
     fun `deleteOnboardingPathForMe should return 204`() {
-        every { onboardingPathService.deleteOnboardingPathForMe(authId) } just Runs
+        every { onboardingPathService.deleteOnboardingPathForMe(authId, projectId) } just Runs
 
         mockMvc
             .perform(
                 delete("/api/v1/onboarding/me/path")
+                    .param("projectId", projectId.toString())
                     .with(userJwt),
             ).andExpect(status().isNoContent)
 
         verify(exactly = 1) {
-            onboardingPathService.deleteOnboardingPathForMe(authId)
+            onboardingPathService.deleteOnboardingPathForMe(authId, projectId)
         }
     }
 
     @Test
     fun `deleteOnboardingPathForMe should return 401 when not authenticated`() {
         mockMvc
-            .perform(delete("/api/v1/onboarding/me/path"))
+            .perform(delete("/api/v1/onboarding/me/path").param("projectId", projectId.toString()))
             .andExpect(status().isUnauthorized)
     }
 
@@ -169,23 +174,25 @@ class OnboardingPathControllerTest(
         mockMvc
             .perform(
                 delete("/api/v1/onboarding/me/path")
+                    .param("projectId", projectId.toString())
                     .with(noUserRoleJwt),
             ).andExpect(status().isForbidden)
     }
 
     @Test
     fun `deleteOnboardingPathForMe should return 404 when not found`() {
-        every { onboardingPathService.deleteOnboardingPathForMe(authId) } throws
+        every { onboardingPathService.deleteOnboardingPathForMe(authId, projectId) } throws
             ResponseStatusException(HttpStatus.NOT_FOUND)
 
         mockMvc
             .perform(
                 delete("/api/v1/onboarding/me/path")
+                    .param("projectId", projectId.toString())
                     .with(userJwt),
             ).andExpect(status().isNotFound)
 
         verify(exactly = 1) {
-            onboardingPathService.deleteOnboardingPathForMe(authId)
+            onboardingPathService.deleteOnboardingPathForMe(authId, projectId)
         }
     }
 

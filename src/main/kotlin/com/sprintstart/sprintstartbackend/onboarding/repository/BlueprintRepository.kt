@@ -13,4 +13,12 @@ interface BlueprintRepository : JpaRepository<Blueprint, UUID> {
     fun findAllByScopeAndStatus(scope: String, status: BlueprintStatus): List<Blueprint>
 
     fun findByScopeAndStatusAndVersion(scope: String, status: BlueprintStatus, version: String): Blueprint?
+
+    // Per-project lookups: a blueprint belongs to a project (or is a legacy/global blueprint with a
+    // null project). Personalization resolves a project's own baseline first and falls back to the
+    // unscoped one when the project has none of its own -- see OnboardingPersonalizationService.
+
+    fun findByProjectIdAndScopeAndStatus(projectId: UUID, scope: String, status: BlueprintStatus): Blueprint?
+
+    fun findByProjectIdIsNullAndScopeAndStatus(scope: String, status: BlueprintStatus): Blueprint?
 }

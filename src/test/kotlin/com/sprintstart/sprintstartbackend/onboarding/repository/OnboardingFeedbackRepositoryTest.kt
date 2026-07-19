@@ -34,7 +34,7 @@ class OnboardingFeedbackRepositoryTest
         private val onboardingPathRepository: OnboardingPathRepository,
     ) {
         private fun persistStep(): OnboardingStep {
-            val path = OnboardingPath(userId = UUID.randomUUID())
+            val path = OnboardingPath(userId = UUID.randomUUID(), projectId = UUID.randomUUID())
             val phase =
                 OnboardingPhase(path = path, position = 0, title = "Phase", description = "Desc")
             val step = OnboardingStep(

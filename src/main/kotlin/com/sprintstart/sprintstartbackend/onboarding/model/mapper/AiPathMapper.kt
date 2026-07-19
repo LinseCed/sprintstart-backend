@@ -17,9 +17,13 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckOpti
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckQuestion
 import java.util.UUID
 
-fun OnboardingPath.toEntities(userId: UUID): com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath {
+fun OnboardingPath.toEntities(
+    userId: UUID,
+    projectId: UUID,
+): com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath {
     val path = com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath(
         userId = userId,
+        projectId = projectId,
     )
     path.phases.addAll(
         phases.mapIndexed { index, phase -> phase.toEntity(path, index) },

@@ -39,7 +39,7 @@ class OnboardingFeedbackServiceTest {
     private val authId = "auth|test-user"
 
     private fun makeStep(): OnboardingStep {
-        val path = OnboardingPath(userId = userId)
+        val path = OnboardingPath(userId = userId, projectId = UUID.randomUUID())
         val phase =
             OnboardingPhase(id = UUID.randomUUID(), path = path, position = 0, title = "Phase", description = "Desc")
         return OnboardingStep(

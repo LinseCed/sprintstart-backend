@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.model.entity.Project
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRepository
+import com.sprintstart.sprintstartbackend.user.repository.ProjectUserAssignmentRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import com.sprintstart.sprintstartbackend.user.service.UserApiService
 import io.mockk.every
@@ -18,7 +19,8 @@ import java.util.UUID
 class UserApiServiceTest {
     private val userRepository: UserRepository = mockk()
     private val projectRepository: ProjectRepository = mockk()
-    private val userApi: UserApi = UserApiService(userRepository, projectRepository)
+    private val projectUserAssignmentRepository: ProjectUserAssignmentRepository = mockk()
+    private val userApi: UserApi = UserApiService(userRepository, projectRepository, projectUserAssignmentRepository)
 
     @Test
     fun `exists should return true when user exists`() {

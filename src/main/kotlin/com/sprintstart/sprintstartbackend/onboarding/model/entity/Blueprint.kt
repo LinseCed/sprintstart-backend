@@ -17,6 +17,12 @@ import java.util.UUID
 class Blueprint(
     @Id
     val id: UUID = UUID.randomUUID(),
+    // The project this baseline belongs to. Onboarding is per-project: a blueprint is one
+    // project's PM-owned baseline, keyed together with [scope] (the role/area) and [version].
+    // Nullable for legacy/global blueprints created before per-project scoping; project-scoped
+    // queries fall back to the unscoped (null-project) blueprint when a project has none of its own.
+    @Column(name = "project_id", nullable = true)
+    val projectId: UUID? = null,
     @Column(nullable = false)
     val scope: String,
     @Column(nullable = false)

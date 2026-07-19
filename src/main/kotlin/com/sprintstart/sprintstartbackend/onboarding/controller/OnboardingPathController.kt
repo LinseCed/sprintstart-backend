@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
@@ -73,8 +74,10 @@ class OnboardingPathController(
     fun getPathForMe(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
+        @Parameter(description = "The project whose path should be returned. Onboarding is per-project.")
+        @RequestParam projectId: UUID,
     ): PathView {
-        return competencyPathService.getPathForMe(jwt.subject)
+        return competencyPathService.getPathForMe(jwt.subject, projectId)
     }
 
     /**
@@ -103,8 +106,10 @@ class OnboardingPathController(
     fun deletePathForMe(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
+        @Parameter(description = "The project whose path should be deleted.")
+        @RequestParam projectId: UUID,
     ) {
-        onboardingPathService.deleteOnboardingPathForMe(jwt.subject)
+        onboardingPathService.deleteOnboardingPathForMe(jwt.subject, projectId)
     }
 
     /**
@@ -131,8 +136,10 @@ class OnboardingPathController(
     fun personalizePath(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
+        @Parameter(description = "The project the user is onboarding for. Each project is onboarded independently.")
+        @RequestParam projectId: UUID,
     ): Flow<OnboardingSseEvent> {
-        return onboardingPersonalizationService.personalize(jwt.subject)
+        return onboardingPersonalizationService.personalize(jwt.subject, projectId)
     }
 
 //  ========================== Endpoints for admins ==========================

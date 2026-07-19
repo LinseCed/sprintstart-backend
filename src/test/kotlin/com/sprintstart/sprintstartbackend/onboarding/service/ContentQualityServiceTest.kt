@@ -27,7 +27,7 @@ class ContentQualityServiceTest {
     private val stepId = UUID.randomUUID()
 
     private fun makeStep(): OnboardingStep {
-        val path = OnboardingPath(userId = UUID.randomUUID())
+        val path = OnboardingPath(userId = UUID.randomUUID(), projectId = UUID.randomUUID())
         val phase =
             OnboardingPhase(id = UUID.randomUUID(), path = path, position = 0, title = "Phase", description = "Desc")
         return OnboardingStep(

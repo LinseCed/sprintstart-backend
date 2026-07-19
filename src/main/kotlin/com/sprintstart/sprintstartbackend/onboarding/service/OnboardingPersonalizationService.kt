@@ -60,31 +60,46 @@ class OnboardingPersonalizationService(
      * never touches the durable `UserCompetencyState` ledger.
      *
      * @param authId External authentication identifier from the JWT subject.
+     * @param projectId The project this hire is onboarding for. Onboarding is per-project: the
+     * baseline, the resolved role scope and the rebuilt path are all scoped to this project, and a
+     * user in several projects onboards each independently.
      * @return A cold [Flow] of [OnboardingSseEvent] emitted during path generation.
-     * @throws ResponseStatusException 404 if no user exists for [authId], 400 if the user
-     * does not have exactly one project role assigned.
+     * @throws ResponseStatusException 404 if no user exists for [authId], 403 if the user is not a
+     * member of [projectId], 400 if the user holds no role in that project.
      */
-    fun personalize(authId: String): Flow<OnboardingSseEvent> {
+    fun personalize(authId: String, projectId: UUID): Flow<OnboardingSseEvent> {
         val profile = userApi
             .getOnboardingProfileByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with authId: $authId not found") }
 
-        if (profile.projectRoles.size != 1) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "User must have exactly one project role assigned")
+        if (!userApi.userHasAccessToProject(authId, projectId)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "User is not a member of project: $projectId")
         }
 
-        val scope = profile.projectRoles.single().toAiScope()
+        // Resolve the role the user holds *within this project* (not the project-agnostic role set)
+        // to pick the blueprint area scope. A user typically holds one role per project; if several,
+        // the first drives the scope for now (multi-role-in-project is a deferred refinement).
+        val rolesInProject = userApi.getProjectRolesForUser(profile.id, projectId)
+        if (rolesInProject.isEmpty()) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "User has no role in project: $projectId",
+            )
+        }
+
+        val scope = rolesInProject.first().toAiScope()
         val requiredScopes = listOf("global", "area:$scope")
 
         return flow {
             // Proficiency comes from the durable competency ledger (chat placement + passed
             // verifications), not the retired self-reported skill wizard -- the ledger is the
-            // one skill store the current UI actually writes.
+            // one skill store the current UI actually writes. The ledger is global (a proven skill
+            // transfers across projects), so it is not project-scoped here.
             val skills = withContext(Dispatchers.IO) {
                 txTemplate.execute { loadLedgerSkills(profile.id) }
             }.orEmpty()
             val blueprints = withContext(Dispatchers.IO) {
-                txTemplate.execute { loadActiveBlueprints(requiredScopes) }
+                txTemplate.execute { loadActiveBlueprints(projectId, requiredScopes) }
             }.orEmpty()
 
             val loadedScopes = blueprints.map { it.scope }.toSet()
@@ -100,13 +115,15 @@ class OnboardingPersonalizationService(
             }
 
             withContext(Dispatchers.IO) {
-                txTemplate.executeWithoutResult { onboardingPathRepository.deleteByUserId(profile.id) }
+                txTemplate.executeWithoutResult {
+                    onboardingPathRepository.deleteByUserIdAndProjectId(profile.id, projectId)
+                }
             }
 
             emitAll(
                 onboardingAiClient
                     .generatePath(scope, skills, blueprints)
-                    .map { event -> event.toSseEvent(profile.id) },
+                    .map { event -> event.toSseEvent(profile.id, projectId) },
             )
         }.catch { e ->
             emit(OnboardingSseEvent(type = "error", message = e.message))
@@ -119,8 +136,9 @@ class OnboardingPersonalizationService(
      * saved view is forwarded.
      *
      * @param userId [UUID] The id of the user of the onboarding path.
+     * @param projectId [UUID] The project the generated path belongs to.
      */
-    private fun OnboardingAiPathEvent.toSseEvent(userId: UUID): OnboardingSseEvent =
+    private fun OnboardingAiPathEvent.toSseEvent(userId: UUID, projectId: UUID): OnboardingSseEvent =
         when (type) {
             "stage" -> {
                 OnboardingSseEvent(type = "stage", name = name, detail = detail)
@@ -128,7 +146,7 @@ class OnboardingPersonalizationService(
 
             "path" -> {
                 val savedPath = path?.let { aiPath ->
-                    val entity = aiPath.toEntities(userId)
+                    val entity = aiPath.toEntities(userId, projectId)
                     onboardingPathRepository.save(entity)
                     entity.toGetForUserResponse()
                 }
@@ -145,16 +163,20 @@ class OnboardingPersonalizationService(
         }
 
     /**
-     * Loads the ACTIVE blueprints for [scopes] and maps them to the wire schema the AI
-     * service consumes. Scopes without an ACTIVE blueprint are skipped. Must be called
-     * within a transaction so each blueprint's lazy steps can be read.
+     * Loads the ACTIVE blueprints for [scopes] within [projectId] and maps them to the wire schema
+     * the AI service consumes. For each scope the project's own ACTIVE blueprint wins; when the
+     * project has none, the unscoped (null-project) legacy/global blueprint is used as a fallback so
+     * projects without their own baseline yet still onboard. Scopes with neither are skipped. Must
+     * be called within a transaction so each blueprint's lazy steps can be read.
      *
+     * @param projectId The project whose baseline should be preferred.
      * @param scopes A list of scopes to load active blueprints from.
      */
-    private fun loadActiveBlueprints(scopes: List<String>): List<BlueprintSchema> =
+    private fun loadActiveBlueprints(projectId: UUID, scopes: List<String>): List<BlueprintSchema> =
         scopes
             .mapNotNull { scope ->
-                blueprintRepository.findByScopeAndStatus(scope, BlueprintStatus.ACTIVE)
+                blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, scope, BlueprintStatus.ACTIVE)
+                    ?: blueprintRepository.findByProjectIdIsNullAndScopeAndStatus(scope, BlueprintStatus.ACTIVE)
             }.map { it.toSchema() }
 
     /**

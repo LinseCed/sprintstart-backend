@@ -13,6 +13,7 @@ import kotlin.test.assertTrue
 
 class AiPathMapperTest {
     private val userId = UUID.randomUUID()
+    private val projectId = UUID.randomUUID()
 
     private fun pathWith(check: PhaseCheck) =
         OnboardingPath(
@@ -43,7 +44,7 @@ class AiPathMapperTest {
             ),
         )
 
-        val phase = pathWith(check).toEntities(userId).phases.single()
+        val phase = pathWith(check).toEntities(userId, projectId).phases.single()
 
         assertEquals(2, phase.checkQuestions.size)
         val mc = phase.checkQuestions.first { it.type == CheckQuestionType.MULTIPLE_CHOICE }
@@ -86,7 +87,7 @@ class AiPathMapperTest {
             ),
         )
 
-        val phase = pathWith(check).toEntities(userId).phases.single()
+        val phase = pathWith(check).toEntities(userId, projectId).phases.single()
 
         assertEquals(1, phase.checkQuestions.size)
         assertEquals("ok?", phase.checkQuestions.single().question)
@@ -94,7 +95,7 @@ class AiPathMapperTest {
 
     @Test
     fun `a phase without a generated check has no questions`() {
-        val phase = pathWith(PhaseCheck()).toEntities(userId).phases.single()
+        val phase = pathWith(PhaseCheck()).toEntities(userId, projectId).phases.single()
 
         assertTrue(phase.checkQuestions.isEmpty())
     }

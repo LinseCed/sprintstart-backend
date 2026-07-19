@@ -28,10 +28,11 @@ class OnboardingPathServiceTest {
 
     private val userId = UUID.randomUUID()
     private val pathId = UUID.randomUUID()
+    private val projectId = UUID.randomUUID()
     private val authId = "auth|test-user"
 
-    private fun makePath(id: UUID = pathId, uid: UUID = userId) =
-        OnboardingPath(id = id, userId = uid)
+    private fun makePath(id: UUID = pathId, uid: UUID = userId, pid: UUID = projectId) =
+        OnboardingPath(id = id, userId = uid, projectId = pid)
 
     @Nested
     inner class GetOnboardingPathOverviewByUserId {
@@ -39,7 +40,7 @@ class OnboardingPathServiceTest {
         fun `returns path when user and path exist`() {
             val path = makePath()
             every { userApi.exists(userId) } returns true
-            every { onboardingPathRepository.findOnboardingPathByUserId(userId) } returns Optional.of(path)
+            every { onboardingPathRepository.findByUserId(userId) } returns listOf(path)
 
             val result = service.getOnboardingPathByUserId(userId)
 
@@ -58,7 +59,7 @@ class OnboardingPathServiceTest {
         @Test
         fun `throws 404 when path not found for user`() {
             every { userApi.exists(userId) } returns true
-            every { onboardingPathRepository.findOnboardingPathByUserId(userId) } returns Optional.empty()
+            every { onboardingPathRepository.findByUserId(userId) } returns emptyList()
 
             assertThrows<ResponseStatusException> {
                 service.getOnboardingPathByUserId(userId)
@@ -69,12 +70,12 @@ class OnboardingPathServiceTest {
     @Nested
     inner class GetOnboardingPathByAuthId {
         @Test
-        fun `returns path for authenticated user`() {
+        fun `returns path for authenticated user in the project`() {
             val path = makePath()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingPathRepository.findOnboardingPathByUserId(userId) } returns Optional.of(path)
+            every { onboardingPathRepository.findByUserIdAndProjectId(userId, projectId) } returns Optional.of(path)
 
-            val result = service.getOnboardingPathForMe(authId)
+            val result = service.getOnboardingPathForMe(authId, projectId)
 
             assertEquals(path.id, result.id)
         }
@@ -84,17 +85,17 @@ class OnboardingPathServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.empty()
 
             assertThrows<ResponseStatusException> {
-                service.getOnboardingPathForMe(authId)
+                service.getOnboardingPathForMe(authId, projectId)
             }.also { assertEquals(404, it.statusCode.value()) }
         }
 
         @Test
-        fun `throws 404 when no path for resolved user`() {
+        fun `throws 404 when no path for resolved user in the project`() {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingPathRepository.findOnboardingPathByUserId(userId) } returns Optional.empty()
+            every { onboardingPathRepository.findByUserIdAndProjectId(userId, projectId) } returns Optional.empty()
 
             assertThrows<ResponseStatusException> {
-                service.getOnboardingPathForMe(authId)
+                service.getOnboardingPathForMe(authId, projectId)
             }.also { assertEquals(404, it.statusCode.value()) }
         }
     }
@@ -126,13 +127,13 @@ class OnboardingPathServiceTest {
     @Nested
     inner class DeleteOnboardingPathByAuthId {
         @Test
-        fun `deletes path for authenticated user`() {
+        fun `deletes path for authenticated user in the project`() {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingPathRepository.deleteByUserId(userId) } just runs
+            every { onboardingPathRepository.deleteByUserIdAndProjectId(userId, projectId) } just runs
 
-            service.deleteOnboardingPathForMe(authId)
+            service.deleteOnboardingPathForMe(authId, projectId)
 
-            verify(exactly = 1) { onboardingPathRepository.deleteByUserId(userId) }
+            verify(exactly = 1) { onboardingPathRepository.deleteByUserIdAndProjectId(userId, projectId) }
         }
 
         @Test
@@ -140,7 +141,7 @@ class OnboardingPathServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.empty()
 
             assertThrows<ResponseStatusException> {
-                service.deleteOnboardingPathForMe(authId)
+                service.deleteOnboardingPathForMe(authId, projectId)
             }.also { assertEquals(404, it.statusCode.value()) }
         }
     }
@@ -169,10 +170,10 @@ class OnboardingPathServiceTest {
             every { userApi.searchUsers(null, null, null, Pageable.unpaged()) } returns PageImpl(listOf(user1, user2))
             every { onboardingPathRepository.findByUserIdIn(listOf(user1Id, user2Id)) } returns listOf(
                 // Empty path for user1 (0% progress)
-                OnboardingPath(userId = user1Id),
+                OnboardingPath(userId = user1Id, projectId = projectId),
                 // User 2 has higher progress (but we just test that it falls back to 0 without phases
                 // and sorts by name if both are 0)
-                OnboardingPath(userId = user2Id),
+                OnboardingPath(userId = user2Id, projectId = projectId),
             )
 
             val result = service.getTeamOverview(null, null, null, "HIGHEST_PROGRESS", pageable)

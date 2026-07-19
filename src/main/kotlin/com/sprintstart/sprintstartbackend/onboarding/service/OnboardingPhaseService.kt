@@ -50,9 +50,12 @@ class OnboardingPhaseService(
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User not found") }
 
+        // Phase authoring is not project-scoped yet; a user can now have one path per project, so
+        // this resolves any one of them. Project-scoped phase authoring is follow-up work.
         val path = onboardingPathRepository
-            .findOnboardingPathByUserId(userId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Onboarding path not found") }
+            .findByUserId(userId)
+            .firstOrNull()
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Onboarding path not found")
 
         return onboardingPhaseRepository
             .findAllByPathId(path.id)
@@ -98,9 +101,12 @@ class OnboardingPhaseService(
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User not found") }
 
+        // Phase authoring is not project-scoped yet; a user can now have one path per project, so
+        // this resolves any one of them. Project-scoped phase authoring is follow-up work.
         val path = onboardingPathRepository
-            .findOnboardingPathByUserId(userId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Onboarding path not found") }
+            .findByUserId(userId)
+            .firstOrNull()
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Onboarding path not found")
 
         // shift all the phases after the new one to make space
         shiftPhasesRight(path, request)
@@ -211,7 +217,8 @@ class OnboardingPhaseService(
     ): CreateOnboardingPhaseResponse {
         val path = onboardingPathRepository
             .findByUserId(userId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No path found for user $userId") }
+            .firstOrNull()
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No path found for user $userId")
 
         // Shift all phases at or after the new position up by one
         shiftPhasesRight(path, request)

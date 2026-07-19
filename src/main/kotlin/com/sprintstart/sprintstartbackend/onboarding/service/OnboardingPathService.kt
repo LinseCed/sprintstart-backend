@@ -45,15 +45,19 @@ class OnboardingPathService(
      * @throws ResponseStatusException When the user or onboarding path does not exist.
      */
     @Transactional(readOnly = true)
-    fun getOnboardingPathForMe(authId: String): GetOnboardingPathForUserResponse {
+    fun getOnboardingPathForMe(authId: String, projectId: UUID): GetOnboardingPathForUserResponse {
         val userId = userApi
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
 
         return onboardingPathRepository
-            .findOnboardingPathByUserId(userId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No path found for user with id: $userId") }
-            .toGetForUserResponse()
+            .findByUserIdAndProjectId(userId, projectId)
+            .orElseThrow {
+                ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "No path found for user $userId in project $projectId",
+                )
+            }.toGetForUserResponse()
     }
 
     /**
@@ -62,12 +66,13 @@ class OnboardingPathService(
      * @param authId External authentication identifier.
      * @throws ResponseStatusException When the user does not exist.
      */
-    fun deleteOnboardingPathForMe(authId: String) {
+    @Transactional
+    fun deleteOnboardingPathForMe(authId: String, projectId: UUID) {
         val userId = userApi
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
 
-        onboardingPathRepository.deleteByUserId(userId)
+        onboardingPathRepository.deleteByUserIdAndProjectId(userId, projectId)
     }
 
 //  ========================== Methods for admins ==========================
@@ -86,10 +91,13 @@ class OnboardingPathService(
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with id: $userId")
         }
 
+        // Per-project onboarding means a user can have several paths. This admin read is not yet
+        // project-scoped, so it returns any one of them; a project-scoped admin view is follow-up.
         return onboardingPathRepository
-            .findOnboardingPathByUserId(userId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No onboarding path found with for: $userId") }
-            .toGetResponse()
+            .findByUserId(userId)
+            .firstOrNull()
+            ?.toGetResponse()
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No onboarding path found with for: $userId")
     }
 
     /**
@@ -130,7 +138,19 @@ class OnboardingPathService(
         }
 
         val userIds = users.map { it.id }
-        val paths = onboardingPathRepository.findByUserIdIn(userIds).associateBy { it.userId }
+        // A user can have one path per project now. When the overview is filtered to a single
+        // project, show that project's path; otherwise fall back to any one path per user (a
+        // project-scoped multi-project PM overview is follow-up work).
+        val paths = if (projectIds != null && projectIds.size == 1) {
+            onboardingPathRepository
+                .findByUserIdInAndProjectId(userIds, projectIds.single())
+                .associateBy { it.userId }
+        } else {
+            onboardingPathRepository
+                .findByUserIdIn(userIds)
+                .groupBy { it.userId }
+                .mapValues { (_, userPaths) -> userPaths.first() }
+        }
 
         val dtos = users.map { user ->
             buildTeamOverviewUserDto(user, paths[user.id])
@@ -170,7 +190,7 @@ class OnboardingPathService(
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
         val userDto = userApi.getUsersByIds(listOf(userId)).firstOrNull()
             ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "User not found")
-        val path = onboardingPathRepository.findOnboardingPathByUserId(userDto.id).orElse(null)
+        val path = onboardingPathRepository.findByUserId(userDto.id).firstOrNull()
 
         return buildTeamOverviewUserDto(userDto, path)
     }
