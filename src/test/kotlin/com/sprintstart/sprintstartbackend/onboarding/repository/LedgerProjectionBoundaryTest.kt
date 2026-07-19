@@ -38,6 +38,7 @@ class LedgerProjectionBoundaryTest
         @Test
         fun `deleting a user's onboarding path leaves their competency ledger untouched`() {
             val userId = UUID.randomUUID()
+            val projectId = UUID.randomUUID()
             userCompetencyStateRepository.saveAndFlush(
                 UserCompetencyState(
                     userId = userId,
@@ -46,12 +47,12 @@ class LedgerProjectionBoundaryTest
                     source = CompetencySource.VERIFIED,
                 ),
             )
-            onboardingPathRepository.saveAndFlush(OnboardingPath(userId = userId))
+            onboardingPathRepository.saveAndFlush(OnboardingPath(userId = userId, projectId = projectId))
 
-            onboardingPathRepository.deleteByUserId(userId)
+            onboardingPathRepository.deleteByUserIdAndProjectId(userId, projectId)
             onboardingPathRepository.flush()
 
-            assertThat(onboardingPathRepository.existsByUserId(userId)).isFalse()
+            assertThat(onboardingPathRepository.existsByUserIdAndProjectId(userId, projectId)).isFalse()
             val ledger = userCompetencyStateRepository.findAllByUserId(userId)
             assertThat(ledger).hasSize(1)
             assertThat(ledger[0].level).isEqualTo(3)

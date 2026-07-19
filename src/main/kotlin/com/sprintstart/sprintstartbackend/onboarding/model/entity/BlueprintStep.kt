@@ -22,6 +22,14 @@ class BlueprintStep(
     val blueprint: Blueprint,
     @Column(nullable = false)
     val stepId: String,
+    // The competency this step targets in the graph, when known. This is the blueprint->target
+    // bridge: a project's path terminates in the competency keys its blueprint declares here,
+    // instead of "all visible competencies". Nullable because the current AI blueprint generation
+    // does not yet emit competency keys (a separate ai-seam issue) -- until a project's steps carry
+    // keys, path projection falls back to all-visible so nothing breaks. May be set by PM/graph
+    // authoring today.
+    @Column(name = "competency_key", nullable = true)
+    val competencyKey: String? = null,
     @Column(nullable = false)
     val title: String,
     @Column(nullable = true, columnDefinition = "TEXT")

@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.external
 
+import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
@@ -49,4 +50,18 @@ interface UserApi {
     fun getOnboardingProfileByAuthId(authId: String): Optional<UserOnboardingProfile>
 
     fun userHasAccessToProject(authId: String, projectId: UUID): Boolean
+
+    /**
+     * Returns the roles a user holds **within a specific project**.
+     *
+     * Resolved from the user's project assignment (`ProjectUserAssignment`), so — unlike the
+     * project-agnostic role set on [UserOnboardingProfile] — this answers "what is
+     * this user in *this* project", which per-project onboarding needs to pick the blueprint scope.
+     * Empty when the user has no assignment or no roles in that project.
+     *
+     * @param userId Internal SprintStart user identifier.
+     * @param projectId The project to resolve roles within.
+     * @return The user's roles in that project; empty if none.
+     */
+    fun getProjectRolesForUser(userId: UUID, projectId: UUID): List<ProjectRoleDto>
 }

@@ -82,7 +82,7 @@ class VerificationServiceTest {
         status: StepStatus = StepStatus.WAITING,
         content: String? = null,
     ): OnboardingStep {
-        val path = OnboardingPath(userId = userId)
+        val path = OnboardingPath(userId = userId, projectId = UUID.randomUUID())
         val phase = OnboardingPhase(path = path, position = 0, title = "P", description = "d")
         return OnboardingStep(
             phase = phase,

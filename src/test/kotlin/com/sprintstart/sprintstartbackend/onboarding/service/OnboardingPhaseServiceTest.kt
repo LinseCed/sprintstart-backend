@@ -31,7 +31,7 @@ class OnboardingPhaseServiceTest {
     private val phaseId = UUID.randomUUID()
     private val authId = "auth|test-user"
 
-    private fun makePath() = OnboardingPath(id = pathId, userId = userId)
+    private fun makePath() = OnboardingPath(id = pathId, userId = userId, projectId = UUID.randomUUID())
 
     private fun makePhase(position: Int = 0, path: OnboardingPath = makePath()) =
         OnboardingPhase(id = phaseId, path = path, position = position, title = "Phase", description = "Desc")
@@ -42,7 +42,7 @@ class OnboardingPhaseServiceTest {
         fun `returns phases for authenticated user`() {
             val path = makePath()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingPathRepository.findOnboardingPathByUserId(userId) } returns Optional.of(path)
+            every { onboardingPathRepository.findByUserId(userId) } returns listOf(path)
             every { onboardingPhaseRepository.findAllByPathId(path.id) } returns mutableListOf(makePhase(0, path))
 
             val result = service.getOnboardingPhasesForMe(authId)
@@ -62,7 +62,7 @@ class OnboardingPhaseServiceTest {
         @Test
         fun `throws 404 when path not found`() {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingPathRepository.findOnboardingPathByUserId(userId) } returns Optional.empty()
+            every { onboardingPathRepository.findByUserId(userId) } returns emptyList()
 
             assertThrows<ResponseStatusException> {
                 service.getOnboardingPhasesForMe(authId)
@@ -103,7 +103,7 @@ class OnboardingPhaseServiceTest {
             val phase = makePhase(0, path)
 
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingPathRepository.findOnboardingPathByUserId(userId) } returns Optional.of(path)
+            every { onboardingPathRepository.findByUserId(userId) } returns listOf(path)
             every { onboardingPhaseRepository.countByPathId(path.id) } returns 0
             every {
                 onboardingPhaseRepository.findByPathIdAndPositionGreaterThanEqualOrderByPositionDesc(path.id, 0)
@@ -121,7 +121,7 @@ class OnboardingPhaseServiceTest {
             val request = CreateOnboardingPhaseRequest(position = 5, title = "Phase", description = "Desc")
 
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingPathRepository.findOnboardingPathByUserId(userId) } returns Optional.of(path)
+            every { onboardingPathRepository.findByUserId(userId) } returns listOf(path)
             every { onboardingPhaseRepository.countByPathId(path.id) } returns 2
 
             assertThrows<ResponseStatusException> {
@@ -215,7 +215,7 @@ class OnboardingPhaseServiceTest {
             val request = CreateOnboardingPhaseRequest(position = 0, title = "Phase", description = "Desc")
             val phase = makePhase(0, path)
 
-            every { onboardingPathRepository.findByUserId(userId) } returns Optional.of(path)
+            every { onboardingPathRepository.findByUserId(userId) } returns listOf(path)
             every { onboardingPhaseRepository.countByPathId(path.id) } returns 0
             every {
                 onboardingPhaseRepository.findByPathIdAndPositionGreaterThanEqualOrderByPositionDesc(path.id, 0)
@@ -230,7 +230,7 @@ class OnboardingPhaseServiceTest {
         @Test
         fun `throws 404 when path not found for userId`() {
             val request = CreateOnboardingPhaseRequest(position = 0, title = "Phase", description = "Desc")
-            every { onboardingPathRepository.findByUserId(userId) } returns Optional.empty()
+            every { onboardingPathRepository.findByUserId(userId) } returns emptyList()
 
             assertThrows<ResponseStatusException> {
                 service.createOnboardingPhaseForUserId(userId, request)

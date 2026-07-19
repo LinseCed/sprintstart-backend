@@ -5,12 +5,16 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.ChangeType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.Blueprint
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphChange
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphVersion
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGraphPin
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
+import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphChangeRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphVersionRepository
@@ -43,6 +47,7 @@ class CompetencyPathServiceTest {
     private val userGraphPinRepository: UserGraphPinRepository = mockk()
     private val effectiveGraphResolver: EffectiveGraphResolver = EffectiveGraphResolver()
     private val verificationRepository: VerificationRepository = mockk()
+    private val blueprintRepository: BlueprintRepository = mockk()
     private val userApi: UserApi = mockk()
     private val service = CompetencyPathService(
         competencyRepository,
@@ -55,14 +60,26 @@ class CompetencyPathServiceTest {
         userGraphPinRepository,
         effectiveGraphResolver,
         verificationRepository,
+        blueprintRepository,
         userApi,
     )
 
     private val authId = "auth|test-user"
     private val userId = UUID.randomUUID()
+    private val projectId = UUID.randomUUID()
 
     private fun stubNoVerifications() {
         every { verificationRepository.findAllByCompetencyKeyIn(any()) } returns emptyList()
+    }
+
+    /**
+     * Stubs the blueprint->target bridge to declare no keys, so the path falls back to targeting
+     * every visible competency -- the behavior these tests assert.
+     */
+    private fun stubBridgeFallsBackToAllVisible() {
+        every { userApi.getProjectRolesForUser(userId, projectId) } returns emptyList()
+        every { blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, any(), any()) } returns null
+        every { blueprintRepository.findByProjectIdIsNullAndScopeAndStatus(any(), any()) } returns null
     }
 
     @Nested
@@ -71,6 +88,7 @@ class CompetencyPathServiceTest {
         fun `resolves the user and projects a path from the visible graph and their ledger`() {
             stubNoVerifications()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            stubBridgeFallsBackToAllVisible()
             every { competencyRepository.findAll() } returns listOf(
                 Competency(key = "git", label = "Git", kind = CompetencyKind.SKILL),
                 Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL),
@@ -94,7 +112,7 @@ class CompetencyPathServiceTest {
                 CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "kotlin"),
             )
 
-            val result = service.getPathForMe(authId)
+            val result = service.getPathForMe(authId, projectId)
 
             assertThat(result.nodes.map { it.key }).containsExactlyInAnyOrder("git", "kotlin")
             assertThat(result.graphVersion).isEqualTo(7)
@@ -105,6 +123,7 @@ class CompetencyPathServiceTest {
         fun `echoes the pinned version, not the live head, when structural changes are held back`() {
             stubNoVerifications()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            stubBridgeFallsBackToAllVisible()
             every { competencyRepository.findAll() } returns listOf(
                 Competency(key = "git", label = "Git", kind = CompetencyKind.SKILL),
             )
@@ -119,7 +138,7 @@ class CompetencyPathServiceTest {
                 CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "git"),
             )
 
-            val result = service.getPathForMe(authId)
+            val result = service.getPathForMe(authId, projectId)
 
             assertThat(result.graphVersion).isEqualTo(7)
         }
@@ -128,6 +147,7 @@ class CompetencyPathServiceTest {
         fun `lazily creates the graph pin at the current version on first call`() {
             stubNoVerifications()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            stubBridgeFallsBackToAllVisible()
             every { competencyRepository.findAll() } returns emptyList()
             every { competencyEdgeRepository.findAll() } returns emptyList()
             every { userCompetencyStateRepository.findAllByUserId(userId) } returns emptyList()
@@ -139,7 +159,7 @@ class CompetencyPathServiceTest {
                 emptyList()
             every { competencyGraphChangeRepository.findAll() } returns emptyList()
 
-            service.getPathForMe(authId)
+            service.getPathForMe(authId, projectId)
 
             assertThat(savedSlot.captured.userId).isEqualTo(userId)
             assertThat(savedSlot.captured.pinnedVersion).isEqualTo(3)
@@ -149,15 +169,62 @@ class CompetencyPathServiceTest {
         fun `throws 404 when the user cannot be resolved`() {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.empty()
 
-            val ex = assertThrows<ResponseStatusException> { service.getPathForMe(authId) }
+            val ex = assertThrows<ResponseStatusException> { service.getPathForMe(authId, projectId) }
 
             assertThat(ex.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
+        }
+
+        @Test
+        fun `narrows the path to the competency keys the project blueprint declares`() {
+            stubNoVerifications()
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { userApi.getProjectRolesForUser(userId, projectId) } returns emptyList()
+            every { competencyRepository.findAll() } returns listOf(
+                Competency(key = "git", label = "Git", kind = CompetencyKind.SKILL),
+                Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL),
+            )
+            every { competencyEdgeRepository.findAll() } returns emptyList()
+            every { userCompetencyStateRepository.findAllByUserId(userId) } returns emptyList()
+            every { competencyGraphVersionService.currentVersion() } returns 1
+            every { userGraphPinRepository.findByUserId(userId) } returns
+                UserGraphPin(userId = userId, pinnedVersion = 1)
+            every { competencyGraphVersionRepository.findAllByVersionGreaterThanOrderByVersionAsc(1) } returns
+                emptyList()
+            every { competencyGraphChangeRepository.findAll() } returns listOf(
+                CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "git"),
+                CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "kotlin"),
+            )
+            // The project's global blueprint declares only "git" as a target, so "kotlin" -- though
+            // visible -- must not appear on the path.
+            val blueprint = Blueprint(
+                projectId = projectId,
+                scope = "global",
+                version = "1",
+                status = BlueprintStatus.ACTIVE,
+            )
+            blueprint.steps.add(
+                BlueprintStep(
+                    blueprint = blueprint,
+                    stepId = "s1",
+                    competencyKey = "git",
+                    title = "Learn Git",
+                    position = 0,
+                ),
+            )
+            every {
+                blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, "global", BlueprintStatus.ACTIVE)
+            } returns blueprint
+
+            val result = service.getPathForMe(authId, projectId)
+
+            assertThat(result.nodes.map { it.key }).containsExactly("git")
         }
 
         @Test
         fun `annotates a node with the step configured to teach-verify it`() {
             val stepId = UUID.randomUUID()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            stubBridgeFallsBackToAllVisible()
             every { competencyRepository.findAll() } returns listOf(
                 Competency(key = "git", label = "Git", kind = CompetencyKind.SKILL),
                 Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL),
@@ -183,7 +250,7 @@ class CompetencyPathServiceTest {
                 ),
             )
 
-            val result = service.getPathForMe(authId)
+            val result = service.getPathForMe(authId, projectId)
 
             assertThat(result.nodes.first { it.key == "kotlin" }.stepId).isEqualTo(stepId)
             assertThat(result.nodes.first { it.key == "git" }.stepId).isNull()

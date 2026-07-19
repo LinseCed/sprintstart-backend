@@ -56,6 +56,7 @@ class OnboardingPersonalizationServiceTest {
     )
 
     private val userId = UUID.randomUUID()
+    private val projectId = UUID.randomUUID()
     private val authId = "auth|test-user"
     private val profile = UserOnboardingProfile(
         id = userId,
@@ -63,17 +64,26 @@ class OnboardingPersonalizationServiceTest {
             ProjectRoleDto(roleId = UUID.randomUUID(), name = "Backend", description = "Backend work"),
         ),
     )
+    private val backendRole = ProjectRoleDto(roleId = UUID.randomUUID(), name = "Backend", description = "Backend work")
 
     private fun activeBlueprint(scope: String): Blueprint =
-        Blueprint(scope = scope, version = "1", status = BlueprintStatus.ACTIVE)
+        Blueprint(projectId = projectId, scope = scope, version = "1", status = BlueprintStatus.ACTIVE)
 
-    /** Stubs an ACTIVE baseline for both required scopes so personalization can stream. */
+    /** Stubs project membership + a single project role so scope resolution succeeds. */
+    private fun stubMembershipAndRole() {
+        every { userApi.userHasAccessToProject(authId, projectId) } returns true
+        every { userApi.getProjectRolesForUser(userId, projectId) } returns listOf(backendRole)
+    }
+
+    /** Stubs an ACTIVE project baseline for both required scopes so personalization can stream. */
     private fun stubBaselinesPresent() {
-        every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns
-            activeBlueprint("global")
-        every { blueprintRepository.findByScopeAndStatus("area:backend", BlueprintStatus.ACTIVE) } returns
-            activeBlueprint("area:backend")
-        every { onboardingPathRepository.deleteByUserId(userId) } just runs
+        every {
+            blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, "global", BlueprintStatus.ACTIVE)
+        } returns activeBlueprint("global")
+        every {
+            blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, "area:backend", BlueprintStatus.ACTIVE)
+        } returns activeBlueprint("area:backend")
+        every { onboardingPathRepository.deleteByUserIdAndProjectId(userId, projectId) } just runs
         stubEmptyLedger()
     }
 
@@ -87,61 +97,90 @@ class OnboardingPersonalizationServiceTest {
         fun `throws 404 when user profile not found`() {
             every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.empty()
 
-            val ex = assertThrows<ResponseStatusException> { service.personalize(authId) }
+            val ex = assertThrows<ResponseStatusException> { service.personalize(authId, projectId) }
 
             assertEquals(404, ex.statusCode.value())
         }
 
         @Test
-        fun `throws 400 when user has no project role assigned`() {
-            val profileWithNoRoles = UserOnboardingProfile(id = userId, projectRoles = emptyList())
-            every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profileWithNoRoles)
-
-            val ex = assertThrows<ResponseStatusException> { service.personalize(authId) }
-
-            assertEquals(400, ex.statusCode.value())
-        }
-
-        @Test
-        fun `throws 400 when user has more than one project role assigned`() {
-            val profileWithTwoRoles = UserOnboardingProfile(
-                id = userId,
-                projectRoles = listOf(
-                    ProjectRoleDto(roleId = UUID.randomUUID(), name = "Backend", description = "Backend work"),
-                    ProjectRoleDto(roleId = UUID.randomUUID(), name = "Frontend", description = "Frontend work"),
-                ),
-            )
-            every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profileWithTwoRoles)
-
-            val ex = assertThrows<ResponseStatusException> { service.personalize(authId) }
-
-            assertEquals(400, ex.statusCode.value())
-        }
-
-        @Test
-        fun `reads active blueprints for the global and area scopes`() = runTest {
+        fun `throws 403 when user is not a member of the project`() {
             every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            every { userApi.userHasAccessToProject(authId, projectId) } returns false
+
+            val ex = assertThrows<ResponseStatusException> { service.personalize(authId, projectId) }
+
+            assertEquals(403, ex.statusCode.value())
+        }
+
+        @Test
+        fun `throws 400 when user has no role in the project`() {
+            every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            every { userApi.userHasAccessToProject(authId, projectId) } returns true
+            every { userApi.getProjectRolesForUser(userId, projectId) } returns emptyList()
+
+            val ex = assertThrows<ResponseStatusException> { service.personalize(authId, projectId) }
+
+            assertEquals(400, ex.statusCode.value())
+        }
+
+        @Test
+        fun `reads active project blueprints for the global and area scopes`() = runTest {
+            every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubMembershipAndRole()
             stubBaselinesPresent()
             every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
                 OnboardingAiPathEvent(type = "done"),
             )
 
-            service.personalize(authId).toList()
+            service.personalize(authId, projectId).toList()
 
-            verify(exactly = 1) { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) }
-            verify(exactly = 1) { blueprintRepository.findByScopeAndStatus("area:backend", BlueprintStatus.ACTIVE) }
+            verify(exactly = 1) {
+                blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, "global", BlueprintStatus.ACTIVE)
+            }
+            verify(exactly = 1) {
+                blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, "area:backend", BlueprintStatus.ACTIVE)
+            }
+        }
+
+        @Test
+        fun `falls back to the unscoped blueprint when the project has none of its own`() = runTest {
+            every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubMembershipAndRole()
+            stubEmptyLedger()
+            every { onboardingPathRepository.deleteByUserIdAndProjectId(userId, projectId) } just runs
+            // Project has no blueprint of its own for either scope -> fall back to the null-project one.
+            every {
+                blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, any(), BlueprintStatus.ACTIVE)
+            } returns null
+            every {
+                blueprintRepository.findByProjectIdIsNullAndScopeAndStatus("global", BlueprintStatus.ACTIVE)
+            } returns activeBlueprint("global")
+            every {
+                blueprintRepository.findByProjectIdIsNullAndScopeAndStatus("area:backend", BlueprintStatus.ACTIVE)
+            } returns activeBlueprint("area:backend")
+            every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
+                OnboardingAiPathEvent(type = "done"),
+            )
+
+            val events = service.personalize(authId, projectId).toList()
+
+            assertEquals("done", events.last().type)
+            verify(exactly = 1) {
+                blueprintRepository.findByProjectIdIsNullAndScopeAndStatus("area:backend", BlueprintStatus.ACTIVE)
+            }
         }
 
         @Test
         fun `passes active blueprints to AI client`() = runTest {
             val blueprintSlot = slot<List<BlueprintSchema>>()
             every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubMembershipAndRole()
             stubBaselinesPresent()
             every {
                 onboardingAiClient.generatePath(any(), any(), capture(blueprintSlot))
             } returns flowOf(OnboardingAiPathEvent(type = "done"))
 
-            service.personalize(authId).toList()
+            service.personalize(authId, projectId).toList()
 
             assertEquals(2, blueprintSlot.captured.size)
             assertEquals(setOf("global", "area:backend"), blueprintSlot.captured.map { it.scope }.toSet())
@@ -151,6 +190,7 @@ class OnboardingPersonalizationServiceTest {
         fun `maps the competency ledger to leveled skills for the AI client, skipping level-0 rows`() = runTest {
             val skillsSlot = slot<List<SkillAssessmentSchema>>()
             every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubMembershipAndRole()
             stubBaselinesPresent()
             every { userCompetencyStateRepository.findAllByUserId(userId) } returns listOf(
                 UserCompetencyState(
@@ -172,7 +212,7 @@ class OnboardingPersonalizationServiceTest {
                 onboardingAiClient.generatePath(any(), capture(skillsSlot), any())
             } returns flowOf(OnboardingAiPathEvent(type = "done"))
 
-            service.personalize(authId).toList()
+            service.personalize(authId, projectId).toList()
 
             assertEquals(listOf(SkillAssessmentSchema(name = "Kotlin", level = "advanced")), skillsSlot.captured)
         }
@@ -180,30 +220,38 @@ class OnboardingPersonalizationServiceTest {
         @Test
         fun `emits an error and does not generate a path when a required baseline is missing`() = runTest {
             every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubMembershipAndRole()
             stubEmptyLedger()
-            every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns
-                activeBlueprint("global")
-            every { blueprintRepository.findByScopeAndStatus("area:backend", BlueprintStatus.ACTIVE) } returns null
+            every {
+                blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, "global", BlueprintStatus.ACTIVE)
+            } returns activeBlueprint("global")
+            every {
+                blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, "area:backend", BlueprintStatus.ACTIVE)
+            } returns null
+            every {
+                blueprintRepository.findByProjectIdIsNullAndScopeAndStatus("area:backend", BlueprintStatus.ACTIVE)
+            } returns null
 
-            val events = service.personalize(authId).toList()
+            val events = service.personalize(authId, projectId).toList()
 
             assertEquals(1, events.size)
             assertEquals("error", events[0].type)
             assertEquals("Onboarding baseline for area:backend is not ready yet", events[0].message)
             verify(exactly = 0) { onboardingAiClient.generatePath(any(), any(), any()) }
-            verify(exactly = 0) { onboardingPathRepository.deleteByUserId(any()) }
+            verify(exactly = 0) { onboardingPathRepository.deleteByUserIdAndProjectId(any(), any()) }
         }
 
         @Test
         fun `maps stage events from AI client`() = runTest {
             every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubMembershipAndRole()
             stubBaselinesPresent()
             every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
                 OnboardingAiPathEvent(type = "stage", name = "retrieve", detail = "Retrieving documents"),
                 OnboardingAiPathEvent(type = "done"),
             )
 
-            val events = service.personalize(authId).toList()
+            val events = service.personalize(authId, projectId).toList()
 
             assertEquals(2, events.size)
             assertEquals("stage", events[0].type)
@@ -215,12 +263,13 @@ class OnboardingPersonalizationServiceTest {
         @Test
         fun `maps error events from AI client`() = runTest {
             every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubMembershipAndRole()
             stubBaselinesPresent()
             every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
                 OnboardingAiPathEvent(type = "error", message = "LLM unavailable"),
             )
 
-            val events = service.personalize(authId).toList()
+            val events = service.personalize(authId, projectId).toList()
 
             assertEquals(1, events.size)
             assertEquals("error", events[0].type)
@@ -228,34 +277,38 @@ class OnboardingPersonalizationServiceTest {
         }
 
         @Test
-        fun `maps path event and persists the generated path`() = runTest {
+        fun `maps path event and persists the generated path scoped to the project`() = runTest {
             val path = OnboardingPath(workingArea = "backend")
             every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubMembershipAndRole()
             stubBaselinesPresent()
             every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
                 OnboardingAiPathEvent(type = "path", path = path),
             )
-            every { onboardingPathRepository.save(any()) } answers { firstArg() }
+            val savedSlot = slot<com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath>()
+            every { onboardingPathRepository.save(capture(savedSlot)) } answers { firstArg() }
 
-            val events = service.personalize(authId).toList()
+            val events = service.personalize(authId, projectId).toList()
 
             assertEquals(1, events.size)
             assertEquals("path", events[0].type)
             assertEquals(userId, events[0].path?.userId)
+            assertEquals(projectId, savedSlot.captured.projectId)
             verify(exactly = 1) { onboardingPathRepository.save(any()) }
         }
 
         @Test
-        fun `deletes existing path before generating new one`() = runTest {
+        fun `deletes existing path for the project before generating new one`() = runTest {
             every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubMembershipAndRole()
             stubBaselinesPresent()
             every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
                 OnboardingAiPathEvent(type = "done"),
             )
 
-            service.personalize(authId).toList()
+            service.personalize(authId, projectId).toList()
 
-            verify(exactly = 1) { onboardingPathRepository.deleteByUserId(userId) }
+            verify(exactly = 1) { onboardingPathRepository.deleteByUserIdAndProjectId(userId, projectId) }
         }
     }
 }

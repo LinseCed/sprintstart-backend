@@ -88,7 +88,7 @@ class PhaseCheckServiceTest {
     }
 
     private fun makePath(vararg phasePositions: Int): OnboardingPath {
-        val path = OnboardingPath(userId = userId)
+        val path = OnboardingPath(userId = userId, projectId = UUID.randomUUID())
         phasePositions.forEach { position ->
             path.phases += OnboardingPhase(path = path, position = position, title = "P$position", description = "d")
         }
