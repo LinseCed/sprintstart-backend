@@ -1,7 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompetencySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintProvenanceSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
@@ -11,10 +13,12 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.Blueprint
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintOrigin
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStep
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toSchema
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintStepRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.every
@@ -39,9 +43,16 @@ class BlueprintServiceTest {
     private val onboardingAiClient: OnboardingAiClient = mockk()
     private val blueprintRepository: BlueprintRepository = mockk()
     private val blueprintStepRepository: BlueprintStepRepository = mockk()
+    private val competencyRepository: CompetencyRepository = mockk(relaxed = true)
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
     private val service =
-        BlueprintService(onboardingAiClient, blueprintRepository, blueprintStepRepository, transactionManager)
+        BlueprintService(
+            onboardingAiClient,
+            blueprintRepository,
+            blueprintStepRepository,
+            competencyRepository,
+            transactionManager,
+        )
 
     private fun makeBlueprint(scope: String, version: String, status: BlueprintStatus): Blueprint =
         Blueprint(scope = scope, version = version, status = status)
@@ -57,7 +68,7 @@ class BlueprintServiceTest {
             val aiStep = GeneratedBlueprintStep(id = "step-1", title = "Setup")
             val aiBlueprint = GeneratedBlueprint(scope = "global", version = "2", steps = listOf(aiStep))
             val outcome = BlueprintOutcome(scope = "global", status = "updated", blueprint = aiBlueprint)
-            coEvery { onboardingAiClient.generateBlueprints(any(), any()) } returns AiGenerateBlueprintsResponse(
+            coEvery { onboardingAiClient.generateBlueprints(any(), any(), any()) } returns AiGenerateBlueprintsResponse(
                 outcomes = listOf(outcome),
             )
             every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns currentActive
@@ -81,7 +92,7 @@ class BlueprintServiceTest {
             val aiStep = GeneratedBlueprintStep(id = "step-1", title = "Setup")
             val aiBlueprint = GeneratedBlueprint(scope = "global", version = "1", steps = listOf(aiStep))
             val outcome = BlueprintOutcome(scope = "global", status = "created", blueprint = aiBlueprint)
-            coEvery { onboardingAiClient.generateBlueprints(any(), any()) } returns AiGenerateBlueprintsResponse(
+            coEvery { onboardingAiClient.generateBlueprints(any(), any(), any()) } returns AiGenerateBlueprintsResponse(
                 outcomes = listOf(outcome),
             )
             every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns null
@@ -101,7 +112,7 @@ class BlueprintServiceTest {
         @Test
         fun `skips outcomes where blueprint is null`() = runTest {
             val outcome = BlueprintOutcome(scope = "global", status = "unchanged", blueprint = null)
-            coEvery { onboardingAiClient.generateBlueprints(any(), any()) } returns AiGenerateBlueprintsResponse(
+            coEvery { onboardingAiClient.generateBlueprints(any(), any(), any()) } returns AiGenerateBlueprintsResponse(
                 outcomes = listOf(outcome),
             )
             every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns null
@@ -116,7 +127,7 @@ class BlueprintServiceTest {
             val aiStep = GeneratedBlueprintStep(id = "step-1", title = "Setup")
             val aiBlueprint = GeneratedBlueprint(scope = "global", version = "2", steps = listOf(aiStep))
             val outcome = BlueprintOutcome(scope = "global", status = "escalated", blueprint = aiBlueprint)
-            coEvery { onboardingAiClient.generateBlueprints(any(), any()) } returns AiGenerateBlueprintsResponse(
+            coEvery { onboardingAiClient.generateBlueprints(any(), any(), any()) } returns AiGenerateBlueprintsResponse(
                 outcomes = listOf(outcome),
             )
             every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns null
@@ -143,7 +154,7 @@ class BlueprintServiceTest {
                 provenance = BlueprintProvenanceSchema(corpusFingerprint = "new-fp"),
             )
             val outcome = BlueprintOutcome(scope = "global", status = "updated", blueprint = aiBlueprint)
-            coEvery { onboardingAiClient.generateBlueprints(any(), capture(activeSlot)) } returns
+            coEvery { onboardingAiClient.generateBlueprints(any(), capture(activeSlot), any()) } returns
                 AiGenerateBlueprintsResponse(outcomes = listOf(outcome))
             every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns currentActive
             val savedSlot = slot<Blueprint>()
@@ -153,6 +164,28 @@ class BlueprintServiceTest {
 
             assertEquals("old-fp", activeSlot.captured[0].provenance?.corpusFingerprint)
             assertEquals("new-fp", savedSlot.captured.corpusFingerprint)
+        }
+
+        @Test
+        fun `sends the live competency graph and persists the returned competency key`() = runTest {
+            val competency = Competency(key = "deploy-runbook", label = "Deploy", kind = CompetencyKind.SKILL)
+            every { competencyRepository.findAll() } returns listOf(competency)
+            val competenciesSlot = slot<List<ActiveCompetencySchema>>()
+            val aiStep = GeneratedBlueprintStep(id = "step-1", title = "Setup", competencyKey = "deploy-runbook")
+            val aiBlueprint = GeneratedBlueprint(scope = "global", version = "1", steps = listOf(aiStep))
+            val outcome = BlueprintOutcome(scope = "global", status = "created", blueprint = aiBlueprint)
+            coEvery {
+                onboardingAiClient.generateBlueprints(any(), any(), capture(competenciesSlot))
+            } returns AiGenerateBlueprintsResponse(outcomes = listOf(outcome))
+            every { blueprintRepository.findByScopeAndStatus("global", BlueprintStatus.ACTIVE) } returns null
+            val savedSlot = slot<Blueprint>()
+            every { blueprintRepository.save(capture(savedSlot)) } returns
+                makeBlueprint("global", "1", BlueprintStatus.PROPOSED)
+
+            service.generateBlueprints(listOf("global"))
+
+            assertEquals(listOf("deploy-runbook"), competenciesSlot.captured.map { it.key })
+            assertEquals("deploy-runbook", savedSlot.captured.steps[0].competencyKey)
         }
     }
 
@@ -414,6 +447,24 @@ class BlueprintServiceTest {
 
             assertEquals(listOf("step-1"), schema.steps.map { it.id })
             assertEquals(setOf("step-1", "step-2"), response.steps.map { it.id }.toSet())
+        }
+
+        @Test
+        fun `carries the competency key into the AI-bound schema for round-tripping`() {
+            val blueprint = makeBlueprint("global", "1", BlueprintStatus.ACTIVE)
+            blueprint.steps.add(
+                BlueprintStep(
+                    blueprint = blueprint,
+                    stepId = "step-1",
+                    title = "Setup",
+                    position = 0,
+                    competencyKey = "deploy-runbook",
+                ),
+            )
+
+            val schema = blueprint.toSchema()
+
+            assertEquals("deploy-runbook", schema.steps[0].competencyKey)
         }
     }
 }

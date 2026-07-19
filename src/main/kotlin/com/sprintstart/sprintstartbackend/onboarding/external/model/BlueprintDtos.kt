@@ -7,6 +7,10 @@ import kotlinx.serialization.Serializable
 data class GenerateBlueprintsRequest(
     val scopes: List<String>? = null,
     val active: List<BlueprintSchema> = emptyList(),
+    // The backend's live competency graph. The AI tags each generated step with the
+    // best-matching key from this catalog (the blueprint->target bridge); the AI discards
+    // any key not present here, so it is safe to send the whole graph.
+    @SerialName("active_competencies") val activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
 )
 
 @Serializable
@@ -39,4 +43,7 @@ data class GeneratedBlueprintStep(
     val audience: List<String> = emptyList(),
     val requirement: String = "recommended",
     val invariant: Boolean = false,
+    // The competency graph key the AI matched this step to, or null when none fit. Persisted onto
+    // BlueprintStep.competencyKey (the blueprint->target bridge).
+    @SerialName("competency_key") val competencyKey: String? = null,
 )

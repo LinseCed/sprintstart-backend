@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompetencySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GeneratedBlueprint
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Blueprint
@@ -18,6 +19,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.Pr
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.VersionListResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintStepRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -35,6 +37,7 @@ class BlueprintService(
     private val onboardingAiClient: OnboardingAiClient,
     private val blueprintRepository: BlueprintRepository,
     private val blueprintStepRepository: BlueprintStepRepository,
+    private val competencyRepository: CompetencyRepository,
     transactionManager: PlatformTransactionManager,
 ) {
     // The AI call is a long-running suspend operation, so it must not run inside
@@ -61,11 +64,13 @@ class BlueprintService(
      */
     suspend fun generateBlueprints(scopes: List<String>?): GenerateBlueprintsResponse {
         // The AI service is stateless: pass it the current active blueprints so
-        // it can number versions and skip an unchanged corpus.
-        val active = withContext(Dispatchers.IO) {
-            readTxTemplate.execute { loadActiveSchemas(scopes) }.orEmpty()
+        // it can number versions and skip an unchanged corpus, plus the live competency
+        // graph so it can tag each generated step with a competency key (blueprint->target bridge).
+        val (active, competencies) = withContext(Dispatchers.IO) {
+            readTxTemplate.execute { loadActiveState(scopes) }
+                ?: (emptyList<BlueprintSchema>() to emptyList())
         }
-        val response = onboardingAiClient.generateBlueprints(scopes, active)
+        val response = onboardingAiClient.generateBlueprints(scopes, active, competencies)
         withContext(Dispatchers.IO) {
             txTemplate.executeWithoutResult {
                 for (outcome in response.outcomes) {
@@ -120,6 +125,7 @@ class BlueprintService(
                     position = index,
                     requirement = step.requirement,
                     invariant = step.invariant,
+                    competencyKey = step.competencyKey,
                 ),
             )
         }
@@ -127,17 +133,31 @@ class BlueprintService(
     }
 
     /**
-     * Loads the ACTIVE blueprints for the given [scopes] (or all scopes when `null`)
-     * and maps them to the wire schema sent to the AI service.
+     * Loads the stateless-AI generation context in a single read transaction: the ACTIVE
+     * blueprints for the given [scopes] (or all scopes when `null`) as the wire schema, plus the
+     * live competency graph the AI tags generated steps against (the blueprint->target bridge).
+     * The AI discards any competency key not in the supplied catalog, so the whole graph is sent.
      *
-     * @param scopes A list of scopes
+     * @param scopes A list of scopes, or `null` for all scopes.
+     * @return The active blueprints and the live competency catalog.
      */
-    private fun loadActiveSchemas(scopes: List<String>?): List<BlueprintSchema> {
+    private fun loadActiveState(
+        scopes: List<String>?,
+    ): Pair<List<BlueprintSchema>, List<ActiveCompetencySchema>> {
         val active = scopes?.mapNotNull {
             blueprintRepository.findByScopeAndStatus(it, BlueprintStatus.ACTIVE)
         }
             ?: blueprintRepository.findAllByStatus(BlueprintStatus.ACTIVE)
-        return active.map { it.toSchema() }
+        val competencies = competencyRepository.findAll().map {
+            ActiveCompetencySchema(
+                key = it.key,
+                label = it.label,
+                description = it.description ?: "",
+                kind = it.kind.name,
+                repoRef = it.repoRef,
+            )
+        }
+        return active.map { it.toSchema() } to competencies
     }
 
     /**
@@ -193,6 +213,7 @@ class BlueprintService(
                     position = step.position,
                     requirement = step.requirement,
                     invariant = step.invariant,
+                    competencyKey = step.competencyKey,
                 ),
             )
         }

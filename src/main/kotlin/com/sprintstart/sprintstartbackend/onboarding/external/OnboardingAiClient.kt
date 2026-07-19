@@ -88,18 +88,26 @@ class OnboardingAiClient(
      *
      * @param scopes The scopes to (re)generate, or `null` to refresh all known scopes.
      * @param active The backend's currently-active blueprints for the requested scopes.
+     * @param activeCompetencies The backend's live competency graph; the AI tags each generated
+     *   step with the best-matching key from it (the blueprint->target bridge).
      * @return The per-scope generation outcomes returned by the AI service.
      */
     suspend fun generateBlueprints(
         scopes: List<String>?,
         active: List<BlueprintSchema> = emptyList(),
+        activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
     ): GenerateBlueprintsResponse =
         try {
             webClient
                 .post()
                 .uri(uri("/api/v1/onboarding/blueprints/generate"))
-                .body(GenerateBlueprintsRequest(scopes = scopes, active = active))
-                .sync()
+                .body(
+                    GenerateBlueprintsRequest(
+                        scopes = scopes,
+                        active = active,
+                        activeCompetencies = activeCompetencies,
+                    ),
+                ).sync()
                 .perform<GenerateBlueprintsResponse>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
             val msg = "Failed to generate blueprints (HTTP ${e.statusCode}): ${e.body}"
