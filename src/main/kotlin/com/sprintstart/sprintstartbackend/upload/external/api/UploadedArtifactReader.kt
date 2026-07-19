@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.upload.external
+package com.sprintstart.sprintstartbackend.upload.external.api
 
 import java.util.UUID
 

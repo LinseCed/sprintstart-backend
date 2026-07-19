@@ -13,8 +13,6 @@ import java.util.Optional
 import java.util.UUID
 
 interface IngestionRunRepository : JpaRepository<IngestionRun, UUID> {
-    fun findAllByStatus(status: IngestionRunStatus): List<IngestionRun>
-
     fun findByOrderByStartedAtDesc(
         pageable: Pageable,
     ): List<IngestionRun>

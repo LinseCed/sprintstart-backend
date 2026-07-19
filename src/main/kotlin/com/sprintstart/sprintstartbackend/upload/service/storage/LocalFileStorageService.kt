@@ -1,12 +1,13 @@
 package com.sprintstart.sprintstartbackend.upload.service.storage
 
-import org.springframework.beans.factory.annotation.Value
+import com.sprintstart.sprintstartbackend.ApplicationConfig
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import org.springframework.stereotype.Service
 import org.springframework.web.multipart.MultipartFile
 import java.nio.file.Files
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
-import java.util.UUID
+import java.util.*
 
 /**
  * Filesystem implementation of upload artifact storage.
@@ -16,8 +17,7 @@ import java.util.UUID
  */
 @Service
 class LocalFileStorageService(
-    @Value("\${app.upload.directory}")
-    private val uploadDirectory: String,
+    private val applicationConfig: ApplicationConfig,
 ) : ArtifactStorageService {
     /**
      * Stores the file under a directory named with the artifact id.
@@ -31,12 +31,13 @@ class LocalFileStorageService(
      * @throws IllegalArgumentException when the multipart file has no original filename.
      * @throws java.io.IOException when the directory cannot be created or the file cannot be copied.
      */
+    @Tracked("Storing uploaded file")
     override fun store(
         file: MultipartFile,
         artifactId: UUID,
     ): String {
         val artifactDirectory = Paths.get(
-            uploadDirectory,
+            applicationConfig.upload.directory,
             artifactId.toString(),
         )
 
@@ -65,30 +66,20 @@ class LocalFileStorageService(
      * @param storagePath The filesystem path previously returned by [store].
      * @throws java.io.IOException when the path or parent directory cannot be inspected or removed.
      */
+    @Tracked("Deleting uploaded file")
     override fun delete(
         storagePath: String,
     ) {
-        val filePath = Paths.get(
-            storagePath,
-        )
+        val filePath = Paths.get(storagePath)
+        Files.deleteIfExists(filePath)
 
-        Files.deleteIfExists(
-            filePath,
-        )
+        val parentDirectory = filePath.parent
 
-        val parentDirectory =
-            filePath.parent
-
-        if (
-            parentDirectory != null &&
-            Files.exists(parentDirectory)
-        ) {
+        if (parentDirectory != null && Files.exists(parentDirectory)) {
             Files.list(parentDirectory).use { files ->
 
                 if (files.findAny().isEmpty) {
-                    Files.deleteIfExists(
-                        parentDirectory,
-                    )
+                    Files.deleteIfExists(parentDirectory)
                 }
             }
         }

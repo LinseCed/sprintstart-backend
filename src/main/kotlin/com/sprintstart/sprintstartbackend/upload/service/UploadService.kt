@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.upload.service
 
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.ArtifactUploadedEvent
 import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.UploadArtifactOperationOutcome
 import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.UploadArtifactStatus
@@ -58,6 +59,7 @@ class UploadService(
      * @throws ResponseStatusException `404` when the uploader id does not exist.
      */
     @Transactional
+    @Tracked("Uploading a new batch of artifacts")
     fun upload(
         authId: String,
         files: List<MultipartFile>,
@@ -65,7 +67,9 @@ class UploadService(
         uploaderId: UUID,
     ): List<UploadArtifactResponse> {
         val transactionId = UUID.randomUUID()
+
         publisher.publishEvent(UploadStartedEvent(transactionId = transactionId))
+
         val userInRepo = userApi.getUserByAuthId(authId)
         if (projectId !in userInRepo.projects.map { it.projectId }) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project")
@@ -81,11 +85,8 @@ class UploadService(
         val responses = mutableListOf<UploadArtifactResponse>()
         val uploadArtifactOperationOutcomes = mutableSetOf<UploadArtifactOperationOutcome>()
 
-        val uploadedArtifactsByFilename =
-            mutableMapOf<String, UploadedArtifact>()
-
-        val markdownArtifacts =
-            mutableListOf<Pair<UploadedArtifact, String>>()
+        val uploadedArtifactsByFilename = mutableMapOf<String, UploadedArtifact>()
+        val markdownArtifacts = mutableListOf<Pair<UploadedArtifact, String>>()
 
         files.forEach { file ->
 
@@ -102,17 +103,10 @@ class UploadService(
 
                 uploadResult.artifact?.let { artifact ->
                     uploadedArtifacts.add(artifact)
+                    uploadedArtifactsByFilename[artifact.filename] = artifact
 
-                    uploadedArtifactsByFilename[
-                        artifact.filename,
-                    ] = artifact
-
-                    if (
-                        artifact.mime.contains("markdown")
-                    ) {
-                        markdownArtifacts.add(
-                            artifact to String(file.bytes),
-                        )
+                    if (artifact.mime.contains("markdown")) {
+                        markdownArtifacts.add(artifact to String(file.bytes))
                     }
                 }
             } catch (
@@ -159,6 +153,132 @@ class UploadService(
         return responses
     }
 
+    /**
+     * Returns persisted uploads for a single uploader.
+     *
+     * @param uploaderId The user whose uploaded artifacts should be listed.
+     * @return Upload list items sorted according to repository default ordering.
+     */
+    @Transactional(readOnly = true)
+    @Tracked("Listing uploads for a single uploader")
+    fun listUploads(
+        uploaderId: UUID,
+    ): List<UploadListItemResponse> =
+        uploadedArtifactRepository
+            .findAllByUploaderId(uploaderId)
+            .map {
+                UploadListItemResponse(
+                    id = it.id,
+                    filename = it.filename,
+                    mime = it.mime,
+                    uploadedAt = it.uploadedAt,
+                )
+            }
+
+    /**
+     * Missing artifacts and storage failures are recorded as failed deletion outcomes. Successful
+     * deletions publish per-artifact deletion events before the upload metadata row is removed, so
+     * ingestion listeners can deindex the mirrored artifact.
+     *
+     * The deletion batch publishes start and finish events even when every requested artifact
+     * fails. Missing artifacts and storage-delete errors are not thrown to the caller; they are
+     * reported through `UploadBatchDeletionFinishedEvent`.
+     *
+     * @param authId The authenticated user's external auth id used for project access checks.
+     * @param artifactIds The uploaded artifact ids requested for deletion.
+     * @param removerId The user recorded as the deletion actor in ingestion failure metadata.
+     * @param projectId The project used to authorize the deletion request.
+     * @throws ResponseStatusException `403` when the authenticated user cannot access the project.
+     * @throws ResponseStatusException `404` when the remover id does not exist.
+     */
+    @Transactional
+    @Tracked("Deleting a batch of artifacts")
+    fun deleteUpload(
+        authId: String,
+        artifactIds: Set<UUID>,
+        removerId: UUID,
+        projectId: UUID,
+    ) {
+        val userInRepo = userApi.getUserByAuthId(authId)
+        if (projectId !in userInRepo.projects.map { it.projectId }) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project")
+        }
+        if (!userApi.exists(removerId)) {
+            throw ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Remover with id $removerId does not exist",
+            )
+        }
+
+        val deleteArtifactOutcomes = mutableSetOf<UploadArtifactOperationOutcome>()
+        val transactionId = UUID.randomUUID()
+
+        publisher.publishEvent(
+            UploadStartedEvent(
+                transactionId = transactionId,
+            ),
+        )
+
+        artifactIds.forEach { artifactId ->
+            val artifact =
+                uploadedArtifactRepository
+                    .findById(artifactId)
+                    .orElse(null)
+            if (artifact == null) {
+                deleteArtifactOutcomes.add(
+                    UploadArtifactOperationOutcome(
+                        id = artifactId,
+                        filename = "unknown",
+                        status = UploadArtifactStatus.FAILED,
+                        error = "Artifact with id $artifactId not found.",
+                    ),
+                )
+                return@forEach
+            }
+
+            linkedImageRepository.deleteAllByMarkdownArtifactId(artifactId)
+            linkedImageRepository.deleteAllByImageArtifactId(artifactId)
+
+            try {
+                storageService.delete(artifact.storagePath)
+            } catch (e: Exception) {
+                deleteArtifactOutcomes.add(
+                    UploadArtifactOperationOutcome(
+                        id = artifactId,
+                        filename = "unknown",
+                        status = UploadArtifactStatus.FAILED,
+                        error = e.message,
+                    ),
+                )
+                return@forEach
+            }
+            publisher.publishEvent(
+                UploadFileDeletedEvent(
+                    transactionId = transactionId,
+                    uploadArtifactId = artifact.id,
+                ),
+            )
+            uploadedArtifactRepository.delete(artifact)
+        }
+        publisher.publishEvent(
+            UploadBatchDeletionFinishedEvent(
+                transactionId = transactionId,
+                removerId = removerId,
+                deleteArtifactOutcomes = deleteArtifactOutcomes,
+            ),
+        )
+    }
+
+    /**
+     * Uploads a single file and processes it for storage and validation.
+     *
+     * @param file the file to be uploaded as a `MultipartFile`
+     * @param uploaderId the unique identifier of the uploader as a `UUID`
+     * @param projectId the unique identifier of the related project as a `UUID`
+     * @param transactionId the unique identifier of the transaction as a `UUID`
+     * @param outcomes a mutable set used to track the outcomes of the upload operation
+     * @return an instance of `UploadResult` containing the upload response and artifact details
+     */
     private fun uploadSingle(
         file: MultipartFile,
         uploaderId: UUID,
@@ -172,8 +292,7 @@ class UploadService(
 
         val hash = sha256(bytes)
 
-        val existingArtifact =
-            uploadedArtifactRepository.findByHash(hash)
+        val existingArtifact = uploadedArtifactRepository.findByHash(hash)
 
         if (existingArtifact != null) {
             outcomes.add(
@@ -202,10 +321,7 @@ class UploadService(
             uploaderId = uploaderId,
         )
 
-        val storagePath = storageService.store(
-            file = file,
-            artifactId = artifact.id,
-        )
+        val storagePath = storageService.store(file = file, artifactId = artifact.id)
 
         artifact.storagePath = storagePath
 
@@ -251,130 +367,9 @@ class UploadService(
                 "%02x".format(it)
             }
     }
-
-    data class UploadResult(
-        val response: UploadArtifactResponse,
-        val artifact: UploadedArtifact?,
-    )
-
-    /**
-     * Returns persisted uploads for a single uploader.
-     *
-     * @param uploaderId The user whose uploaded artifacts should be listed.
-     * @return Upload list items sorted according to repository default ordering.
-     */
-    fun listUploads(
-        uploaderId: UUID,
-    ): List<UploadListItemResponse> =
-        uploadedArtifactRepository
-            .findAllByUploaderId(uploaderId)
-            .map {
-                UploadListItemResponse(
-                    id = it.id,
-                    filename = it.filename,
-                    mime = it.mime,
-                    uploadedAt = it.uploadedAt,
-                )
-            }
-
-    /**
-     * Missing artifacts and storage failures are recorded as failed deletion outcomes. Successful
-     * deletions publish per-artifact deletion events before the upload metadata row is removed, so
-     * ingestion listeners can deindex the mirrored artifact.
-     *
-     * The deletion batch publishes start and finish events even when every requested artifact
-     * fails. Missing artifacts and storage-delete errors are not thrown to the caller; they are
-     * reported through `UploadBatchDeletionFinishedEvent`.
-     *
-     * @param authId The authenticated user's external auth id used for project access checks.
-     * @param artifactIds The uploaded artifact ids requested for deletion.
-     * @param removerId The user recorded as the deletion actor in ingestion failure metadata.
-     * @param projectId The project used to authorize the deletion request.
-     * @throws ResponseStatusException `403` when the authenticated user cannot access the project.
-     * @throws ResponseStatusException `404` when the remover id does not exist.
-     */
-    @Transactional
-    fun deleteUpload(
-        authId: String,
-        artifactIds: Set<UUID>,
-        removerId: UUID,
-        projectId: UUID,
-    ) {
-        val userInRepo = userApi.getUserByAuthId(authId)
-        if (projectId !in userInRepo.projects.map { it.projectId }) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project")
-        }
-        if (!userApi.exists(removerId)) {
-            throw ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "Remover with id $removerId does not exist",
-            )
-        }
-        val deleteArtifactOutcomes = mutableSetOf<UploadArtifactOperationOutcome>()
-        val transactionId = UUID.randomUUID()
-        publisher.publishEvent(
-            UploadStartedEvent(
-                transactionId = transactionId,
-            ),
-        )
-        artifactIds.forEach { artifactId ->
-            val artifact =
-                uploadedArtifactRepository
-                    .findById(artifactId)
-                    .orElse(null)
-            if (artifact == null) {
-                deleteArtifactOutcomes.add(
-                    UploadArtifactOperationOutcome(
-                        id = artifactId,
-                        filename = "unknown",
-                        status = UploadArtifactStatus.FAILED,
-                        error = "Artifact with id $artifactId not found.",
-                    ),
-                )
-                return@forEach
-            }
-
-            linkedImageRepository
-                .deleteAllByMarkdownArtifactId(
-                    artifactId,
-                )
-
-            linkedImageRepository
-                .deleteAllByImageArtifactId(
-                    artifactId,
-                )
-
-            try {
-                storageService.delete(
-                    artifact.storagePath,
-                )
-            } catch (e: Exception) {
-                deleteArtifactOutcomes.add(
-                    UploadArtifactOperationOutcome(
-                        id = artifactId,
-                        filename = "unknown",
-                        status = UploadArtifactStatus.FAILED,
-                        error = e.message,
-                    ),
-                )
-                return@forEach
-            }
-            publisher.publishEvent(
-                UploadFileDeletedEvent(
-                    transactionId = transactionId,
-                    uploadArtifactId = artifact.id,
-                ),
-            )
-            uploadedArtifactRepository.delete(
-                artifact,
-            )
-        }
-        publisher.publishEvent(
-            UploadBatchDeletionFinishedEvent(
-                transactionId = transactionId,
-                removerId = removerId,
-                deleteArtifactOutcomes = deleteArtifactOutcomes,
-            ),
-        )
-    }
 }
+
+data class UploadResult(
+    val response: UploadArtifactResponse,
+    val artifact: UploadedArtifact?,
+)

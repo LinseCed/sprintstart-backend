@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.external
 
+import com.sprintstart.sprintstartbackend.ingestion.external.model.ArtifactDto
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import java.time.Instant
 import java.util.UUID
 
@@ -40,4 +42,12 @@ interface ArtifactIngestionApi {
      * Returns whether the artifact exists and belongs to the specified project.
      */
     fun existsInProject(projectId: UUID, artifactId: UUID): Boolean
+
+    /**
+     * Finds and retrieves an artifact by its unique identifier.
+     *
+     * @param artifactId The unique identifier of the artifact to be retrieved.
+     * @return The artifact details wrapped in an [ArtifactDto] object.
+     */
+    fun findArtifactById(artifactId: UUID): ArtifactDto?
 }

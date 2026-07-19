@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import jakarta.transaction.Transactional
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
@@ -39,6 +40,7 @@ class IngestionRunLifeCycleService(
      * @param failureReason Optional run-level failure reason for startup failures.
      */
     @Transactional
+    @Tracked("Starting ingestion run")
     fun startRun(
         transactionId: UUID,
         sourceSystem: SourceSystem,
@@ -77,6 +79,7 @@ class IngestionRunLifeCycleService(
      * @throws IngestionRunNotFoundException when the run id is unknown.
      */
     @Transactional
+    @Tracked("Updating ingestion run status")
     fun updateRunStatus(transactionId: UUID, status: IngestionRunStatus) {
         val run = ingestionRunRepository
             .findByIdOrNull(transactionId)
@@ -94,6 +97,7 @@ class IngestionRunLifeCycleService(
      * @param run The managed ingestion run entity whose terminal status should be calculated.
      */
     @Transactional
+    @Tracked("Finishing ingestion run")
     fun finishRun(run: IngestionRun) {
         if (run.failedCount > 0) {
             if (run.ingestedCount > 0 || run.updatedCount > 0 || run.deletedCount > 0) {
@@ -124,6 +128,7 @@ class IngestionRunLifeCycleService(
      * @param runId The ingestion run whose AI sync just completed.
      */
     @Transactional
+    @Tracked("Marking AI sync succeeded")
     fun markAiSyncSucceeded(runId: UUID) {
         ingestionRunRepository.findByIdOrNull(runId)?.let { run ->
             run.aiSyncStatus = AiSyncStatus.SUCCEEDED
@@ -138,6 +143,7 @@ class IngestionRunLifeCycleService(
      * @param reason A short description of the failure, surfaced alongside the run.
      */
     @Transactional
+    @Tracked("Marking AI sync failed")
     fun markAiSyncFailed(runId: UUID, reason: String?) {
         ingestionRunRepository.findByIdOrNull(runId)?.let { run ->
             run.aiSyncStatus = AiSyncStatus.FAILED

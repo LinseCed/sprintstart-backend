@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.service
 
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.enums.SkillStatus
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.entity.Skill
@@ -33,11 +34,13 @@ class SkillService(
     private val userSkillAssessmentRepository: UserSkillAssessmentRepository,
 ) {
     @Transactional(readOnly = true)
+    @Tracked("Retrieving all skills")
     fun getAllSkills(): List<GetSkillResponse> {
         return skillRepository.findAll().map { it.toGetResponse() }
     }
 
     @Transactional(readOnly = true)
+    @Tracked("Retrieving skill by id")
     fun getSkillById(skillId: UUID): GetSkillResponse {
         return skillRepository
             .findById(skillId)
@@ -46,6 +49,7 @@ class SkillService(
     }
 
     @Transactional
+    @Tracked("Creating skill")
     fun createSkill(request: CreateSkillRequest): CreateSkillResponse {
         val roles = findRolesByIds(request.roleIds)
         val existingSkill = skillRepository.findByNormalizedName(request.name)
@@ -72,6 +76,7 @@ class SkillService(
     }
 
     @Transactional
+    @Tracked("Updating skill")
     fun updateSkill(skillId: UUID, request: UpdateSkillRequest): UpdateSkillResponse {
         val skill = skillRepository
             .findById(skillId)
@@ -106,6 +111,7 @@ class SkillService(
      * Existing assessments referencing this skill are preserved.
      */
     @Transactional
+    @Tracked("Retiring skill")
     fun retireSkill(skillId: UUID) {
         val skill = skillRepository
             .findById(skillId)
@@ -116,6 +122,7 @@ class SkillService(
     }
 
     @Transactional(readOnly = true)
+    @Tracked("Retrieving user skill assessments")
     fun getUserSkillAssessments(userId: UUID): List<GetSkillAssessmentResponse> {
         if (!userRepository.existsById(userId)) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "User with id $userId not found")
@@ -124,6 +131,7 @@ class SkillService(
     }
 
     @Transactional
+    @Tracked("Retrieving my skill assessments")
     fun getMySkillAssessments(authId: String): List<GetSkillAssessmentResponse> {
         val user = userRepository
             .findByAuthId(authId)
@@ -137,6 +145,7 @@ class SkillService(
     }
 
     @Transactional
+    @Tracked("Assessing skill for me")
     fun assessSkillForMe(authId: String, request: CreateSkillAssessmentRequest): CreateSkillAssessmentResponse {
         val user = userRepository
             .findByAuthId(authId)

@@ -36,14 +36,6 @@ fun OnboardingPhase.checkPassed(): Boolean = checkAttempts.any { it.passed }
 /** The most recently submitted attempt for this phase's knowledge check. */
 fun OnboardingPhase.latestCheckAttempt(): PhaseCheckAttempt? = checkAttempts.maxByOrNull { it.createdAt }
 
-/**
- * Whether this phase is completed from the user's perspective: all steps done or
- * skipped and, if a knowledge check exists, the check passed.
- */
-fun OnboardingPhase.completedForUser(): Boolean {
-    return stepsCompleted() && (!hasCheck() || checkPassed())
-}
-
 //  ========================== Response mappers ==========================
 
 fun OnboardingPhase.toCheckSummaryResponse(): PhaseCheckSummaryResponse {

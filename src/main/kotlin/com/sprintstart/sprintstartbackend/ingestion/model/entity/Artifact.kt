@@ -19,14 +19,14 @@ class Artifact(
     @Id
     val id: UUID = UUID.randomUUID(),
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "source_system", nullable = false)
     val sourceSystem: SourceSystem,
-    @Column(nullable = false)
+    @Column(name = "source_id", nullable = false)
     val sourceId: String,
-    @Column(length = 2048)
+    @Column(name = "source_url", length = 2048)
     val sourceUrl: String?,
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "artifact_type", nullable = false)
     val artifactType: ArtifactType,
     var title: String?,
     @Column(columnDefinition = "TEXT")
@@ -44,9 +44,11 @@ class Artifact(
     // Add companion obj to Artifact to have Artifact.create
     // to keep internal state hidden
     private val projectIdsInternal: MutableSet<UUID> = mutableSetOf(),
+    @Column(name = "created_at_source")
     val createdAtSource: Instant?,
+    @Column(name = "updated_at_source")
     val updatedAtSource: Instant?,
-    @Column(nullable = false)
+    @Column(name = "ingested_at", nullable = false)
     val ingestedAt: Instant = Instant.now(),
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ingestion_run_id")

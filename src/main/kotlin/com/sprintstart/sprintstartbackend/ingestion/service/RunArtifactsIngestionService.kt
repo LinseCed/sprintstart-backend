@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRu
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ingestion.ArtifactAiMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -40,6 +41,7 @@ class RunArtifactsIngestionService(
      * @throws com.sprintstart.sprintstartbackend.upload.model.exceptions.IngestionResponseException
      * when the AI ingestion service rejects the sync request.
      */
+    @Tracked("Dispatching AI sync for run")
     suspend fun ingestRunArtifacts(runId: UUID) {
         val request = withContext(Dispatchers.IO) {
             val run = ingestionRunRepository

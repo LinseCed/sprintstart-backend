@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.upload.service
 
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import org.springframework.stereotype.Component
 
 /**
@@ -22,6 +23,7 @@ class MarkdownImageReferenceExtractor {
      * @param markdown The markdown document content to scan.
      * @return Image targets in the order they appear in the document.
      */
+    @Tracked("Extracting image targets from markdown")
     fun extract(markdown: String): List<String> {
         return imageRegex
             .findAll(markdown)

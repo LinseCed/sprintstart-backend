@@ -28,6 +28,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPhaseR
 import com.sprintstart.sprintstartbackend.onboarding.repository.PhaseCheckAttemptRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.PhaseCheckQuestionRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.PhaseCheckReviewItemRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
@@ -81,6 +82,7 @@ class PhaseCheckService(
      * @throws ResponseStatusException When the user or phase does not exist.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving onboarding phase check")
     fun getPhaseCheckForMe(authId: String, phaseId: UUID): GetPhaseCheckForUserResponse {
         val userId = resolveUserId(authId)
         val phase = findPhaseForUser(phaseId, userId)
@@ -108,6 +110,7 @@ class PhaseCheckService(
      * phase has no knowledge check.
      */
     @Transactional
+    @Tracked("Submitting onboarding phase check")
     fun submitPhaseCheckAttemptForMe(
         authId: String,
         phaseId: UUID,
@@ -188,6 +191,7 @@ class PhaseCheckService(
      * @throws ResponseStatusException When the phase does not exist.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving onboarding phase check")
     fun getPhaseCheck(phaseId: UUID): GetPhaseCheckResponse {
         return findPhase(phaseId).toCheckResponse()
     }
@@ -206,6 +210,7 @@ class PhaseCheckService(
      * is invalid for its type.
      */
     @Transactional
+    @Tracked("Replacing onboarding phase check")
     fun replacePhaseCheck(phaseId: UUID, request: UpdatePhaseCheckRequest): GetPhaseCheckResponse {
         val phase = findPhase(phaseId)
 
@@ -248,6 +253,7 @@ class PhaseCheckService(
      * @throws ResponseStatusException When the user or phase does not exist.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving onboarding phase check attempts")
     fun getPhaseCheckAttemptsForUser(userId: UUID, phaseId: UUID): GetPhaseCheckAttemptsResponse {
         if (!userApi.exists(userId)) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with id: $userId")
@@ -265,18 +271,40 @@ class PhaseCheckService(
 
 //  ========================== Helper Methods ==========================
 
+    /**
+     * Resolves the user ID corresponding to the provided authentication ID.
+     *
+     * @param authId The authentication ID used to locate the user.
+     * @return The UUID of the user corresponding to the given authentication ID.
+     * @throws ResponseStatusException if no user is found for the provided authentication ID.
+     */
     private fun resolveUserId(authId: String): UUID {
         return userApi
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
     }
 
+    /**
+     * Finds an onboarding phase based on the provided phase ID.
+     *
+     * @param phaseId the unique identifier of the onboarding phase to retrieve
+     * @return the onboarding phase associated with the given phase ID
+     * @throws ResponseStatusException if no onboarding phase is found with the specified phase ID
+     */
     private fun findPhase(phaseId: UUID): OnboardingPhase {
         return onboardingPhaseRepository
             .findById(phaseId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No phase found with id: $phaseId") }
     }
 
+    /**
+     * Finds an onboarding phase associated with a specific user.
+     *
+     * @param phaseId The unique identifier of the onboarding phase to retrieve.
+     * @param userId The unique identifier of the user associated with the onboarding phase.
+     * @return The onboarding phase associated with the given phase ID and user ID.
+     * @throws ResponseStatusException if no onboarding phase is found for the provided IDs.
+     */
     private fun findPhaseForUser(phaseId: UUID, userId: UUID): OnboardingPhase {
         return onboardingPhaseRepository
             .findByIdAndPathUserId(phaseId, userId)
@@ -306,7 +334,13 @@ class PhaseCheckService(
         return multipleChoice + shortText
     }
 
-    /** A multiple choice answer is correct when it selects exactly the correct options. */
+    /**
+     * Grades a multiple-choice question by comparing the selected answers with the correct answers.
+     *
+     * @param question The multiple-choice question containing the list of options and their correctness.
+     * @param answer The submitted answer containing the selected option IDs, or null if no answer was submitted.
+     * @return A boolean indicating whether the submitted answer matches the correct answers.
+     */
     private fun gradeMultipleChoice(question: PhaseCheckQuestion, answer: SubmitCheckAnswerRequest?): Boolean {
         if (answer == null) return false
         val correctOptionIds = question.options
@@ -374,6 +408,13 @@ class PhaseCheckService(
             null
         }
 
+    /**
+     * Converts the PhaseCheckQuestion instance into a CheckAnswerResultResponse object.
+     *
+     * @param correct Indicates whether the answer is correct.
+     * @param feedback Optional feedback message associated with the question.
+     * @return A CheckAnswerResultResponse object containing the result details.
+     */
     private fun PhaseCheckQuestion.toResultResponse(
         correct: Boolean,
         feedback: String? = null,
@@ -388,11 +429,23 @@ class PhaseCheckService(
         )
     }
 
+    /**
+     * Determines if there is a subsequent phase in the onboarding process.
+     *
+     * @return true if there is a phase with a higher position than the current phase, false otherwise.
+     */
     private fun OnboardingPhase.hasNextPhase(): Boolean {
         return path.phases.any { it.position > this.position }
     }
 
-    /** The phase directly after this one by position, or null when this is the last phase. */
+    /**
+     * Determines the next phase in the onboarding process based on the current phase's position.
+     *
+     * It searches through the phases with a position greater than the current phase's position
+     * and selects the one with the smallest position (i.e., the closest subsequent phase).
+     *
+     * @return The next OnboardingPhase in the sequence, or null if no subsequent phase exists.
+     */
     private fun OnboardingPhase.nextPhase(): OnboardingPhase? =
         path.phases.filter { it.position > this.position }.minByOrNull { it.position }
 
@@ -461,7 +514,15 @@ class PhaseCheckService(
         }
     }
 
-    /** Ids of the phase's own questions answered incorrectly in at least one of the user's attempts. */
+    /**
+     * Retrieves the set of IDs corresponding to the user's own questions that were answered incorrectly during their attempts
+     * in a specific phase.
+     *
+     * @param phaseId the unique identifier of the phase.
+     * @param userId the unique identifier of the user.
+     * @param ownQuestions the list of questions that are considered the user's own.
+     * @return a set of unique question IDs that were answered incorrectly among the user's own questions.
+     */
     private fun everWrongOwnQuestionIds(
         phaseId: UUID,
         userId: UUID,
@@ -476,9 +537,21 @@ class PhaseCheckService(
             .toSet()
     }
 
+    /**
+     * Throws a ResponseStatusException with HttpStatus.BAD_REQUEST and the provided message.
+     *
+     * @param message The error message to include in the exception.
+     * @return This function does not return as it always throws an exception.
+     */
     private fun badRequest(message: String): Nothing =
         throw ResponseStatusException(HttpStatus.BAD_REQUEST, message)
 
+    /**
+     * Validates the questions in the given request to ensure they meet the required criteria
+     * based on the type of each question. Throws a bad request error if validation fails.
+     *
+     * @param request The UpdatePhaseCheckRequest containing the list of questions to be validated.
+     */
     private fun validateQuestions(request: UpdatePhaseCheckRequest) {
         request.questions.forEach { question ->
             when (question.type) {

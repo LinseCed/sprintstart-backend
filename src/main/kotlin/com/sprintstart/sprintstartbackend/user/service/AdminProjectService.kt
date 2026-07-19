@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.connectors.overview.external.ProjectSourceApi
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.model.entity.Project
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectUserAssignment
 import com.sprintstart.sprintstartbackend.user.model.mapper.toAdminDetailResponse
@@ -42,6 +43,7 @@ class AdminProjectService(
      * @return All projects visible to administrators.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving all projects")
     fun getAllProjects(): List<AdminProjectListResponse> {
         val projects = projectRepository.findAll()
         if (projects.isEmpty()) {
@@ -68,6 +70,7 @@ class AdminProjectService(
      * @throws ResponseStatusException When no project exists for [id].
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving specific project")
     fun getProjectById(id: UUID): AdminProjectDetailResponse {
         val project = findProject(id)
         return project.toAdminDetailResponse(
@@ -86,6 +89,7 @@ class AdminProjectService(
      * @throws ResponseStatusException When the name is blank or already in use.
      */
     @Transactional
+    @Tracked("Creating new project")
     fun createProject(request: CreateAdminProjectRequest): AdminProjectDetailResponse {
         val name = validatedName(request.name)
         ensureProjectNameAvailable(name)
@@ -114,6 +118,7 @@ class AdminProjectService(
      * @throws ResponseStatusException When no project exists for [id] or the requested name is invalid.
      */
     @Transactional
+    @Tracked("Updating project")
     fun patchProject(id: UUID, request: PatchAdminProjectRequest): AdminProjectDetailResponse {
         val project = findProject(id)
 
@@ -140,6 +145,7 @@ class AdminProjectService(
      * @throws ResponseStatusException When no project exists for [id].
      */
     @Transactional
+    @Tracked("Deleting project")
     fun deleteProject(id: UUID): DeleteProjectResponse {
         val project = findProject(id)
         val assignments = assignmentRepository.findAllByProjectId(project.id)
@@ -157,6 +163,7 @@ class AdminProjectService(
      * @throws ResponseStatusException When no project exists for [projectId].
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving project users")
     fun getProjectUsers(projectId: UUID): List<ProjectUserResponse> {
         findProject(projectId)
         return assignmentRepository
@@ -175,6 +182,7 @@ class AdminProjectService(
      * @throws ResponseStatusException When the project or any requested user does not exist.
      */
     @Transactional
+    @Tracked("Assigning project users")
     fun assignUsers(projectId: UUID, request: AssignProjectUsersRequest): List<ProjectUserResponse> {
         val project = findProject(projectId)
         val users = userRepository.findAllById(request.userIds)
@@ -209,6 +217,7 @@ class AdminProjectService(
      * @throws ResponseStatusException When the project or assignment does not exist.
      */
     @Transactional
+    @Tracked("Removing project user")
     fun removeUser(projectId: UUID, userId: UUID) {
         findProject(projectId)
         val assignment = assignmentRepository.findByProjectIdAndUserId(projectId, userId)
@@ -220,12 +229,26 @@ class AdminProjectService(
         assignmentRepository.delete(assignment)
     }
 
+    /**
+     * Finds a project by its unique identifier.
+     *
+     * @param id the unique identifier of the project to be retrieved
+     * @return the project associated with the given id
+     * @throws ResponseStatusException if no project is found with the given id
+     */
     private fun findProject(id: UUID): Project {
         return projectRepository
             .findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Project with id $id not found") }
     }
 
+    /**
+     * Validates the provided name by trimming whitespace and ensuring it is not blank.
+     *
+     * @param name the name to be validated
+     * @return the validated and trimmed name
+     * @throws ResponseStatusException if the trimmed name is blank, with a BAD_REQUEST status
+     */
     private fun validatedName(name: String): String {
         val trimmedName = name.trim()
         if (trimmedName.isBlank()) {
@@ -234,6 +257,14 @@ class AdminProjectService(
         return trimmedName
     }
 
+    /**
+     * Checks if the given project name is available. Throws an exception if a project with the same name
+     * already exists, unless the project is the same as the one specified by the provided current project ID.
+     *
+     * @param name The name of the project to check for availability.
+     * @param currentProjectId The UUID of the current project, if applicable. Optional parameter.
+     * @throws ResponseStatusException if the project name is already in use by another project.
+     */
     private fun ensureProjectNameAvailable(name: String, currentProjectId: UUID? = null) {
         val existingProject = projectRepository.findByName(name)
         if (existingProject != null && existingProject.id != currentProjectId) {

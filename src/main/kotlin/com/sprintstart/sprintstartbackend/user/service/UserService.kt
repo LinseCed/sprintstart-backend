@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.service
 
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.external.events.UserCreatedEvent
 import com.sprintstart.sprintstartbackend.user.model.entity.User
@@ -37,6 +38,7 @@ class UserService(
      * @return All users mapped to controller response DTOs.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving all users")
     fun getAllUsers(): List<GetUserResponse> =
         userRepository.findAll().map { it.toGetResponse() }
 
@@ -48,6 +50,7 @@ class UserService(
      * @return The matching user.
      */
     @Transactional
+    @Tracked("Retrieving authenticated user")
     fun getMe(jwt: Jwt): GetUserResponse {
         val user = userRepository.findByAuthId(jwt.subject).orElseGet {
             val newUser = User(
@@ -76,6 +79,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given auth ID.
      */
     @Transactional
+    @Tracked("Updating authenticated user")
     fun patchMe(authId: String, request: PatchMeRequest): GetUserResponse {
         val user = findByAuthId(authId)
 
@@ -107,6 +111,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given auth ID.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving authenticated user's projects")
     fun getMyProjects(authId: String): List<MyProjectResponse> =
         findByAuthId(authId).projects.map { MyProjectResponse(id = it.id, name = it.name) }
 
@@ -124,6 +129,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given ID.
      */
     @Transactional
+    @Tracked("Updating user")
     fun patchAdminUserById(id: UUID, request: PatchUserRequest): GetUserResponse {
         val user = findById(id)
 
@@ -153,6 +159,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given ID.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving user by id")
     fun getUserById(id: UUID): GetUserResponse =
         findById(id).toGetResponse()
 
@@ -165,6 +172,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given ID.
      */
     @Transactional
+    @Tracked("Updating user enabled state")
     fun updateUserEnabledById(id: UUID, request: UpdateUserEnabledRequest): GetUserResponse {
         val user = findById(id)
         keycloakAdminClient.setUserEnabled(user.authId, request.enabled)
@@ -180,6 +188,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given ID.
      */
     @Transactional
+    @Tracked("Deleting user by id")
     fun deleteUserById(id: UUID) {
         val authId = userRepository
             .findAuthIdById(id)
@@ -201,6 +210,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given ID.
      */
     @Transactional
+    @Tracked("Deleting user by id")
     fun deleteAdminUserById(id: UUID): DeleteUserResponse {
         deleteUserById(id)
         // Todo: Remove return

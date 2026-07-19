@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.upload.external
+package com.sprintstart.sprintstartbackend.upload.external.api
 
 import com.nimbusds.jose.util.StandardCharset
 import com.sprintstart.sprintstartbackend.upload.repository.UploadedArtifactRepository

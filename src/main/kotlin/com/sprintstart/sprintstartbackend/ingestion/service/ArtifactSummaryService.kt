@@ -1,13 +1,13 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.ingestion.ArtifactIngestionClient
-import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.request.AiArtifactSummaryRequest
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.AiArtifactSummaryStreamMessage
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactSummary
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactSummaryCitation
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactSummaryRepository
-import com.sprintstart.sprintstartbackend.upload.external.UploadApi
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.upload.external.api.UploadApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterNotNull
@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.onCompletion
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
@@ -58,6 +59,8 @@ internal class ArtifactSummaryService(
      * @throws org.springframework.web.server.ResponseStatusException with status `FORBIDDEN` if the user does not have access to the project.
      * @throws org.springframework.web.server.ResponseStatusException with status `NOT_FOUND` if the specified artifact does not exist in the project.
      */
+    @Transactional(readOnly = true)
+    @Tracked("Streaming artifact summary for project")
     fun getSummary(projectId: UUID, artifactId: UUID, authId: String): Flow<AiArtifactSummaryStreamMessage> {
         if (!userApi.userHasAccessToProject(authId, projectId)) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project")
@@ -168,6 +171,15 @@ internal class ArtifactSummaryService(
         return event
     }
 
+    /**
+     * Builds an instance of the `ArtifactSummary` class with its associated citations.
+     *
+     * @param artifactId Unique identifier of the artifact for which the summary is being built.
+     * @param sourceHash Hash representing the source of the artifact.
+     * @param summaryText Summary description of the artifact.
+     * @param citations List of pending citations to be associated with the artifact summary.
+     * @return An instance of `ArtifactSummary` populated with the provided details and citations.
+     */
     private fun buildCacheEntity(
         artifactId: UUID,
         sourceHash: String,
@@ -207,6 +219,13 @@ internal class ArtifactSummaryService(
         throw ResponseStatusException(HttpStatus.NOT_FOUND, "Artifact $artifactId not found")
     }
 
+    /**
+     * Attempts to parse the given string into a UUID.
+     * If the string is not a valid UUID, returns null.
+     *
+     * @param value the string representation of the UUID to be parsed.
+     * @return the parsed UUID object if the string is valid, or null if parsing fails.
+     */
     private fun parseUuidOrNull(value: String): UUID? =
         try {
             UUID.fromString(value)

@@ -1,5 +1,5 @@
 @ApplicationModule(
-        allowedDependencies = {"shared :: shared", "user :: api",  "upload :: api", "connectors :: github-events", "connectors :: api"}
+        allowedDependencies = {"shared :: shared", "user :: api", "upload :: api", "connectors :: github-events", "connectors :: api", "shared :: annotations", "upload :: upload.api"}
 )
 package com.sprintstart.sprintstartbackend.ingestion;
 

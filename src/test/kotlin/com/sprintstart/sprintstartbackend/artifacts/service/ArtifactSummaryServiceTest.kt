@@ -8,7 +8,7 @@ import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactSummary
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.ArtifactSummaryAiException
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactSummaryRepository
 import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactSummaryService
-import com.sprintstart.sprintstartbackend.upload.external.UploadApi
+import com.sprintstart.sprintstartbackend.upload.external.api.UploadApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
 import io.mockk.mockk

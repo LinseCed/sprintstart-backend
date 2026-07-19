@@ -28,7 +28,7 @@ import java.util.UUID
 @RestController
 @RequestMapping("/api/v1")
 @Tag(name = "Artifacts", description = "Artifact-related endpoints")
-class ArtifactSummaryController(
+internal class ArtifactSummaryController(
     private val artifactSummaryService: ArtifactSummaryService,
 ) {
     /**

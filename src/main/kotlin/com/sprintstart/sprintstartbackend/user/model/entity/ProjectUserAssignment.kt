@@ -15,18 +15,6 @@ import jakarta.persistence.Table
 import java.io.Serializable
 import java.util.UUID
 
-@Embeddable
-data class ProjectUserAssignmentId(
-    @Column(name = "user_id")
-    var userId: UUID = UUID(0L, 0L),
-    @Column(name = "project_id")
-    var projectId: UUID = UUID(0L, 0L),
-) : Serializable {
-    companion object {
-        private const val serialVersionUID: Long = 1L
-    }
-}
-
 @Entity
 @Table(name = "user_projects")
 class ProjectUserAssignment(
@@ -72,4 +60,16 @@ class ProjectUserAssignment(
         user = user,
         project = project,
     )
+}
+
+@Embeddable
+data class ProjectUserAssignmentId(
+    @Column(name = "user_id")
+    var userId: UUID = UUID(0L, 0L),
+    @Column(name = "project_id")
+    var projectId: UUID = UUID(0L, 0L),
+) : Serializable {
+    companion object {
+        private const val serialVersionUID: Long = 1L
+    }
 }

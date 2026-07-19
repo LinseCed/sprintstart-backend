@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.ingestion.service
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.FinishedTypes
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
 import java.util.UUID
@@ -30,6 +31,7 @@ class GithubIngestionRunService(
      * @throws IngestionRunNotFoundException when the run id is unknown.
      */
     @Transactional
+    @Tracked("Marking fetch phase as finished")
     fun markFetchPhaseFinished(runId: UUID, finishedType: FinishedTypes) {
         val run = ingestionRunRepository
             .findByIdForUpdate(runId)

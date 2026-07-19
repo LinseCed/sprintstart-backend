@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.connectors.overview.service
 import com.sprintstart.sprintstartbackend.connectors.overview.external.ProjectSourceApi
 import com.sprintstart.sprintstartbackend.connectors.overview.external.ProjectSourceDto
 import com.sprintstart.sprintstartbackend.connectors.overview.external.ProjectSourceProvider
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -22,6 +23,7 @@ class ProjectSourceService(
      * @param projectId The project whose sources should be listed.
      * @return A combined list from all registered source providers.
      */
+    @Tracked("Retrieving project-scoped sources for overview")
     override fun findSourcesByProjectId(projectId: UUID): List<ProjectSourceDto> {
         return providers.flatMap { it.findSourcesByProjectId(projectId) }
     }

@@ -23,10 +23,12 @@ import com.sprintstart.sprintstartbackend.chat.models.responses.toChatResponse
 import com.sprintstart.sprintstartbackend.chat.repository.ChatMessageRepository
 import com.sprintstart.sprintstartbackend.chat.repository.ChatRepository
 import com.sprintstart.sprintstartbackend.chat.repository.CitationRepository
+import com.sprintstart.sprintstartbackend.connectors.overview.external.api.ConnectorOverviewApi
 import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorDisabledException
 import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.overview.service.ConnectorConfigurationService
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import jakarta.validation.Valid
 import kotlinx.coroutines.flow.Flow
@@ -53,7 +55,7 @@ internal class ChatService(
     private val chatRepository: ChatRepository,
     private val messageRepository: ChatMessageRepository,
     private val citationRepository: CitationRepository,
-    private val connectorConfigurationService: ConnectorConfigurationService,
+    private val connectorOverviewApi: ConnectorOverviewApi,
     private val chatAiClient: ChatAiClient,
     private val userApi: UserApi,
     private val artifactLookupService: ArtifactLookupService,
@@ -66,7 +68,7 @@ internal class ChatService(
      * This function retrieves the n latest chats, including only their metadata, not the messages.
      * As AI chats can get quite long, loading all chat's messages would take up way too many resources,
      * especially when facing the fact that the user will most likely only open 1 or 2.
-     * For this reason the messages are not included, but can be lazy-loaded using the chat id.
+     * For this reason the messages are not included but can be lazy-loaded using the chat id.
      *
      * @param request The request including the necessary data to calculate the response.
      * @return The [GetChatsResponse] including the chats and their metadata
@@ -74,6 +76,7 @@ internal class ChatService(
      * @see GetChatsResponse
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving last n chats")
     fun getChats(@Valid request: GetChatsRequest): GetChatsResponse {
         val pageable = if (request.limit == null) {
             Pageable.unpaged(Sort.by(Sort.Direction.ASC, "createdAt"))
@@ -99,6 +102,7 @@ internal class ChatService(
      * @see GetChatMessagesRequest
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving chat messages")
     fun getChat(chatId: UUID, @Valid request: GetChatMessagesRequest): GetChatMessagesResponse {
         val pageable = if (request.limit == null) {
             Pageable.unpaged(Sort.by(Sort.Direction.ASC, "created_at"))
@@ -123,6 +127,7 @@ internal class ChatService(
      * @see CreateChatRequest
      * @see CreateChatResponse
      */
+    @Tracked("Creating a new chat")
     fun createChat(@Valid request: CreateChatRequest): CreateChatResponse {
         if (!userApi.exists(request.userId)) {
             throw HttpClientErrorException(
@@ -154,6 +159,7 @@ internal class ChatService(
      * @see PromptRequest
      * @see Flow
      */
+    @Tracked("Prompting the AI system with a user prompt")
     suspend fun prompt(@Valid request: PromptRequest): Flow<AiStreamMessage> {
         val chat = chatRepository.findById(request.chatId).orElseThrow {
             HttpClientErrorException(
@@ -279,7 +285,7 @@ internal class ChatService(
      * @param sourceSystems The systems used by the AI to generate responses.
      */
     private fun validateSourceSystems(sourceSystems: List<SourceSystem>?) {
-        val connectorsByName = connectorConfigurationService.findAllConnectors().associateBy { it.name }
+        val connectorsByName = connectorOverviewApi.findAllConnectors().associateBy { it.name }
 
         sourceSystems?.forEach { sourceSystem ->
             val connector = connectorsByName[sourceSystem.name]
