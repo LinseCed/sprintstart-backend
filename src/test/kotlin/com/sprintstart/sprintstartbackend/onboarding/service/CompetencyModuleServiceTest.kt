@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContentProvenance
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModulePageKind
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.http.HttpStatus
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.web.server.ResponseStatusException
 import java.util.Optional
 import java.util.UUID
@@ -36,12 +38,16 @@ class CompetencyModuleServiceTest {
     private val competencyRepository: CompetencyRepository = mockk()
     private val verificationRepository: VerificationRepository = mockk(relaxed = true)
     private val userApi: UserApi = mockk()
+    private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
     private val service = CompetencyModuleService(
         competencyModuleRepository,
         modulePageRepository,
         competencyRepository,
         verificationRepository,
         userApi,
+        onboardingAiClient,
+        transactionManager,
     )
 
     private val projectId = UUID.randomUUID()

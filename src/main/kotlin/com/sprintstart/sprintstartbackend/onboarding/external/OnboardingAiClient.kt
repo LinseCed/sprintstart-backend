@@ -23,7 +23,9 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.HireCompeten
 import com.sprintstart.sprintstartbackend.onboarding.external.model.LessonOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.MatchHireToPoolRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.MineStarterWorkRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ModuleProposalOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingAiPathEvent
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposeModuleRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedStarterTaskSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.RankedStarterTaskSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.SkillAssessmentSchema
@@ -38,6 +40,9 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.net.URI
 
+// One method per AI-service endpoint: the count tracks the size of Seam 1, not a class doing too
+// many things. Splitting it by endpoint group would hide that seam rather than shrink it.
+@Suppress("TooManyFunctions")
 @Component
 class OnboardingAiClient(
     private val webClient: WebClient,
@@ -211,6 +216,48 @@ class OnboardingAiClient(
                 .perform<LessonOutcome>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
             val msg = "Failed to synthesize lesson (HTTP ${e.statusCode}): ${e.body}"
+            throw OnboardingAiException(e.statusCode, e.body, msg)
+        }
+
+    /**
+     * Proposes the shared module one competency teaches (#49/ai#19).
+     *
+     * Heavyweight/offline, matching [synthesizeLesson]: one retrieval + LLM pass, intended for an
+     * authoring action rather than a hire's request path. Nothing about an individual hire is sent
+     * -- one competency yields one module everybody reads. [lastFingerprint] is whatever
+     * fingerprint the caller last recorded for this competency, so an unchanged corpus does not
+     * churn a module a PM has already edited.
+     *
+     * @param competencyKey The competency this module teaches.
+     * @param competencyLabel The competency's display label.
+     * @param competencyDescription Optional extra context for grounding the pages.
+     * @param level Target level to teach to (`beginner`/`intermediate`/`advanced`/`expert`).
+     * @param lastFingerprint The corpus fingerprint recorded from the last proposal, if any.
+     * @return The proposal outcome returned by the AI service.
+     */
+    suspend fun proposeModule(
+        competencyKey: String,
+        competencyLabel: String,
+        competencyDescription: String = "",
+        level: String = "beginner",
+        lastFingerprint: String? = null,
+    ): ModuleProposalOutcome =
+        try {
+            webClient
+                .post()
+                .uri(uri("/api/v1/onboarding/modules/propose"))
+                .body(
+                    ProposeModuleRequest(
+                        competencyKey = competencyKey,
+                        competencyLabel = competencyLabel,
+                        competencyDescription = competencyDescription,
+                        level = level,
+                        lastFingerprint = lastFingerprint,
+                    ),
+                ).sync()
+                .perform<ModuleProposalOutcome>()
+        } catch (@Suppress("SwallowedException") e: WebClientException) {
+            val msg = "Failed to propose module (HTTP ${e.statusCode}): ${e.body}"
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 

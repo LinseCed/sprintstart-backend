@@ -1,8 +1,13 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContentProvenance
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModulePageKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ModuleProposalOutcome
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedModuleSchema
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ModulePage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
@@ -20,10 +25,14 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyReposi
 import com.sprintstart.sprintstartbackend.onboarding.repository.ModulePageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 import java.util.UUID
@@ -48,7 +57,13 @@ class CompetencyModuleService(
     private val competencyRepository: CompetencyRepository,
     private val verificationRepository: VerificationRepository,
     private val userApi: UserApi,
+    private val onboardingAiClient: OnboardingAiClient,
+    transactionManager: PlatformTransactionManager,
 ) {
+    // The AI call is a long-running suspend operation, so it must not run inside a
+    // transaction -- same reasoning as BlueprintService/CompetencyProposalService.
+    private val txTemplate = TransactionTemplate(transactionManager)
+    private val readTxTemplate = TransactionTemplate(transactionManager).apply { isReadOnly = true }
     private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
@@ -91,6 +106,146 @@ class CompetencyModuleService(
         competencyModuleRepository.save(module)
         return module.toResponse(competency.label, verificationRepository.findByModuleId(module.id)?.type)
     }
+
+    /**
+     * Asks the AI to draft the module for one competency, and stores it as a proposal.
+     *
+     * Proposal-only, like every other AI-authored artifact here: this never touches what is live.
+     * The draft lands as [ModuleStatus.PROPOSED] with [ContentProvenance.AI] pages, so a later
+     * re-synthesis can replace what the AI wrote while leaving anything a PM edited alone.
+     *
+     * The AI call runs outside any transaction; the surrounding reads and the write are their own
+     * short ones. Idempotent per competency: the fingerprint of the last proposal for this
+     * `(competency, project)` is sent, so an unchanged corpus returns `unchanged` and nothing new
+     * is written -- a PM's review queue does not refill with identical drafts.
+     *
+     * @return The stored proposal, or null when the AI had nothing to propose (empty corpus, no
+     * grounded pages, or an unchanged corpus).
+     * @throws ResponseStatusException 404 if the competency does not exist in the graph.
+     */
+    suspend fun proposeFromCorpus(competencyKey: String, projectId: UUID): CompetencyModuleResponse? {
+        val context = withContext(Dispatchers.IO) {
+            readTxTemplate.execute { loadProposalContext(competencyKey, projectId) }!!
+        }
+
+        val outcome = onboardingAiClient.proposeModule(
+            competencyKey = competencyKey,
+            competencyLabel = context.label,
+            competencyDescription = context.description,
+            level = context.level,
+            lastFingerprint = context.lastFingerprint,
+        )
+        val proposed = outcome.module
+        if (outcome.status != "proposed" || proposed == null) {
+            logger.info(
+                "No module proposed for {} in project {}: {}",
+                competencyKey,
+                projectId,
+                outcome.notes.firstOrNull() ?: outcome.status,
+            )
+            return null
+        }
+
+        return withContext(Dispatchers.IO) {
+            txTemplate.execute { persistProposal(competencyKey, projectId, proposed, outcome) }
+        }
+    }
+
+    private data class ProposalContext(
+        val label: String,
+        val description: String,
+        val level: String,
+        val lastFingerprint: String?,
+    )
+
+    private fun loadProposalContext(competencyKey: String, projectId: UUID): ProposalContext {
+        val competency = competencyRepository.findByKey(competencyKey)
+            ?: throw ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "No competency found with key: $competencyKey",
+            )
+        val previous = competencyModuleRepository
+            .findAllByCompetencyKeyAndProjectIdOrderByVersionDesc(competencyKey, projectId)
+            .firstOrNull()
+        return ProposalContext(
+            label = competency.label,
+            description = competency.description.orEmpty(),
+            // Teach to the bar the node is actually held to, so the module's depth and its check
+            // agree: a check pitched at the target level with a beginner's lesson behind it is
+            // exactly the mismatch that strands a hire.
+            level = LEVEL_NAMES[competency.targetLevel] ?: LEVEL_NAMES.getValue(Competency.DEFAULT_TARGET_LEVEL),
+            lastFingerprint = previous?.corpusFingerprint,
+        )
+    }
+
+    private fun persistProposal(
+        competencyKey: String,
+        projectId: UUID,
+        proposed: ProposedModuleSchema,
+        outcome: ModuleProposalOutcome,
+    ): CompetencyModuleResponse {
+        val nextVersion = competencyModuleRepository
+            .findAllByCompetencyKeyAndProjectIdOrderByVersionDesc(competencyKey, projectId)
+            .firstOrNull()
+            ?.version
+            ?.plus(1)
+            ?: 1
+
+        val module = CompetencyModule(
+            competencyKey = competencyKey,
+            projectId = projectId,
+            version = nextVersion,
+            status = ModuleStatus.PROPOSED,
+            origin = ContentProvenance.AI,
+            title = proposed.title,
+            summary = proposed.summary.takeIf { it.isNotBlank() },
+            corpusFingerprint = outcome.provenance?.corpusFingerprint,
+        )
+
+        proposed.pages
+            // A kind the enum does not know is dropped rather than stored: the AI validates against
+            // the same set, so this is the backend not trusting that.
+            .mapNotNull { page -> parsePageKind(page.kind)?.let { it to page } }
+            .forEachIndexed { index, (kind, page) ->
+                module.pages.add(
+                    ModulePage(
+                        module = module,
+                        kind = kind,
+                        title = page.title,
+                        body = page.body,
+                        position = index,
+                        provenance = ContentProvenance.AI,
+                    ),
+                )
+            }
+
+        competencyModuleRepository.save(module)
+
+        proposed.verification?.let { check ->
+            verificationRepository.save(
+                Verification(
+                    moduleId = module.id,
+                    type = parseVerificationType(check.type),
+                    prompt = check.prompt,
+                    rubric = check.rubric,
+                    competencyKey = competencyKey,
+                    level = LEVEL_NAMES[
+                        competencyRepository.findByKey(competencyKey)?.targetLevel
+                            ?: Competency.DEFAULT_TARGET_LEVEL,
+                    ] ?: LEVEL_NAMES.getValue(Competency.DEFAULT_TARGET_LEVEL),
+                ),
+            )
+        }
+
+        return module.toResponseWithJoins()
+    }
+
+    private fun parsePageKind(raw: String): ModulePageKind? =
+        ModulePageKind.entries.firstOrNull { it.name.equals(raw.trim(), ignoreCase = true) }
+
+    private fun parseVerificationType(raw: String): VerificationType =
+        VerificationType.entries.firstOrNull { it.name.equals(raw.trim(), ignoreCase = true) }
+            ?: VerificationType.KNOWLEDGE
 
     /** Lists a project's modules in one status, for the authoring surface. */
     @Transactional(readOnly = true)
@@ -364,6 +519,9 @@ class CompetencyModuleService(
             verificationType = verificationRepository.findByModuleId(id)?.type,
         )
 }
+
+/** Ledger ranks back to the level names the AI service and Verification.level speak. */
+private val LEVEL_NAMES = mapOf(1 to "beginner", 2 to "intermediate", 3 to "advanced", 4 to "expert")
 
 /** The page kinds that carry lesson prose, used as grounded evidence when grading a check. */
 val LESSON_PAGE_KINDS = setOf(ModulePageKind.CONTEXT, ModulePageKind.LESSON, ModulePageKind.WALKTHROUGH)

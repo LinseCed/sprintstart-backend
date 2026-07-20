@@ -101,6 +101,26 @@ class CompetencyModuleController(
         @RequestBody request: CreateCompetencyModuleRequest,
     ): CompetencyModuleResponse = competencyModuleService.create(request)
 
+    @Operation(
+        summary = "Draft a module with the AI",
+        description = "Asks the AI to draft the module for one competency from the project's corpus",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Proposal stored, or nothing to propose"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "No competency found with the given key"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/propose")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    suspend fun proposeFromCorpus(
+        @RequestParam competencyKey: String,
+        @RequestParam projectId: UUID,
+    ): CompetencyModuleResponse? = competencyModuleService.proposeFromCorpus(competencyKey, projectId)
+
     @Operation(summary = "Edit a module", description = "Updates a draft module's title or summary")
     @ApiResponses(
         value = [
