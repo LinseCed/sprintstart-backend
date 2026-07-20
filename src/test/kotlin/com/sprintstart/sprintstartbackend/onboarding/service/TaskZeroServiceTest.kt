@@ -1,0 +1,224 @@
+package com.sprintstart.sprintstartbackend.onboarding.service
+
+import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
+import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskZeroAssignment
+import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.TaskZeroAssignmentRepository
+import com.sprintstart.sprintstartbackend.user.external.ProjectMember
+import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.springframework.web.server.ResponseStatusException
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneOffset
+import java.util.Optional
+import java.util.UUID
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class TaskZeroServiceTest {
+    private val proposalRepository: StarterWorkTaskProposalRepository = mockk(relaxed = true)
+    private val assignmentRepository: TaskZeroAssignmentRepository = mockk(relaxed = true)
+    private val environmentReadinessService: EnvironmentReadinessService = mockk()
+    private val projectMembershipApi: ProjectMembershipApi = mockk()
+    private val artifactIngestionApi: ArtifactIngestionApi = mockk()
+
+    private val now: Instant = Instant.parse("2026-07-20T12:00:00Z")
+    private val hireId: UUID = UUID.randomUUID()
+    private val projectId: UUID = UUID.randomUUID()
+
+    private val service = TaskZeroService(
+        proposalRepository,
+        assignmentRepository,
+        environmentReadinessService,
+        projectMembershipApi,
+        artifactIngestionApi,
+        Clock.fixed(now, ZoneOffset.UTC),
+    )
+
+    private fun member(login: String? = "hire") =
+        ProjectMember(hireId, "A Hire", login, now.minus(Duration.ofDays(5)))
+
+    private fun isMember(login: String? = "hire") {
+        every { projectMembershipApi.getProjectMembers(projectId) } returns listOf(member(login))
+    }
+
+    private fun ready(at: Instant? = now.minus(Duration.ofDays(1))) {
+        every { environmentReadinessService.readyAtFor(any(), projectId) } returns at
+    }
+
+    private fun noAuthoredPrs() {
+        every { artifactIngestionApi.getAuthoredPullRequests(projectId, "hire") } returns emptyList()
+    }
+
+    private fun task(eligible: Boolean = true, createdDaysAgo: Long = 1) =
+        StarterWorkTaskProposal(
+            sourceId = "github:org/repo:ISSUE:${UUID.randomUUID()}",
+            title = "Fix a typo",
+            status = ProposalStatus.APPROVED,
+            taskZeroEligible = eligible,
+            createdAt = now.minus(Duration.ofDays(createdDaysAgo)),
+        )
+
+    @Test
+    fun `setEligibility flags an approved task`() {
+        val proposal = task(eligible = false)
+        every { proposalRepository.findById(proposal.id) } returns Optional.of(proposal)
+        every { proposalRepository.save(any()) } answers { firstArg() }
+
+        val result = service.setEligibility(proposal.id, true)
+
+        assertTrue(result.taskZeroEligible)
+    }
+
+    @Test
+    fun `setEligibility 409s on a task that is not approved`() {
+        val proposal = StarterWorkTaskProposal(sourceId = "s", title = "t", status = ProposalStatus.PROPOSED)
+        every { proposalRepository.findById(proposal.id) } returns Optional.of(proposal)
+
+        assertThrows<ResponseStatusException> { service.setEligibility(proposal.id, true) }
+    }
+
+    @Test
+    fun `setEligibility 404s on an unknown task`() {
+        val id = UUID.randomUUID()
+        every { proposalRepository.findById(id) } returns Optional.empty()
+
+        assertThrows<ResponseStatusException> { service.setEligibility(id, true) }
+    }
+
+    @Test
+    fun `getForHire returns not-ready and assigns nothing when the environment is not up`() {
+        isMember()
+        ready(at = null)
+        noAuthoredPrs()
+
+        val result = service.getForHire(hireId, projectId)
+
+        assertFalse(result.ready)
+        assertNull(result.task)
+        verify(exactly = 0) { assignmentRepository.save(any()) }
+    }
+
+    @Test
+    fun `getForHire auto-assigns the earliest eligible task once ready`() {
+        isMember()
+        ready()
+        noAuthoredPrs()
+        every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
+        every { assignmentRepository.findAllAssignedProposalIds() } returns emptyList()
+        val older = task(createdDaysAgo = 5)
+        val newer = task(createdDaysAgo = 1)
+        every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.APPROVED) } returns
+            listOf(newer, older)
+        val saved = slot<TaskZeroAssignment>()
+        every { assignmentRepository.save(capture(saved)) } answers { firstArg() }
+
+        val result = service.getForHire(hireId, projectId)
+
+        assertTrue(result.ready)
+        assertFalse(result.noneAvailable)
+        // The oldest eligible task is handed out first.
+        assertEquals(older.id, saved.captured.proposalId)
+    }
+
+    @Test
+    fun `getForHire is a handled state, not an error, when nothing is eligible`() {
+        isMember()
+        ready()
+        noAuthoredPrs()
+        every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
+        every { assignmentRepository.findAllAssignedProposalIds() } returns emptyList()
+        every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.APPROVED) } returns emptyList()
+
+        val result = service.getForHire(hireId, projectId)
+
+        assertTrue(result.ready)
+        assertTrue(result.noneAvailable)
+        assertNull(result.task)
+        verify(exactly = 0) { assignmentRepository.save(any()) }
+    }
+
+    @Test
+    fun `getForHire never assigns the same task to two hires`() {
+        isMember()
+        ready()
+        noAuthoredPrs()
+        every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
+        val taken = task(createdDaysAgo = 5)
+        val free = task(createdDaysAgo = 1)
+        every { assignmentRepository.findAllAssignedProposalIds() } returns listOf(taken.id)
+        every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.APPROVED) } returns
+            listOf(taken, free)
+        val saved = slot<TaskZeroAssignment>()
+        every { assignmentRepository.save(capture(saved)) } answers { firstArg() }
+
+        service.getForHire(hireId, projectId)
+
+        assertEquals(free.id, saved.captured.proposalId)
+    }
+
+    @Test
+    fun `getForHire returns the existing assignment without assigning again`() {
+        isMember()
+        ready()
+        noAuthoredPrs()
+        val proposal = task()
+        every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns
+            TaskZeroAssignment(hireId = hireId, projectId = projectId, proposalId = proposal.id, assignedAt = now)
+        every { proposalRepository.findById(proposal.id) } returns Optional.of(proposal)
+
+        val result = service.getForHire(hireId, projectId)
+
+        assertEquals(now, result.assignedAt)
+        verify(exactly = 0) { assignmentRepository.save(any()) }
+    }
+
+    @Test
+    fun `getForHire reports the loop proven once the hire has merged a pull request`() {
+        isMember()
+        ready()
+        every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
+        every { assignmentRepository.findAllAssignedProposalIds() } returns emptyList()
+        every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.APPROVED) } returns emptyList()
+        every { artifactIngestionApi.getAuthoredPullRequests(projectId, "hire") } returns
+            listOf(
+                AuthoredPullRequest(
+                    UUID.randomUUID(),
+                    now.minus(Duration.ofDays(2)),
+                    null,
+                    now.minus(Duration.ofDays(1)),
+                    "MERGED",
+                ),
+            )
+
+        val result = service.getForHire(hireId, projectId)
+
+        assertTrue(result.loopProven)
+    }
+
+    @Test
+    fun `getForHire 404s when the hire is not a member`() {
+        every { projectMembershipApi.getProjectMembers(projectId) } returns emptyList()
+
+        assertThrows<ResponseStatusException> { service.getForHire(hireId, projectId) }
+    }
+
+    @Test
+    fun `unassign frees the task`() {
+        service.unassign(hireId, projectId)
+
+        verify(exactly = 1) { assignmentRepository.deleteByHireIdAndProjectId(hireId, projectId) }
+    }
+}

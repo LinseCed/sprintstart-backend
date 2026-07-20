@@ -22,6 +22,12 @@ data class HireTimelineResponse(
      * derived from a pull request they authored. Null while not ready; the first wall of week one.
      */
     val envReadyAt: Instant?,
+    /**
+     * When the hire was auto-assigned their Task 0 — the trivial first task that proves the loop.
+     * Distinct from [firstTaskClaimedAt], which is a goal the hire chose; this one is handed to them
+     * on readiness. Null when none has been assigned.
+     */
+    val taskZeroAssignedAt: Instant?,
     val firstTaskClaimedAt: Instant?,
     val firstPullRequestOpenedAt: Instant?,
     val firstResponseAt: Instant?,

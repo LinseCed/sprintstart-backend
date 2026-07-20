@@ -64,6 +64,7 @@ class OnboardingBuddyServiceTest {
         githubLogin = "hire",
         joinedAt = daysAgo(30),
         envReadyAt = null,
+        taskZeroAssignedAt = null,
         firstTaskClaimedAt = null,
         firstPullRequestOpenedAt = null,
         firstResponseAt = null,

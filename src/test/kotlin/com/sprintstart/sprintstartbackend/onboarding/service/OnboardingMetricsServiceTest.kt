@@ -35,6 +35,9 @@ class OnboardingMetricsServiceTest {
     // "not ready" (null) so these timeline assertions stay about the pull-request-derived moments.
     private val environmentReadinessService: EnvironmentReadinessService = mockk(relaxed = true)
 
+    // Task-0 assignment is exercised in TaskZeroServiceTest; here it defaults to "none assigned".
+    private val taskZeroService: TaskZeroService = mockk(relaxed = true)
+
     private val now: Instant = Instant.parse("2026-07-20T12:00:00Z")
     private val projectId: UUID = UUID.randomUUID()
 
@@ -43,6 +46,7 @@ class OnboardingMetricsServiceTest {
         artifactIngestionApi,
         userGoalRepository,
         environmentReadinessService,
+        taskZeroService,
         Clock.fixed(now, ZoneOffset.UTC),
     )
 
