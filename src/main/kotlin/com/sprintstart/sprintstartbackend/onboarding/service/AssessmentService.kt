@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKi
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.SkillAssessmentSessionStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentHistoryEntrySchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTargetsSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.CandidateCompetencySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.CandidateSignalSchema
@@ -109,7 +110,9 @@ class AssessmentService(
         val question = aiResponse.question ?: throw badGateway("start")
 
         return withContext(Dispatchers.IO) {
-            txTemplate.execute { openFirstTurn(reserved.sessionId, question) }!!
+            txTemplate.execute {
+                openFirstTurn(reserved.sessionId, question, aiResponse.targets.orEmpty())
+            }!!
         }
     }
 
@@ -144,7 +147,11 @@ class AssessmentService(
      * Two concurrent starts can both reach the interviewer; only one question is kept, so both
      * callers see the same interview rather than one silently overwriting the other's turn.
      */
-    private fun openFirstTurn(sessionId: UUID, question: String): StartAssessmentResponse {
+    private fun openFirstTurn(
+        sessionId: UUID,
+        question: String,
+        targets: List<String>,
+    ): StartAssessmentResponse {
         val session = skillAssessmentSessionRepository.findByIdOrNull(sessionId)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Assessment session no longer exists")
 
@@ -153,7 +160,12 @@ class AssessmentService(
         }
 
         session.turns.add(
-            SkillAssessmentTurn(session = session, turnIndex = session.turns.size, question = question),
+            SkillAssessmentTurn(
+                session = session,
+                turnIndex = session.turns.size,
+                question = question,
+                targets = targets.toMutableList(),
+            ),
         )
         session.updatedAt = Instant.now()
         return StartAssessmentResponse(sessionId = session.id, question = question)
@@ -176,22 +188,27 @@ class AssessmentService(
     ): AnswerAssessmentResponse {
         val userId = resolveUserId(authId)
 
-        val (history, nextTurnIndex, candidates) = withContext(Dispatchers.IO) {
+        val turnState = withContext(Dispatchers.IO) {
             readTxTemplate.execute {
                 val session = loadOwnedSession(userId, sessionId)
                 val openTurn = requireOpenTurn(session, sessionId)
-                val history = buildHistory(session, openTurn, answer)
-                Triple(history, openTurn.turnIndex + 1, loadCandidateCompetencies())
+                TurnState(
+                    history = buildHistory(session, openTurn, answer),
+                    targets = buildTargets(session),
+                    nextTurnIndex = openTurn.turnIndex + 1,
+                    candidates = loadCandidateCompetencies(),
+                )
             }!!
         }
 
-        val mustFinish = nextTurnIndex >= MAX_TURNS - 1
+        val mustFinish = turnState.nextTurnIndex >= MAX_TURNS - 1
         val aiResponse = onboardingAiClient.assessTurn(
             AssessmentTurnRequest(
-                candidateCompetencies = candidates,
+                candidateCompetencies = turnState.candidates,
                 candidateSignal = withContext(Dispatchers.IO) { loadCandidateSignal(userId) },
-                history = history,
-                turn = nextTurnIndex,
+                history = turnState.history,
+                targets = turnState.targets,
+                turn = turnState.nextTurnIndex,
                 maxTurns = MAX_TURNS,
                 mustFinish = mustFinish,
             ),
@@ -205,7 +222,7 @@ class AssessmentService(
                 session.updatedAt = Instant.now()
 
                 if (aiResponse.done) {
-                    val validKeys = candidates.map { it.key }.toSet()
+                    val validKeys = turnState.candidates.map { it.key }.toSet()
                     for (result in aiResponse.assessments.orEmpty()) {
                         if (result.key !in validKeys) continue
                         writeCompetencyState(userId, result.key, result.level, result.confidence)
@@ -219,6 +236,7 @@ class AssessmentService(
                             session = session,
                             turnIndex = openTurn.turnIndex + 1,
                             question = question,
+                            targets = aiResponse.targets.orEmpty().toMutableList(),
                         ),
                     )
                     AnswerAssessmentResponse(done = false, question = question)
@@ -226,6 +244,26 @@ class AssessmentService(
             }!!
         }
     }
+
+    private data class TurnState(
+        val history: List<AssessmentHistoryEntrySchema>,
+        val targets: List<AssessmentTargetsSchema>,
+        val nextTurnIndex: Int,
+        val candidates: List<CandidateCompetencySchema>,
+    )
+
+    /**
+     * What every past question set out to probe, per turn.
+     *
+     * Turns that targeted nothing are dropped rather than sent as empty lists: an interview
+     * started before targets were recorded would otherwise look like it had probed a set of keys
+     * and come up empty, when in fact nothing was ever asked. Absent is the honest reading, and it
+     * makes the interviewer cover more rather than less.
+     */
+    private fun buildTargets(session: SkillAssessmentSession): List<AssessmentTargetsSchema> =
+        session.turns
+            .filter { it.targets.isNotEmpty() }
+            .map { AssessmentTargetsSchema(turn = it.turnIndex, keys = it.targets.toList()) }
 
     /** Returns the resumable question for an existing in-progress session, or `null`. */
     private fun findResumableSession(userId: UUID): StartAssessmentResponse? {

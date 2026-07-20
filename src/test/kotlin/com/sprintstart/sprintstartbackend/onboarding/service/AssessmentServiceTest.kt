@@ -238,6 +238,110 @@ class AssessmentServiceTest {
             coVerify(exactly = 0) { onboardingAiClient.assessTurn(any()) }
             verify(exactly = 0) { skillAssessmentSessionRepository.save(any()) }
         }
+
+        @Test
+        fun `records what the first question probed`() = runTest {
+            setUpUser()
+            every {
+                skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                    userId,
+                    SkillAssessmentSessionStatus.IN_PROGRESS,
+                )
+            } returns null
+            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            coEvery { onboardingAiClient.assessTurn(any()) } returns AssessmentTurnResponse(
+                done = false,
+                question = "q",
+                targets = listOf("kotlin", "jpa-persistence"),
+            )
+            val savedSlot = slot<SkillAssessmentSession>()
+            every { skillAssessmentSessionRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
+            every { skillAssessmentSessionRepository.findById(any()) } answers { Optional.of(savedSlot.captured) }
+
+            service.startAssessment(authId)
+
+            assertEquals(listOf("kotlin", "jpa-persistence"), savedSlot.captured.turns[0].targets)
+        }
+    }
+
+    @Nested
+    inner class AssessmentCoverage {
+        @Test
+        fun `sends every past question's targets so the interviewer can be held to covering them`() = runTest {
+            setUpUser()
+            val session = SkillAssessmentSession(userId = userId)
+            session.turns.add(
+                SkillAssessmentTurn(
+                    session = session,
+                    turnIndex = 0,
+                    question = "Q0",
+                    answer = "a0",
+                    targets = mutableListOf("kotlin"),
+                ),
+            )
+            session.turns.add(
+                SkillAssessmentTurn(
+                    session = session,
+                    turnIndex = 1,
+                    question = "Q1",
+                    targets = mutableListOf("jpa-persistence"),
+                ),
+            )
+            every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
+            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            val request = slot<AssessmentTurnRequest>()
+            coEvery { onboardingAiClient.assessTurn(capture(request)) } returns
+                AssessmentTurnResponse(done = false, question = "Q2", targets = listOf("testing"))
+
+            service.answerAssessment(authId, session.id, "a1")
+
+            assertEquals(listOf(0, 1), request.captured.targets.map { it.turn })
+            assertEquals(listOf("kotlin"), request.captured.targets[0].keys)
+            assertEquals(listOf("jpa-persistence"), request.captured.targets[1].keys)
+        }
+
+        @Test
+        fun `omits turns that recorded no targets rather than sending them as probed-but-empty`() = runTest {
+            setUpUser()
+            // A session started before targets were recorded: absent is the honest reading, and it
+            // makes the interviewer cover more rather than less.
+            val session = SkillAssessmentSession(userId = userId)
+            session.turns.add(
+                SkillAssessmentTurn(session = session, turnIndex = 0, question = "Q0", answer = "a0"),
+            )
+            session.turns.add(
+                SkillAssessmentTurn(
+                    session = session,
+                    turnIndex = 1,
+                    question = "Q1",
+                    targets = mutableListOf("kotlin"),
+                ),
+            )
+            every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
+            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            val request = slot<AssessmentTurnRequest>()
+            coEvery { onboardingAiClient.assessTurn(capture(request)) } returns
+                AssessmentTurnResponse(done = false, question = "Q2")
+
+            service.answerAssessment(authId, session.id, "a1")
+
+            assertEquals(listOf(1), request.captured.targets.map { it.turn })
+        }
+
+        @Test
+        fun `records what each following question probed`() = runTest {
+            setUpUser()
+            val session = SkillAssessmentSession(userId = userId)
+            session.turns.add(SkillAssessmentTurn(session = session, turnIndex = 0, question = "Q0"))
+            every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
+            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            coEvery { onboardingAiClient.assessTurn(any()) } returns
+                AssessmentTurnResponse(done = false, question = "Q1", targets = listOf("testing"))
+
+            service.answerAssessment(authId, session.id, "a0")
+
+            assertEquals(listOf("testing"), session.turns[1].targets)
+        }
     }
 
     @Nested
