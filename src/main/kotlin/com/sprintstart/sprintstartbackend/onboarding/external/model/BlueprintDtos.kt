@@ -18,6 +18,9 @@ data class BaselineCompetencySchema(
     @SerialName("target_level") val targetLevel: Int? = null,
     val requirement: String = "recommended",
     val invariant: Boolean = false,
+    // Why the proposer put this competency in the baseline. Shown to the reviewing PM; carries no
+    // meaning for path projection.
+    val rationale: String = "",
 )
 
 /**

@@ -21,6 +21,8 @@ data class BlueprintCompetencyResponse(
     val targetLevelOverridden: Boolean,
     val requirement: String,
     val invariant: Boolean,
+    // Why the proposer put this competency in the baseline, when it said.
+    val rationale: String? = null,
     // The BlueprintCompetency entity id, targeted by
     // POST .../blueprints/competencies/{proposalId}/approve|reject.
     val proposalId: UUID,

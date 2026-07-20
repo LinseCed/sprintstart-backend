@@ -54,6 +54,13 @@ class BlueprintCompetency(
      */
     @Column(nullable = false)
     var invariant: Boolean = false,
+    /**
+     * Why this competency belongs in the baseline, in the proposer's words. Review-facing only:
+     * a PM deciding whether everyone must reach a node needs the argument for it, not just the
+     * name. Never read by path projection.
+     */
+    @Column(nullable = true, columnDefinition = "TEXT")
+    var rationale: String? = null,
     @Column(nullable = false)
     var position: Int,
     /**
