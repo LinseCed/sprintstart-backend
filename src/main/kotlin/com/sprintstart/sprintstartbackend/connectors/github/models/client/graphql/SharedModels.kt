@@ -74,6 +74,9 @@ data class LabelsConnection(
 data class ReviewNode(
     val body: String?,
     val state: String,
+    // When the review was submitted. Load-bearing for onboarding instrumentation: "how long did
+    // this hire wait for a response" is the human-loop metric, and it cannot be derived without it.
+    val submittedAt: String? = null,
     val author: GithubActor?,
 )
 

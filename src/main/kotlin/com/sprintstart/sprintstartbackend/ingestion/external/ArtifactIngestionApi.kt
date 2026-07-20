@@ -53,7 +53,35 @@ interface ArtifactIngestionApi {
      * @return One entry per artifact authored by that account; empty when there are none.
      */
     fun getAuthoredWork(projectId: UUID, authorLogin: String): List<AuthoredArtifact>
+
+    /**
+     * The pull requests one GitHub account has authored in a project, with the timestamps
+     * onboarding measures against.
+     *
+     * Separate from [getAuthoredWork] because it answers a different question with a different
+     * shape: that one describes involvement (where, what kind), this one describes a lifecycle
+     * (opened, answered, merged). Folding the timestamps into `AuthoredArtifact` would put a
+     * pull-request-only concern on a type that also covers issues.
+     *
+     * Reads only artifacts already ingested -- no GitHub call.
+     */
+    fun getAuthoredPullRequests(projectId: UUID, authorLogin: String): List<AuthoredPullRequest>
 }
+
+/**
+ * One pull request a person authored, reduced to its lifecycle.
+ *
+ * [firstResponseAt] is the earliest reaction from anyone else -- a review or a comment. A null
+ * means nobody has responded yet, which is a finding rather than missing data: an unanswered pull
+ * request is the failure onboarding instrumentation exists to catch.
+ */
+data class AuthoredPullRequest(
+    val artifactId: UUID,
+    val openedAt: Instant?,
+    val firstResponseAt: Instant?,
+    val mergedAt: Instant?,
+    val state: String?,
+)
 
 /**
  * One artifact a person authored, reduced to what a prior can be built from.

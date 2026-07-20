@@ -195,8 +195,42 @@ class GithubArtifactMapper {
                     name = event.repositoryName,
                 ),
             ),
+            // GitHub reports MERGED as a state and the merge time separately; both are kept,
+            // because "closed without merging" and "merged" are different outcomes for a hire.
+            state = event.state,
             authorLogin = event.author?.lowercase(),
+            mergedAtSource = event.mergedAt?.let(Instant::parse),
+            firstResponseAtSource = firstResponseAt(event),
         )
+    }
+
+    /**
+     * The earliest response to a pull request from anyone other than its author.
+     *
+     * Reviews and plain comments both count. A newcomer waiting on their first pull request does
+     * not experience the two differently, and treating only reviews as a response would report a
+     * long silence on a PR somebody answered in a comment within the hour.
+     *
+     * Self-responses are excluded: an author commenting on their own pull request is not the
+     * project responding to them. Reviews GitHub reports without a timestamp are skipped rather
+     * than guessed at.
+     */
+    private fun firstResponseAt(event: GithubPullRequestFetchedEvent): Instant? {
+        val author = event.author?.lowercase()
+
+        val reviewTimes = event.reviews
+            .orEmpty()
+            .filter { it.author?.lowercase() != author }
+            .mapNotNull { it.submittedAt }
+
+        val commentTimes = event.comments
+            .orEmpty()
+            .filter { it.author?.lowercase() != author }
+            .map { it.createdAt }
+
+        return (reviewTimes + commentTimes)
+            .mapNotNull { runCatching { Instant.parse(it) }.getOrNull() }
+            .minOrNull()
     }
 
     private fun buildRepositoryFullName(owner: String, name: String) = "$owner/$name"

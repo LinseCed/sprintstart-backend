@@ -88,10 +88,15 @@ class GithubArtifactProviderService(
             ingestionRun = ingestionRun,
             hash = command.hash,
             metadata = artifactMetadataJsonMapper.toJson(command.metadata),
-            createdAtSource = null,
-            updatedAtSource = null,
+            // These were hardcoded to null, so no artifact ever carried the time it was created at
+            // the source -- while every mapper was dutifully computing it. Nothing read them, so
+            // nothing complained, until onboarding needed to know when a pull request was opened.
+            createdAtSource = command.createdAtSource,
+            updatedAtSource = command.updatedAtSource,
             aiSyncRunId = runId,
             authorLogin = command.authorLogin,
+            mergedAtSource = command.mergedAtSource,
+            firstResponseAtSource = command.firstResponseAtSource,
         )
         artifactRepository.save(artifact)
         ingestionRun.ingestedCount++
@@ -151,6 +156,19 @@ class GithubArtifactProviderService(
 
         artifact.title = command.title
         artifact.content = command.bodyText
+
+        // Lifecycle facts, not content. They change on almost every crawl of an active repository
+        // and are not part of what the AI embeds, so they are written unconditionally and
+        // deliberately do *not* mark the artifact pending -- otherwise merging one pull request
+        // would re-embed it for no reason.
+        artifact.state = command.state
+        artifact.mergedAtSource = command.mergedAtSource
+        artifact.firstResponseAtSource = command.firstResponseAtSource
+        // Backfills rows written before these were persisted; a source creation time never changes.
+        if (artifact.createdAtSource == null) {
+            artifact.createdAtSource = command.createdAtSource
+        }
+
         countUpdate(runId)
     }
 

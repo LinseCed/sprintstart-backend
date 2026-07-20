@@ -57,8 +57,10 @@ class Artifact(
     )
     @Column(name = "label", nullable = false)
     val labels: MutableList<String> = mutableListOf(),
-    val createdAtSource: Instant?,
-    val updatedAtSource: Instant?,
+    // `var` so a crawl can backfill rows written before these were persisted at all. They are
+    // not part of the AI payload, so writing one never marks the artifact for re-embedding.
+    var createdAtSource: Instant?,
+    var updatedAtSource: Instant?,
     @Column(nullable = false)
     val ingestedAt: Instant = Instant.now(),
     @ManyToOne(fetch = FetchType.LAZY)
@@ -80,6 +82,25 @@ class Artifact(
      */
     @Column(name = "author_login", nullable = true)
     var authorLogin: String? = null,
+    /**
+     * When a pull request was merged at the source; null for anything unmerged or not a PR.
+     *
+     * The north-star metric of onboarding is time-to-first-merged-PR, and until this column existed
+     * the merge was fetched from GitHub and then thrown away at the mapper -- the one fact the
+     * whole measurement rests on.
+     */
+    @Column(name = "merged_at_source")
+    var mergedAtSource: Instant? = null,
+    /**
+     * The first time anyone other than the author responded to a pull request -- the earliest of a
+     * submitted review or a comment by someone else.
+     *
+     * "Receiving a response" is among the most-evidenced newcomer barriers, so the wait for a first
+     * response is measured directly rather than inferred from when the PR eventually merged. A
+     * review and a comment both count: a newcomer does not experience them differently.
+     */
+    @Column(name = "first_response_at_source")
+    var firstResponseAtSource: Instant? = null,
     // --- AI sync outbox (see ArtifactAiSyncState) ---------------------------------------------
     @Enumerated(EnumType.STRING)
     @Column(name = "ai_sync_state", nullable = false)
