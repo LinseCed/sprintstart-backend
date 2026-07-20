@@ -1,6 +1,9 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
+import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredArtifact
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
+import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMetadataJsonMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -16,6 +19,7 @@ import java.util.UUID
 @Service
 internal class ArtifactIngestionApiService(
     private val artifactRepository: ArtifactRepository,
+    private val artifactMetadataJsonMapper: ArtifactMetadataJsonMapper,
 ) : ArtifactIngestionApi {
     @Transactional(readOnly = true)
     override fun getFirstIngestedAt(component: String): Instant? {
@@ -44,5 +48,19 @@ internal class ArtifactIngestionApiService(
     @Transactional(readOnly = true)
     override fun getHash(artifactId: UUID): String? {
         return artifactRepository.findById(artifactId).orElse(null)?.hash
+    }
+
+    @Transactional(readOnly = true)
+    override fun getAuthoredWork(projectId: UUID, authorLogin: String): List<AuthoredArtifact> {
+        return artifactRepository
+            .findAllByProjectIdAndAuthorLogin(projectId, authorLogin.lowercase())
+            .map { artifact ->
+                val metadata = artifactMetadataJsonMapper.fromJson(artifact.metadata)
+                AuthoredArtifact(
+                    artifactType = artifact.artifactType.name,
+                    repositoryFullName = (metadata as? GithubArtifactMetadata)?.repositoryFullName,
+                    labels = artifact.labels.toList(),
+                )
+            }
     }
 }

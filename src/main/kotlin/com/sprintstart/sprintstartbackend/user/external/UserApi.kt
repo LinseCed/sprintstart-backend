@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
+import java.time.Instant
 import java.util.Optional
 import java.util.UUID
 
@@ -76,4 +77,33 @@ interface UserApi {
      * @return The user's GitHub login, or `null` when they have none (or do not exist).
      */
     fun getGithubLoginByUserId(userId: UUID): String?
+
+    /**
+     * Everything the GitHub-history seeding feature needs about a user, in one read.
+     *
+     * Bundled rather than exposed as three accessors because they are only ever used together, and
+     * the module boundary should describe a purpose rather than mirror columns.
+     *
+     * @return The user's seeding context, or `null` when no such user exists.
+     */
+    fun getGithubSeedingContext(userId: UUID): GithubSeedingContext?
+
+    /**
+     * Records or clears consent for using a user's existing repository work to calibrate their
+     * skill assessment. `null` withdraws it.
+     */
+    fun setGithubSeedingConsent(userId: UUID, consentedAt: Instant?)
 }
+
+/**
+ * The user-module facts a consent-gated history prior is built from.
+ *
+ * @property githubLogin The account their work is attributed to; `null` until declared.
+ * @property projectIds The projects whose corpus may be read on their behalf -- never any other.
+ * @property seedingConsentAt When they opted in, or `null` when they have not (or withdrew).
+ */
+data class GithubSeedingContext(
+    val githubLogin: String?,
+    val projectIds: Set<UUID>,
+    val seedingConsentAt: Instant?,
+)

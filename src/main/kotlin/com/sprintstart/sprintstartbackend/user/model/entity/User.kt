@@ -61,6 +61,12 @@ class User(
     @Enumerated(EnumType.STRING)
     @Column(name = "github_login_source", nullable = true)
     var githubLoginSource: GithubLoginSource? = null,
+    // When the user opted in to having their existing work in the project's connected repositories
+    // used to calibrate their skill assessment. Null means no consent -- the default, and what
+    // revoking returns it to. Consent is the gate; the derived signal itself lives in
+    // GithubHistoryPrior and is deleted on revocation.
+    @Column(name = "github_seeding_consent_at", nullable = true)
+    var githubSeedingConsentAt: Instant? = null,
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "user_projects",
