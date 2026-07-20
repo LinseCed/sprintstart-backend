@@ -74,6 +74,10 @@ data class AiTask(
 data class PathStep(
     val title: String,
     val description: String? = null,
+    // The competency the AI carried over from the blueprint step this came from; null for steps it
+    // added on top of the blueprint, which have no competency attached to copy.
+    @SerialName("competency_key")
+    val competencyKey: String? = null,
     val resources: List<PathResource> = emptyList(),
     val citations: List<Citation> = emptyList(),
     val tasks: List<AiTask> = emptyList(),

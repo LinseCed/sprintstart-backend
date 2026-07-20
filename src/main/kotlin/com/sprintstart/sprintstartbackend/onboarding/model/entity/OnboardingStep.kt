@@ -50,6 +50,15 @@ class OnboardingStep(
     val resources: MutableList<OnboardingResource> = mutableListOf(),
     @Column(nullable = false, columnDefinition = "TEXT")
     var expectedOutcome: String,
+    /**
+     * The competency this step teaches, carried over from the blueprint step it came from.
+     *
+     * This is what turns a step into a *module*: on generation a default [Verification] is created
+     * for it, and the competency path uses that verification to point the matching graph node at
+     * this step. A step with no key is still a step -- it just has no node to open from.
+     */
+    @Column(name = "competency_key", nullable = true)
+    var competencyKey: String? = null,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var status: StepStatus,
