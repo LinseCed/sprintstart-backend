@@ -38,6 +38,10 @@ class OnboardingMetricsServiceTest {
     // Task-0 assignment is exercised in TaskZeroServiceTest; here it defaults to "none assigned".
     private val taskZeroService: TaskZeroService = mockk(relaxed = true)
 
+    // Autonomy is exercised in RampServiceTest; here it defaults to "not reached". This read must
+    // never write -- a PM opening the dashboard cannot be what grants somebody autonomy.
+    private val rampService: RampService = mockk(relaxed = true)
+
     private val now: Instant = Instant.parse("2026-07-20T12:00:00Z")
     private val projectId: UUID = UUID.randomUUID()
 
@@ -47,6 +51,7 @@ class OnboardingMetricsServiceTest {
         userGoalRepository,
         environmentReadinessService,
         taskZeroService,
+        rampService,
         Clock.fixed(now, ZoneOffset.UTC),
     )
 

@@ -76,6 +76,8 @@ class OnboardingBuddyServiceTest {
         longestOpenWaitHours = longestOpenWaitHours,
         stalled = stalled,
         stalledReason = stalledReason,
+        autonomyReachedAt = null,
+        reworkedPullRequestCount = 0,
     )
 
     private fun stageAttention(

@@ -97,6 +97,7 @@ class GithubArtifactProviderService(
             authorLogin = command.authorLogin,
             mergedAtSource = command.mergedAtSource,
             firstResponseAtSource = command.firstResponseAtSource,
+            changesRequestedCount = command.changesRequestedCount,
         )
         artifactRepository.save(artifact)
         ingestionRun.ingestedCount++
@@ -164,6 +165,7 @@ class GithubArtifactProviderService(
         artifact.state = command.state
         artifact.mergedAtSource = command.mergedAtSource
         artifact.firstResponseAtSource = command.firstResponseAtSource
+        artifact.changesRequestedCount = command.changesRequestedCount
         // Backfills rows written before these were persisted; a source creation time never changes.
         if (artifact.createdAtSource == null) {
             artifact.createdAtSource = command.createdAtSource

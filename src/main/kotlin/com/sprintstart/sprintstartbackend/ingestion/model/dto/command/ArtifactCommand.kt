@@ -40,6 +40,8 @@ data class GithubArtifactCommand(
     val mergedAtSource: Instant? = null,
     /** First response by someone other than the author; pull requests only. */
     val firstResponseAtSource: Instant? = null,
+    /** Reviews by someone other than the author that asked for changes; pull requests only. */
+    val changesRequestedCount: Int = 0,
 ) : ArtifactCommand
 
 data class UploadArtifactCommand(

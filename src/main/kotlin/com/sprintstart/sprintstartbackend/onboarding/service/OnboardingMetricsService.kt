@@ -44,6 +44,7 @@ class OnboardingMetricsService(
     private val userGoalRepository: UserGoalRepository,
     private val environmentReadinessService: EnvironmentReadinessService,
     private val taskZeroService: TaskZeroService,
+    private val rampService: RampService,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     /**
@@ -132,6 +133,12 @@ class OnboardingMetricsService(
             longestOpenWaitHours = longestOpenWait,
             stalled = stalledReason != null,
             stalledReason = stalledReason,
+            // The end of onboarding belongs next to the other numbers about how onboarding is
+            // going. Read-only here: a PM opening the dashboard must never be what grants it.
+            autonomyReachedAt = rampService.autonomyReachedAtFor(member.userId, projectId),
+            // R7's own measure, on our data: whether a suggested task was claimed, and whether it
+            // came back sent-for-rework. Both derived, so history is covered without a backfill.
+            reworkedPullRequestCount = pullRequests.count { it.changesRequestedCount > 0 },
         )
     }
 

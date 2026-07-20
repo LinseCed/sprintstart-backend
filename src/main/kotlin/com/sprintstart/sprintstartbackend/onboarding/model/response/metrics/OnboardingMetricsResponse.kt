@@ -48,6 +48,22 @@ data class HireTimelineResponse(
     val stalled: Boolean,
     /** What the stall is attributed to, in plain words; null when not stalled. */
     val stalledReason: String?,
+    /**
+     * When this hire reached autonomy — a task completed with no buddy intervention and no review
+     * rework. Null while onboarding is still going.
+     *
+     * The end of onboarding is a dated event rather than a threshold crossed, so a PM sees *when*
+     * somebody became independent rather than a percentage that happened to reach 100.
+     */
+    val autonomyReachedAt: Instant?,
+    /**
+     * How many of this hire's pull requests were sent back for changes.
+     *
+     * The counterpart to the merge count: shipping five changes that each needed three rounds is a
+     * different story from shipping five clean ones, and only one of those two numbers was visible
+     * before.
+     */
+    val reworkedPullRequestCount: Int,
 )
 
 /**
