@@ -3,6 +3,8 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.model.response.dashboard.CompetencyAggregateResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.dashboard.CompetencySourceCounts
+import com.sprintstart.sprintstartbackend.onboarding.model.response.dashboard.DashboardProjectResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.dashboard.DashboardProjectRoleResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.dashboard.UserCompetencyStateResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.dashboard.UserCompetencySummaryResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
@@ -93,6 +95,9 @@ class CompetencyDashboardService(
                 userId = user.id,
                 firstname = user.firstname,
                 lastname = user.lastname,
+                profileIcon = user.profileIcon,
+                roles = user.projectRoles.map { DashboardProjectRoleResponse(id = it.roleId, name = it.name) },
+                projects = user.projects.map { DashboardProjectResponse(id = it.projectId, name = it.name) },
                 competencies = statesByUser[user.id].orEmpty().mapNotNull { state ->
                     competenciesByKey[state.competencyKey]?.let { competency ->
                         UserCompetencyStateResponse(
