@@ -41,6 +41,28 @@ interface ArtifactRepository : JpaRepository<Artifact, UUID> {
     )
     fun findPendingAiSync(@Param("now") now: Instant, pageable: Pageable): List<Artifact>
 
+    /**
+     * Returns the artifacts a given GitHub account authored within one project.
+     *
+     * The basis for recognizing a hire's own prior work: with their declared `User.githubLogin`,
+     * their issues and pull requests in the project's already-connected repositories can be found
+     * without asking GitHub for anything new. Only issues and pull requests carry an author login
+     * (see `Artifact.authorLogin`), so commits and files never match.
+     */
+    @Query(
+        """
+            SELECT DISTINCT a
+            FROM Artifact a
+            JOIN a.projectIdsInternal p
+            WHERE p = :projectId
+                AND a.authorLogin = :authorLogin
+        """,
+    )
+    fun findAllByProjectIdAndAuthorLogin(
+        @Param("projectId") projectId: UUID,
+        @Param("authorLogin") authorLogin: String,
+    ): List<Artifact>
+
     fun countByAiSyncRunIdAndAiSyncState(runId: UUID, state: ArtifactAiSyncState): Long
 
     fun findAllByAiSyncRunIdAndAiSyncState(runId: UUID, state: ArtifactAiSyncState): List<Artifact>

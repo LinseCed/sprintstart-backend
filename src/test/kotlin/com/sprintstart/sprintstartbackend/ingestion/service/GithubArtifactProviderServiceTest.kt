@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.external.events.file
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.GithubArtifactCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactAiSyncState
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
@@ -167,6 +168,47 @@ class GithubArtifactProviderServiceTest {
     }
 
     @Test
+    fun `persistArtifact stores the author login of a new issue`() {
+        val run = ingestionRun()
+        val savedArtifact = slot<Artifact>()
+        every { ingestionRunRepository.findByIdForUpdate(runId) } returns Optional.of(run)
+        every { artifactRepository.findBySourceId("github:owner/repo:ISSUE:42") } returns null
+        every { artifactRepository.save(capture(savedArtifact)) } answers { savedArtifact.captured }
+
+        service.persistArtifact(
+            artifactCommand(
+                sourceId = "github:owner/repo:ISSUE:42",
+                artifactType = ArtifactType.ISSUE,
+                authorLogin = "octocat",
+            ),
+        )
+
+        assertThat(savedArtifact.captured.authorLogin).isEqualTo("octocat")
+    }
+
+    @Test
+    fun `persistArtifact backfills a missing author login without re-queueing the artifact`() {
+        val existing = artifact(artifactType = ArtifactType.ISSUE, hash = "same-hash").apply {
+            aiSyncState = ArtifactAiSyncState.SYNCED
+        }
+        every { artifactRepository.findBySourceId(existing.sourceId) } returns existing
+
+        service.persistArtifact(
+            artifactCommand(
+                sourceId = existing.sourceId,
+                artifactType = ArtifactType.ISSUE,
+                hash = "same-hash",
+                authorLogin = "octocat",
+            ),
+        )
+
+        // Rows ingested before the column existed pick the author up on the next crawl. The author
+        // isn't part of the AI payload, so this must not cost a re-embed.
+        assertThat(existing.authorLogin).isEqualTo("octocat")
+        assertThat(existing.aiSyncState).isEqualTo(ArtifactAiSyncState.SYNCED)
+    }
+
+    @Test
     fun `deleteFileArtifact deletes existing artifact and records deindex id`() {
         val run = ingestionRun()
         val existing = artifact(hash = "hash")
@@ -211,6 +253,7 @@ class GithubArtifactProviderServiceTest {
         hash: String? = "hash-1",
         state: String? = null,
         labels: List<String> = emptyList(),
+        authorLogin: String? = null,
     ) = GithubArtifactCommand(
         ingestionRunId = runId,
         sourceSystem = SourceSystem.GITHUB,
@@ -230,6 +273,7 @@ class GithubArtifactProviderServiceTest {
         ),
         state = state,
         labels = labels,
+        authorLogin = authorLogin,
     )
 
     private fun ingestionRun() = IngestionRun(

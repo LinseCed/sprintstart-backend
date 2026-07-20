@@ -56,6 +56,11 @@ class GithubArtifactProviderService(
         val existing = artifactRepository.findBySourceId(command.sourceId)
         if (existing != null) {
             existing.addProjectIds(projectIds)
+            // Backfills rows ingested before the column existed. Not part of the AI payload, so it
+            // deliberately does not mark the artifact for re-embedding.
+            if (existing.authorLogin == null) {
+                existing.authorLogin = command.authorLogin
+            }
             when (command.artifactType) {
                 ArtifactType.COMMIT -> Unit
                 ArtifactType.FILE -> updateFile(existing, command, runId)
@@ -86,6 +91,7 @@ class GithubArtifactProviderService(
             createdAtSource = null,
             updatedAtSource = null,
             aiSyncRunId = runId,
+            authorLogin = command.authorLogin,
         )
         artifactRepository.save(artifact)
         ingestionRun.ingestedCount++
