@@ -4,6 +4,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.GenerateStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.ProposedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
@@ -26,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.request
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.util.UUID
@@ -134,27 +136,29 @@ class StarterWorkControllerTest(
     }
 
     @Test
-    fun `getMatchesForMe should return 200 for a USER`() {
-        coEvery { starterWorkTaskProposalService.matchForUser("test-subject") } returns
+    fun `getMatchesForMe should return 200 for a USER, with the reasons a task was suggested`() {
+        val projectId = UUID.randomUUID()
+        // No longer a suspend method: ranking is deterministic and local since #74, so there is no
+        // AI call to dispatch asynchronously around.
+        every { starterWorkTaskProposalService.matchForUser("test-subject", projectId) } returns
             listOf(
                 RankedStarterWorkTaskResponse(
                     task = taskResponse(),
-                    score = 1.0,
+                    score = 40.0,
                     matchedCompetencyKeys = listOf("docs"),
+                    taskType = TaskType.DOCS,
+                    reasons = listOf("uses docs, which you have already shown"),
                 ),
             )
 
-        // Suspend controller methods dispatch asynchronously in Spring MVC; the final status is
-        // only observable after asyncDispatch, mirroring VerificationControllerTest's
-        // `synthesizeContent` test.
-        val mvcResult = mockMvc
-            .perform(get("/api/v1/onboarding/starter-work/me/matches").with(userJwt))
-            .andExpect(request().asyncStarted())
-            .andReturn()
-
         mockMvc
-            .perform(asyncDispatch(mvcResult))
-            .andExpect(status().isOk)
+            .perform(
+                get("/api/v1/onboarding/starter-work/me/matches")
+                    .param("projectId", projectId.toString())
+                    .with(userJwt),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].taskType").value("DOCS"))
+            .andExpect(jsonPath("$[0].reasons[0]").value("uses docs, which you have already shown"))
     }
 
     @Test

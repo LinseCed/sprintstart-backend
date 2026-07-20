@@ -37,22 +37,7 @@ data class StarterWorkOutcome(
     val notes: List<String> = emptyList(),
 )
 
-@Serializable
-data class HireCompetencySchema(
-    val key: String,
-    val label: String,
-    val description: String = "",
-)
-
-@Serializable
-data class MatchHireToPoolRequest(
-    @SerialName("hire_competencies") val hireCompetencies: List<HireCompetencySchema> = emptyList(),
-    val pool: List<ProposedStarterTaskSchema> = emptyList(),
-)
-
-@Serializable
-data class RankedStarterTaskSchema(
-    val task: ProposedStarterTaskSchema,
-    val score: Double,
-    @SerialName("matched_competency_keys") val matchedCompetencyKeys: List<String> = emptyList(),
-)
+// HireCompetencySchema / MatchHireToPoolRequest / RankedStarterTaskSchema are gone with
+// `OnboardingAiClient.matchHireToPool` (#74): ranking is deterministic and local now, so these
+// described a seam that no longer exists. Keeping serializable DTOs for an endpoint nothing calls
+// is how `repo_signal` and mining's `last_fingerprint` became dead wiring.
