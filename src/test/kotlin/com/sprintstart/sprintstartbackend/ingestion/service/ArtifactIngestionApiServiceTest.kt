@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
+import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMetadataJsonMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -9,12 +10,14 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import tools.jackson.databind.ObjectMapper
 import java.util.Optional
 import java.util.UUID
 
 class ArtifactIngestionApiServiceTest {
     private val artifactRepository = mockk<ArtifactRepository>()
-    private val service = ArtifactIngestionApiService(artifactRepository)
+    private val artifactMetadataJsonMapper = ArtifactMetadataJsonMapper(ObjectMapper())
+    private val service = ArtifactIngestionApiService(artifactRepository, artifactMetadataJsonMapper)
 
     private val artifactId = UUID.randomUUID()
 

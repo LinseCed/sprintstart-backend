@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.service
 
+import com.sprintstart.sprintstartbackend.user.external.GithubSeedingContext
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
@@ -19,6 +20,7 @@ import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 import java.util.Optional
 import java.util.UUID
 
@@ -125,6 +127,22 @@ class UserApiService(
                 },
             )
         }
+
+    @Transactional(readOnly = true)
+    override fun getGithubSeedingContext(userId: UUID): GithubSeedingContext? {
+        val user = userRepository.findById(userId).orElse(null) ?: return null
+
+        return GithubSeedingContext(
+            githubLogin = user.githubLogin,
+            projectIds = user.projects.map { it.id }.toSet(),
+            seedingConsentAt = user.githubSeedingConsentAt,
+        )
+    }
+
+    @Transactional
+    override fun setGithubSeedingConsent(userId: UUID, consentedAt: Instant?) {
+        userRepository.findById(userId).ifPresent { it.githubSeedingConsentAt = consentedAt }
+    }
 
     @Transactional(readOnly = true)
     override fun getGithubLoginByUserId(userId: UUID): String? =
