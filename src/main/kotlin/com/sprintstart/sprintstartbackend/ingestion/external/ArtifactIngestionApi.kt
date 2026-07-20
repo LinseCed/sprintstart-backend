@@ -137,6 +137,14 @@ data class AuthoredPullRequest(
     val firstResponseAt: Instant?,
     val mergedAt: Instant?,
     val state: String?,
+    /**
+     * How many reviews asked the author to change this pull request.
+     *
+     * Zero is the whole point: "done with no rework" is half the operational definition of
+     * autonomy, and merge state alone cannot tell a clean change from one sent back three times.
+     */
+    val changesRequestedCount: Int = 0,
+    val repositoryFullName: String? = null,
 )
 
 /**

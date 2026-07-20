@@ -101,6 +101,18 @@ class Artifact(
      */
     @Column(name = "first_response_at_source")
     var firstResponseAtSource: Instant? = null,
+    /**
+     * How many reviews on a pull request asked for changes.
+     *
+     * The operational definition of "can be left alone here" is a task completed with no help and
+     * **no review rework** — so whether a change had to be sent back is the load-bearing half of
+     * the autonomy signal, and it cannot be recovered from merge state: a pull request that went
+     * through three rounds of requested changes merges exactly like one that did not.
+     *
+     * Zero on a pull request nobody asked changes on, and on everything that is not a pull request.
+     */
+    @Column(name = "changes_requested_count", nullable = false)
+    var changesRequestedCount: Int = 0,
     // --- AI sync outbox (see ArtifactAiSyncState) ---------------------------------------------
     @Enumerated(EnumType.STRING)
     @Column(name = "ai_sync_state", nullable = false)

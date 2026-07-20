@@ -67,6 +67,10 @@ internal class ArtifactIngestionApiService(
                     firstResponseAt = it.firstResponseAtSource,
                     mergedAt = it.mergedAtSource,
                     state = it.state,
+                    changesRequestedCount = it.changesRequestedCount,
+                    repositoryFullName = (
+                        artifactMetadataJsonMapper.fromJson(it.metadata) as? GithubArtifactMetadata
+                    )?.repositoryFullName,
                 )
             }
     }

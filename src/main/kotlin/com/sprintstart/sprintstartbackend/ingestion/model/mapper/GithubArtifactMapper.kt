@@ -17,6 +17,9 @@ import java.time.Instant
 
 private const val GITHUB_COMMIT_MESSAGE_LENGTH = 72
 
+/** GitHub's review state for "please change this before I approve it". */
+private const val CHANGES_REQUESTED = "CHANGES_REQUESTED"
+
 /**
  * Translates GitHub domain events into canonical artifact commands.
  *
@@ -201,7 +204,21 @@ class GithubArtifactMapper {
             authorLogin = event.author?.lowercase(),
             mergedAtSource = event.mergedAt?.let(Instant::parse),
             firstResponseAtSource = firstResponseAt(event),
+            changesRequestedCount = changesRequestedCount(event),
         )
+    }
+
+    /**
+     * How many times somebody asked the author to change this pull request.
+     *
+     * Self-reviews are excluded for the same reason they are excluded from the first response: an
+     * author asking themselves for changes is not the project sending work back.
+     */
+    private fun changesRequestedCount(event: GithubPullRequestFetchedEvent): Int {
+        val author = event.author?.lowercase()
+        return event.reviews
+            .orEmpty()
+            .count { it.author?.lowercase() != author && it.state.equals(CHANGES_REQUESTED, ignoreCase = true) }
     }
 
     /**

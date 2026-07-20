@@ -74,6 +74,8 @@ class OnboardingMetricsControllerTest(
             longestOpenWaitHours = 72,
             stalled = true,
             stalledReason = "Waiting on a review for 3 days",
+            autonomyReachedAt = null,
+            reworkedPullRequestCount = 0,
         )
 
     @Test
