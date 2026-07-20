@@ -242,9 +242,19 @@ class StarterWorkTaskProposalService(
         return MatchInput(hireCompetencies, pool)
     }
 
-    /** Derives a stable, deterministic competency key for the CONTRIBUTION node an approved task becomes. */
-    private fun contributionKeyFor(sourceId: String): String =
-        sourceId.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+    companion object {
+        /**
+         * Derives a stable, deterministic competency key for the CONTRIBUTION node an approved
+         * task becomes.
+         *
+         * Deliberately a pure function of [sourceId] and nothing else, so the mapping from task to
+         * node survives everything a PM can change: since graph authoring (#50) a node's label,
+         * description and kind are all editable, so matching a task to its node on any of those
+         * would break the first time somebody renamed it.
+         */
+        fun contributionKeyFor(sourceId: String): String =
+            sourceId.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+    }
 
     private fun findPendingProposal(id: UUID): StarterWorkTaskProposal {
         val proposal = starterWorkTaskProposalRepository.findById(id).orElseThrow {
