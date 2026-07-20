@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyGraphResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.DeleteCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyGraphAuthoringService
@@ -23,6 +24,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -52,6 +54,7 @@ class CompetencyGraphAuthoringControllerTest(
     }
 
     private val pmJwt = jwtWithRoles("PM")
+    private val hrJwt = jwtWithRoles("HR")
     private val userJwt = jwtWithRoles("USER")
 
     private fun liveCompetencyResponse(): CompetencyResponse =
@@ -64,6 +67,42 @@ class CompetencyGraphAuthoringControllerTest(
             invariant = false,
             repoRef = null,
         )
+
+    @Test
+    fun `getGraph should return the whole graph for a PM`() {
+        every { competencyGraphAuthoringService.getGraph() } returns CompetencyGraphResponse(
+            competencies = listOf(liveCompetencyResponse()),
+            edges = listOf(CompetencyEdgeResponse("kotlin", "spring", EdgeKind.PREREQUISITE)),
+            graphVersion = 7,
+        )
+
+        mockMvc
+            .perform(get("/api/v1/onboarding/competency-graph").with(pmJwt))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.competencies[0].key").value("kotlin"))
+            .andExpect(jsonPath("$.edges[0].toKey").value("spring"))
+            .andExpect(jsonPath("$.graphVersion").value(7))
+    }
+
+    @Test
+    fun `getGraph should be readable by HR, which reviews the graph without authoring it`() {
+        every { competencyGraphAuthoringService.getGraph() } returns CompetencyGraphResponse(
+            competencies = emptyList(),
+            edges = emptyList(),
+            graphVersion = 1,
+        )
+
+        mockMvc
+            .perform(get("/api/v1/onboarding/competency-graph").with(hrJwt))
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `getGraph should return 403 for a plain USER`() {
+        mockMvc
+            .perform(get("/api/v1/onboarding/competency-graph").with(userJwt))
+            .andExpect(status().isForbidden)
+    }
 
     @Test
     fun `updateCompetency should return 200 for a PM`() {

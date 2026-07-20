@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyEdgeRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.UpdateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyGraphResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.DeleteCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRepository
@@ -97,6 +98,24 @@ class CompetencyGraphAuthoringService(
     @Transactional(readOnly = true)
     fun getCompetency(key: String): CompetencyResponse =
         findVisibleCompetency(key, headGraph()).toAuthoringResponse()
+
+    /**
+     * The whole live graph at the head version — what a PM authors against.
+     *
+     * Until this existed the only way to see the graph as a whole was `GET /me/path`, a hire's
+     * projection: filtered to one project's baseline, carrying per-user node state, and resolved
+     * at that hire's pin. A PM looking at it saw their own onboarding, and on a project whose
+     * baseline selects nothing they saw an empty graph with nothing to edit.
+     */
+    @Transactional(readOnly = true)
+    fun getGraph(): CompetencyGraphResponse {
+        val graph = headGraph()
+        return CompetencyGraphResponse(
+            competencies = graph.competencies.map { it.toAuthoringResponse() },
+            edges = graph.edges.map { it.toAuthoringResponse() },
+            graphVersion = competencyGraphVersionService.currentVersion(),
+        )
+    }
 
     /**
      * Applies a PM's edit to one competency node.
@@ -257,22 +276,26 @@ class CompetencyGraphAuthoringService(
         graph.competencies.firstOrNull { it.key == key }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No competency found with key: $key")
 
-    private fun Competency.toAuthoringResponse(): CompetencyResponse =
-        CompetencyResponse(
-            key = key,
-            label = label,
-            description = description,
-            kind = kind,
-            targetLevel = targetLevel,
-            invariant = invariant,
-            repoRef = repoRef,
-        )
-
-    /** Throws a [ResponseStatusException]; expression-bodied so callers stay under detekt's throw budget. */
-    private fun reject(status: HttpStatus, message: String): Nothing = throw ResponseStatusException(status, message)
-
     companion object {
         private const val MIN_TARGET_LEVEL = 1
         private const val MAX_TARGET_LEVEL = 4
     }
 }
+
+/** Pure mappers, kept top-level so the service stays under detekt's per-class function budget. */
+private fun Competency.toAuthoringResponse(): CompetencyResponse =
+    CompetencyResponse(
+        key = key,
+        label = label,
+        description = description,
+        kind = kind,
+        targetLevel = targetLevel,
+        invariant = invariant,
+        repoRef = repoRef,
+    )
+
+private fun CompetencyEdge.toAuthoringResponse(): CompetencyEdgeResponse =
+    CompetencyEdgeResponse(fromKey = fromKey, toKey = toKey, kind = kind)
+
+/** Throws a [ResponseStatusException]; expression-bodied so callers stay under detekt's throw budget. */
+private fun reject(status: HttpStatus, message: String): Nothing = throw ResponseStatusException(status, message)
