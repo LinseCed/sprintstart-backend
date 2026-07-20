@@ -39,6 +39,7 @@ import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -77,6 +78,19 @@ class VerificationServiceTest {
 
     private val userId = UUID.randomUUID()
     private val authId = "auth|test-user"
+
+    @BeforeEach
+    fun stubAnswerReuseCheck() {
+        // Only ARTIFACT submissions consult this; default to "nobody else claimed it" so each
+        // test opts in to the reuse case explicitly.
+        every {
+            verificationAttemptRepository.existsByVerificationIdAndAnswerAndPassedIsTrueAndUserIdNot(
+                any(),
+                any(),
+                any(),
+            )
+        } returns false
+    }
 
     private fun makeStep(
         status: StepStatus = StepStatus.WAITING,
@@ -267,6 +281,64 @@ class VerificationServiceTest {
             assertTrue(result.passed)
             coVerify(exactly = 1) { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) }
             coVerify(exactly = 1) { onboardingAiClient.gradeArtifact(any(), any(), any()) }
+        }
+
+        @Test
+        fun `ARTIFACT rejects a PR another user already passed with, without a GitHub or AI call`() = runTest {
+            val repositoryConnectionId = UUID.randomUUID()
+            val step = makeStep()
+            val verification = makeVerification(
+                VerificationType.ARTIFACT,
+                step.id,
+                rubric = "closes the ticket",
+                repositoryConnectionId = repositoryConnectionId,
+            )
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
+            every { verificationRepository.findByStepId(step.id) } returns verification
+            every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
+            every { competencyGraphVersionService.currentVersion() } returns 1
+            every {
+                verificationAttemptRepository.existsByVerificationIdAndAnswerAndPassedIsTrueAndUserIdNot(
+                    verification.id,
+                    "42",
+                    userId,
+                )
+            } returns true
+            every { verificationAttemptRepository.save(any()) } answers { firstArg() }
+
+            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest(" 42 "))
+
+            // One PR can't prove two people did the work, and the LLM judge would happily pass it
+            // a second time -- so this never reaches GitHub or the AI service.
+            assertFalse(result.passed)
+            assertTrue(result.feedback.contains("already been submitted"))
+            coVerify(exactly = 0) { githubRepositoryApi.getPullRequestEvidence(any(), any()) }
+            coVerify(exactly = 0) { onboardingAiClient.gradeArtifact(any(), any(), any()) }
+        }
+
+        @Test
+        fun `ARTIFACT stores the PR number normalized so the reuse check can match it`() = runTest {
+            val repositoryConnectionId = UUID.randomUUID()
+            val step = makeStep()
+            val verification = makeVerification(
+                VerificationType.ARTIFACT,
+                step.id,
+                rubric = "closes the ticket",
+                repositoryConnectionId = repositoryConnectionId,
+            )
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
+            every { verificationRepository.findByStepId(step.id) } returns verification
+            every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
+            every { competencyGraphVersionService.currentVersion() } returns 1
+            coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) } returns null
+            val saved = slot<VerificationAttempt>()
+            every { verificationAttemptRepository.save(capture(saved)) } answers { firstArg() }
+
+            service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("  42  "))
+
+            assertEquals("42", saved.captured.answer)
         }
 
         @Test

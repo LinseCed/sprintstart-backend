@@ -11,4 +11,17 @@ interface VerificationAttemptRepository : JpaRepository<VerificationAttempt, UUI
     ): List<VerificationAttempt>
 
     fun countByVerificationIdAndUserId(verificationId: UUID, userId: UUID): Int
+
+    /**
+     * Whether someone else has already passed this verification with the same answer.
+     *
+     * Used by `ARTIFACT` grading, where the answer is a pull request number: one pull request
+     * cannot be evidence that two different people did the work. Scoped to a single verification,
+     * so the answer refers to the same task on the same linked repository.
+     */
+    fun existsByVerificationIdAndAnswerAndPassedIsTrueAndUserIdNot(
+        verificationId: UUID,
+        answer: String,
+        userId: UUID,
+    ): Boolean
 }
