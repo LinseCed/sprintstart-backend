@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompetencySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveEdgeSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ArtifactEvidenceDto
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AssembleOrientationRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentHistoryEntrySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
@@ -21,6 +22,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.HireCompeten
 import com.sprintstart.sprintstartbackend.onboarding.external.model.MatchHireToPoolRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.MineStarterWorkRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ModuleProposalOutcome
+import com.sprintstart.sprintstartbackend.onboarding.external.model.OrientationOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposeModuleRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedStarterTaskSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.RankedStarterTaskSchema
@@ -175,6 +177,55 @@ class OnboardingAiClient(
                 .perform<ModuleProposalOutcome>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
             val msg = "Failed to propose module (HTTP ${e.statusCode}): ${e.body}"
+            throw OnboardingAiException(e.statusCode, e.body, msg)
+        }
+
+    /**
+     * Assembles the orientation packet for one task from the project's existing material (#73/ai#31).
+     *
+     * Unlike [proposeModule] this *is* on a hire's request path — it is what somebody reads while
+     * doing the task they just picked up — which is why the caller caches the result against the
+     * task and sends [lastFingerprint] on every read: an unchanged corpus comes back `unchanged`
+     * with no retrieval or LLM pass, and a corpus that has moved is re-assembled rather than
+     * described from a packet that no longer matches the code.
+     *
+     * Nothing about the individual hire is sent, deliberately: orientation is a property of the
+     * task, so two people who claim it read the same packet and can talk about it.
+     *
+     * The AI service returns `skipped` with no packet when it cannot ground one. That is a real
+     * answer and must reach the hire as an honest empty state — never a fabricated packet.
+     *
+     * @param taskTitle The task the packet orients somebody for.
+     * @param taskBody The task's description, when it has one.
+     * @param labels The task's labels, used to aim retrieval.
+     * @param touchedPaths Repository paths the task is expected to touch, when known.
+     * @param lastFingerprint The corpus fingerprint recorded when this task's packet was last
+     *   assembled, if any.
+     * @return The assembly outcome returned by the AI service.
+     */
+    suspend fun assembleOrientation(
+        taskTitle: String,
+        taskBody: String = "",
+        labels: List<String> = emptyList(),
+        touchedPaths: List<String> = emptyList(),
+        lastFingerprint: String? = null,
+    ): OrientationOutcome =
+        try {
+            webClient
+                .post()
+                .uri(uri("/api/v1/onboarding/orientation"))
+                .body(
+                    AssembleOrientationRequest(
+                        taskTitle = taskTitle,
+                        taskBody = taskBody,
+                        labels = labels,
+                        touchedPaths = touchedPaths,
+                        lastFingerprint = lastFingerprint,
+                    ),
+                ).sync()
+                .perform<OrientationOutcome>()
+        } catch (@Suppress("SwallowedException") e: WebClientException) {
+            val msg = "Failed to assemble orientation (HTTP ${e.statusCode}): ${e.body}"
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 

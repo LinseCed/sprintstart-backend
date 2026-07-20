@@ -66,7 +66,33 @@ interface ArtifactIngestionApi {
      * Reads only artifacts already ingested -- no GitHub call.
      */
     fun getAuthoredPullRequests(projectId: UUID, authorLogin: String): List<AuthoredPullRequest>
+
+    /**
+     * The ingested artifact one starter-work task was mined from, by its source id.
+     *
+     * Exists so task-scoped orientation can be assembled from what the issue *actually says* — its
+     * body and its labels — rather than from the one-line summary the mining pass wrote. Reads only
+     * artifacts already ingested; no GitHub call.
+     *
+     * @param sourceId The backend's stable identifier, e.g. `github:org/repo:ISSUE:123`.
+     * @return The artifact's own text, or null when nothing with that source id is ingested.
+     */
+    fun getTaskSource(sourceId: String): TaskSourceArtifact?
 }
+
+/**
+ * The text of the artifact a task came from.
+ *
+ * Carries body and labels, unlike [AuthoredArtifact], because here the content *is* the point:
+ * orientation is aimed at what this task involves, so the retrieval it drives has to see the task's
+ * own words.
+ */
+data class TaskSourceArtifact(
+    val title: String?,
+    val body: String?,
+    val labels: List<String>,
+    val sourceUrl: String?,
+)
 
 /**
  * One pull request a person authored, reduced to its lifecycle.

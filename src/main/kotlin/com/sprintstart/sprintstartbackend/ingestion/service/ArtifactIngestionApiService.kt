@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.ingestion.service
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredArtifact
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
+import com.sprintstart.sprintstartbackend.ingestion.external.TaskSourceArtifact
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMetadataJsonMapper
@@ -80,5 +81,16 @@ internal class ArtifactIngestionApiService(
                     labels = artifact.labels.toList(),
                 )
             }
+    }
+
+    @Transactional(readOnly = true)
+    override fun getTaskSource(sourceId: String): TaskSourceArtifact? {
+        val artifact = artifactRepository.findBySourceId(sourceId) ?: return null
+        return TaskSourceArtifact(
+            title = artifact.title,
+            body = artifact.content,
+            labels = artifact.labels.toList(),
+            sourceUrl = artifact.sourceUrl,
+        )
     }
 }
