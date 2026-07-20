@@ -25,6 +25,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.VerificationAt
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.model.request.verification.SubmitVerificationAttemptRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.verification.UpsertVerificationRequest
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyModuleRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingStepRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
@@ -56,6 +57,7 @@ class VerificationServiceTest {
     private val verificationRepository: VerificationRepository = mockk()
     private val verificationAttemptRepository: VerificationAttemptRepository = mockk()
     private val onboardingStepRepository: OnboardingStepRepository = mockk()
+    private val competencyModuleRepository: CompetencyModuleRepository = mockk()
     private val competencyRepository: CompetencyRepository = mockk()
     private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
     private val competencyGraphVersionService: CompetencyGraphVersionService = mockk()
@@ -67,6 +69,7 @@ class VerificationServiceTest {
         verificationRepository,
         verificationAttemptRepository,
         onboardingStepRepository,
+        competencyModuleRepository,
         competencyRepository,
         userCompetencyStateRepository,
         competencyGraphVersionService,

@@ -10,16 +10,18 @@ fun Verification.toResponse(): VerificationResponse =
     VerificationResponse(
         id = id,
         stepId = stepId,
+        moduleId = moduleId,
         type = type,
         prompt = prompt,
         competencyKey = competencyKey,
         level = level,
     )
 
-fun VerificationAttempt.toSubmitResponse(stepStatus: StepStatus): SubmitVerificationAttemptResponse =
+fun VerificationAttempt.toSubmitResponse(stepStatus: StepStatus? = null): SubmitVerificationAttemptResponse =
     SubmitVerificationAttemptResponse(
         attemptId = id,
         stepId = verification.stepId,
+        moduleId = verification.moduleId,
         passed = passed,
         score = score,
         feedback = feedback,

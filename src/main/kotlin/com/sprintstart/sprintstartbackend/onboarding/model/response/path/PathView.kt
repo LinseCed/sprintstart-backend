@@ -11,13 +11,13 @@ data class PathNode(
     val kind: CompetencyKind,
     val state: NodeState,
     val level: Int? = null,
-    // The onboarding step whose Verification.competencyKey matches this node, if one is
-    // configured -- lets a client open this node as a learn-verify module (#8/#5). Null when no
-    // step has been wired up to teach/verify this competency yet.
-    val stepId: UUID? = null,
-    // Echoed from the same Verification as stepId (#6, frontend) so a client can recognize an
-    // artifact-checked node without an extra per-node fetch. Null under the same condition as
-    // stepId (no step wired up yet).
+    // The live CompetencyModule that teaches this node in this project, if one has been approved
+    // -- what a client opens when the hire clicks the node. Null when nobody has published a
+    // module for this competency yet, which is a real and visible state: the node is on the path
+    // but there is nothing to open.
+    val moduleId: UUID? = null,
+    // Echoed from that module's check so a client can recognize e.g. an artifact-graded node
+    // without a per-node fetch. Null when the module has no check configured.
     val verificationType: VerificationType? = null,
 )
 

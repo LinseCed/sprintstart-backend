@@ -3,11 +3,13 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.SkipStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ArtifactEvidenceDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
@@ -19,6 +21,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.verification.
 import com.sprintstart.sprintstartbackend.onboarding.model.request.verification.UpsertVerificationRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.verification.SubmitVerificationAttemptResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.verification.VerificationResponse
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyModuleRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingStepRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
@@ -64,6 +67,7 @@ class VerificationService(
     private val verificationRepository: VerificationRepository,
     private val verificationAttemptRepository: VerificationAttemptRepository,
     private val onboardingStepRepository: OnboardingStepRepository,
+    private val competencyModuleRepository: CompetencyModuleRepository,
     private val competencyRepository: CompetencyRepository,
     private val userCompetencyStateRepository: UserCompetencyStateRepository,
     private val competencyGraphVersionService: CompetencyGraphVersionService,
@@ -133,10 +137,11 @@ class VerificationService(
 
     private data class SubmissionContext(
         val userId: UUID,
-        val stepId: UUID,
         val verification: Verification,
         val lessonContent: String,
         val attemptNo: Int,
+        /** The legacy per-user step being verified, or null for a module-owned check. */
+        val stepId: UUID? = null,
         /**
          * Another user already passed this verification with this exact answer.
          *
@@ -182,8 +187,9 @@ class VerificationService(
         answer: String,
         graded: GradedResult,
     ): SubmitVerificationAttemptResponse {
-        val step = findStepForUser(context.stepId, context.userId)
-        val verification = findVerification(context.stepId)
+        val stepId = requireNotNull(context.stepId) { "a step-owned submission always carries its step" }
+        val step = findStepForUser(stepId, context.userId)
+        val verification = findVerification(stepId)
         requireStepNotConcluded(step)
 
         val attempt = verificationAttemptRepository.save(
@@ -214,7 +220,169 @@ class VerificationService(
         }
     }
 
+//  ================= Methods for users: module-owned checks =================
+
+    /**
+     * Returns the check config for a live module, without revealing the rubric or canonical answer.
+     *
+     * Access is by project membership, not by "this row is in your path": a module is shared, so
+     * there is no per-user copy to look the hire up in. That is the point of the rework.
+     *
+     * @throws ResponseStatusException 404 if the module or its check doesn't exist; 403 if the
+     * user is not a member of the module's project.
+     */
+    @Transactional(readOnly = true)
+    fun getModuleVerificationForMe(authId: String, moduleId: UUID): VerificationResponse {
+        val module = findModuleForUser(authId, moduleId)
+        return findModuleVerification(module.id).toResponse()
+    }
+
+    /**
+     * Grades a submitted answer against a module's check and, on pass, writes the ledger.
+     *
+     * Unlike the step-owned path, nothing per-user is completed here -- there is no per-user row to
+     * complete. Passing writes [UserCompetencyState], and the projection derives the node's state
+     * and its dependents' availability from the ledger, which is what "the path is a disposable
+     * projection" has always meant.
+     *
+     * @throws ResponseStatusException 404 if the module or its check doesn't exist; 403 if the
+     * user is not a member of the module's project; 503 if grading needs the AI service and it's
+     * unavailable.
+     */
+    suspend fun submitModuleAttemptForMe(
+        authId: String,
+        moduleId: UUID,
+        request: SubmitVerificationAttemptRequest,
+    ): SubmitVerificationAttemptResponse {
+        val context = withContext(Dispatchers.IO) {
+            readTxTemplate.execute { loadModuleSubmissionContext(authId, moduleId, request.answer) }!!
+        }
+
+        val answer = if (context.verification.type == VerificationType.ARTIFACT) {
+            request.answer.trim()
+        } else {
+            request.answer
+        }
+        val graded = grade(context, answer)
+
+        return withContext(Dispatchers.IO) {
+            txTemplate.execute { persistGradedModuleAttempt(context, answer, graded) }!!
+        }
+    }
+
+    private fun loadModuleSubmissionContext(authId: String, moduleId: UUID, answer: String): SubmissionContext {
+        val userId = resolveUserId(authId)
+        val module = findModuleForUser(authId, moduleId)
+        val verification = findModuleVerification(module.id)
+        val attemptNo = verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) + 1
+        return SubmissionContext(
+            userId = userId,
+            verification = verification,
+            lessonContent = module.lessonEvidence(),
+            attemptNo = attemptNo,
+            answerAlreadyClaimed = verification.type == VerificationType.ARTIFACT &&
+                verificationAttemptRepository.existsByVerificationIdAndAnswerAndPassedIsTrueAndUserIdNot(
+                    verification.id,
+                    answer.trim(),
+                    userId,
+                ),
+            githubLogin = if (verification.type == VerificationType.ARTIFACT) {
+                userApi.getGithubLoginByUserId(userId)
+            } else {
+                null
+            },
+        )
+    }
+
+    private fun persistGradedModuleAttempt(
+        context: SubmissionContext,
+        answer: String,
+        graded: GradedResult,
+    ): SubmitVerificationAttemptResponse {
+        val verification = verificationRepository
+            .findById(context.verification.id)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Verification no longer exists") }
+
+        val attempt = verificationAttemptRepository.save(
+            VerificationAttempt(
+                verification = verification,
+                userId = context.userId,
+                answer = answer,
+                passed = graded.passed,
+                score = graded.score,
+                feedback = graded.feedback,
+                hint = graded.hint,
+                attemptNo = context.attemptNo,
+                graphVersion = competencyGraphVersionService.currentVersion(),
+            ),
+        )
+
+        if (graded.passed) {
+            writeVerifiedCompetencyState(context.userId, verification.competencyKey, verification.level)
+        }
+
+        return attempt.toSubmitResponse(stepStatus = null)
+    }
+
+    /**
+     * The module's prose, as grounded evidence for rubric grading: the pages that teach, in order.
+     * A hire is judged against what the module actually said, not against the corpus at large.
+     */
+    private fun CompetencyModule.lessonEvidence(): String =
+        pages
+            .filter { it.kind in LESSON_PAGE_KINDS }
+            .mapNotNull { page -> page.body?.takeIf { it.isNotBlank() } }
+            .joinToString(System.lineSeparator() + System.lineSeparator())
+
 //  ========================== Methods for admins ==========================
+
+    /**
+     * Creates or replaces a module's check.
+     *
+     * @throws ResponseStatusException 404 if the module or referenced competency doesn't exist;
+     * 400 if a type-required field is missing; 409 if the module is live or archived -- a live
+     * module's gate is what earlier hires were held to, so it changes by new version, not in place.
+     */
+    @Transactional
+    fun upsertModuleVerification(moduleId: UUID, request: UpsertVerificationRequest): VerificationResponse {
+        val module = competencyModuleRepository
+            .findById(moduleId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No module found with id: $moduleId") }
+        if (module.status == ModuleStatus.ACTIVE || module.status == ModuleStatus.ARCHIVED) {
+            throw ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Module $moduleId is ${module.status}; create a new version to change its check",
+            )
+        }
+        validateGradingConfig(request)
+        if (!competencyRepository.existsByKey(request.competencyKey)) {
+            throw ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "No competency found with key: ${request.competencyKey}",
+            )
+        }
+
+        val verification = verificationRepository.findByModuleId(module.id)?.apply {
+            type = request.type
+            prompt = request.prompt
+            rubric = request.rubric
+            canonicalAnswer = request.canonicalAnswer
+            repositoryConnectionId = request.repositoryConnectionId
+            competencyKey = request.competencyKey
+            level = request.level
+        } ?: Verification(
+            moduleId = module.id,
+            type = request.type,
+            prompt = request.prompt,
+            rubric = request.rubric,
+            canonicalAnswer = request.canonicalAnswer,
+            repositoryConnectionId = request.repositoryConnectionId,
+            competencyKey = request.competencyKey,
+            level = request.level,
+        )
+
+        return verificationRepository.save(verification).toResponse()
+    }
 
     /**
      * Creates or replaces the verification config for a step.
@@ -597,6 +765,28 @@ class VerificationService(
         onboardingStepRepository
             .findByIdAndPhasePathUserId(stepId, userId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No step found with id: $stepId") }
+
+    /**
+     * Resolves a module the authenticated user may open: it has to be live, and they have to be in
+     * its project. Membership is the whole access rule -- a shared module has no per-user row to
+     * look them up in.
+     */
+    private fun findModuleForUser(authId: String, moduleId: UUID): CompetencyModule {
+        val module = competencyModuleRepository
+            .findById(moduleId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No module found with id: $moduleId") }
+        if (module.status != ModuleStatus.ACTIVE) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "No module found with id: $moduleId")
+        }
+        if (!userApi.userHasAccessToProject(authId, module.projectId)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "User is not a member of this module's project")
+        }
+        return module
+    }
+
+    private fun findModuleVerification(moduleId: UUID): Verification =
+        verificationRepository.findByModuleId(moduleId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No check configured for module: $moduleId")
 
     private fun findVerification(stepId: UUID): Verification =
         verificationRepository.findByStepId(stepId)

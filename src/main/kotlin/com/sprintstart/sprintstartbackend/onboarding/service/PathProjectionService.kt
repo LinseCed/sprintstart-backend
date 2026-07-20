@@ -35,13 +35,13 @@ class PathProjectionService(
      * [Competency.targetLevel]. The bar is partly a property of the team's expectations, not only
      * of the competency: the same node can be a passing acquaintance in one project and a core
      * skill in another. Keys absent here use the competency's own bar.
-     * @param stepIdByCompetencyKey The onboarding step configured to teach/verify each competency
-     * key, if any (see [com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification]).
-     * Echoed onto each [PathNode] as-is so a client can open a node as a learn-verify module.
-     * @param verificationTypeByCompetencyKey The grading type of that same
-     * [com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification], keyed the same
-     * way. Echoed onto each [PathNode] so a client can recognize e.g. an artifact-checked node
-     * without fetching each step's verification config individually.
+     * @param moduleIdByCompetencyKey The live
+     * [com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule] that teaches
+     * each competency key, if one has been approved. Echoed onto each [PathNode] as-is so a client
+     * can open a node as a learn-verify module.
+     * @param verificationTypeByCompetencyKey The grading type of that module's check, keyed the
+     * same way. Echoed onto each [PathNode] so a client can recognize e.g. an artifact-checked node
+     * without fetching each module's check individually.
      * @return [targetKeys] plus their transitive prerequisites, topologically ordered, each
      * annotated with its [NodeState]; edges are restricted to pairs where both ends are returned.
      */
@@ -52,7 +52,7 @@ class PathProjectionService(
         ledger: Map<String, Int>,
         graphVersion: Int,
         targetLevelOverrides: Map<String, Int> = emptyMap(),
-        stepIdByCompetencyKey: Map<String, UUID> = emptyMap(),
+        moduleIdByCompetencyKey: Map<String, UUID> = emptyMap(),
         verificationTypeByCompetencyKey: Map<String, VerificationType> = emptyMap(),
     ): PathView {
         val competenciesByKey = competencies.associateBy { it.key }
@@ -94,7 +94,7 @@ class PathProjectionService(
                 kind = competency.kind,
                 state = states.getValue(key),
                 level = ledger[key],
-                stepId = stepIdByCompetencyKey[key],
+                moduleId = moduleIdByCompetencyKey[key],
                 verificationType = verificationTypeByCompetencyKey[key],
             )
         }

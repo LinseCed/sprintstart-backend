@@ -7,5 +7,9 @@ import java.util.UUID
 interface VerificationRepository : JpaRepository<Verification, UUID> {
     fun findByStepId(stepId: UUID): Verification?
 
+    fun findByModuleId(moduleId: UUID): Verification?
+
+    fun findAllByModuleIdIn(moduleIds: Collection<UUID>): List<Verification>
+
     fun findAllByCompetencyKeyIn(competencyKeys: Collection<String>): List<Verification>
 }

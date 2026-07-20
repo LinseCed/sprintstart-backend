@@ -262,11 +262,11 @@ class PathProjectionServiceTest {
                 targetKeys = setOf("kotlin", "git"),
                 ledger = emptyMap(),
                 graphVersion = 1,
-                stepIdByCompetencyKey = mapOf("kotlin" to stepId),
+                moduleIdByCompetencyKey = mapOf("kotlin" to stepId),
             )
 
-            assertThat(result.nodes.first { it.key == "kotlin" }.stepId).isEqualTo(stepId)
-            assertThat(result.nodes.first { it.key == "git" }.stepId).isNull()
+            assertThat(result.nodes.first { it.key == "kotlin" }.moduleId).isEqualTo(stepId)
+            assertThat(result.nodes.first { it.key == "git" }.moduleId).isNull()
         }
 
         @Test
@@ -279,7 +279,7 @@ class PathProjectionServiceTest {
                 graphVersion = 1,
             )
 
-            assertThat(result.nodes.single().stepId).isNull()
+            assertThat(result.nodes.single().moduleId).isNull()
         }
     }
 

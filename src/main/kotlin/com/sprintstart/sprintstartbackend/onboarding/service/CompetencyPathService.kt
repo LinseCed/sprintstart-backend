@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGraphPin
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathView
@@ -7,6 +8,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintReposit
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphChangeRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphVersionRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyModuleRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGraphPinRepository
@@ -43,6 +45,7 @@ class CompetencyPathService(
     private val userGraphPinRepository: UserGraphPinRepository,
     private val effectiveGraphResolver: EffectiveGraphResolver,
     private val verificationRepository: VerificationRepository,
+    private val competencyModuleRepository: CompetencyModuleRepository,
     private val blueprintRepository: BlueprintRepository,
     private val userApi: UserApi,
 ) {
@@ -66,13 +69,17 @@ class CompetencyPathService(
             .findAllByUserId(userId)
             .associate { it.competencyKey to it.level }
 
-        // First competency-to-step bridge in the codebase (#8): a competency key is expected to be
-        // taught/verified by at most one step -- if more than one Verification shares a key,
-        // `associateBy` keeps the last one encountered, an acceptable simplification until
-        // graph-authoring (Phase 5) can enforce uniqueness.
-        val verificationByCompetencyKey = verificationRepository
-            .findAllByCompetencyKeyIn(effectiveGraph.competencies.map { it.key })
+        // What a hire opens when they click a node: the live module for that competency in this
+        // project. One per (competency, project) by construction -- the module is the shared
+        // artifact, so there is no per-user copy to disambiguate between.
+        val liveModules = competencyModuleRepository
+            .findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE)
             .associateBy { it.competencyKey }
+        val competencyKeyByModuleId = liveModules.entries.associate { (key, module) -> module.id to key }
+        val checkTypeByCompetencyKey = verificationRepository
+            .findAllByModuleIdIn(competencyKeyByModuleId.keys)
+            .mapNotNull { check -> competencyKeyByModuleId[check.moduleId]?.let { it to check.type } }
+            .toMap()
 
         // Echo the *pin's* version, not the live head: the projected content is the effective
         // graph at the pin (STRUCTURAL changes above it are held back), so echoing the head
@@ -89,8 +96,8 @@ class CompetencyPathService(
             targetLevelOverrides = baseline.targetLevelOverrides,
             ledger = ledger,
             graphVersion = pin.pinnedVersion,
-            stepIdByCompetencyKey = verificationByCompetencyKey.mapValues { it.value.stepId },
-            verificationTypeByCompetencyKey = verificationByCompetencyKey.mapValues { it.value.type },
+            moduleIdByCompetencyKey = liveModules.mapValues { it.value.id },
+            verificationTypeByCompetencyKey = checkTypeByCompetencyKey,
         )
     }
 
