@@ -3,13 +3,44 @@ package com.sprintstart.sprintstartbackend.onboarding.external.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * One competency selected into a baseline, on the AI wire.
+ *
+ * This is what a blueprint *is* now (see
+ * [com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintCompetency]): the AI
+ * proposes a selection over the competency graph, not prose steps.
+ */
+@Serializable
+data class BaselineCompetencySchema(
+    @SerialName("competency_key") val competencyKey: String,
+    // Null means "use the competency's own bar" -- the AI only sets this when the scope genuinely
+    // demands more (or less) than the graph's default.
+    @SerialName("target_level") val targetLevel: Int? = null,
+    val requirement: String = "recommended",
+    val invariant: Boolean = false,
+)
+
+/**
+ * A baseline as sent to and received from the AI service: scope, version, and the selection.
+ *
+ * Distinct from [BlueprintSchema], which is the step-shaped payload path generation still
+ * consumes. The two converge once the per-user step tree is retired (backend#53).
+ */
+@Serializable
+data class BaselineSchema(
+    val scope: String,
+    val version: String = "0",
+    val source: String = "authored",
+    val competencies: List<BaselineCompetencySchema> = emptyList(),
+    val provenance: BlueprintProvenanceSchema? = null,
+)
+
 @Serializable
 data class GenerateBlueprintsRequest(
     val scopes: List<String>? = null,
-    val active: List<BlueprintSchema> = emptyList(),
-    // The backend's live competency graph. The AI tags each generated step with the
-    // best-matching key from this catalog (the blueprint->target bridge); the AI discards
-    // any key not present here, so it is safe to send the whole graph.
+    val active: List<BaselineSchema> = emptyList(),
+    // The backend's live competency graph -- the set the AI selects from. A key outside this
+    // catalog is discarded on both sides, so it is safe to send the whole graph.
     @SerialName("active_competencies") val activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
 )
 
@@ -22,28 +53,6 @@ data class GenerateBlueprintsResponse(
 data class BlueprintOutcome(
     val scope: String,
     val status: String,
-    val blueprint: GeneratedBlueprint? = null,
+    val blueprint: BaselineSchema? = null,
     val notes: List<String> = emptyList(),
-)
-
-@Serializable
-data class GeneratedBlueprint(
-    val scope: String,
-    val version: String,
-    val steps: List<GeneratedBlueprintStep> = emptyList(),
-    val provenance: BlueprintProvenanceSchema? = null,
-)
-
-@Serializable
-data class GeneratedBlueprintStep(
-    val id: String,
-    val title: String,
-    val description: String? = null,
-    @SerialName("min_experience") val minExperience: String? = null,
-    val audience: List<String> = emptyList(),
-    val requirement: String = "recommended",
-    val invariant: Boolean = false,
-    // The competency graph key the AI matched this step to, or null when none fit. Persisted onto
-    // BlueprintStep.competencyKey (the blueprint->target bridge).
-    @SerialName("competency_key") val competencyKey: String? = null,
 )

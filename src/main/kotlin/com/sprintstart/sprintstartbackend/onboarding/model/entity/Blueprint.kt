@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.entity
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
@@ -45,7 +46,17 @@ class Blueprint(
     val corpusFingerprint: String? = null,
     @Column(nullable = false)
     val createdAt: Instant = Instant.now(),
+    // What the baseline actually is: the competencies everyone in this scope must reach. Not a
+    // list of prose steps -- see BlueprintCompetency for why that model was retired.
     @OneToMany(mappedBy = "blueprint", cascade = [CascadeType.ALL], orphanRemoval = true)
     @OrderBy("position ASC")
-    val steps: MutableList<BlueprintStep> = mutableListOf(),
-)
+    val competencies: MutableList<BlueprintCompetency> = mutableListOf(),
+) {
+    /**
+     * The entries that still count: everything a PM has not rejected. `PROPOSED` (never explicitly
+     * decided) and `APPROVED` both count, so a PM who never reviews individual entries sees no
+     * behavior change from per-entry curation existing.
+     */
+    fun activeCompetencies(): List<BlueprintCompetency> =
+        competencies.filter { it.status != ProposalStatus.REJECTED }
+}

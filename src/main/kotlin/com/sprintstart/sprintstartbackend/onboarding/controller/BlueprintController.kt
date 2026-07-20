@@ -2,11 +2,11 @@ package com.sprintstart.sprintstartbackend.onboarding.controller
 
 import com.sprintstart.sprintstartbackend.onboarding.model.request.blueprint.ApproveBlueprintRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.blueprint.GenerateBlueprintsRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.blueprint.RejectBlueprintCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.blueprint.RejectBlueprintRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.blueprint.RejectBlueprintStepRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.blueprint.RollbackBlueprintRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.BlueprintCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.BlueprintResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.BlueprintStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.GenerateBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.ProposedBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.VersionListResponse
@@ -174,57 +174,58 @@ class BlueprintController(
     }
 
     /**
-     * Approves one blueprint step within a proposal, independent of the whole blueprint's own
+     * Approves one competency within a proposed baseline, independent of the whole baseline's own
      * approve/reject decision.
      */
     @Operation(
-        summary = "Approve a blueprint step",
-        description = "Approves one step within a proposed blueprint",
+        summary = "Approve a baseline competency",
+        description = "Approves one competency within a proposed baseline",
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "Step approved"),
+            ApiResponse(responseCode = "200", description = "Competency approved"),
             ApiResponse(responseCode = "401", description = "Authentication required"),
             ApiResponse(responseCode = "403", description = "Insufficient role"),
-            ApiResponse(responseCode = "404", description = "No step found with the given id"),
-            ApiResponse(responseCode = "409", description = "Step was already decided"),
+            ApiResponse(responseCode = "404", description = "No baseline competency found with the given id"),
+            ApiResponse(responseCode = "409", description = "Competency was already decided"),
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @PostMapping("/steps/{id}/approve")
+    @PostMapping("/competencies/{id}/approve")
     @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
-    fun approveStep(
+    fun approveCompetency(
         @PathVariable id: UUID,
-    ): BlueprintStepResponse {
-        return blueprintService.approveStep(id)
+    ): BlueprintCompetencyResponse {
+        return blueprintService.approveCompetency(id)
     }
 
     /**
-     * Rejects one blueprint step within a proposal, excluding it from the blueprint going forward.
+     * Rejects one competency within a proposed baseline, excluding it from the baseline going
+     * forward -- it stops being something everyone in the scope must reach.
      */
     @Operation(
-        summary = "Reject a blueprint step",
-        description = "Rejects one step within a proposed blueprint",
+        summary = "Reject a baseline competency",
+        description = "Rejects one competency within a proposed baseline",
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "Step rejected"),
+            ApiResponse(responseCode = "200", description = "Competency rejected"),
             ApiResponse(responseCode = "401", description = "Authentication required"),
             ApiResponse(responseCode = "403", description = "Insufficient role"),
-            ApiResponse(responseCode = "404", description = "No step found with the given id"),
+            ApiResponse(responseCode = "404", description = "No baseline competency found with the given id"),
             ApiResponse(
                 responseCode = "409",
-                description = "Step was already decided, or is invariant and cannot be rejected",
+                description = "Competency was already decided, or is invariant and cannot be rejected",
             ),
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @PostMapping("/steps/{id}/reject")
+    @PostMapping("/competencies/{id}/reject")
     @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
-    fun rejectStep(
+    fun rejectCompetency(
         @PathVariable id: UUID,
-        @RequestBody request: RejectBlueprintStepRequest,
-    ): BlueprintStepResponse {
-        return blueprintService.rejectStep(id, request.reason)
+        @RequestBody request: RejectBlueprintCompetencyRequest,
+    ): BlueprintCompetencyResponse {
+        return blueprintService.rejectCompetency(id, request.reason)
     }
 }

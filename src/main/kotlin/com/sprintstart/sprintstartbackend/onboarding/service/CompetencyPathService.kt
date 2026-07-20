@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGraphPin
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathView
@@ -28,11 +27,9 @@ import java.util.UUID
  * [UserGraphPin] holds back STRUCTURAL changes until their next session start while
  * ADDITIVE/INVARIANT changes stay visible immediately.
  *
- * The path is scoped to a project: its target set is the competency keys declared by that
- * project's ACTIVE blueprint steps for the user's role scopes (the blueprint->target bridge).
- * Blueprint steps that carry no competency key yet (the AI does not emit them yet) contribute
- * nothing, so a project whose blueprints declare no keys falls back to every currently-visible
- * competency -- the previous behavior, kept so nothing breaks before keys are populated.
+ * The path is scoped to a project: its target set is the competency selection of that project's
+ * ACTIVE baselines for the user's role scopes. A baseline *is* that selection -- the step-shaped
+ * indirection it used to be read through is gone (backend#52).
  */
 @Service
 class CompetencyPathService(
@@ -83,11 +80,13 @@ class CompetencyPathService(
         // detect "your path changed" would fire while the change is still hidden, then miss the
         // session start where the pin advances and the content actually appears.
         val visibleKeys = effectiveGraph.competencies.map { it.key }.toSet()
+        val baseline = resolveBaseline(userId, projectId, visibleKeys)
 
         return pathProjectionService.project(
             competencies = effectiveGraph.competencies,
             edges = effectiveGraph.edges,
-            targetKeys = resolveTargetKeys(userId, projectId, visibleKeys),
+            targetKeys = baseline.targetKeys,
+            targetLevelOverrides = baseline.targetLevelOverrides,
             ledger = ledger,
             graphVersion = pin.pinnedVersion,
             stepIdByCompetencyKey = verificationByCompetencyKey.mapValues { it.value.stepId },
@@ -96,32 +95,45 @@ class CompetencyPathService(
     }
 
     /**
-     * Resolves the competency keys this project's path should terminate in -- the blueprint->target
-     * bridge. Loads the project's ACTIVE blueprints for the user's role scopes (`global` +
-     * `area:<role>`, project-own with a fallback to the unscoped blueprint), and collects the
-     * non-rejected steps' declared competency keys, restricted to what is currently visible.
+     * Resolves this project's baseline: the competency keys the path should terminate in, and any
+     * per-baseline level overrides. Loads the project's ACTIVE blueprints for the user's role
+     * scopes (`global` + `area:<role>`, project-own with a fallback to the unscoped blueprint) and
+     * reads their selections directly, restricted to what is currently visible.
      *
-     * Falls back to every visible competency when the project's blueprints declare no keys yet,
-     * so behavior is unchanged until blueprint steps start carrying competency keys.
+     * There is no fallback to "every visible competency": a path aims at what the PM selected. A
+     * project with an empty baseline gets an empty path — which is the truth, and visible as such,
+     * rather than a path spanning the whole graph that only looks like a plan.
+     *
+     * When two scopes select the same competency with different bars, the higher bar wins: a
+     * role-specific baseline may raise what `global` asks for, never quietly lower it.
      */
-    private fun resolveTargetKeys(userId: UUID, projectId: UUID, visibleKeys: Set<String>): Set<String> {
+    private fun resolveBaseline(userId: UUID, projectId: UUID, visibleKeys: Set<String>): Baseline {
         val scopes = userApi
             .getProjectRolesForUser(userId, projectId)
             .map { "area:${it.toAiScope()}" }
             .toSet() + "global"
 
-        val declaredKeys = scopes
+        val entries = scopes
             .mapNotNull { scope ->
                 blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, scope, BlueprintStatus.ACTIVE)
                     ?: blueprintRepository.findByProjectIdIsNullAndScopeAndStatus(scope, BlueprintStatus.ACTIVE)
-            }.flatMap { blueprint -> blueprint.steps }
-            .filter { it.status != ProposalStatus.REJECTED }
-            .mapNotNull { it.competencyKey }
-            .filter { it in visibleKeys }
-            .toSet()
+            }.flatMap { blueprint -> blueprint.activeCompetencies() }
+            .filter { it.competencyKey in visibleKeys }
 
-        return declaredKeys.ifEmpty { visibleKeys }
+        return Baseline(
+            targetKeys = entries.map { it.competencyKey }.toSet(),
+            targetLevelOverrides = entries
+                .mapNotNull { entry -> entry.targetLevel?.let { entry.competencyKey to it } }
+                .groupBy({ it.first }, { it.second })
+                .mapValues { (_, levels) -> levels.max() },
+        )
     }
+
+    /** A project's resolved baseline: what the path aims at, and the bars this project sets. */
+    private data class Baseline(
+        val targetKeys: Set<String>,
+        val targetLevelOverrides: Map<String, Int>,
+    )
 
     private fun resolvePin(userId: UUID, currentVersion: Int): UserGraphPin =
         userGraphPinRepository.findByUserId(userId)
