@@ -19,7 +19,6 @@ fun User.toGetResponse(): GetUserResponse =
         permissionGroup = this.effectivePermissionGroup(),
         enabled = this.enabled,
         profileIcon = this.profileIcon,
-        hasCompletedOnboarding = this.hasCompletedOnboarding,
         githubLogin = this.githubLogin,
         githubLoginSource = this.githubLoginSource,
     )

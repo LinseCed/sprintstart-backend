@@ -14,19 +14,15 @@ import java.util.UUID
 /**
  * A graded check — the gate on a competency.
  *
- * Owned by a [CompetencyModule] ([moduleId]): one shared check per module, so two hires proving
- * the same competency are held to the same bar. [stepId] is the **legacy** owner, a per-user
- * [OnboardingStep], and survives only until the per-user content tree is retired (backend#53).
- * Exactly one of the two is set.
+ * Owned by a [CompetencyModule]: one shared check per module, so two hires proving the same
+ * competency are held to the same bar. The per-user step that used to own checks is gone
+ * (backend#53); [VerificationAttempt] rows survived that unchanged, because they always pointed at
+ * a [Verification] rather than at its owner.
  *
- * Keeping both owners on one entity is deliberate: [VerificationAttempt] points at a
- * [Verification], so a hire's attempt history needs no migration and no repointing — the rows it
- * references simply change owner over time.
- *
- * Either owner has at most one [Verification] (enforced by the unique constraints), referenced by
- * a plain FK rather than a bidirectional JPA relationship, so this entity can be created/edited
- * independently without touching the owner's cascade footprint.
- * [competencyKey] ties this step to a [Competency] by its stable key (not a FK, matching the same
+ * A module has at most one [Verification] (enforced by the unique constraint), referenced by a
+ * plain FK rather than a bidirectional JPA relationship, so this entity can be created/edited
+ * independently without touching the module's cascade footprint.
+ * [competencyKey] ties this check to a [Competency] by its stable key (not a FK, matching the same
  * loosely-coupled convention `CompetencyEdge`/`BlueprintCompetency` already use), and [level] is the
  * target proficiency level being verified, aligned with the AI service's `beginner..expert` ladder
  * (see `AssessmentService.LEVEL_RANKS` for the same scale used elsewhere in this module).
@@ -42,19 +38,14 @@ import java.util.UUID
 @Table(
     name = "verifications",
     uniqueConstraints = [
-        UniqueConstraint(name = "uq_verifications_step", columnNames = ["step_id"]),
         UniqueConstraint(name = "uq_verifications_module", columnNames = ["module_id"]),
     ],
 )
 class Verification(
     @Id
     val id: UUID = UUID.randomUUID(),
-    // Legacy owner: the per-user step this check hangs off. Null for module-owned checks, which
-    // is every check created from here on. Removed with the per-user tree (backend#53).
-    @Column(name = "step_id", nullable = true)
-    val stepId: UUID? = null,
-    @Column(name = "module_id", nullable = true)
-    val moduleId: UUID? = null,
+    @Column(name = "module_id", nullable = false)
+    val moduleId: UUID,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var type: VerificationType,

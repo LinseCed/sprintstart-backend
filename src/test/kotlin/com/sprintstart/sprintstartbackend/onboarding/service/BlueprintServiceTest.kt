@@ -4,17 +4,16 @@ import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompetencySchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProvenanceSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BaselineCompetencySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BaselineSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintOutcome
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintProvenanceSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Blueprint
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintCompetency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintOrigin
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintRequirement
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
-import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toPathSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toSchema
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintCompetencyRepository
@@ -228,7 +227,7 @@ class BlueprintServiceTest {
                 scope = "global",
                 version = "2",
                 competencies = listOf(BaselineCompetencySchema(competencyKey = "deploy-runbook")),
-                provenance = BlueprintProvenanceSchema(corpusFingerprint = "new-fp"),
+                provenance = AiProvenanceSchema(corpusFingerprint = "new-fp"),
             )
             val outcome = BlueprintOutcome(scope = "global", status = "updated", blueprint = generated)
             coEvery { onboardingAiClient.generateBlueprints(any(), capture(activeSlot), any()) } returns
@@ -559,29 +558,6 @@ class BlueprintServiceTest {
             val response = blueprint.toResponse(emptyMap())
 
             assertEquals("removed-node", response.competencies.single().label)
-        }
-
-        @Test
-        fun `derives every path step from a selected competency, so each carries its key`() {
-            val blueprint = makeBlueprint("global", "1", BlueprintStatus.ACTIVE)
-            blueprint.competencies.add(makeEntry(blueprint, "deploy-runbook"))
-            val graph = mapOf("deploy-runbook" to makeCompetency("deploy-runbook", "Deploy the service"))
-
-            val schema = blueprint.toPathSchema(graph)
-
-            val step = schema.steps.single()
-            assertEquals("Deploy the service", step.title)
-            assertEquals("deploy-runbook", step.competencyKey)
-        }
-
-        @Test
-        fun `skips a path step whose competency is missing from the graph`() {
-            val blueprint = makeBlueprint("global", "1", BlueprintStatus.ACTIVE)
-            blueprint.competencies.add(makeEntry(blueprint, "removed-node"))
-
-            val schema = blueprint.toPathSchema(emptyMap())
-
-            assertTrue(schema.steps.isEmpty())
         }
     }
 }

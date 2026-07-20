@@ -36,8 +36,6 @@ class User(
     var enabled: Boolean = true,
     @Column(nullable = true)
     var profileIcon: String? = null,
-    @Column(nullable = false)
-    var hasCompletedOnboarding: Boolean = false,
     // Stamped by SessionActivityService on authenticated request traffic; used to detect an idle
     // gap past the configured threshold as a stand-in for a real login/session boundary.
     @Column(name = "last_seen_at", nullable = true)

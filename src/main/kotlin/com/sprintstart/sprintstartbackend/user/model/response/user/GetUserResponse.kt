@@ -17,7 +17,6 @@ data class GetUserResponse(
     val permissionGroup: Role,
     val enabled: Boolean,
     val profileIcon: String? = null,
-    val hasCompletedOnboarding: Boolean,
     val githubLogin: String? = null,
     val githubLoginSource: GithubLoginSource? = null,
 )
