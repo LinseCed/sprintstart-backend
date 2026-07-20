@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.ChangeClassi
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ChangeType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Blueprint
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintCompetency
@@ -11,6 +12,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatu
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphChange
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphVersion
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGraphPin
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
@@ -18,6 +20,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintReposit
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphChangeRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphVersionRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyModuleRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGraphPinRepository
@@ -47,6 +50,7 @@ class CompetencyPathServiceTest {
     private val userGraphPinRepository: UserGraphPinRepository = mockk()
     private val effectiveGraphResolver: EffectiveGraphResolver = EffectiveGraphResolver()
     private val verificationRepository: VerificationRepository = mockk()
+    private val competencyModuleRepository: CompetencyModuleRepository = mockk()
     private val blueprintRepository: BlueprintRepository = mockk()
     private val userApi: UserApi = mockk()
     private val service = CompetencyPathService(
@@ -60,6 +64,7 @@ class CompetencyPathServiceTest {
         userGraphPinRepository,
         effectiveGraphResolver,
         verificationRepository,
+        competencyModuleRepository,
         blueprintRepository,
         userApi,
     )
@@ -68,8 +73,10 @@ class CompetencyPathServiceTest {
     private val userId = UUID.randomUUID()
     private val projectId = UUID.randomUUID()
 
-    private fun stubNoVerifications() {
-        every { verificationRepository.findAllByCompetencyKeyIn(any()) } returns emptyList()
+    private fun stubNoModules() {
+        every { competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE) } returns
+            emptyList()
+        every { verificationRepository.findAllByModuleIdIn(any()) } returns emptyList()
     }
 
     /**
@@ -100,7 +107,7 @@ class CompetencyPathServiceTest {
     inner class GetPathForMe {
         @Test
         fun `resolves the user and projects a path from the visible graph and their ledger`() {
-            stubNoVerifications()
+            stubNoModules()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubBaselineSelecting("git", "kotlin")
             every { competencyRepository.findAll() } returns listOf(
@@ -135,7 +142,7 @@ class CompetencyPathServiceTest {
 
         @Test
         fun `echoes the pinned version, not the live head, when structural changes are held back`() {
-            stubNoVerifications()
+            stubNoModules()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubBaselineSelecting("git", "kotlin")
             every { competencyRepository.findAll() } returns listOf(
@@ -159,7 +166,7 @@ class CompetencyPathServiceTest {
 
         @Test
         fun `lazily creates the graph pin at the current version on first call`() {
-            stubNoVerifications()
+            stubNoModules()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubBaselineSelecting("git", "kotlin")
             every { competencyRepository.findAll() } returns emptyList()
@@ -190,7 +197,7 @@ class CompetencyPathServiceTest {
 
         @Test
         fun `narrows the path to the competencies the project baseline selects`() {
-            stubNoVerifications()
+            stubNoModules()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { userApi.getProjectRolesForUser(userId, projectId) } returns emptyList()
             every { competencyRepository.findAll() } returns listOf(
@@ -229,8 +236,8 @@ class CompetencyPathServiceTest {
         }
 
         @Test
-        fun `annotates a node with the step configured to teach-verify it`() {
-            val stepId = UUID.randomUUID()
+        fun `points a node at the live module that teaches it`() {
+            val moduleId = UUID.randomUUID()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubBaselineSelecting("git", "kotlin")
             every { competencyRepository.findAll() } returns listOf(
@@ -248,9 +255,22 @@ class CompetencyPathServiceTest {
                 CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "git"),
                 CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "kotlin"),
             )
-            every { verificationRepository.findAllByCompetencyKeyIn(any()) } returns listOf(
+            // Only "kotlin" has a published module, so only "kotlin" is openable. A node with
+            // nothing published against it stays on the path with nothing behind it -- a real,
+            // visible state, not an error.
+            val module = CompetencyModule(
+                id = moduleId,
+                competencyKey = "kotlin",
+                projectId = projectId,
+                version = 1,
+                status = ModuleStatus.ACTIVE,
+                title = "Kotlin",
+            )
+            every { competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE) } returns
+                listOf(module)
+            every { verificationRepository.findAllByModuleIdIn(setOf(moduleId)) } returns listOf(
                 Verification(
-                    stepId = stepId,
+                    moduleId = moduleId,
                     type = VerificationType.ATTEST,
                     prompt = "Confirm?",
                     competencyKey = "kotlin",
@@ -260,8 +280,8 @@ class CompetencyPathServiceTest {
 
             val result = service.getPathForMe(authId, projectId)
 
-            assertThat(result.nodes.first { it.key == "kotlin" }.stepId).isEqualTo(stepId)
-            assertThat(result.nodes.first { it.key == "git" }.stepId).isNull()
+            assertThat(result.nodes.first { it.key == "kotlin" }.moduleId).isEqualTo(moduleId)
+            assertThat(result.nodes.first { it.key == "git" }.moduleId).isNull()
             assertThat(result.nodes.first { it.key == "kotlin" }.verificationType)
                 .isEqualTo(VerificationType.ATTEST)
             assertThat(result.nodes.first { it.key == "git" }.verificationType).isNull()

@@ -12,18 +12,27 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * The "Verify" zone config for one [OnboardingStep] — a graph node's check.
+ * A graded check — the gate on a competency.
  *
- * A step has at most one [Verification] (enforced by the unique constraint on [stepId]),
- * referenced by a plain FK rather than a bidirectional JPA relationship, so this entity can be
- * created/edited independently without touching [OnboardingStep]'s existing cascade footprint.
+ * Owned by a [CompetencyModule] ([moduleId]): one shared check per module, so two hires proving
+ * the same competency are held to the same bar. [stepId] is the **legacy** owner, a per-user
+ * [OnboardingStep], and survives only until the per-user content tree is retired (backend#53).
+ * Exactly one of the two is set.
+ *
+ * Keeping both owners on one entity is deliberate: [VerificationAttempt] points at a
+ * [Verification], so a hire's attempt history needs no migration and no repointing — the rows it
+ * references simply change owner over time.
+ *
+ * Either owner has at most one [Verification] (enforced by the unique constraints), referenced by
+ * a plain FK rather than a bidirectional JPA relationship, so this entity can be created/edited
+ * independently without touching the owner's cascade footprint.
  * [competencyKey] ties this step to a [Competency] by its stable key (not a FK, matching the same
- * loosely-coupled convention `CompetencyEdge`/`BlueprintStep` already use), and [level] is the
+ * loosely-coupled convention `CompetencyEdge`/`BlueprintCompetency` already use), and [level] is the
  * target proficiency level being verified, aligned with the AI service's `beginner..expert` ladder
  * (see `AssessmentService.LEVEL_RANKS` for the same scale used elsewhere in this module).
  *
  * [rubric] is required for [VerificationType.KNOWLEDGE] (graded by the AI service against the
- * step's [OnboardingStep.content] as grounded evidence) and [canonicalAnswer] for
+ * owner's lesson content as grounded evidence) and [canonicalAnswer] for
  * [VerificationType.EXACT] (graded locally); neither is meaningful for [VerificationType.ATTEST].
  * [rubric] is also required for [VerificationType.ARTIFACT], alongside [repositoryConnectionId] --
  * the GitHub repository connection (owned by the `connectors.github` module, referenced by plain
@@ -34,13 +43,18 @@ import java.util.UUID
     name = "verifications",
     uniqueConstraints = [
         UniqueConstraint(name = "uq_verifications_step", columnNames = ["step_id"]),
+        UniqueConstraint(name = "uq_verifications_module", columnNames = ["module_id"]),
     ],
 )
 class Verification(
     @Id
     val id: UUID = UUID.randomUUID(),
-    @Column(name = "step_id", nullable = false)
-    val stepId: UUID,
+    // Legacy owner: the per-user step this check hangs off. Null for module-owned checks, which
+    // is every check created from here on. Removed with the per-user tree (backend#53).
+    @Column(name = "step_id", nullable = true)
+    val stepId: UUID? = null,
+    @Column(name = "module_id", nullable = true)
+    val moduleId: UUID? = null,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var type: VerificationType,
