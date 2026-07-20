@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSch
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingAiPathEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.SkillAssessmentSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toEntities
@@ -244,10 +245,6 @@ class OnboardingPersonalizationService(
     }
 
     private companion object {
-        // Every generated check starts at the entry rung; a PM raises it per step if the work
-        // actually demands more.
-        const val DEFAULT_VERIFICATION_LEVEL = "beginner"
-
         // Inverse of AssessmentService.LEVEL_RANKS -- ledger 1..4 back to the AI's level names.
         val LEVEL_NAMES = mapOf(
             1 to "beginner",
@@ -255,5 +252,12 @@ class OnboardingPersonalizationService(
             3 to "advanced",
             4 to "expert",
         )
+
+        // Must clear Competency.DEFAULT_TARGET_LEVEL: passing a generated check is how a hire
+        // masters a node that has no PM-authored bar, so a check pitched *below* the default bar
+        // would mean doing everything the path asks and completing nothing. The two defaults move
+        // together -- raising one without the other silently strands every generated module.
+        // A PM adjusts either per node/step once graph editing lands (backend#50).
+        val DEFAULT_VERIFICATION_LEVEL = LEVEL_NAMES.getValue(Competency.DEFAULT_TARGET_LEVEL)
     }
 }

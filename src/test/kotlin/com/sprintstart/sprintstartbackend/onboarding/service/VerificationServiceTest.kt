@@ -589,7 +589,11 @@ class VerificationServiceTest {
             // ledger state this service writes into the real (pure) PathProjectionService and
             // confirm the dependent flips from LOCKED to AVAILABLE.
             val step = makeStep()
-            val verification = makeVerification(VerificationType.ATTEST, step.id, competencyKey = "kotlin")
+            // "intermediate" is what generated checks are pitched at, and it is what clears a
+            // competency's default bar -- a beginner-level check against a default node passes
+            // without mastering it, which is the point of the bar, not a regression.
+            val verification =
+                makeVerification(VerificationType.ATTEST, step.id, competencyKey = "kotlin", level = "intermediate")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
             every { verificationRepository.findByStepId(step.id) } returns verification

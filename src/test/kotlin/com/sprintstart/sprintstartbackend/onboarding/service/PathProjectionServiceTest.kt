@@ -16,8 +16,11 @@ import java.util.UUID
 class PathProjectionServiceTest {
     private val service = PathProjectionService(GraphTraversalService())
 
-    private fun node(key: String, kind: CompetencyKind = CompetencyKind.SKILL) =
-        Competency(key = key, label = key, kind = kind)
+    // Most cases here are about traversal rather than the bar, so they pin targetLevel = 1 to keep
+    // "has a ledger entry" and "is mastered" the same thing. The entity's real default is asserted
+    // separately below, since it is what a competency gets until a PM authors a bar.
+    private fun node(key: String, kind: CompetencyKind = CompetencyKind.SKILL, targetLevel: Int = 1) =
+        Competency(key = key, label = key, kind = kind, targetLevel = targetLevel)
 
     private fun prerequisite(from: String, to: String) =
         CompetencyEdge(fromKey = from, toKey = to, kind = EdgeKind.PREREQUISITE)
@@ -70,7 +73,7 @@ class PathProjectionServiceTest {
         }
 
         @Test
-        fun `a ledger entry above zero always means mastered, regardless of prerequisites`() {
+        fun `a ledger entry at or above the node's target level means mastered, regardless of prerequisites`() {
             val result = service.project(
                 competencies = listOf(node("git"), node("kotlin")),
                 edges = listOf(prerequisite("git", "kotlin")),
@@ -80,6 +83,57 @@ class PathProjectionServiceTest {
             )
 
             assertThat(stateOf(result, "kotlin")).isEqualTo(NodeState.MASTERED)
+        }
+
+        @Test
+        fun `a ledger entry below the node's target level is not mastery`() {
+            val result = service.project(
+                competencies = listOf(node("kotlin", targetLevel = 3)),
+                edges = emptyList(),
+                targetKeys = setOf("kotlin"),
+                ledger = mapOf("kotlin" to 1),
+                graphVersion = 1,
+            )
+
+            // Being placed at beginner on a node that demands advanced is progress, not completion.
+            // Treating any non-zero level as mastery is what marked a self-declared beginner done.
+            assertThat(stateOf(result, "kotlin")).isEqualTo(NodeState.AVAILABLE)
+        }
+
+        @Test
+        fun `a competency with no authored bar is not mastered by a beginner placement`() {
+            // The default bar is what nearly every competency runs on today -- nothing populates
+            // target_level yet -- so it carries the whole fix. A default of 1 would re-open the bug.
+            val default = Competency(key = "kotlin", label = "kotlin", kind = CompetencyKind.SKILL)
+
+            fun stateAtLevel(level: Int) = stateOf(
+                service.project(
+                    competencies = listOf(default),
+                    edges = emptyList(),
+                    targetKeys = setOf("kotlin"),
+                    ledger = mapOf("kotlin" to level),
+                    graphVersion = 1,
+                ),
+                "kotlin",
+            )
+
+            assertThat(stateAtLevel(1)).isEqualTo(NodeState.AVAILABLE)
+            assertThat(stateAtLevel(2)).isEqualTo(NodeState.MASTERED)
+        }
+
+        @Test
+        fun `a level-0 ledger entry never masters or unlocks anything`() {
+            val result = service.project(
+                competencies = listOf(node("git"), node("kotlin")),
+                edges = listOf(prerequisite("git", "kotlin")),
+                targetKeys = setOf("kotlin"),
+                ledger = mapOf("git" to 0),
+                graphVersion = 1,
+            )
+
+            // 0 means "we asked and saw no competence" -- it must not unlock dependents.
+            assertThat(stateOf(result, "git")).isEqualTo(NodeState.AVAILABLE)
+            assertThat(stateOf(result, "kotlin")).isEqualTo(NodeState.LOCKED)
         }
 
         @Test

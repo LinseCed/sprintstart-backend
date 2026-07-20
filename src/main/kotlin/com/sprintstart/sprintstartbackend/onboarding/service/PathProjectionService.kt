@@ -67,9 +67,13 @@ class PathProjectionService(
 
         val states = mutableMapOf<String, NodeState>()
         for (key in orderedKeys) {
-            val level = ledger[key]
+            val level = ledger[key] ?: 0
+            // A node is met or it isn't, and the bar is the competency's own target level. Treating
+            // any non-zero level as mastery meant an assessment that placed somebody at `beginner`
+            // -- including one where they said they knew nothing -- marked the node done for good.
+            val targetLevel = competenciesByKey[key]?.targetLevel ?: Competency.DEFAULT_TARGET_LEVEL
             states[key] = when {
-                level != null && level > 0 -> NodeState.MASTERED
+                level >= targetLevel -> NodeState.MASTERED
                 directPrerequisitesByKey[key].orEmpty().all { states[it] == NodeState.MASTERED } -> NodeState.AVAILABLE
                 else -> NodeState.LOCKED
             }
