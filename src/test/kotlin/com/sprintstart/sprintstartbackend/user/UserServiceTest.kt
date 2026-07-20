@@ -39,6 +39,7 @@ class UserServiceTest {
         val user = user(authId = "auth-1", username = "alice")
         val jwt = mockk<Jwt>()
         every { jwt.subject } returns "auth-1"
+        every { jwt.claims } returns emptyMap()
         user.roles.add(Role.USER)
         every { userRepository.findByAuthId("auth-1") } returns Optional.of(user)
 
@@ -54,6 +55,7 @@ class UserServiceTest {
     fun `getMe should provision JIT when user missing`() {
         val jwt = mockk<Jwt>()
         every { jwt.subject } returns "missing"
+        every { jwt.claims } returns emptyMap()
         every { jwt.getClaimAsString("preferred_username") } returns "missingUser"
         every { jwt.getClaimAsString("email") } returns "missing@test.com"
         every { jwt.getClaimAsString("given_name") } returns "Missing"
