@@ -140,11 +140,10 @@ class OnboardingBuddyService(
     @Transactional(readOnly = true)
     fun getBuddyFor(hireId: UUID, projectId: UUID): MyBuddyResponse? {
         val assignment = onboardingBuddyRepository.findByHireIdAndProjectId(hireId, projectId) ?: return null
-        val buddyName = projectMembershipApi
+        val buddyMember = projectMembershipApi
             .getProjectMembers(projectId)
             .firstOrNull { it.userId == assignment.buddyId }
-            ?.displayName
-            ?: UNKNOWN
+        val buddyName = buddyMember?.displayName ?: UNKNOWN
 
         val lastContact = buddyContactRepository
             .findAllByHireIdAndProjectIdOrderByOccurredAtDesc(hireId, projectId)
@@ -158,6 +157,7 @@ class OnboardingBuddyService(
         return MyBuddyResponse(
             buddyId = assignment.buddyId,
             buddyName = buddyName,
+            buddyGithubLogin = buddyMember?.githubLogin,
             projectId = projectId,
             assignedAt = assignment.assignedAt,
             cadenceTargetDays = assignment.cadenceTargetDays,

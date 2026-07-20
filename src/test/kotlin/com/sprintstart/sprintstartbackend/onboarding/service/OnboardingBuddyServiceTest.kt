@@ -219,6 +219,8 @@ class OnboardingBuddyServiceTest {
             // and people learn to ignore the signal.
             assertEquals(0, result.daysSinceContact)
             assertFalse(result.overdue)
+            // The buddy's handle rides along so the hire has a concrete way to reach them.
+            assertEquals("buddy", result.buddyGithubLogin)
         }
 
         @Test
