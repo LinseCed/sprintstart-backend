@@ -86,6 +86,19 @@ class CompetencyGraphAuthoringService(
     }
 
     /**
+     * Reads one live competency, so an editor can show what it currently says.
+     *
+     * The projected path deliberately carries only what a hire's map needs (label, kind, state),
+     * not `description`/`targetLevel`/`invariant` -- so without this an edit form would have to
+     * start blank on the fields a PM is most likely to be adjusting.
+     *
+     * @throws ResponseStatusException 404 if no competency has [key], or it was removed.
+     */
+    @Transactional(readOnly = true)
+    fun getCompetency(key: String): CompetencyResponse =
+        findVisibleCompetency(key, headGraph()).toAuthoringResponse()
+
+    /**
      * Applies a PM's edit to one competency node.
      *
      * Omitted fields are left alone. [key] is not editable -- see [UpdateCompetencyRequest].

@@ -91,6 +91,36 @@ class CompetencyGraphAuthoringServiceTest {
         CompetencyEdge(fromKey = from, toKey = to, kind = kind)
 
     @Nested
+    inner class GetCompetency {
+        @Test
+        fun `returns the fields the projected path omits`() {
+            val kotlin = competency("kotlin", label = "Kotlin", targetLevel = 3)
+            kotlin.description = "What we use it for here"
+            stageGraph(competencies = listOf(kotlin))
+
+            val response = service.getCompetency("kotlin")
+
+            assertEquals("What we use it for here", response.description)
+            assertEquals(3, response.targetLevel)
+            assertEquals("kotlin", response.key)
+        }
+
+        @Test
+        fun `404s for a competency that was removed from the graph`() {
+            stageGraph(
+                competencies = listOf(competency("kotlin")),
+                extraChanges = listOf(
+                    CompetencyGraphChange(version = 2, changeType = ChangeType.NODE_REMOVED, competencyKey = "kotlin"),
+                ),
+            )
+
+            val exception = assertThrows<ResponseStatusException> { service.getCompetency("kotlin") }
+
+            assertEquals(HttpStatus.NOT_FOUND, exception.statusCode)
+        }
+    }
+
+    @Nested
     inner class UpdateCompetency {
         @Test
         fun `applies only the supplied fields and leaves the rest alone`() {
