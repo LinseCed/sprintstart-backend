@@ -114,13 +114,20 @@ class VerificationService(
         request: SubmitVerificationAttemptRequest,
     ): SubmitVerificationAttemptResponse {
         val context = withContext(Dispatchers.IO) {
-            readTxTemplate.execute { loadSubmissionContext(authId, stepId) }!!
+            readTxTemplate.execute { loadSubmissionContext(authId, stepId, request.answer) }!!
         }
 
-        val graded = grade(context.verification, context.lessonContent, request.answer, context.attemptNo)
+        // An ARTIFACT answer is a PR number, and it is also the key the reuse check matches on, so
+        // it is stored in the same normalized form it was looked up with.
+        val answer = if (context.verification.type == VerificationType.ARTIFACT) {
+            request.answer.trim()
+        } else {
+            request.answer
+        }
+        val graded = grade(context, answer)
 
         return withContext(Dispatchers.IO) {
-            txTemplate.execute { persistGradedAttempt(context, request.answer, graded) }!!
+            txTemplate.execute { persistGradedAttempt(context, answer, graded) }!!
         }
     }
 
@@ -130,9 +137,16 @@ class VerificationService(
         val verification: Verification,
         val lessonContent: String,
         val attemptNo: Int,
+        /**
+         * Another user already passed this verification with this exact answer.
+         *
+         * Only meaningful for `ARTIFACT`, where the answer is a pull request number. Resolved
+         * here, inside the read transaction, so grading itself stays free of repository access.
+         */
+        val answerAlreadyClaimed: Boolean = false,
     )
 
-    private fun loadSubmissionContext(authId: String, stepId: UUID): SubmissionContext {
+    private fun loadSubmissionContext(authId: String, stepId: UUID, answer: String): SubmissionContext {
         val userId = resolveUserId(authId)
         val step = findStepForUser(stepId, userId)
         val verification = findVerification(stepId)
@@ -144,6 +158,12 @@ class VerificationService(
             verification = verification,
             lessonContent = step.content ?: "",
             attemptNo = attemptNo,
+            answerAlreadyClaimed = verification.type == VerificationType.ARTIFACT &&
+                verificationAttemptRepository.existsByVerificationIdAndAnswerAndPassedIsTrueAndUserIdNot(
+                    verification.id,
+                    answer.trim(),
+                    userId,
+                ),
         )
     }
 
@@ -290,17 +310,32 @@ class VerificationService(
     )
 
     private suspend fun grade(
-        verification: Verification,
-        lessonContent: String,
+        context: SubmissionContext,
         answer: String,
-        attemptNo: Int,
-    ): GradedResult =
-        when (verification.type) {
+    ): GradedResult {
+        val verification = context.verification
+
+        // Somebody else already passed this task with this pull request. One PR cannot be evidence
+        // that two people did the work, and no rubric judgment can establish otherwise -- so this
+        // is rejected here rather than sent to the judge, which would happily pass it again.
+        if (context.answerAlreadyClaimed) {
+            return GradedResult(
+                passed = false,
+                score = 0.0,
+                feedback = "That pull request has already been submitted by someone else for this task.",
+                hint = "Submit a pull request you opened yourself.",
+            )
+        }
+
+        return when (verification.type) {
             VerificationType.EXACT -> gradeExact(verification.canonicalAnswer ?: "", answer)
             VerificationType.ATTEST -> gradeAttest(answer)
-            VerificationType.KNOWLEDGE -> gradeKnowledge(verification, lessonContent, answer, attemptNo)
+            VerificationType.KNOWLEDGE ->
+                gradeKnowledge(verification, context.lessonContent, answer, context.attemptNo)
+
             VerificationType.ARTIFACT -> gradeArtifact(verification, answer)
         }
+    }
 
     /** Normalized (case/whitespace-insensitive) exact match -- mirrors the AI service's `grade_exact`. */
     private fun gradeExact(canonicalAnswer: String, answer: String): GradedResult {
