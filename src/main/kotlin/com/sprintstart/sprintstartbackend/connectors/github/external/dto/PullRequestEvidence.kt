@@ -13,4 +13,11 @@ data class PullRequestEvidence(
     val filesChanged: List<String>,
     val checksPassed: Boolean?,
     val commitMessages: List<String>,
+    /**
+     * GitHub login of whoever opened the pull request, lower-cased, or `null` when GitHub reports
+     * no author (e.g. a deleted account). Artifact verification compares this against the
+     * submitting user's declared GitHub login -- without it, a hire could pass a task with
+     * somebody else's pull request.
+     */
+    val authorLogin: String?,
 )

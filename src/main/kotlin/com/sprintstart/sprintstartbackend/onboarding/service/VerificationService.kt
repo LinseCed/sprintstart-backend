@@ -144,6 +144,11 @@ class VerificationService(
          * here, inside the read transaction, so grading itself stays free of repository access.
          */
         val answerAlreadyClaimed: Boolean = false,
+        /**
+         * The submitting user's declared GitHub login, or `null` when they have none. Only
+         * `ARTIFACT` uses it, to check that they actually opened the pull request they submitted.
+         */
+        val githubLogin: String? = null,
     )
 
     private fun loadSubmissionContext(authId: String, stepId: UUID, answer: String): SubmissionContext {
@@ -164,6 +169,11 @@ class VerificationService(
                     answer.trim(),
                     userId,
                 ),
+            githubLogin = if (verification.type == VerificationType.ARTIFACT) {
+                userApi.getGithubLoginByUserId(userId)
+            } else {
+                null
+            },
         )
     }
 
@@ -333,8 +343,38 @@ class VerificationService(
             VerificationType.KNOWLEDGE ->
                 gradeKnowledge(verification, context.lessonContent, answer, context.attemptNo)
 
-            VerificationType.ARTIFACT -> gradeArtifact(verification, answer)
+            VerificationType.ARTIFACT -> gradeArtifact(verification, answer, context.githubLogin)
         }
+    }
+
+    /**
+     * Rejects a pull request that cannot be attributed to the submitting user, or `null` to proceed.
+     *
+     * An artifact check claims "this person did this work", so it is only meaningful when the
+     * submitter is known to be the PR's author. A user who has not declared a GitHub login is asked
+     * for one rather than being graded on an unattributable PR -- the alternative, grading it
+     * anyway, is what let a hire pass with a colleague's work.
+     */
+    private fun attributionFailure(githubLogin: String?, authorLogin: String?, prNumber: Int): GradedResult? {
+        if (githubLogin.isNullOrBlank()) {
+            return GradedResult(
+                passed = false,
+                score = 0.0,
+                feedback = "We can't tell whether you opened this pull request.",
+                hint = "Add your GitHub username to your profile, then submit again.",
+            )
+        }
+
+        if (authorLogin == null || authorLogin != githubLogin) {
+            return GradedResult(
+                passed = false,
+                score = 0.0,
+                feedback = "PR #$prNumber was opened by someone else, so it can't verify your work.",
+                hint = "Submit a pull request you opened yourself.",
+            )
+        }
+
+        return null
     }
 
     /** Normalized (case/whitespace-insensitive) exact match -- mirrors the AI service's `grade_exact`. */
@@ -408,7 +448,11 @@ class VerificationService(
      * those aren't judgment calls, they're facts only Kotlin can observe.
      */
     @Suppress("ThrowsCount")
-    private suspend fun gradeArtifact(verification: Verification, answer: String): GradedResult {
+    private suspend fun gradeArtifact(
+        verification: Verification,
+        answer: String,
+        githubLogin: String?,
+    ): GradedResult {
         val prNumber = answer.trim().toIntOrNull()
             ?: return GradedResult(
                 passed = false,
@@ -434,6 +478,11 @@ class VerificationService(
                 feedback = "No PR #$prNumber found in the linked repository.",
                 hint = "Double-check the PR number and that it's on the linked repository.",
             )
+
+        // Attribution, before any judgment: a PR somebody else opened is evidence that *they* did
+        // the work. The judge cannot catch this -- it would look at a PR that genuinely satisfies
+        // the rubric and pass it, for the wrong person.
+        attributionFailure(githubLogin, evidence.authorLogin, prNumber)?.let { return it }
 
         val result = try {
             onboardingAiClient.gradeArtifact(

@@ -90,6 +90,10 @@ class VerificationServiceTest {
                 any(),
             )
         } returns false
+
+        // Artifact checks attribute the PR to its submitter, so the default fixture user *is*
+        // the author of the fixture PR. Tests that care opt into a mismatch explicitly.
+        every { userApi.getGithubLoginByUserId(userId) } returns "octocat"
     }
 
     private fun makeStep(
@@ -263,6 +267,7 @@ class VerificationServiceTest {
                 filesChanged = listOf("src/Main.kt"),
                 checksPassed = true,
                 commitMessages = listOf("fix: bug"),
+                authorLogin = "octocat",
             )
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
@@ -281,6 +286,79 @@ class VerificationServiceTest {
             assertTrue(result.passed)
             coVerify(exactly = 1) { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) }
             coVerify(exactly = 1) { onboardingAiClient.gradeArtifact(any(), any(), any()) }
+        }
+
+        @Test
+        fun `ARTIFACT rejects a PR opened by somebody else, without an AI call`() = runTest {
+            val repositoryConnectionId = UUID.randomUUID()
+            val step = makeStep()
+            val verification = makeVerification(
+                VerificationType.ARTIFACT,
+                step.id,
+                rubric = "closes the ticket",
+                repositoryConnectionId = repositoryConnectionId,
+            )
+            val evidence = PullRequestEvidence(
+                title = "Fix bug",
+                body = "Closes #42",
+                state = "MERGED",
+                filesChanged = listOf("src/Main.kt"),
+                checksPassed = true,
+                commitMessages = listOf("fix: bug"),
+                authorLogin = "a-colleague",
+            )
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
+            every { verificationRepository.findByStepId(step.id) } returns verification
+            every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
+            every { competencyGraphVersionService.currentVersion() } returns 1
+            coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) } returns evidence
+            every { verificationAttemptRepository.save(any()) } answers { firstArg() }
+
+            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("42"))
+
+            // The judge would pass this -- the PR genuinely satisfies the rubric. It just isn't
+            // this user's work, which is not something a rubric can decide.
+            assertFalse(result.passed)
+            assertTrue(result.feedback.contains("opened by someone else"))
+            coVerify(exactly = 0) { onboardingAiClient.gradeArtifact(any(), any(), any()) }
+        }
+
+        @Test
+        fun `ARTIFACT asks for a GitHub username when the submitter has none`() = runTest {
+            val repositoryConnectionId = UUID.randomUUID()
+            val step = makeStep()
+            val verification = makeVerification(
+                VerificationType.ARTIFACT,
+                step.id,
+                rubric = "closes the ticket",
+                repositoryConnectionId = repositoryConnectionId,
+            )
+            val evidence = PullRequestEvidence(
+                title = "Fix bug",
+                body = "Closes #42",
+                state = "MERGED",
+                filesChanged = listOf("src/Main.kt"),
+                checksPassed = true,
+                commitMessages = listOf("fix: bug"),
+                authorLogin = "octocat",
+            )
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { userApi.getGithubLoginByUserId(userId) } returns null
+            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
+            every { verificationRepository.findByStepId(step.id) } returns verification
+            every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
+            every { competencyGraphVersionService.currentVersion() } returns 1
+            coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) } returns evidence
+            every { verificationAttemptRepository.save(any()) } answers { firstArg() }
+
+            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("42"))
+
+            // Grading an unattributable PR anyway is exactly what let a hire pass with someone
+            // else's work, so this asks for the missing identity instead.
+            assertFalse(result.passed)
+            assertTrue(result.hint!!.contains("GitHub username"))
+            coVerify(exactly = 0) { onboardingAiClient.gradeArtifact(any(), any(), any()) }
         }
 
         @Test
@@ -419,6 +497,7 @@ class VerificationServiceTest {
                 filesChanged = emptyList(),
                 checksPassed = null,
                 commitMessages = emptyList(),
+                authorLogin = "octocat",
             )
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)

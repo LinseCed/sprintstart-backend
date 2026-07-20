@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.user.model.request.user.PatchMeRequest
 import com.sprintstart.sprintstartbackend.user.model.request.user.PatchUserRequest
 import com.sprintstart.sprintstartbackend.user.model.request.user.UpdateUserEnabledRequest
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
+import com.sprintstart.sprintstartbackend.user.service.GithubLoginService
 import com.sprintstart.sprintstartbackend.user.service.KeycloakAdminClient
 import com.sprintstart.sprintstartbackend.user.service.UserService
 import io.mockk.every
@@ -30,7 +31,8 @@ class UserServiceTest {
     private val userRepository: UserRepository = mockk()
     private val eventPublisher: ApplicationEventPublisher = mockk()
     private val keycloakAdminClient: KeycloakAdminClient = mockk()
-    private val userService = UserService(userRepository, eventPublisher, keycloakAdminClient)
+    private val githubLoginService = GithubLoginService(userRepository)
+    private val userService = UserService(userRepository, eventPublisher, keycloakAdminClient, githubLoginService)
 
     @Test
     fun `getMe returns extended user response`() {

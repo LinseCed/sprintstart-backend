@@ -64,4 +64,16 @@ interface UserApi {
      * @return The user's roles in that project; empty if none.
      */
     fun getProjectRolesForUser(userId: UUID, projectId: UUID): List<ProjectRoleDto>
+
+    /**
+     * Returns the GitHub account a user contributes as, if they have declared one.
+     *
+     * Artifact verification uses this to attribute a submitted pull request to the hire who
+     * submitted it. Always lower-cased, because GitHub logins are case-insensitive and a case
+     * difference must not read as a different person.
+     *
+     * @param userId Internal SprintStart user identifier.
+     * @return The user's GitHub login, or `null` when they have none (or do not exist).
+     */
+    fun getGithubLoginByUserId(userId: UUID): String?
 }
