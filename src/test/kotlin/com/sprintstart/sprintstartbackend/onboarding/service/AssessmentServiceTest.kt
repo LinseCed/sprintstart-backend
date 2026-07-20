@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentRe
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.GithubHistoryPrior
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.SkillAssessmentSession
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.SkillAssessmentTurn
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
@@ -42,6 +43,7 @@ class AssessmentServiceTest {
     private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
     private val userApi: UserApi = mockk()
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
+    private val githubHistoryPriorService: GithubHistoryPriorService = mockk()
     private val service =
         AssessmentService(
             onboardingAiClient,
@@ -49,6 +51,7 @@ class AssessmentServiceTest {
             competencyRepository,
             userCompetencyStateRepository,
             userApi,
+            githubHistoryPriorService,
             transactionManager,
         )
 
@@ -57,6 +60,9 @@ class AssessmentServiceTest {
     private val kotlinCompetency = Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL)
 
     private fun setUpUser() {
+        // Most tests are about the interview itself; the consented involvement prior defaults to
+        // "not consented", which is the common case.
+        every { githubHistoryPriorService.getPrior(userId) } returns null
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
     }
 
@@ -113,6 +119,55 @@ class AssessmentServiceTest {
             assertEquals(1, savedSlot.captured.turns.size)
             assertEquals(0, savedSlot.captured.turns[0].turnIndex)
             assertNull(savedSlot.captured.turns[0].answer)
+        }
+
+        @Test
+        fun `sends the consented involvement prior to the interviewer`() = runTest {
+            setUpUser()
+            val prior = GithubHistoryPrior(
+                userId = userId,
+                signals = mutableMapOf("repo:owner/api" to 9, "type:PULL_REQUEST" to 9),
+            )
+            every { githubHistoryPriorService.getPrior(userId) } returns prior
+            every {
+                skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                    userId,
+                    SkillAssessmentSessionStatus.IN_PROGRESS,
+                )
+            } returns null
+            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            val request = slot<AssessmentTurnRequest>()
+            coEvery { onboardingAiClient.assessTurn(capture(request)) } returns
+                AssessmentTurnResponse(done = false, question = "q")
+            val savedSlot = slot<SkillAssessmentSession>()
+            every { skillAssessmentSessionRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
+
+            service.startAssessment(authId)
+
+            assertEquals(9, request.captured.candidateSignal.signals["repo:owner/api"])
+        }
+
+        @Test
+        fun `sends an empty prior when the user has not consented`() = runTest {
+            setUpUser()
+            every {
+                skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                    userId,
+                    SkillAssessmentSessionStatus.IN_PROGRESS,
+                )
+            } returns null
+            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            val request = slot<AssessmentTurnRequest>()
+            coEvery { onboardingAiClient.assessTurn(capture(request)) } returns
+                AssessmentTurnResponse(done = false, question = "q")
+            val savedSlot = slot<SkillAssessmentSession>()
+            every { skillAssessmentSessionRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
+
+            service.startAssessment(authId)
+
+            // Not consenting must be indistinguishable from having no history, never an error.
+            val signals = request.captured.candidateSignal.signals
+            assertTrue(signals.isEmpty())
         }
 
         @Test

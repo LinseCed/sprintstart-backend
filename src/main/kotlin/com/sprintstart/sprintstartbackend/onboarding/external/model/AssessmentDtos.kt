@@ -26,6 +26,18 @@ data class RepoSignalSchema(
     val notable: List<String> = emptyList(),
 )
 
+/**
+ * The candidate's own prior involvement in the project's repositories, as counted buckets.
+ *
+ * Consent-gated: empty unless the user opted in (see `GithubHistoryPriorService`). Distinct from
+ * [RepoSignalSchema], which describes the *repository*; this describes the *person*, and the AI
+ * service treats it as a calibration prior rather than evidence of proficiency.
+ */
+@Serializable
+data class CandidateSignalSchema(
+    val signals: Map<String, Int> = emptyMap(),
+)
+
 @Serializable
 data class AssessmentHistoryEntrySchema(
     val role: String,
@@ -38,6 +50,8 @@ data class AssessmentTurnRequest(
     val candidateCompetencies: List<CandidateCompetencySchema>,
     @SerialName("repo_signal")
     val repoSignal: RepoSignalSchema = RepoSignalSchema(),
+    @SerialName("candidate_signal")
+    val candidateSignal: CandidateSignalSchema = CandidateSignalSchema(),
     val history: List<AssessmentHistoryEntrySchema> = emptyList(),
     val turn: Int,
     @SerialName("max_turns")

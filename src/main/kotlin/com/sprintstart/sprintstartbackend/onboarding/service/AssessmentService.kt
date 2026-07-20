@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.SkillAssessm
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentHistoryEntrySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.CandidateCompetencySchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.CandidateSignalSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.SkillAssessmentSession
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.SkillAssessmentTurn
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
@@ -45,6 +46,7 @@ class AssessmentService(
     private val competencyRepository: CompetencyRepository,
     private val userCompetencyStateRepository: UserCompetencyStateRepository,
     private val userApi: UserApi,
+    private val githubHistoryPriorService: GithubHistoryPriorService,
     transactionManager: PlatformTransactionManager,
 ) {
     // Mirrors BlueprintService: the AI call is a long-running suspend operation and must not run
@@ -86,9 +88,11 @@ class AssessmentService(
         val candidates = withContext(Dispatchers.IO) {
             readTxTemplate.execute { loadCandidateCompetencies() }.orEmpty()
         }
+        val candidateSignal = withContext(Dispatchers.IO) { loadCandidateSignal(userId) }
         val aiResponse = onboardingAiClient.assessTurn(
             AssessmentTurnRequest(
                 candidateCompetencies = candidates,
+                candidateSignal = candidateSignal,
                 turn = 0,
                 maxTurns = MAX_TURNS,
                 mustFinish = false,
@@ -138,6 +142,7 @@ class AssessmentService(
         val aiResponse = onboardingAiClient.assessTurn(
             AssessmentTurnRequest(
                 candidateCompetencies = candidates,
+                candidateSignal = withContext(Dispatchers.IO) { loadCandidateSignal(userId) },
                 history = history,
                 turn = nextTurnIndex,
                 maxTurns = MAX_TURNS,
@@ -183,6 +188,19 @@ class AssessmentService(
         ) ?: return null
         val openTurn = session.turns.lastOrNull { it.answer == null } ?: return null
         return StartAssessmentResponse(sessionId = session.id, question = openTurn.question)
+    }
+
+    /**
+     * The candidate's consented involvement prior, or an empty signal.
+     *
+     * Sent on every turn because the AI service is stateless and re-derives its belief from the
+     * request each time -- omitting it after turn 0 would silently change how later turns are
+     * calibrated. Consent is re-checked on each read, so withdrawing it takes effect immediately,
+     * mid-interview included.
+     */
+    private fun loadCandidateSignal(userId: UUID): CandidateSignalSchema {
+        val prior = githubHistoryPriorService.getPrior(userId) ?: return CandidateSignalSchema()
+        return CandidateSignalSchema(signals = prior.signals.toMap())
     }
 
     private fun loadCandidateCompetencies(): List<CandidateCompetencySchema> =
