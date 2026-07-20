@@ -3,18 +3,23 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingAiPathEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingPath
+import com.sprintstart.sprintstartbackend.onboarding.external.model.PathPhase
+import com.sprintstart.sprintstartbackend.onboarding.external.model.PathStep
 import com.sprintstart.sprintstartbackend.onboarding.external.model.SkillAssessmentSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Blueprint
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
@@ -42,6 +47,7 @@ class OnboardingPersonalizationServiceTest {
     private val blueprintRepository: BlueprintRepository = mockk()
     private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
     private val competencyRepository: CompetencyRepository = mockk()
+    private val verificationRepository: VerificationRepository = mockk(relaxed = true)
     private val userApi: UserApi = mockk()
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
 
@@ -51,6 +57,7 @@ class OnboardingPersonalizationServiceTest {
         blueprintRepository,
         userCompetencyStateRepository,
         competencyRepository,
+        verificationRepository,
         userApi,
         transactionManager,
     )
@@ -295,6 +302,68 @@ class OnboardingPersonalizationServiceTest {
             assertEquals(userId, events[0].path?.userId)
             assertEquals(projectId, savedSlot.captured.projectId)
             verify(exactly = 1) { onboardingPathRepository.save(any()) }
+        }
+
+        @Test
+        fun `gives every competency-tagged step a check, so the graph gets openable modules`() = runTest {
+            val path = OnboardingPath(
+                workingArea = "backend",
+                phases = listOf(
+                    PathPhase(
+                        title = "Phase 1",
+                        steps = listOf(
+                            PathStep(
+                                title = "Run the stack locally",
+                                description = "Boot it end to end",
+                                competencyKey = "local-dev",
+                            ),
+                            PathStep(title = "Read the notes", description = "Context only"),
+                        ),
+                    ),
+                ),
+            )
+            every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubMembershipAndRole()
+            stubBaselinesPresent()
+            every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
+                OnboardingAiPathEvent(type = "path", path = path),
+            )
+            every { onboardingPathRepository.save(any()) } answers { firstArg() }
+            val saved = slot<List<Verification>>()
+            every { verificationRepository.saveAll(capture(saved)) } answers { firstArg() }
+
+            service.personalize(authId, projectId).toList()
+
+            // Without this, a generated path had a full graph and zero openable nodes: a node only
+            // becomes a module when a Verification carries its competency key.
+            assertEquals(1, saved.captured.size)
+            assertEquals("local-dev", saved.captured[0].competencyKey)
+            assertEquals(VerificationType.KNOWLEDGE, saved.captured[0].type)
+        }
+
+        @Test
+        fun `does not invent a check for a step with no competency`() = runTest {
+            val path = OnboardingPath(
+                workingArea = "backend",
+                phases = listOf(
+                    PathPhase(
+                        title = "Phase 1",
+                        steps = listOf(PathStep(title = "Read the notes", description = "Context")),
+                    ),
+                ),
+            )
+            every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
+            stubMembershipAndRole()
+            stubBaselinesPresent()
+            every { onboardingAiClient.generatePath(any(), any(), any()) } returns flowOf(
+                OnboardingAiPathEvent(type = "path", path = path),
+            )
+            every { onboardingPathRepository.save(any()) } answers { firstArg() }
+
+            service.personalize(authId, projectId).toList()
+
+            // There would be no graph node to open it from.
+            verify(exactly = 0) { verificationRepository.saveAll(any<List<Verification>>()) }
         }
 
         @Test

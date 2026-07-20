@@ -104,6 +104,7 @@ private fun PathStep.toEntity(phase: OnboardingPhase, index: Int): OnboardingSte
         estimatedMinutes = 0,
         expectedOutcome = this.description ?: "",
         status = StepStatus.WAITING,
+        competencyKey = this.competencyKey,
     )
     step.resources.addAll(
         resources.map { it.toEntity(step) },

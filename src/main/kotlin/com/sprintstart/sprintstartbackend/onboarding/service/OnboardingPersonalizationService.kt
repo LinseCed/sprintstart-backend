@@ -1,10 +1,13 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingAiPathEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.SkillAssessmentSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toEntities
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toGetForUserResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toSchema
@@ -13,6 +16,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintReposit
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.toAiScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +40,7 @@ class OnboardingPersonalizationService(
     private val blueprintRepository: BlueprintRepository,
     private val userCompetencyStateRepository: UserCompetencyStateRepository,
     private val competencyRepository: CompetencyRepository,
+    private val verificationRepository: VerificationRepository,
     private val userApi: UserApi,
     transactionManager: PlatformTransactionManager,
 ) {
@@ -148,6 +153,7 @@ class OnboardingPersonalizationService(
                 val savedPath = path?.let { aiPath ->
                     val entity = aiPath.toEntities(userId, projectId)
                     onboardingPathRepository.save(entity)
+                    createDefaultVerifications(entity)
                     entity.toGetForUserResponse()
                 }
                 OnboardingSseEvent(type = "path", path = savedPath)
@@ -200,7 +206,48 @@ class OnboardingPersonalizationService(
         }
     }
 
+    /**
+     * Gives every competency-tagged step a graded check, so generating a path also produces
+     * openable modules.
+     *
+     * A graph node becomes a module only when some [Verification] carries its competency key --
+     * that is the sole bridge from the competency graph to a step. Nothing created those rows
+     * except a PM configuring each step by hand, so a freshly generated path had a full graph and
+     * *zero* openable nodes.
+     *
+     * The default is a `KNOWLEDGE` check rubric'd against the step's expected outcome: gradeable
+     * immediately, and already what the step claims the hire should be able to do. A PM can replace
+     * it with a stricter tier (`ARTIFACT`, `EXACT`, ...) through the existing upsert -- this only
+     * guarantees a check *exists*. Steps with no competency key are skipped: there would be no node
+     * to open them from.
+     */
+    private fun createDefaultVerifications(path: OnboardingPath) {
+        val steps = path.phases
+            .flatMap { it.steps }
+            .filter { !it.competencyKey.isNullOrBlank() }
+        if (steps.isEmpty()) {
+            return
+        }
+
+        verificationRepository.saveAll(
+            steps.map { step ->
+                Verification(
+                    stepId = step.id,
+                    type = VerificationType.KNOWLEDGE,
+                    prompt = "Show that you can: " + step.expectedOutcome.ifBlank { step.title },
+                    rubric = step.expectedOutcome.ifBlank { step.description },
+                    competencyKey = step.competencyKey.orEmpty(),
+                    level = DEFAULT_VERIFICATION_LEVEL,
+                )
+            },
+        )
+    }
+
     private companion object {
+        // Every generated check starts at the entry rung; a PM raises it per step if the work
+        // actually demands more.
+        const val DEFAULT_VERIFICATION_LEVEL = "beginner"
+
         // Inverse of AssessmentService.LEVEL_RANKS -- ledger 1..4 back to the AI's level names.
         val LEVEL_NAMES = mapOf(
             1 to "beginner",
