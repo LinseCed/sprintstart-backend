@@ -27,6 +27,20 @@ data class CompetencyEdgeResponse(
 )
 
 /**
+ * The whole live graph, for a PM authoring it.
+ *
+ * Distinct from a hire's projected path in three ways that matter: it is not filtered by any
+ * project's baseline, it carries no per-user state (nothing here is mastered or locked — that is
+ * a property of a person, not of the graph), and it resolves at the head version rather than at
+ * anyone's pin. A PM edits what the graph *is*.
+ */
+data class CompetencyGraphResponse(
+    val competencies: List<CompetencyResponse>,
+    val edges: List<CompetencyEdgeResponse>,
+    val graphVersion: Int,
+)
+
+/**
  * The outcome of removing a competency node from the graph.
  *
  * [edgesRemoved] is surfaced because deleting one node silently detaches every edge touching it,

@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyEdgeRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.UpdateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyGraphResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.DeleteCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyGraphAuthoringService
@@ -41,6 +42,28 @@ import org.springframework.web.bind.annotation.RestController
 class CompetencyGraphAuthoringController(
     private val competencyGraphAuthoringService: CompetencyGraphAuthoringService,
 ) {
+    /**
+     * Reads the whole live graph, for the PM authoring surface.
+     */
+    @Operation(
+        summary = "Read the live competency graph",
+        description = "Returns every visible competency and edge at the head version, unfiltered by any baseline " +
+            "and carrying no per-user state",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Graph returned"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
+    fun getGraph(): CompetencyGraphResponse {
+        return competencyGraphAuthoringService.getGraph()
+    }
+
     /**
      * Reads one live competency, including the fields the projected path omits.
      */

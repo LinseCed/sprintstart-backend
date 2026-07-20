@@ -121,6 +121,70 @@ class CompetencyGraphAuthoringServiceTest {
     }
 
     @Nested
+    inner class GetGraph {
+        @Test
+        fun `returns every visible competency and edge with the head version`() {
+            stageGraph(
+                competencies = listOf(competency("kotlin"), competency("jpa")),
+                edges = listOf(edge("kotlin", "jpa")),
+            )
+
+            val response = service.getGraph()
+
+            assertEquals(listOf("kotlin", "jpa"), response.competencies.map { it.key })
+            assertEquals(listOf("kotlin" to "jpa"), response.edges.map { it.fromKey to it.toKey })
+            assertEquals(10, response.graphVersion)
+        }
+
+        @Test
+        fun `omits what was removed, so a PM authors against the live graph`() {
+            stageGraph(
+                competencies = listOf(competency("kotlin"), competency("jpa")),
+                edges = listOf(edge("kotlin", "jpa")),
+                extraChanges = listOf(
+                    CompetencyGraphChange(version = 2, changeType = ChangeType.NODE_REMOVED, competencyKey = "jpa"),
+                    CompetencyGraphChange(
+                        version = 2,
+                        changeType = ChangeType.EDGE_REMOVED,
+                        fromKey = "kotlin",
+                        toKey = "jpa",
+                        edgeKind = EdgeKind.PREREQUISITE,
+                    ),
+                ),
+            )
+
+            val response = service.getGraph()
+
+            // The rows still exist -- removal is recorded, not deleted -- so reading the tables
+            // directly would show a node no hire can see.
+            assertEquals(listOf("kotlin"), response.competencies.map { it.key })
+            assertTrue(response.edges.isEmpty())
+        }
+
+        @Test
+        fun `carries the authoring fields a hire's projection leaves out`() {
+            val kotlin = competency("kotlin", targetLevel = 4)
+            kotlin.description = "Why it matters here"
+            stageGraph(competencies = listOf(kotlin))
+
+            val response = service.getGraph()
+
+            assertEquals("Why it matters here", response.competencies[0].description)
+            assertEquals(4, response.competencies[0].targetLevel)
+        }
+
+        @Test
+        fun `an empty graph is an empty response, not a failure`() {
+            stageGraph()
+
+            val response = service.getGraph()
+
+            assertTrue(response.competencies.isEmpty())
+            assertTrue(response.edges.isEmpty())
+        }
+    }
+
+    @Nested
     inner class UpdateCompetency {
         @Test
         fun `applies only the supplied fields and leaves the rest alone`() {
