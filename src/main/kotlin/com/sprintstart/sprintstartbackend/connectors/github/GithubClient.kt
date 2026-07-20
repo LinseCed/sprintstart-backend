@@ -154,6 +154,22 @@ class GithubClient(
                 .get()
                 .uri("https://api.github.com/orgs/$org/repos")
                 .header("Authorization", "Bearer $token")
+                .header("Accept", "application/vnd.github+json")
+                .sync()
+                .perform<Array<DiscoveredRepository>>()
+            return DiscoverRepositoriesResponse(result.toList())
+        } catch (e: WebClientException) {
+            println(e.statusCode)
+            throw e
+        }
+    }
+
+    suspend fun discoverRepositoriesOfUser(user: String, token: String): DiscoverRepositoriesResponse {
+        try {
+            val result = webClient
+                .get()
+                .uri("https://api.github.com/users/$user/repos")
+                .header("Authorization", "Bearer $token")
                 .sync()
                 .perform<Array<DiscoveredRepository>>()
             return DiscoverRepositoriesResponse(result.toList())

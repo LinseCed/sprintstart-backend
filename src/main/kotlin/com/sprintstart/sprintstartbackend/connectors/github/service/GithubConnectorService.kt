@@ -128,6 +128,34 @@ class GithubConnectorService(
     }
 
     /**
+     * Discovers the repositories of a specific GitHub user.
+     *
+     * @param user The username of the GitHub user whose repositories are to be discovered.
+     * @param authId The authentication ID associated with the GitHub user.
+     * @param tokenName The name of the token used for authentication.
+     * @return A response object containing the discovered repositories and their statuses.
+     */
+    @Transactional(readOnly = true)
+    @Tracked("Discovering GitHub repositories of a user")
+    suspend fun discoverRepositoriesOfUser(
+        user: String,
+        authId: String,
+        tokenName: String,
+    ): DiscoverRepositoriesResponse {
+        val token = withContext(Dispatchers.IO) {
+            githubUserRepository.findById(GithubUserPat(authId, tokenName))
+        }.orElseThrow { GithubUserPatNotFoundException(tokenName, authId) }
+
+        val result = githubClient.discoverRepositoriesOfUser(user, token.token)
+        result.repositories.forEach {
+            val repo = repoConnectionRepository.findByOwnerAndName(user, it.name)
+            it.alreadyConnected = repo != null
+            it.isEnabled = repo?.sourceEnabled
+        }
+        return result
+    }
+
+    /**
      * Connect a new repository.
      *
      * Given an authenticated user and a repository request, this validates project access,

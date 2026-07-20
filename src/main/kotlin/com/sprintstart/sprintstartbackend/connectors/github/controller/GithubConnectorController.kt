@@ -52,7 +52,14 @@ internal class GithubConnectorController(
     }
 
     @GetMapping("/discover/user/{user}")
-    fun discoverRepositoriesOfUser() {}
+    suspend fun discoverRepositoriesOfUser(
+        @Parameter(hidden = true) @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable user: String,
+        @RequestParam(required = true) tokenName: String,
+    ): ResponseEntity<DiscoverRepositoriesResponse> {
+        val result = githubConnectorService.discoverRepositoriesOfUser(user, jwt.subject, tokenName)
+        return ResponseEntity.ok(result)
+    }
 
     /**
      * Connects a GitHub repository to the SprintStart application.
