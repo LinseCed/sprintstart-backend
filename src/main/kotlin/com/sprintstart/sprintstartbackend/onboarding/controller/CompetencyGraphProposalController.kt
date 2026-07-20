@@ -1,10 +1,13 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
+import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.ApproveGraphBatchRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.RejectProposalRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.ApproveGraphBatchResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.GenerateCompetencyGraphResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.ProposedCompetencyGraphResponse
+import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyGraphAuthoringService
 import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyProposalService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -23,9 +26,13 @@ import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1/onboarding/competency-graph")
-@Tag(name = "Onboarding - Competency Graph", description = "Manage AI-proposed competency graph nodes and edges")
+@Tag(
+    name = "Onboarding - Competency Graph",
+    description = "Review AI-proposed competency graph nodes and edges, and author the live graph directly",
+)
 class CompetencyGraphProposalController(
     private val competencyProposalService: CompetencyProposalService,
+    private val competencyGraphAuthoringService: CompetencyGraphAuthoringService,
 ) {
     /**
      * Triggers AI competency graph proposal generation over the ingested corpus.
@@ -171,5 +178,35 @@ class CompetencyGraphProposalController(
         @RequestBody(required = false) request: RejectProposalRequest?,
     ): CompetencyEdgeProposalResponse {
         return competencyProposalService.rejectEdge(id, request?.reason)
+    }
+
+    /**
+     * Approves a set of proposed nodes and edges as one graph version.
+     *
+     * Preferred over approving a node and then its edges individually: batched, the subgraph
+     * classifies ADDITIVE and reaches hires already wired, rather than the node arriving first as
+     * an orphan that can re-lock once its held-back edges land.
+     */
+    @Operation(
+        summary = "Approve proposed competencies and edges as one batch",
+        description = "Approves nodes and edges together so the whole subgraph lands in a single graph version",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Batch approved and created"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "One of the given proposals does not exist"),
+            ApiResponse(
+                responseCode = "409",
+                description = "A proposal is no longer PROPOSED, or an edge endpoint is neither live nor in the batch",
+            ),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/approve-batch")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun approveBatch(@RequestBody request: ApproveGraphBatchRequest): ApproveGraphBatchResponse {
+        return competencyProposalService.approveBatch(request.competencyProposalIds, request.edgeProposalIds)
     }
 }

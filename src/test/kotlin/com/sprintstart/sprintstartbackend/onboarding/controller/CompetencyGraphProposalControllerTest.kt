@@ -6,9 +6,12 @@ import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.ApproveGraphBatchResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyProposalResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.ProposedCompetencyGraphResponse
+import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyGraphAuthoringService
 import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyProposalService
 import io.mockk.every
 import org.junit.jupiter.api.Test
@@ -24,6 +27,7 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.util.UUID
 
@@ -35,6 +39,9 @@ class CompetencyGraphProposalControllerTest(
 ) {
     @MockkBean
     private lateinit var competencyProposalService: CompetencyProposalService
+
+    @MockkBean
+    private lateinit var competencyGraphAuthoringService: CompetencyGraphAuthoringService
 
     @MockkBean
     private lateinit var jwtDecoder: JwtDecoder
@@ -64,6 +71,17 @@ class CompetencyGraphProposalControllerTest(
             kind = CompetencyKind.SKILL,
             repoRef = null,
             status = ProposalStatus.APPROVED,
+        )
+
+    private fun liveCompetencyResponse(): CompetencyResponse =
+        CompetencyResponse(
+            key = "kotlin",
+            label = "Kotlin Basics",
+            description = null,
+            kind = CompetencyKind.SKILL,
+            targetLevel = 3,
+            invariant = false,
+            repoRef = null,
         )
 
     private fun edgeResponse(): CompetencyEdgeProposalResponse =
@@ -160,5 +178,27 @@ class CompetencyGraphProposalControllerTest(
         mockMvc
             .perform(post("/api/v1/onboarding/competency-graph/edges/$edgeId/reject").with(pmJwt))
             .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `approveBatch should return 200 for a PM`() {
+        every { competencyProposalService.approveBatch(listOf(competencyId), listOf(edgeId)) } returns
+            ApproveGraphBatchResponse(competenciesApproved = 1, edgesApproved = 1, graphVersion = 4)
+
+        mockMvc
+            .perform(
+                post("/api/v1/onboarding/competency-graph/approve-batch")
+                    .with(pmJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            mapOf(
+                                "competencyProposalIds" to listOf(competencyId),
+                                "edgeProposalIds" to listOf(edgeId),
+                            ),
+                        ),
+                    ),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.graphVersion").value(4))
     }
 }

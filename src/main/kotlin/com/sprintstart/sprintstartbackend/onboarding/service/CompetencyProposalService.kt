@@ -12,6 +12,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyProp
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toCompetency
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toCompetencyEdge
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.ApproveGraphBatchResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.GenerateCompetencyGraphResponse
@@ -234,6 +235,61 @@ class CompetencyProposalService(
         proposal.decidedAt = Instant.now()
         proposal.rejectionReason = reason
         return proposal.toResponse()
+    }
+
+    /**
+     * Approves a set of node and edge proposals as a single graph version.
+     *
+     * Exists because approving them one at a time is not equivalent. Each single approval bumps
+     * its own version, so an edge into a node approved a moment earlier is an edge into an
+     * *already-existing* node -- which [GraphChangeClassifier] correctly calls STRUCTURAL and
+     * [EffectiveGraphResolver] then holds back until the hire's next session start. The hire sees
+     * the node arrive as an orphan `AVAILABLE` node with no prerequisites, starts it, and can
+     * find it re-locked once the edges land. Approved together, the node counts as newly
+     * introduced in the same batch, the whole subgraph classifies ADDITIVE, and it appears
+     * already wired.
+     *
+     * Nodes are created before edges within the batch so [approveEdge]'s endpoint check passes
+     * for edges whose endpoints are approved in the same call.
+     *
+     * @throws ResponseStatusException 404 if any id has no proposal; 409 if any proposal is no
+     * longer PROPOSED, or an edge endpoint is not live and not in this batch. The whole batch
+     * rolls back -- a partially applied batch is exactly the split version this exists to avoid.
+     */
+    @Transactional
+    fun approveBatch(competencyProposalIds: List<UUID>, edgeProposalIds: List<UUID>): ApproveGraphBatchResponse {
+        val competencyProposals = competencyProposalIds.map { findPendingCompetencyProposal(it) }
+        val edgeProposals = edgeProposalIds.map { findPendingEdgeProposal(it) }
+
+        competencyProposals.forEach { proposal ->
+            competencyRepository.save(proposal.toCompetency())
+            competencyGraphVersionService.recordNodeAdded(proposal.key)
+            proposal.status = ProposalStatus.APPROVED
+            proposal.decidedAt = Instant.now()
+        }
+        edgeProposals.forEach { proposal ->
+            if (!competencyRepository.existsByKey(proposal.fromKey) ||
+                !competencyRepository.existsByKey(proposal.toKey)
+            ) {
+                throw ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Cannot approve edge ${proposal.fromKey} -> ${proposal.toKey}: both endpoints must be live " +
+                        "competencies or approved in the same batch",
+                )
+            }
+            competencyEdgeRepository.save(proposal.toCompetencyEdge())
+            competencyGraphVersionService.recordEdgeAdded(proposal.fromKey, proposal.toKey, proposal.kind)
+            proposal.status = ProposalStatus.APPROVED
+            proposal.decidedAt = Instant.now()
+        }
+
+        // One bump for the whole batch -- this is the entire point.
+        val version = competencyGraphVersionService.bump()
+        return ApproveGraphBatchResponse(
+            competenciesApproved = competencyProposals.size,
+            edgesApproved = edgeProposals.size,
+            graphVersion = version,
+        )
     }
 
     private fun findPendingCompetencyProposal(id: UUID): CompetencyProposal {
