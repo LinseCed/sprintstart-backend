@@ -3,15 +3,20 @@ package com.sprintstart.sprintstartbackend.onboarding.controller
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectOnboardingMetricsResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingMetricsService
+import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.security.core.annotation.AuthenticationPrincipal
+import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
@@ -31,7 +36,41 @@ import java.util.UUID
 )
 class OnboardingMetricsController(
     private val onboardingMetricsService: OnboardingMetricsService,
+    private val userApi: UserApi,
 ) {
+    @Operation(
+        summary = "My own onboarding timeline",
+        description = "The self-serve counterpart of the PM-facing per-hire timeline: a hire reads " +
+            "their own moments and gaps. Carries `longestOpenWaitHours` — how long their pull " +
+            "request has been waiting on anyone — which is the number that tells a stuck newcomer " +
+            "the delay is not their fault. Project-scoped, because onboarding is per-project.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Timeline returned"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "You are not a member of that project"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/me")
+    @PreAuthorize("hasAnyRole('USER', 'PM', 'HR', 'ADMIN')")
+    fun getMyTimeline(
+        @Parameter(hidden = true)
+        @AuthenticationPrincipal jwt: Jwt,
+        @RequestParam projectId: UUID,
+    ): HireTimelineResponse {
+        val userId = userApi.getUserIdByAuthId(jwt.subject).orElseThrow {
+            ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: ${jwt.subject}")
+        }
+        return onboardingMetricsService.getHireTimeline(userId, projectId)
+            ?: throw ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "You are not a member of project $projectId",
+            )
+    }
+
     @Operation(
         summary = "Onboarding metrics for a project",
         description = "Per-hire timelines plus the aggregates: median time to a first merged pull request, " +

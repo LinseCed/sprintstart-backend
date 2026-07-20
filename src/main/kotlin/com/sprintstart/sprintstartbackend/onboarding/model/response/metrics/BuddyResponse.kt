@@ -7,6 +7,12 @@ import java.util.UUID
 data class MyBuddyResponse(
     val buddyId: UUID,
     val buddyName: String,
+    /**
+     * The buddy's GitHub handle, when they have declared one — the one concrete way to reach them
+     * this product already knows. Null when unknown, in which case the hire is pointed at their
+     * usual channel rather than a dead link.
+     */
+    val buddyGithubLogin: String?,
     val projectId: UUID,
     val assignedAt: Instant,
     val cadenceTargetDays: Int,
