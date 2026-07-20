@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.external
+﻿package com.sprintstart.sprintstartbackend.onboarding.external
 
 import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompetencySchema
@@ -18,14 +18,10 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeArtifac
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeKnowledgeRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeResult
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GraphProposalOutcome
-import com.sprintstart.sprintstartbackend.onboarding.external.model.HireCompetencySchema
-import com.sprintstart.sprintstartbackend.onboarding.external.model.MatchHireToPoolRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.MineStarterWorkRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ModuleProposalOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OrientationOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposeModuleRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedStarterTaskSchema
-import com.sprintstart.sprintstartbackend.onboarding.external.model.RankedStarterTaskSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
@@ -183,8 +179,8 @@ class OnboardingAiClient(
     /**
      * Assembles the orientation packet for one task from the project's existing material (#73/ai#31).
      *
-     * Unlike [proposeModule] this *is* on a hire's request path — it is what somebody reads while
-     * doing the task they just picked up — which is why the caller caches the result against the
+     * Unlike [proposeModule] this *is* on a hire's request path â€” it is what somebody reads while
+     * doing the task they just picked up â€” which is why the caller caches the result against the
      * task and sends [lastFingerprint] on every read: an unchanged corpus comes back `unchanged`
      * with no retrieval or LLM pass, and a corpus that has moved is re-assembled rather than
      * described from a packet that no longer matches the code.
@@ -193,7 +189,7 @@ class OnboardingAiClient(
      * task, so two people who claim it read the same packet and can talk about it.
      *
      * The AI service returns `skipped` with no packet when it cannot ground one. That is a real
-     * answer and must reach the hire as an honest empty state — never a fabricated packet.
+     * answer and must reach the hire as an honest empty state â€” never a fabricated packet.
      *
      * @param taskTitle The task the packet orients somebody for.
      * @param taskBody The task's description, when it has one.
@@ -385,32 +381,11 @@ class OnboardingAiClient(
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 
-    /**
-     * Ranks the starter-work pool by fit against one hire's competencies (Phase 4, #9).
-     *
-     * No LLM generation call on the AI side -- competency-key overlap is the primary score,
-     * embeddings only break ties -- so this is cheap enough to call on the hire's request path. A
-     * non-2xx response is wrapped in an [OnboardingAiException] carrying the upstream status/body.
-     *
-     * @param hireCompetencies The hire's freshly-built competencies (ledger).
-     * @param pool The backend's current (PM-approved) starter-work pool.
-     * @return The pool, ranked by fit, most relevant first.
-     */
-    suspend fun matchHireToPool(
-        hireCompetencies: List<HireCompetencySchema>,
-        pool: List<ProposedStarterTaskSchema>,
-    ): List<RankedStarterTaskSchema> =
-        try {
-            webClient
-                .post()
-                .uri(uri("/api/v1/onboarding/starter-work/match"))
-                .body(MatchHireToPoolRequest(hireCompetencies = hireCompetencies, pool = pool))
-                .sync()
-                .perform<List<RankedStarterTaskSchema>>()
-        } catch (@Suppress("SwallowedException") e: WebClientException) {
-            val msg = "Failed to match hire to starter-work pool (HTTP ${e.statusCode}): ${e.body}"
-            throw OnboardingAiException(e.statusCode, e.body, msg)
-        }
+    // `matchHireToPool` used to live here, calling the AI service's /starter-work/match. It is gone
+    // rather than left unused: #74 requires that a hire be told why a task was suggested, and an
+    // embedding tie-break cannot say -- so ranking moved into `StarterWorkMatcher`, which is
+    // deterministic, local and self-explaining. The AI service's /match endpoint now has no caller
+    // and is a candidate for removal in slice 5.
 
     /** Builds an absolute URI for [path] against the configured AI service base URL. */
     private fun uri(path: String): URI = URI.create("${applicationConfig.ai.baseUrl}$path")

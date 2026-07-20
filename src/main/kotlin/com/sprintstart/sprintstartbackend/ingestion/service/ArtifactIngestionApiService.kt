@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.ingestion.service
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredArtifact
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
+import com.sprintstart.sprintstartbackend.ingestion.external.RepositoryResponsiveness
 import com.sprintstart.sprintstartbackend.ingestion.external.TaskSourceArtifact
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
@@ -10,6 +11,7 @@ import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMetadat
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 
@@ -81,6 +83,40 @@ internal class ArtifactIngestionApiService(
                     labels = artifact.labels.toList(),
                 )
             }
+    }
+
+    @Transactional(readOnly = true)
+    override fun getRepositoryResponsiveness(projectId: UUID): List<RepositoryResponsiveness> {
+        return artifactRepository
+            .findAllByProjectIdAndArtifactType(projectId, ArtifactType.PULL_REQUEST)
+            .groupBy {
+                (artifactMetadataJsonMapper.fromJson(it.metadata) as? GithubArtifactMetadata)?.repositoryFullName
+            }.mapNotNull { (repository, pullRequests) ->
+                if (repository == null) return@mapNotNull null
+                // A pull request that was merged without a recorded response still got attention,
+                // so only one with neither is counted as unanswered.
+                val latencies = pullRequests.mapNotNull { hoursBetween(it.createdAtSource, it.firstResponseAtSource) }
+                val unanswered = pullRequests.count {
+                    it.firstResponseAtSource == null && it.mergedAtSource == null && it.createdAtSource != null
+                }
+                RepositoryResponsiveness(
+                    repositoryFullName = repository,
+                    medianHoursToFirstResponse = median(latencies),
+                    answeredCount = latencies.size,
+                    unansweredCount = unanswered,
+                )
+            }
+    }
+
+    private fun hoursBetween(from: Instant?, to: Instant?): Long? {
+        if (from == null || to == null) return null
+        return Duration.between(from, to).toHours()
+    }
+
+    private fun median(values: List<Long>): Long? {
+        if (values.isEmpty()) return null
+        val sorted = values.sorted()
+        return sorted[(sorted.size - 1) / 2]
     }
 
     @Transactional(readOnly = true)

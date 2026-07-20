@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.ingestion.repository
 
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactAiSyncState
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
@@ -12,7 +13,11 @@ import java.util.UUID
 
 /**
  * Persistence access for stored artifacts and project-scoped artifact searches.
+ *
+ * One method per distinct read the rest of the system needs; the count tracks how many questions
+ * are asked of artifacts, not a repository doing too many things.
  */
+@Suppress("TooManyFunctions")
 interface ArtifactRepository : JpaRepository<Artifact, UUID> {
     fun findBySourceId(sourceId: String): Artifact?
 
@@ -61,6 +66,27 @@ interface ArtifactRepository : JpaRepository<Artifact, UUID> {
     fun findAllByProjectIdAndAuthorLogin(
         @Param("projectId") projectId: UUID,
         @Param("authorLogin") authorLogin: String,
+    ): List<Artifact>
+
+    /**
+     * Returns every artifact of one type within a project.
+     *
+     * Used to characterise a project's *repositories* rather than one person's work — for example
+     * how long pull requests in each repo wait for their first response, which is a property of the
+     * people who review there and cannot be derived from any single author's artifacts.
+     */
+    @Query(
+        """
+            SELECT DISTINCT a
+            FROM Artifact a
+            JOIN a.projectIdsInternal p
+            WHERE p = :projectId
+                AND a.artifactType = :artifactType
+        """,
+    )
+    fun findAllByProjectIdAndArtifactType(
+        @Param("projectId") projectId: UUID,
+        @Param("artifactType") artifactType: ArtifactType,
     ): List<Artifact>
 
     fun countByAiSyncRunIdAndAiSyncState(runId: UUID, state: ArtifactAiSyncState): Long

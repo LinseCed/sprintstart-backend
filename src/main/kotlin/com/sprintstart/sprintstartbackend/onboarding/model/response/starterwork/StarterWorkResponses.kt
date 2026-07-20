@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import java.util.UUID
 
 data class StarterWorkTaskProposalResponse(
@@ -29,8 +30,19 @@ data class GenerateStarterWorkResponse(
     val notes: List<String>,
 )
 
+/**
+ * One pool task ranked for one hire.
+ *
+ * [reasons] is not decoration: matching is a *suggestion*, and a suggestion nobody can interrogate
+ * is an instruction. Each entry is one clause the client can render as "suggested because it …",
+ * strongest signal first, with any responsiveness warning last. An empty list means nothing matched
+ * and the task is only in the list because it is available — which is worth saying plainly rather
+ * than dressing up with an invented reason.
+ */
 data class RankedStarterWorkTaskResponse(
     val task: StarterWorkTaskProposalResponse,
     val score: Double,
     val matchedCompetencyKeys: List<String>,
+    val taskType: TaskType,
+    val reasons: List<String>,
 )

@@ -78,7 +78,37 @@ interface ArtifactIngestionApi {
      * @return The artifact's own text, or null when nothing with that source id is ingested.
      */
     fun getTaskSource(sourceId: String): TaskSourceArtifact?
+
+    /**
+     * How responsive each of a project's repositories is to pull requests.
+     *
+     * A property of the *repository*, not of any one author: it is derived from every ingested pull
+     * request in the project, so it describes the people who review there. That is the only honest
+     * grain available — ingestion records when a pull request first got a response, but not **who**
+     * responded, so per-person responsiveness cannot be computed today.
+     *
+     * @param projectId The project whose repositories to characterise.
+     * @return One entry per repository that has at least one ingested pull request.
+     */
+    fun getRepositoryResponsiveness(projectId: UUID): List<RepositoryResponsiveness>
 }
+
+/**
+ * How long a repository takes to answer a pull request, and how many go unanswered.
+ *
+ * Exists because "an unblocked task owned by someone who never answers is not an unblocked task":
+ * a newcomer's first contribution succeeding depends at least as much on somebody responding as on
+ * the task being well scoped.
+ *
+ * [medianHoursToFirstResponse] is null when no ingested pull request here has been answered at all
+ * — which is *worse* than a slow median, not unknown, and callers must not read it as "no data".
+ */
+data class RepositoryResponsiveness(
+    val repositoryFullName: String,
+    val medianHoursToFirstResponse: Long?,
+    val answeredCount: Int,
+    val unansweredCount: Int,
+)
 
 /**
  * The text of the artifact a task came from.

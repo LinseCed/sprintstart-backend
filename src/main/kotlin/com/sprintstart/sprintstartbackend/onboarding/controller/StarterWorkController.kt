@@ -146,9 +146,12 @@ class StarterWorkController(
      */
     @Operation(
         summary = "Get current user's starter-work matches",
-        description = "Ranks the approved starter-work pool by fit against the authenticated user's " +
-            "ledger competencies. Deterministic on the AI side: competency-key overlap is the primary " +
-            "score, embeddings only break ties.",
+        description = "Ranks the approved starter-work pool by fit for the authenticated user on a " +
+            "project. Deterministic and local — no AI call: competency overlap is one input among " +
+            "task type, prior involvement and label familiarity, and a repository that answers " +
+            "pull requests slowly demotes its tasks without ever hiding them. Every task carries " +
+            "the reasons it was suggested, because a suggestion nobody can interrogate is an " +
+            "instruction.",
     )
     @ApiResponses(
         value = [
@@ -161,10 +164,11 @@ class StarterWorkController(
     @ResponseStatus(HttpStatus.OK)
     @GetMapping("/me/matches")
     @PreAuthorize("hasRole('USER')")
-    suspend fun getMatchesForMe(
+    fun getMatchesForMe(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
-    ): List<RankedStarterWorkTaskResponse> = starterWorkTaskProposalService.matchForUser(jwt.subject)
+        @RequestParam projectId: UUID,
+    ): List<RankedStarterWorkTaskResponse> = starterWorkTaskProposalService.matchForUser(jwt.subject, projectId)
 
     /**
      * Claims an approved starter-work task as the authenticated hire's goal for a project.

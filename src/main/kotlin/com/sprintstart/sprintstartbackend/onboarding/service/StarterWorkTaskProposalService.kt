@@ -1,16 +1,16 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.model.HireCompetencySchema
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.GenerateStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.ProposedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
@@ -49,6 +49,8 @@ class StarterWorkTaskProposalService(
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val userCompetencyStateRepository: UserCompetencyStateRepository,
     private val competencyGraphVersionService: CompetencyGraphVersionService,
+    private val githubHistoryPriorService: GithubHistoryPriorService,
+    private val artifactIngestionApi: ArtifactIngestionApi,
     private val userApi: UserApi,
     transactionManager: PlatformTransactionManager,
 ) {
@@ -191,58 +193,129 @@ class StarterWorkTaskProposalService(
     }
 
     /**
-     * Ranks the current (APPROVED) starter-work pool by fit against the authenticated user's
-     * ledger competencies.
+     * Ranks the current (APPROVED) starter-work pool by fit for the authenticated user on a project.
      *
-     * No claiming/assignment state is tracked here -- this is a ranking view only, matching issue
-     * #9's scope ("match a hire -> task by the competencies they just built"). The AI call runs
-     * outside any transaction.
+     * **No longer an AI call.** Ranking used to delegate to the AI service, which scored competency
+     * overlap and broke ties on embeddings; #74 requires that a hire be told in one line why a task
+     * was suggested, and an embedding distance cannot say. The ranking is now deterministic, local
+     * and self-explaining (see [StarterWorkMatcher]) — which also takes a network round trip off a
+     * hire's request path.
+     *
+     * Project-scoped, unlike the previous version: two of the signals (prior involvement and
+     * repository responsiveness) are only meaningful inside one project's ingested corpus.
      *
      * @throws ResponseStatusException 404 if no user matches [authId].
      */
-    suspend fun matchForUser(authId: String): List<RankedStarterWorkTaskResponse> {
-        val (hireCompetencies, pool) = withContext(Dispatchers.IO) {
-            readTxTemplate.execute { loadMatchInput(authId) }!!
-        }
-        if (pool.isEmpty()) return emptyList()
-
-        val ranked = onboardingAiClient.matchHireToPool(hireCompetencies, pool.map { it.toSchema() })
-        val poolBySourceId = pool.associateBy { it.sourceId }
-        return ranked.mapNotNull { rankedTask ->
-            val proposal = poolBySourceId[rankedTask.task.sourceId] ?: return@mapNotNull null
-            RankedStarterWorkTaskResponse(
-                task = proposal.toResponse(),
-                score = rankedTask.score,
-                matchedCompetencyKeys = rankedTask.matchedCompetencyKeys,
-            )
-        }
-    }
-
-    private data class MatchInput(
-        val hireCompetencies: List<HireCompetencySchema>,
-        val pool: List<StarterWorkTaskProposal>,
-    )
-
-    private fun loadMatchInput(authId: String): MatchInput {
+    @Transactional(readOnly = true)
+    fun matchForUser(authId: String, projectId: UUID): List<RankedStarterWorkTaskResponse> {
         val userId = userApi.getUserIdByAuthId(authId).orElseThrow {
             ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId")
         }
-        // Level 0 means "unknown/not yet placed" -- such a ledger row is not a competency the
-        // hire has met, so it must not count toward fit.
-        val ledger = userCompetencyStateRepository.findAllByUserId(userId).filter { it.level > 0 }
-        val competenciesByKey = competencyRepository
-            .findAllByKeyIn(ledger.map { it.competencyKey })
-            .associateBy { it.key }
-        val hireCompetencies = ledger.mapNotNull { state ->
-            competenciesByKey[state.competencyKey]?.let {
-                HireCompetencySchema(key = it.key, label = it.label, description = it.description ?: "")
-            }
-        }
         val pool = starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED)
-        return MatchInput(hireCompetencies, pool)
+        if (pool.isEmpty()) return emptyList()
+
+        val profile = buildProfile(userId)
+        val responsivenessByRepo = artifactIngestionApi
+            .getRepositoryResponsiveness(projectId)
+            .associateBy { it.repositoryFullName }
+
+        return pool
+            .map { proposal ->
+                val features = featuresOf(proposal)
+                val responsiveness = features.repositoryFullName
+                    ?.let { responsivenessByRepo[it] }
+                    ?.let { StarterWorkMatcher.Responsiveness(it.medianHoursToFirstResponse, it.unansweredCount) }
+                val scored = StarterWorkMatcher.score(profile, features, responsiveness)
+                RankedStarterWorkTaskResponse(
+                    task = proposal.toResponse(),
+                    score = scored.score,
+                    matchedCompetencyKeys = scored.matchedCompetencyKeys,
+                    taskType = features.taskType,
+                    reasons = scored.reasons,
+                )
+            }
+            // Ties broken by the oldest task first, so the ranking is stable across calls rather
+            // than reshuffling equally-good suggestions every time the hire reloads.
+            .sortedWith(compareByDescending<RankedStarterWorkTaskResponse> { it.score }.thenBy { it.task.title })
     }
 
+    /**
+     * What is known about one hire, from data already held.
+     *
+     * The GitHub-history half is **consent-gated and may simply be absent**; an empty prior means
+     * *no evidence*, never "beginner" — the same rule the assessment interviewer follows, and for
+     * the same reason: otherwise the feature meant to help new joiners punishes them.
+     */
+    private fun buildProfile(userId: UUID): StarterWorkMatcher.HireProfile {
+        // Level 0 means "unknown/not yet placed" -- such a ledger row is not a competency the
+        // hire has met, so it must not count toward fit.
+        val competencyKeys = userCompetencyStateRepository
+            .findAllByUserId(userId)
+            .filter { it.level > 0 }
+            .map { it.competencyKey }
+            .toSet()
+
+        // Null when the hire never consented, which is a legitimate and common state.
+        val signals = githubHistoryPriorService.getPrior(userId)?.signals.orEmpty()
+        val repositories = signals.keys
+            .filter { it.startsWith(REPO_SIGNAL_PREFIX) }
+            .map { it.removePrefix(REPO_SIGNAL_PREFIX) }
+            .toSet()
+        val labels = signals.keys
+            .filter { it.startsWith(LABEL_SIGNAL_PREFIX) }
+            .map { it.removePrefix(LABEL_SIGNAL_PREFIX).lowercase() }
+            .toSet()
+
+        return StarterWorkMatcher.HireProfile(
+            competencyKeys = competencyKeys,
+            familiarRepositories = repositories,
+            familiarLabels = labels,
+            // Derived from the same labels rather than stored separately, so a hire's task-type
+            // familiarity and a task's type are always read off the same vocabulary.
+            familiarTaskTypes = labels
+                .mapNotNull { label ->
+                    TaskType.fromLabels(listOf(label)).takeIf { it != TaskType.OTHER }
+                }.toSet(),
+        )
+    }
+
+    /**
+     * The ranking features of one pool task.
+     *
+     * Labels and repository come from the **ingested issue**, not from the proposal row: mining
+     * stored a title, a summary and competency tags, but the issue's own labels are what the
+     * project actually says this work is. Falls back to no labels when the issue is no longer
+     * ingested, which costs the task its type signal rather than inventing one.
+     */
+    private fun featuresOf(proposal: StarterWorkTaskProposal): StarterWorkMatcher.TaskFeatures {
+        val source = artifactIngestionApi.getTaskSource(proposal.sourceId)
+        val labels = source
+            ?.labels
+            .orEmpty()
+            .map { it.lowercase() }
+            .toSet()
+        return StarterWorkMatcher.TaskFeatures(
+            competencyKeys = proposal.competencyKeys.toSet(),
+            taskType = TaskType.fromLabels(labels),
+            labels = labels,
+            repositoryFullName = repositoryOf(proposal.sourceId),
+        )
+    }
+
+    /**
+     * The `owner/name` a mined task's source id points at.
+     *
+     * Source ids are built by `SourceIdFactory` as `github:owner/name:TYPE:number`, so the
+     * repository is already in the identifier and needs no extra lookup.
+     */
+    private fun repositoryOf(sourceId: String): String? =
+        sourceId.split(':').getOrNull(1)?.takeIf { it.contains('/') }
+
     companion object {
+        /** Namespaces used by `GithubHistoryPrior.signals`; see that entity's docs. */
+        private const val REPO_SIGNAL_PREFIX = "repo:"
+        private const val LABEL_SIGNAL_PREFIX = "label:"
+
         /**
          * Derives a stable, deterministic competency key for the CONTRIBUTION node an approved
          * task becomes.
