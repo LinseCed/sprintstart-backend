@@ -44,6 +44,21 @@ data class AssessmentHistoryEntrySchema(
     val content: String,
 )
 
+/**
+ * The candidate competency keys one past question set out to probe.
+ *
+ * Accumulated by the backend across the session and re-sent on every turn, because the AI service
+ * holds no session state — same arrangement as [CandidateSignalSchema]. The transcript alone can't
+ * supply this: a question is prose, and only the response that produced it knows which keys it was
+ * aiming at. It is what lets the interviewer be refused a `done=true` that leaves candidates
+ * unprobed, instead of merely counting turns.
+ */
+@Serializable
+data class AssessmentTargetsSchema(
+    val turn: Int,
+    val keys: List<String>,
+)
+
 @Serializable
 data class AssessmentTurnRequest(
     @SerialName("candidate_competencies")
@@ -53,6 +68,7 @@ data class AssessmentTurnRequest(
     @SerialName("candidate_signal")
     val candidateSignal: CandidateSignalSchema = CandidateSignalSchema(),
     val history: List<AssessmentHistoryEntrySchema> = emptyList(),
+    val targets: List<AssessmentTargetsSchema> = emptyList(),
     val turn: Int,
     @SerialName("max_turns")
     val maxTurns: Int,
