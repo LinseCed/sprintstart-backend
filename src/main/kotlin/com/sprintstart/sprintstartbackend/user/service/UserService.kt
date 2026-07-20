@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.service
 
+import com.sprintstart.sprintstartbackend.config.KeycloakRoleMapper
 import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginSource
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.external.events.UserCreatedEvent
@@ -51,6 +52,8 @@ class UserService(
      */
     @Transactional
     fun getMe(jwt: Jwt): GetUserResponse {
+        val tokenRoles = jwt.realmRoles()
+
         val user = userRepository.findByAuthId(jwt.subject).orElseGet {
             val newUser = User(
                 authId = jwt.subject,
@@ -58,12 +61,23 @@ class UserService(
                 email = jwt.getClaimAsString("email"),
                 firstname = jwt.getClaimAsString("given_name") ?: "Unknown",
                 lastname = jwt.getClaimAsString("family_name") ?: "User",
-                roles = mutableSetOf(Role.USER),
+                roles = tokenRoles.ifEmpty { mutableSetOf(Role.USER) }.toMutableSet(),
             )
             val savedUser = userRepository.save(newUser)
             eventPublisher.publishEvent(UserCreatedEvent(savedUser.id))
             savedUser
         }
+
+        // Keycloak is authoritative for permission groups. Without this the local
+        // projection only ever tracks roles that arrived via a REALM_ROLE_MAPPING
+        // event, so a user created any other way (realm import, admin console while
+        // the backend was down) stays USER forever and loses every PM/HR/admin route.
+        if (tokenRoles.isNotEmpty() && tokenRoles != user.roles) {
+            user.roles.retainAll(tokenRoles)
+            user.roles.addAll(tokenRoles)
+            userRepository.save(user)
+        }
+
         return user.toGetResponse()
     }
 
@@ -220,4 +234,11 @@ class UserService(
         userRepository
             .findByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with authId: $authId not found") }
+}
+
+private fun Jwt.realmRoles(): Set<Role> {
+    val realmAccess = claims["realm_access"] as? Map<*, *> ?: return emptySet()
+    val roles = realmAccess["roles"] as? Collection<*> ?: return emptySet()
+
+    return KeycloakRoleMapper.mapRealmRoles(roles.filterIsInstance<String>())
 }
