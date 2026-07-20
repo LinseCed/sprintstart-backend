@@ -3,8 +3,6 @@ package com.sprintstart.sprintstartbackend.ingestion.service
 import com.sprintstart.sprintstartbackend.ingestion.ArtifactIngestionClient
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.request.RunArtifactsAiSyncRequest
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
-import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ingestion.ArtifactAiMapper
-import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -16,69 +14,52 @@ import java.util.UUID
 import kotlin.jvm.optionals.getOrElse
 
 /**
- * Sends the final AI indexing payload for a completed ingestion run.
+ * Removes a completed run's deleted artifacts from the AI index.
  *
- * The service builds one batch containing newly stored run artifacts and artifact ids that were
- * deleted during the same run and must be removed from the AI index. Database reads stay on
- * [Dispatchers.IO]; the HTTP call happens after the request is built.
+ * Indexing itself is no longer this service's job: artifacts are synced incrementally during the
+ * crawl by [ArtifactAiSyncService], so by the time a run finishes there is nothing left to batch.
+ * Deletions are the exception -- a deleted artifact has no row left to carry outbox state, so the
+ * ids are collected on the run (`artifactIdsToDeindex`) and flushed here, once, when the run ends.
  */
 @Service
 class RunArtifactsIngestionService(
     private val ingestionRunRepository: IngestionRunRepository,
-    private val artifactRepository: ArtifactRepository,
-    private val artifactAiMapper: ArtifactAiMapper,
     private val artifactIngestionClient: ArtifactIngestionClient,
     transactionManager: PlatformTransactionManager,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    // Reads plus the artifactAiMapper.toIngestRequest mapping must share one session: Artifact.labels
-    // is lazy, so mapping it after the session closes throws LazyInitializationException.
     private val readTxTemplate = TransactionTemplate(transactionManager).apply { isReadOnly = true }
 
     /**
-     * Loads the run output, skips empty runs, and dispatches the batched ingest/deindex request.
+     * Sends the run's deindex list to the AI service, if it has one.
      *
-     * Empty runs are intentionally ignored because there is nothing for the AI layer to index or
-     * remove. Repository reads (and the lazy-collection mapping they drive) are executed on
-     * [Dispatchers.IO] inside a read-only transaction before the outbound HTTP call.
-     *
-     * @param runId The completed ingestion run whose artifacts should be synced to AI.
+     * @param runId The finished ingestion run.
      * @throws IngestionRunNotFoundException when the run id does not exist.
      * @throws com.sprintstart.sprintstartbackend.upload.model.exceptions.IngestionResponseException
-     * when the AI ingestion service rejects the sync request.
+     * when the AI ingestion service rejects the request.
      */
-    suspend fun ingestRunArtifacts(runId: UUID) {
-        val request = withContext(Dispatchers.IO) {
-            readTxTemplate.execute { buildSyncRequest(runId) }
-        } ?: return
+    suspend fun deindexRunArtifacts(runId: UUID) {
+        val artifactIdsToDeindex = withContext(Dispatchers.IO) {
+            readTxTemplate.execute { loadDeindexIds(runId) }
+        }.orEmpty()
 
-        logger.info(
-            "Dispatching AI sync for run {}: {} to ingest, {} to deindex",
-            runId,
-            request.artifactsToIngest.size,
-            request.artifactsToDeindex.size,
+        if (artifactIdsToDeindex.isEmpty()) {
+            logger.info("Run {} deleted nothing, no deindex request needed", runId)
+            return
+        }
+
+        logger.info("Deindexing {} deleted artifact(s) for run {}", artifactIdsToDeindex.size, runId)
+        artifactIngestionClient.ingest(
+            RunArtifactsAiSyncRequest(artifactsToIngest = emptyList(), artifactsToDeindex = artifactIdsToDeindex),
         )
-        artifactIngestionClient.ingest(request)
-        logger.info("AI sync confirmed for run {}", runId)
     }
 
-    private fun buildSyncRequest(runId: UUID): RunArtifactsAiSyncRequest? {
+    private fun loadDeindexIds(runId: UUID): List<String> {
         val run = ingestionRunRepository
             .findWithArtifactIdsToDeindexById(runId)
             .getOrElse { throw IngestionRunNotFoundException(runId) }
 
-        val artifactsToIngest = artifactRepository.findAllByIngestionRunId(runId)
-        val artifactsToDeindex = run.artifactIdsToDeindex
-
-        if (artifactsToIngest.isEmpty() && artifactsToDeindex.isEmpty()) {
-            logger.info("Run {} has nothing for AI to sync, skipping", runId)
-            return null
-        }
-
-        return RunArtifactsAiSyncRequest(
-            artifactsToIngest = artifactsToIngest.map { artifactAiMapper.toIngestRequest(it) },
-            artifactsToDeindex = run.artifactIdsToDeindex,
-        )
+        return run.artifactIdsToDeindex.toList()
     }
 }

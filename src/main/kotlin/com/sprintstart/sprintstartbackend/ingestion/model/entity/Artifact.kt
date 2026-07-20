@@ -66,9 +66,42 @@ class Artifact(
     val ingestionRun: IngestionRun,
     @Column(name = "content_hash", length = 64)
     var hash: String?,
+    // --- AI sync outbox (see ArtifactAiSyncState) ---------------------------------------------
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_sync_state", nullable = false)
+    var aiSyncState: ArtifactAiSyncState = ArtifactAiSyncState.PENDING,
+    // The run that last marked this artifact pending -- not `ingestionRun`, which stays pinned to
+    // the run that first created the row. A run's AI-sync status is derived from this column, so
+    // an artifact updated by a later run reports against that later run.
+    @Column(name = "ai_sync_run_id")
+    var aiSyncRunId: UUID? = null,
+    @Column(name = "ai_sync_attempts", nullable = false)
+    var aiSyncAttempts: Int = 0,
+    // Earliest time the drainer may retry this artifact; null means "eligible now".
+    @Column(name = "ai_sync_next_attempt_at")
+    var aiSyncNextAttemptAt: Instant? = null,
+    @Column(name = "ai_sync_error", columnDefinition = "TEXT")
+    var aiSyncError: String? = null,
+    @Column(name = "ai_synced_at")
+    var aiSyncedAt: Instant? = null,
 ) {
     val projectIds: Set<UUID>
         get() = projectIdsInternal.toSet()
+
+    /**
+     * Marks this artifact as owed to the AI index again, attributed to [runId].
+     *
+     * Called on every change that alters what the AI service would embed (content, title, issue
+     * state, labels). The attempt budget and backoff are reset because this is a *new* version of
+     * the artifact, not a retry of the previous one.
+     */
+    fun markAiSyncPending(runId: UUID) {
+        aiSyncState = ArtifactAiSyncState.PENDING
+        aiSyncRunId = runId
+        aiSyncAttempts = 0
+        aiSyncNextAttemptAt = null
+        aiSyncError = null
+    }
 
     fun addProjectIds(projectIds: Set<UUID>) {
         projectIdsInternal.addAll(projectIds)

@@ -47,6 +47,7 @@ class UploadArtifactProviderService(
             if (artifact.hash != command.hash) {
                 artifact.content = command.content
                 artifact.hash = command.hash
+                artifact.markAiSyncPending(runId)
                 val ingestionRun = ingestionRunRepository.findByIdForUpdate(command.ingestionRunId).orElseThrow {
                     IngestionRunNotFoundException(command.ingestionRunId)
                 }
@@ -71,6 +72,7 @@ class UploadArtifactProviderService(
             hash = command.hash,
             createdAtSource = null,
             updatedAtSource = null,
+            aiSyncRunId = runId,
         )
         artifactRepository.save(artifact)
         ingestionRun.ingestedCount++
