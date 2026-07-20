@@ -148,35 +148,47 @@ class GithubClient(
      * @return a [DiscoverRepositoriesResponse] object containing the list of repositories belonging to the organization.
      * @throws WebClientException if there is an issue with the network or server response, such as a non-2xx status code.
      */
-    suspend fun discoverRepositoriesOfOrg(org: String, token: String): DiscoverRepositoriesResponse {
-        try {
-            val result = webClient
-                .get()
-                .uri("https://api.github.com/orgs/$org/repos")
-                .header("Authorization", "Bearer $token")
-                .header("Accept", "application/vnd.github+json")
-                .sync()
-                .perform<Array<DiscoveredRepository>>()
-            return DiscoverRepositoriesResponse(result.toList())
-        } catch (e: WebClientException) {
-            println(e.statusCode)
-            throw e
-        }
+    suspend fun discoverRepositoriesOfOrg(
+        org: String,
+        token: String,
+        page: Int,
+        pageSize: Int,
+    ): DiscoverRepositoriesResponse {
+        val uri = "https://api.github.com/orgs/$org/repos?per_page=$pageSize&page=${page + 1}"
+        return discoverRepositories(uri, token)
     }
 
-    suspend fun discoverRepositoriesOfUser(user: String, token: String): DiscoverRepositoriesResponse {
-        try {
-            val result = webClient
-                .get()
-                .uri("https://api.github.com/users/$user/repos")
-                .header("Authorization", "Bearer $token")
-                .sync()
-                .perform<Array<DiscoveredRepository>>()
-            return DiscoverRepositoriesResponse(result.toList())
-        } catch (e: WebClientException) {
-            println(e.statusCode)
-            throw e
-        }
+    /**
+     * Discovers repositories of a given GitHub user.
+     *
+     * This method queries the GitHub API to fetch repositories associated with the specified user.
+     * Authentication is performed using the provided personal access token (PAT).
+     *
+     * @param user the username of the GitHub user whose repositories are to be discovered.
+     * @param token the personal access token (PAT) used to authenticate the request to the GitHub API.
+     * @param page the zero-based index of the page to fetch.
+     * @param pageSize the number of repositories to fetch per page.
+     * @return a [DiscoverRepositoriesResponse] object containing the list of repositories belonging to the user.
+     * @throws WebClientException if there is an issue with the network or server response, such as a non-2xx status code.
+     */
+    suspend fun discoverRepositoriesOfUser(
+        user: String,
+        token: String,
+        page: Int,
+        pageSize: Int,
+    ): DiscoverRepositoriesResponse {
+        val uri = "https://api.github.com/users/$user/repos?per_page=$pageSize&page=${page + 1}"
+        return discoverRepositories(uri, token)
+    }
+
+    private suspend fun discoverRepositories(uri: String, token: String): DiscoverRepositoriesResponse {
+        val result = webClient
+            .get()
+            .uri(uri)
+            .header("Authorization", "Bearer $token")
+            .sync()
+            .perform<Array<DiscoveredRepository>>()
+        return DiscoverRepositoriesResponse(result.toList())
     }
 
     /**

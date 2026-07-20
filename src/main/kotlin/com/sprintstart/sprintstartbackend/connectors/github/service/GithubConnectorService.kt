@@ -8,7 +8,10 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.GithubReposit
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoriesRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.DiscoverRepositoriesRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.ConnectRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoverRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
@@ -29,11 +32,49 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
+import org.springframework.context.annotation.Lazy
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
+
+/**
+ * Service class responsible for orchestrating the connection of GitHub repositories.
+ *
+ * This orchestrator service is needed to keep the connection transactions scoped per repository.
+ * That means that each repository to connect will either be completely connected or not at all.
+ * The magic for this behavior lies in the `@Transactional()` annotation, however, that annotation only works via
+ * a service-level proxy, invoked at runtime. As [connectRepositoriesIfExist] just calls `connectRepositoryIfExists`,
+ * for each requested repository, doing this from within the same service would lead to the necessary proxy to not spin
+ * up, hence the transactions not to work. Therefore, this is done via this orchestrator class.
+ */
+@Service
+class GithubRepositoryConnectionOrchestrator(
+    private val connectorService: GithubConnectorService,
+) {
+    /**
+     * Attempts to connect a list of GitHub repositories if they exist. For each repository,
+     * a connection transaction is initiated and its transaction ID is recorded.
+     *
+     * @param authId The authentication identifier for the operation.
+     * @param request The request containing the list of repositories to connect.
+     * @return A response containing a mapping of repository identifiers in the format "owner/name"
+     * to their corresponding transaction IDs.
+     */
+    @Tracked("Attempting to connect a list of GitHub repositories")
+    suspend fun connectRepositoriesIfExist(
+        authId: String,
+        request: ConnectRepositoriesRequest,
+    ): ConnectRepositoriesResponse {
+        val transactionIdsByRepoIds = mutableMapOf<String, UUID>() // "owner/name" -> transactionId
+        request.repositories.forEach {
+            val transactionId = connectorService.connectRepositoryIfExists(authId, it)
+            transactionIdsByRepoIds["${it.owner}/${it.name}"] = transactionId
+        }
+        return ConnectRepositoriesResponse(transactionIdsByRepoIds)
+    }
+}
 
 /**
  * Handles the business logic of connecting and managing GitHub repositories.
@@ -54,6 +95,7 @@ class GithubConnectorService(
     private val githubClient: GithubClient,
     private val eventPublisher: ApplicationEventPublisher,
     private val userApi: UserApi,
+    @Lazy private val self: GithubConnectorService?,
 ) {
     /**
      * Retrieves all 'sources' in the connector overview sense.
@@ -96,63 +138,43 @@ class GithubConnectorService(
     }
 
     /**
-     * Discovers and retrieves the repositories of a GitHub organization.
+     * Discovers the GitHub repositories for a specific organization based on the provided request details.
      *
-     * This method fetches the repositories of the specified organization using the GitHub API, marks
-     * their connection and enabled statuses, and returns the discovery result.
-     *
-     * @param org The name of the GitHub organization whose repositories are to be discovered.
-     * @param authId The ID of the authentication token owner used to authorize the request.
-     * @param tokenName The name of the personal access token used for GitHub API authentication.
-     * @return A `DiscoverRepositoriesResponse` containing information on the discovered repositories,
-     *         including their connection and enabled statuses.
+     * @param request Contains the necessary details to retrieve the repositories, including the user ID,
+     * token name, repository owner, page number, and page size.
+     * @return A response containing the list of repositories and associated metadata.
+     * @throws GithubUserPatNotFoundException (404) if the personal access token (PAT) for the specified user ID
+     * and token name cannot be found.
      */
     @Transactional(readOnly = true)
     @Tracked("Discovering GitHub repositories of an organization")
-    suspend fun discoverRepositoriesOfOrg(
-        org: String,
-        authId: String,
-        tokenName: String,
-    ): DiscoverRepositoriesResponse {
+    suspend fun discoverRepositoriesOfOrg(request: DiscoverRepositoriesRequest): DiscoverRepositoriesResponse {
         val token = withContext(Dispatchers.IO) {
-            githubUserRepository.findById(GithubUserPat(authId, tokenName))
-        }.orElseThrow { GithubUserPatNotFoundException(tokenName, authId) }
+            githubUserRepository.findById(GithubUserPat(request.userId, request.tokenName))
+        }.orElseThrow { GithubUserPatNotFoundException(request.tokenName, request.userId) }
 
-        val result = githubClient.discoverRepositoriesOfOrg(org, token.token)
-        result.repositories.forEach {
-            val repo = repoConnectionRepository.findByOwnerAndName(org, it.name)
-            it.alreadyConnected = repo != null
-            it.isEnabled = repo?.sourceEnabled
-        }
-        return result
+        val result = githubClient.discoverRepositoriesOfOrg(request.owner, token.token, request.page, request.pageSize)
+        return withMetadata(request.owner, result)
     }
 
     /**
-     * Discovers the repositories of a specific GitHub user.
+     * Discovers the GitHub repositories for a specific user based on the provided request details.
      *
-     * @param user The username of the GitHub user whose repositories are to be discovered.
-     * @param authId The authentication ID associated with the GitHub user.
-     * @param tokenName The name of the token used for authentication.
-     * @return A response object containing the discovered repositories and their statuses.
+     * @param request Contains the necessary details to retrieve the repositories, including the user ID,
+     * token name, repository owner, page number, and page size.
+     * @return A response containing the list of repositories and associated metadata.
+     * @throws GithubUserPatNotFoundException (404) if the personal access token (PAT) for the specified user ID
+     * and token name cannot be found.
      */
     @Transactional(readOnly = true)
     @Tracked("Discovering GitHub repositories of a user")
-    suspend fun discoverRepositoriesOfUser(
-        user: String,
-        authId: String,
-        tokenName: String,
-    ): DiscoverRepositoriesResponse {
+    suspend fun discoverRepositoriesOfUser(request: DiscoverRepositoriesRequest): DiscoverRepositoriesResponse {
         val token = withContext(Dispatchers.IO) {
-            githubUserRepository.findById(GithubUserPat(authId, tokenName))
-        }.orElseThrow { GithubUserPatNotFoundException(tokenName, authId) }
+            githubUserRepository.findById(GithubUserPat(request.userId, request.tokenName))
+        }.orElseThrow { GithubUserPatNotFoundException(request.tokenName, request.userId) }
 
-        val result = githubClient.discoverRepositoriesOfUser(user, token.token)
-        result.repositories.forEach {
-            val repo = repoConnectionRepository.findByOwnerAndName(user, it.name)
-            it.alreadyConnected = repo != null
-            it.isEnabled = repo?.sourceEnabled
-        }
-        return result
+        val result = githubClient.discoverRepositoriesOfUser(request.owner, token.token, request.page, request.pageSize)
+        return withMetadata(request.owner, result)
     }
 
     /**
@@ -286,5 +308,24 @@ class GithubConnectorService(
         }
 
         return transactionId
+    }
+
+    /**
+     * Processes the repositories by updating their metadata to indicate connection status and source enablement.
+     *
+     * @param owner The owner of the repositories.
+     * @param repositories The response object containing a list of repositories to be updated with metadata.
+     * @return The updated response object with metadata applied to the repositories.
+     */
+    private suspend fun withMetadata(
+        owner: String,
+        repositories: DiscoverRepositoriesResponse,
+    ): DiscoverRepositoriesResponse {
+        repositories.repositories.forEach {
+            val repo = repoConnectionRepository.findByOwnerAndName(owner, it.name)
+            it.alreadyConnected = repo != null
+            it.isEnabled = repo?.sourceEnabled
+        }
+        return repositories
     }
 }
