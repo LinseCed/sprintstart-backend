@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS blueprint_competencies (
     target_level     INTEGER,
     requirement      VARCHAR(32)  NOT NULL DEFAULT 'RECOMMENDED',
     invariant        BOOLEAN      NOT NULL DEFAULT FALSE,
+    -- Why the proposer selected this competency. Review-facing only.
+    rationale        TEXT,
     position         INTEGER      NOT NULL,
     status           VARCHAR(32)  NOT NULL DEFAULT 'PROPOSED',
     decided_at       TIMESTAMPTZ,
@@ -39,7 +41,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_blueprint_competencies_key
 -- guessed at. A PM regenerates the baseline to get a real selection; nothing durable is lost,
 -- since progress lives on the competency ledger, never on a blueprint.
 INSERT INTO blueprint_competencies (
-    id, blueprint_id, competency_key, target_level, requirement, invariant, position,
+    id, blueprint_id, competency_key, target_level, requirement, invariant, rationale, position,
     status, decided_at, rejection_reason
 )
 SELECT DISTINCT ON (s.blueprint_id, s.competency_key)
@@ -49,6 +51,7 @@ SELECT DISTINCT ON (s.blueprint_id, s.competency_key)
        NULL,
        UPPER(COALESCE(s.requirement, 'recommended')),
        COALESCE(s.invariant, FALSE),
+       s.description,
        s.position,
        COALESCE(s.status, 'PROPOSED'),
        s.decided_at,

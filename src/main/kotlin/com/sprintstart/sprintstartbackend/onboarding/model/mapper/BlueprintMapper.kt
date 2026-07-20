@@ -28,6 +28,7 @@ fun BlueprintCompetency.toResponse(competency: Competency?): BlueprintCompetency
         targetLevelOverridden = targetLevel != null,
         requirement = requirement.wireValue(),
         invariant = invariant,
+        rationale = rationale,
         proposalId = id,
         status = status,
     )
@@ -66,6 +67,7 @@ fun Blueprint.toSchema(): BaselineSchema =
                 targetLevel = entry.targetLevel,
                 requirement = entry.requirement.wireValue(),
                 invariant = entry.invariant,
+                rationale = entry.rationale.orEmpty(),
             )
         },
         provenance = corpusFingerprint?.let { BlueprintProvenanceSchema(corpusFingerprint = it) },
