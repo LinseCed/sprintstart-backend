@@ -3,6 +3,14 @@ package com.sprintstart.sprintstartbackend.onboarding.external.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/**
+ * A step-shaped baseline entry, as path generation still consumes it.
+ *
+ * **Transitional.** A baseline no longer stores steps -- it stores a competency selection
+ * ([com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintCompetency]). These are
+ * derived from that selection at call time so the AI's per-user path generation keeps working
+ * unchanged; they are deleted along with the per-user step tree in backend#53.
+ */
 @Serializable
 data class BlueprintStepSchema(
     val id: String,
@@ -30,6 +38,7 @@ data class BlueprintProvenanceSchema(
     val notes: List<String> = emptyList(),
 )
 
+/** The transitional step-shaped blueprint payload path generation consumes. See [BlueprintStepSchema]. */
 @Serializable
 data class BlueprintSchema(
     val scope: String,

@@ -4,8 +4,8 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.BlueprintCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.BlueprintResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.BlueprintStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.blueprint.ProposedBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.BlueprintService
 import io.mockk.every
@@ -54,10 +54,19 @@ class BlueprintControllerTest(
     private val userJwt = jwtWithRoles("USER")
 
     private fun blueprintResponse(): BlueprintResponse =
-        BlueprintResponse(scope = "backend", version = "1", steps = emptyList())
+        BlueprintResponse(scope = "backend", version = "1", competencies = emptyList())
 
-    private fun blueprintStepResponse(id: UUID, status: ProposalStatus): BlueprintStepResponse =
-        BlueprintStepResponse(title = "Setup", proposalId = id, status = status)
+    private fun blueprintCompetencyResponse(id: UUID, status: ProposalStatus): BlueprintCompetencyResponse =
+        BlueprintCompetencyResponse(
+            competencyKey = "deploy-runbook",
+            label = "Deploy the service",
+            targetLevel = 2,
+            targetLevelOverridden = false,
+            requirement = "recommended",
+            invariant = false,
+            proposalId = id,
+            status = status,
+        )
 
     @Test
     fun `generateBlueprints should return 401 when not authenticated`() {
@@ -158,66 +167,67 @@ class BlueprintControllerTest(
     }
 
     @Test
-    fun `approveStep should return 200 for a PM`() {
+    fun `approveCompetency should return 200 for a PM`() {
         val id = UUID.randomUUID()
-        every { blueprintService.approveStep(id) } returns blueprintStepResponse(id, ProposalStatus.APPROVED)
+        every { blueprintService.approveCompetency(id) } returns
+            blueprintCompetencyResponse(id, ProposalStatus.APPROVED)
 
         mockMvc
-            .perform(post("/api/v1/onboarding/blueprints/steps/$id/approve").with(pmJwt))
+            .perform(post("/api/v1/onboarding/blueprints/competencies/$id/approve").with(pmJwt))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("APPROVED"))
     }
 
     @Test
-    fun `approveStep should return 404 when the step does not exist`() {
+    fun `approveCompetency should return 404 when the competency does not exist`() {
         val id = UUID.randomUUID()
-        every { blueprintService.approveStep(id) } throws
-            ResponseStatusException(HttpStatus.NOT_FOUND, "No blueprint step found with id: $id")
+        every { blueprintService.approveCompetency(id) } throws
+            ResponseStatusException(HttpStatus.NOT_FOUND, "No blueprint competency found with id: $id")
 
         mockMvc
-            .perform(post("/api/v1/onboarding/blueprints/steps/$id/approve").with(pmJwt))
+            .perform(post("/api/v1/onboarding/blueprints/competencies/$id/approve").with(pmJwt))
             .andExpect(status().isNotFound)
     }
 
     @Test
-    fun `approveStep should return 403 for a plain USER`() {
+    fun `approveCompetency should return 403 for a plain USER`() {
         mockMvc
-            .perform(post("/api/v1/onboarding/blueprints/steps/${UUID.randomUUID()}/approve").with(userJwt))
+            .perform(post("/api/v1/onboarding/blueprints/competencies/${UUID.randomUUID()}/approve").with(userJwt))
             .andExpect(status().isForbidden)
     }
 
     @Test
-    fun `approveStep should return 401 when not authenticated`() {
+    fun `approveCompetency should return 401 when not authenticated`() {
         mockMvc
-            .perform(post("/api/v1/onboarding/blueprints/steps/${UUID.randomUUID()}/approve"))
+            .perform(post("/api/v1/onboarding/blueprints/competencies/${UUID.randomUUID()}/approve"))
             .andExpect(status().isUnauthorized)
     }
 
     @Test
-    fun `rejectStep should return 200 for a PM`() {
+    fun `rejectCompetency should return 200 for a PM`() {
         val id = UUID.randomUUID()
-        every { blueprintService.rejectStep(id, "duplicates an existing step") } returns
-            blueprintStepResponse(id, ProposalStatus.REJECTED)
+        every { blueprintService.rejectCompetency(id, "not expected of everyone") } returns
+            blueprintCompetencyResponse(id, ProposalStatus.REJECTED)
 
         mockMvc
             .perform(
-                post("/api/v1/onboarding/blueprints/steps/$id/reject")
+                post("/api/v1/onboarding/blueprints/competencies/$id/reject")
                     .with(pmJwt)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(mapOf("reason" to "duplicates an existing step"))),
+                    .content(objectMapper.writeValueAsString(mapOf("reason" to "not expected of everyone"))),
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$.status").value("REJECTED"))
     }
 
     @Test
-    fun `rejectStep should return 409 when the step is invariant`() {
+    fun `rejectCompetency should return 409 when the competency is invariant`() {
         val id = UUID.randomUUID()
-        every { blueprintService.rejectStep(id, null) } throws
-            ResponseStatusException(HttpStatus.CONFLICT, "Cannot reject invariant step: $id")
+        every { blueprintService.rejectCompetency(id, null) } throws
+            ResponseStatusException(HttpStatus.CONFLICT, "Cannot reject invariant baseline entry: $id")
 
         mockMvc
             .perform(
-                post("/api/v1/onboarding/blueprints/steps/$id/reject")
+                post("/api/v1/onboarding/blueprints/competencies/$id/reject")
                     .with(pmJwt)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}"),
@@ -225,10 +235,10 @@ class BlueprintControllerTest(
     }
 
     @Test
-    fun `rejectStep should return 403 for a plain USER`() {
+    fun `rejectCompetency should return 403 for a plain USER`() {
         mockMvc
             .perform(
-                post("/api/v1/onboarding/blueprints/steps/${UUID.randomUUID()}/reject")
+                post("/api/v1/onboarding/blueprints/competencies/${UUID.randomUUID()}/reject")
                     .with(userJwt)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}"),
@@ -236,10 +246,10 @@ class BlueprintControllerTest(
     }
 
     @Test
-    fun `rejectStep should return 401 when not authenticated`() {
+    fun `rejectCompetency should return 401 when not authenticated`() {
         mockMvc
             .perform(
-                post("/api/v1/onboarding/blueprints/steps/${UUID.randomUUID()}/reject")
+                post("/api/v1/onboarding/blueprints/competencies/${UUID.randomUUID()}/reject")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}"),
             ).andExpect(status().isUnauthorized)

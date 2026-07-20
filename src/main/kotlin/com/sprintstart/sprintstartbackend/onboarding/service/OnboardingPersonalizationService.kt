@@ -11,7 +11,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toEntities
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toGetForUserResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toSchema
+import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toPathSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.OnboardingSseEvent
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
@@ -170,21 +170,33 @@ class OnboardingPersonalizationService(
         }
 
     /**
-     * Loads the ACTIVE blueprints for [scopes] within [projectId] and maps them to the wire schema
-     * the AI service consumes. For each scope the project's own ACTIVE blueprint wins; when the
-     * project has none, the unscoped (null-project) legacy/global blueprint is used as a fallback so
-     * projects without their own baseline yet still onboard. Scopes with neither are skipped. Must
-     * be called within a transaction so each blueprint's lazy steps can be read.
+     * Loads the ACTIVE baselines for [scopes] within [projectId] and derives the step-shaped
+     * payload the AI's path generation consumes from their competency selections. For each scope
+     * the project's own ACTIVE baseline wins; when the project has none, the unscoped
+     * (null-project) legacy/global baseline is used as a fallback so projects without their own
+     * baseline yet still onboard. Scopes with neither are skipped. Must be called within a
+     * transaction so each baseline's lazy entries can be read.
+     *
+     * The step shape is transitional -- see [toPathSchema]. Because every derived step comes from a
+     * selected competency, every generated step carries a competency key, and therefore gets a
+     * default check and an openable graph node.
      *
      * @param projectId The project whose baseline should be preferred.
-     * @param scopes A list of scopes to load active blueprints from.
+     * @param scopes A list of scopes to load active baselines from.
      */
-    private fun loadActiveBlueprints(projectId: UUID, scopes: List<String>): List<BlueprintSchema> =
-        scopes
-            .mapNotNull { scope ->
-                blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, scope, BlueprintStatus.ACTIVE)
-                    ?: blueprintRepository.findByProjectIdIsNullAndScopeAndStatus(scope, BlueprintStatus.ACTIVE)
-            }.map { it.toSchema() }
+    private fun loadActiveBlueprints(projectId: UUID, scopes: List<String>): List<BlueprintSchema> {
+        val blueprints = scopes.mapNotNull { scope ->
+            blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, scope, BlueprintStatus.ACTIVE)
+                ?: blueprintRepository.findByProjectIdIsNullAndScopeAndStatus(scope, BlueprintStatus.ACTIVE)
+        }
+        val keys = blueprints.flatMap { it.activeCompetencies() }.map { it.competencyKey }.toSet()
+        val competenciesByKey = if (keys.isEmpty()) {
+            emptyMap()
+        } else {
+            competencyRepository.findAllByKeyIn(keys).associateBy { it.key }
+        }
+        return blueprints.map { it.toPathSchema(competenciesByKey) }
+    }
 
     /**
      * Maps the user's competency ledger to the AI's skill schema: competency label (falling back

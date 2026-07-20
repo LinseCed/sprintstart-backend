@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.ArtifactEvid
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentHistoryEntrySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BaselineSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamRequest
@@ -82,19 +83,19 @@ class OnboardingAiClient(
     /**
      * Runs the AI service's batch blueprint generation job over the ingested corpus.
      *
-     * The AI service is stateless: [active] (the backend's current active blueprints)
+     * The AI service is stateless: [active] (the backend's current active baselines)
      * drives version numbering and lets the job skip an unchanged corpus. A non-2xx
      * response is wrapped in an [OnboardingAiException] carrying the upstream status/body.
      *
      * @param scopes The scopes to (re)generate, or `null` to refresh all known scopes.
-     * @param active The backend's currently-active blueprints for the requested scopes.
-     * @param activeCompetencies The backend's live competency graph; the AI tags each generated
-     *   step with the best-matching key from it (the blueprint->target bridge).
+     * @param active The backend's currently-active baselines for the requested scopes.
+     * @param activeCompetencies The backend's live competency graph -- the set the AI selects the
+     *   baseline from.
      * @return The per-scope generation outcomes returned by the AI service.
      */
     suspend fun generateBlueprints(
         scopes: List<String>?,
-        active: List<BlueprintSchema> = emptyList(),
+        active: List<BaselineSchema> = emptyList(),
         activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
     ): GenerateBlueprintsResponse =
         try {

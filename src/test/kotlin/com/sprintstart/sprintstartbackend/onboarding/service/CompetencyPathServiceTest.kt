@@ -6,8 +6,8 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKi
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Blueprint
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintCompetency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphChange
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphVersion
@@ -73,13 +73,27 @@ class CompetencyPathServiceTest {
     }
 
     /**
-     * Stubs the blueprint->target bridge to declare no keys, so the path falls back to targeting
-     * every visible competency -- the behavior these tests assert.
+     * Stubs the project's ACTIVE global baseline to select [keys], the targets the path aims at.
+     * There is no "all visible competencies" fallback: a path aims at what the PM selected.
      */
-    private fun stubBridgeFallsBackToAllVisible() {
+    private fun stubBaselineSelecting(vararg keys: String) {
         every { userApi.getProjectRolesForUser(userId, projectId) } returns emptyList()
+        val blueprint = Blueprint(
+            projectId = projectId,
+            scope = "global",
+            version = "1",
+            status = BlueprintStatus.ACTIVE,
+        )
+        keys.forEachIndexed { index, key ->
+            blueprint.competencies.add(
+                BlueprintCompetency(blueprint = blueprint, competencyKey = key, position = index),
+            )
+        }
         every { blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, any(), any()) } returns null
         every { blueprintRepository.findByProjectIdIsNullAndScopeAndStatus(any(), any()) } returns null
+        every {
+            blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, "global", BlueprintStatus.ACTIVE)
+        } returns blueprint
     }
 
     @Nested
@@ -88,7 +102,7 @@ class CompetencyPathServiceTest {
         fun `resolves the user and projects a path from the visible graph and their ledger`() {
             stubNoVerifications()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            stubBridgeFallsBackToAllVisible()
+            stubBaselineSelecting("git", "kotlin")
             every { competencyRepository.findAll() } returns listOf(
                 Competency(key = "git", label = "Git", kind = CompetencyKind.SKILL),
                 Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL),
@@ -123,7 +137,7 @@ class CompetencyPathServiceTest {
         fun `echoes the pinned version, not the live head, when structural changes are held back`() {
             stubNoVerifications()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            stubBridgeFallsBackToAllVisible()
+            stubBaselineSelecting("git", "kotlin")
             every { competencyRepository.findAll() } returns listOf(
                 Competency(key = "git", label = "Git", kind = CompetencyKind.SKILL),
             )
@@ -147,7 +161,7 @@ class CompetencyPathServiceTest {
         fun `lazily creates the graph pin at the current version on first call`() {
             stubNoVerifications()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            stubBridgeFallsBackToAllVisible()
+            stubBaselineSelecting("git", "kotlin")
             every { competencyRepository.findAll() } returns emptyList()
             every { competencyEdgeRepository.findAll() } returns emptyList()
             every { userCompetencyStateRepository.findAllByUserId(userId) } returns emptyList()
@@ -175,7 +189,7 @@ class CompetencyPathServiceTest {
         }
 
         @Test
-        fun `narrows the path to the competency keys the project blueprint declares`() {
+        fun `narrows the path to the competencies the project baseline selects`() {
             stubNoVerifications()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { userApi.getProjectRolesForUser(userId, projectId) } returns emptyList()
@@ -194,22 +208,16 @@ class CompetencyPathServiceTest {
                 CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "git"),
                 CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "kotlin"),
             )
-            // The project's global blueprint declares only "git" as a target, so "kotlin" -- though
-            // visible -- must not appear on the path.
+            // The project's global baseline selects only "git", so "kotlin" -- though visible --
+            // must not appear on the path.
             val blueprint = Blueprint(
                 projectId = projectId,
                 scope = "global",
                 version = "1",
                 status = BlueprintStatus.ACTIVE,
             )
-            blueprint.steps.add(
-                BlueprintStep(
-                    blueprint = blueprint,
-                    stepId = "s1",
-                    competencyKey = "git",
-                    title = "Learn Git",
-                    position = 0,
-                ),
+            blueprint.competencies.add(
+                BlueprintCompetency(blueprint = blueprint, competencyKey = "git", position = 0),
             )
             every {
                 blueprintRepository.findByProjectIdAndScopeAndStatus(projectId, "global", BlueprintStatus.ACTIVE)
@@ -224,7 +232,7 @@ class CompetencyPathServiceTest {
         fun `annotates a node with the step configured to teach-verify it`() {
             val stepId = UUID.randomUUID()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            stubBridgeFallsBackToAllVisible()
+            stubBaselineSelecting("git", "kotlin")
             every { competencyRepository.findAll() } returns listOf(
                 Competency(key = "git", label = "Git", kind = CompetencyKind.SKILL),
                 Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL),
