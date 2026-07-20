@@ -8,5 +8,7 @@ data class PatchUserRequest(
     val firstName: String? = null,
     val lastName: String? = null,
     val permissionGroup: Role? = null,
+    // Set by a PM/HR, so it is recorded as PM_CONFIRMED rather than the user's own claim.
+    val githubLogin: String? = null,
     val projectsId: Set<UUID> = emptySet(),
 )

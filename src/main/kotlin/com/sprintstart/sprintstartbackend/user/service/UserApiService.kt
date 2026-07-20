@@ -127,6 +127,10 @@ class UserApiService(
         }
 
     @Transactional(readOnly = true)
+    override fun getGithubLoginByUserId(userId: UUID): String? =
+        userRepository.findById(userId).map { it.githubLogin }.orElse(null)
+
+    @Transactional(readOnly = true)
     override fun getProjectRolesForUser(userId: UUID, projectId: UUID): List<ProjectRoleDto> {
         val assignment = projectUserAssignmentRepository.findByProjectIdAndUserId(projectId, userId)
             ?: return emptyList()

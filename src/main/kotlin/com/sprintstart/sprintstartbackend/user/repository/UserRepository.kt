@@ -25,6 +25,14 @@ interface UserRepository :
 
     fun existsByAuthId(authId: String): Boolean
 
+    /**
+     * Whether a *different* user already claims this GitHub login.
+     *
+     * Two users claiming the same account would make pull-request attribution ambiguous during
+     * artifact verification, so the login is unique.
+     */
+    fun existsByGithubLoginAndIdNot(githubLogin: String, id: UUID): Boolean
+
     @Query("select u.id from User u where u.authId = :authId")
     fun findIdByAuthId(authId: String): Optional<UUID>
 

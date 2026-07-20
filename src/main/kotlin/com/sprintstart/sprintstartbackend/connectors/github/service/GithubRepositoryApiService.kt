@@ -50,5 +50,6 @@ class GithubRepositoryApiService(
                 else -> null
             },
             commitMessages = commits?.nodes?.map { it.commit.message } ?: emptyList(),
+            authorLogin = author?.login?.lowercase(),
         )
 }

@@ -20,6 +20,8 @@ fun User.toGetResponse(): GetUserResponse =
         enabled = this.enabled,
         profileIcon = this.profileIcon,
         hasCompletedOnboarding = this.hasCompletedOnboarding,
+        githubLogin = this.githubLogin,
+        githubLoginSource = this.githubLoginSource,
     )
 
 fun User.effectivePermissionGroup(): Role {

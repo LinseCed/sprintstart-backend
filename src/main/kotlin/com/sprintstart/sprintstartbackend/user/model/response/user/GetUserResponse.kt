@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.model.response.user
 
+import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginSource
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import java.util.UUID
 
@@ -17,6 +18,8 @@ data class GetUserResponse(
     val enabled: Boolean,
     val profileIcon: String? = null,
     val hasCompletedOnboarding: Boolean,
+    val githubLogin: String? = null,
+    val githubLoginSource: GithubLoginSource? = null,
 )
 
 data class ProjectRoleSummary(

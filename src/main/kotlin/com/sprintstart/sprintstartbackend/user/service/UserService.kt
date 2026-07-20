@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.service
 
+import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginSource
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.external.events.UserCreatedEvent
 import com.sprintstart.sprintstartbackend.user.model.entity.User
@@ -30,6 +31,7 @@ class UserService(
     private val userRepository: UserRepository,
     private val eventPublisher: ApplicationEventPublisher,
     private val keycloakAdminClient: KeycloakAdminClient,
+    private val githubLoginService: GithubLoginService,
 ) {
     /**
      * Returns all persisted users.
@@ -91,6 +93,7 @@ class UserService(
         request.firstName?.let { user.firstname = it }
         request.lastName?.let { user.lastname = it }
         request.profileIcon?.let { user.profileIcon = it }
+        request.githubLogin?.let { githubLoginService.apply(user, it, GithubLoginSource.SELF_DECLARED) }
 
         return userRepository.save(user).toGetResponse()
     }
@@ -139,6 +142,7 @@ class UserService(
         request.email?.let { user.email = it }
         request.firstName?.let { user.firstname = it }
         request.lastName?.let { user.lastname = it }
+        request.githubLogin?.let { githubLoginService.apply(user, it, GithubLoginSource.PM_CONFIRMED) }
 
         // Todo: map this to PatchResponse
         val response = userRepository.save(user).toGetResponse()

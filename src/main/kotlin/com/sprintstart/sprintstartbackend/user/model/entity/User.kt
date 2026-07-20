@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.model.entity
 
+import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginSource
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import jakarta.persistence.CollectionTable
 import jakarta.persistence.Column
@@ -51,6 +52,15 @@ class User(
     val roles: MutableSet<Role> = mutableSetOf(),
     @Column(nullable = true)
     var avatarUrl: String? = null,
+    // The GitHub account this user contributes as. Artifact verification attributes a submitted
+    // pull request to a hire by comparing its author against this, so it is what makes the
+    // highest-rigor tier attributable at all -- see GithubLoginSource for how far it can be
+    // trusted. Null until the user (or a PM) fills it in.
+    @Column(name = "github_login", nullable = true, unique = true)
+    var githubLogin: String? = null,
+    @Enumerated(EnumType.STRING)
+    @Column(name = "github_login_source", nullable = true)
+    var githubLoginSource: GithubLoginSource? = null,
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "user_projects",
