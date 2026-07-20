@@ -1,6 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ChangeClassification
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ChangeType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
@@ -11,6 +13,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedComp
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedEdgeSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdgeProposal
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphChange
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyProposal
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRepository
@@ -214,6 +217,91 @@ class CompetencyProposalServiceTest {
 
             assertEquals(HttpStatus.CONFLICT, ex.statusCode)
             verify(exactly = 0) { competencyEdgeRepository.save(any()) }
+        }
+    }
+
+    @Nested
+    inner class ApproveBatch {
+        @Test
+        fun `creates nodes before edges and bumps the version exactly once`() {
+            val node = CompetencyProposal(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL)
+            val edge = CompetencyEdgeProposal(fromKey = "kotlin", toKey = "domain-model")
+            every { competencyProposalRepository.findById(node.id) } returns Optional.of(node)
+            every { competencyEdgeProposalRepository.findById(edge.id) } returns Optional.of(edge)
+            // "domain-model" is already live; "kotlin" only becomes live inside this batch, so
+            // the endpoint check passing at all depends on nodes being created first.
+            every { competencyRepository.existsByKey(any()) } returns true
+            every { competencyRepository.save(any<Competency>()) } answers { firstArg() }
+            every { competencyEdgeRepository.save(any()) } answers { firstArg() }
+            every { competencyGraphVersionService.bump() } returns 7
+
+            val result = service.approveBatch(listOf(node.id), listOf(edge.id))
+
+            assertEquals(1, result.competenciesApproved)
+            assertEquals(1, result.edgesApproved)
+            assertEquals(7, result.graphVersion)
+            assertEquals(ProposalStatus.APPROVED, node.status)
+            assertEquals(ProposalStatus.APPROVED, edge.status)
+            // One bump for the whole batch is the entire reason this endpoint exists: it is what
+            // lets GraphChangeClassifier see the edge's target as newly introduced and classify
+            // the subgraph ADDITIVE instead of STRUCTURAL.
+            verify(exactly = 1) { competencyGraphVersionService.bump() }
+            verify(exactly = 1) { competencyGraphVersionService.recordNodeAdded("kotlin") }
+            verify(exactly = 1) {
+                competencyGraphVersionService.recordEdgeAdded("kotlin", "domain-model", EdgeKind.PREREQUISITE)
+            }
+        }
+
+        @Test
+        fun `a node and the edge into it classify ADDITIVE when batched`() {
+            // The regression this endpoint exists for, asserted against the real classifier
+            // rather than a mock: approved separately these are two versions, and the edge's
+            // version is STRUCTURAL, so it is held back and the node can re-lock later.
+            val changes = listOf(
+                CompetencyGraphChange(version = 3, changeType = ChangeType.NODE_ADDED, competencyKey = "spring"),
+                CompetencyGraphChange(
+                    version = 3,
+                    changeType = ChangeType.EDGE_ADDED,
+                    fromKey = "kotlin",
+                    toKey = "spring",
+                    edgeKind = EdgeKind.PREREQUISITE,
+                ),
+            )
+            val competencies = mapOf(
+                "kotlin" to Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL),
+                "spring" to Competency(key = "spring", label = "Spring", kind = CompetencyKind.SKILL),
+            )
+
+            val classification = GraphChangeClassifier().classify(changes, competencies)
+
+            assertEquals(ChangeClassification.ADDITIVE, classification)
+        }
+
+        @Test
+        fun `rolls back the whole batch when one edge endpoint is missing`() {
+            val edge = CompetencyEdgeProposal(fromKey = "kotlin", toKey = "not-approved")
+            every { competencyEdgeProposalRepository.findById(edge.id) } returns Optional.of(edge)
+            every { competencyRepository.existsByKey("kotlin") } returns true
+            every { competencyRepository.existsByKey("not-approved") } returns false
+
+            val ex = assertThrows<ResponseStatusException> { service.approveBatch(emptyList(), listOf(edge.id)) }
+
+            assertEquals(HttpStatus.CONFLICT, ex.statusCode)
+            // A partially applied batch is exactly the split version this avoids, so nothing is
+            // bumped -- the transaction rolls the rest back.
+            verify(exactly = 0) { competencyGraphVersionService.bump() }
+        }
+
+        @Test
+        fun `409s when a proposal in the batch was already decided`() {
+            val node = CompetencyProposal(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL)
+            node.status = ProposalStatus.APPROVED
+            every { competencyProposalRepository.findById(node.id) } returns Optional.of(node)
+
+            val ex = assertThrows<ResponseStatusException> { service.approveBatch(listOf(node.id), emptyList()) }
+
+            assertEquals(HttpStatus.CONFLICT, ex.statusCode)
+            verify(exactly = 0) { competencyGraphVersionService.bump() }
         }
     }
 

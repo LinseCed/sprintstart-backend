@@ -29,9 +29,15 @@ data class EffectiveGraph(
  *
  * Change rows are replayed in version order to derive which keys/edges are currently visible;
  * [allCompetencies]/[allEdges] supply their live content (label, kind, etc.) -- this resolver
- * decides *whether* a node/edge is shown, not what a hidden node looked like historically, since
- * nothing can be modified today (only added) and Phase 5 graph-authoring will need to revisit
- * this once removal/modification is real.
+ * decides *whether* a node/edge is shown, never what it contained at some earlier version.
+ *
+ * **Consequence, now that PM graph authoring is real:** removal is deferrable but *modification is
+ * not*. A hidden `NODE_REMOVED` leaves the node in the visible set until the pin advances, which
+ * is the intended hold-back. A hidden `NODE_MODIFIED`, though, holds back nothing -- the key was
+ * already visible, and the content comes from [allCompetencies] live -- so an edited label, kind
+ * or **target level** reaches every hire immediately regardless of their pin, and raising a target
+ * level can re-lock a node that read as mastered. Deferring an edit would need per-version node
+ * content, which the change table does not carry.
  */
 @Service
 class EffectiveGraphResolver {

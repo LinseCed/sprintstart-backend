@@ -1,10 +1,19 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
+import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.ApproveGraphBatchRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyEdgeRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.RejectProposalRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.UpdateCompetencyRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.ApproveGraphBatchResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeProposalResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyProposalResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.DeleteCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.GenerateCompetencyGraphResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.ProposedCompetencyGraphResponse
+import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyGraphAuthoringService
 import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyProposalService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -12,20 +21,27 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1/onboarding/competency-graph")
-@Tag(name = "Onboarding - Competency Graph", description = "Manage AI-proposed competency graph nodes and edges")
+@Tag(
+    name = "Onboarding - Competency Graph",
+    description = "Review AI-proposed competency graph nodes and edges, and author the live graph directly",
+)
 class CompetencyGraphProposalController(
     private val competencyProposalService: CompetencyProposalService,
+    private val competencyGraphAuthoringService: CompetencyGraphAuthoringService,
 ) {
     /**
      * Triggers AI competency graph proposal generation over the ingested corpus.
@@ -171,5 +187,140 @@ class CompetencyGraphProposalController(
         @RequestBody(required = false) request: RejectProposalRequest?,
     ): CompetencyEdgeProposalResponse {
         return competencyProposalService.rejectEdge(id, request?.reason)
+    }
+
+    /**
+     * Approves a set of proposed nodes and edges as one graph version.
+     *
+     * Preferred over approving a node and then its edges individually: batched, the subgraph
+     * classifies ADDITIVE and reaches hires already wired, rather than the node arriving first as
+     * an orphan that can re-lock once its held-back edges land.
+     */
+    @Operation(
+        summary = "Approve proposed competencies and edges as one batch",
+        description = "Approves nodes and edges together so the whole subgraph lands in a single graph version",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Batch approved and created"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "One of the given proposals does not exist"),
+            ApiResponse(
+                responseCode = "409",
+                description = "A proposal is no longer PROPOSED, or an edge endpoint is neither live nor in the batch",
+            ),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/approve-batch")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun approveBatch(@RequestBody request: ApproveGraphBatchRequest): ApproveGraphBatchResponse {
+        return competencyProposalService.approveBatch(request.competencyProposalIds, request.edgeProposalIds)
+    }
+
+    /**
+     * Applies a PM's edit to a live competency node.
+     *
+     * The competency's `key` is not editable — it is the identity every ledger row, edge and
+     * module points at. The label is what a PM renames.
+     */
+    @Operation(
+        summary = "Edit a live competency",
+        description = "Updates a live competency's label, description, kind, target level or invariant flag",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Competency updated"),
+            ApiResponse(responseCode = "400", description = "Target level outside 1..4, or blank label"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "No live competency found with the given key"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PutMapping("/competencies/{key}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun updateCompetency(
+        @PathVariable key: String,
+        @RequestBody request: UpdateCompetencyRequest,
+    ): CompetencyResponse {
+        return competencyGraphAuthoringService.updateCompetency(key, request)
+    }
+
+    /**
+     * Removes a competency and every edge touching it from the live graph.
+     *
+     * The node leaves every hire's path, but nobody loses a competency they already earned: the
+     * ledger is independent of graph visibility, and this records the removal rather than
+     * deleting anything.
+     */
+    @Operation(
+        summary = "Remove a competency from the graph",
+        description = "Removes a competency and its edges from the live graph; earned ledger entries are kept",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Competency removed from the graph"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "No live competency found with the given key"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @DeleteMapping("/competencies/{key}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun deleteCompetency(@PathVariable key: String): DeleteCompetencyResponse {
+        return competencyGraphAuthoringService.deleteCompetency(key)
+    }
+
+    /**
+     * Adds a hand-authored edge between two live competencies.
+     */
+    @Operation(
+        summary = "Add a competency edge",
+        description = "Adds a hand-authored edge between two live competencies",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Edge created"),
+            ApiResponse(responseCode = "400", description = "Self-edge, or the edge would create a prerequisite cycle"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "An endpoint is not a live competency"),
+            ApiResponse(responseCode = "409", description = "The edge already exists"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/edges")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun createEdge(@RequestBody request: CreateCompetencyEdgeRequest): CompetencyEdgeResponse {
+        return competencyGraphAuthoringService.createEdge(request)
+    }
+
+    /**
+     * Removes one edge from the live graph, leaving both endpoints in place.
+     */
+    @Operation(
+        summary = "Remove a competency edge",
+        description = "Removes one edge from the live graph; both endpoint competencies are kept",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Edge removed"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "No such edge in the live graph"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @DeleteMapping("/edges")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun deleteEdge(
+        @RequestParam fromKey: String,
+        @RequestParam toKey: String,
+        @RequestParam(defaultValue = "PREREQUISITE") kind: EdgeKind,
+    ): CompetencyEdgeResponse {
+        return competencyGraphAuthoringService.deleteEdge(fromKey, toKey, kind)
     }
 }
