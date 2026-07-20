@@ -42,6 +42,7 @@ class OnboardingMetricsService(
     private val projectMembershipApi: ProjectMembershipApi,
     private val artifactIngestionApi: ArtifactIngestionApi,
     private val userGoalRepository: UserGoalRepository,
+    private val environmentReadinessService: EnvironmentReadinessService,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     /**
@@ -117,6 +118,7 @@ class OnboardingMetricsService(
             displayName = member.displayName,
             githubLogin = login,
             joinedAt = member.joinedAt,
+            envReadyAt = environmentReadinessService.readyAtFor(member, projectId),
             firstTaskClaimedAt = goalClaimedAt,
             firstPullRequestOpenedAt = opened,
             firstResponseAt = firstPullRequest?.firstResponseAt,
