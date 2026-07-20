@@ -61,6 +61,7 @@ class OnboardingMetricsControllerTest(
             displayName = "Ada",
             githubLogin = "ada",
             joinedAt = null,
+            envReadyAt = null,
             firstTaskClaimedAt = null,
             firstPullRequestOpenedAt = null,
             firstResponseAt = null,
