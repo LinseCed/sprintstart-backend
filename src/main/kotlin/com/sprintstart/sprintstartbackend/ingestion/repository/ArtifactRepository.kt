@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.repository
 
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactAiSyncState
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
@@ -16,6 +17,33 @@ interface ArtifactRepository : JpaRepository<Artifact, UUID> {
     fun findBySourceId(sourceId: String): Artifact?
 
     fun findAllByIngestionRunId(runId: UUID): MutableList<Artifact>
+
+    /**
+     * Returns the next artifacts owed to the AI index, oldest first.
+     *
+     * Drives the incremental AI sync drainer: artifacts become `PENDING` as soon as they are
+     * created or changed, so this deliberately spans runs -- a crawl that is still fetching has
+     * pending artifacts worth embedding right now, and an artifact updated by a later run is owed
+     * again even though its `ingestionRun` still points at the run that first created it.
+     *
+     * @param now Cut-off for the retry backoff; artifacts with no `aiSyncNextAttemptAt` are always
+     * eligible.
+     * @param pageable Caps the batch size (page 0 only -- drained rows leave the result set).
+     */
+    @Query(
+        """
+            SELECT a
+            FROM Artifact a
+            WHERE a.aiSyncState = com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactAiSyncState.PENDING
+                AND (a.aiSyncNextAttemptAt IS NULL OR a.aiSyncNextAttemptAt <= :now)
+            ORDER BY a.aiSyncNextAttemptAt ASC NULLS FIRST, a.ingestedAt ASC
+        """,
+    )
+    fun findPendingAiSync(@Param("now") now: Instant, pageable: Pageable): List<Artifact>
+
+    fun countByAiSyncRunIdAndAiSyncState(runId: UUID, state: ArtifactAiSyncState): Long
+
+    fun findAllByAiSyncRunIdAndAiSyncState(runId: UUID, state: ArtifactAiSyncState): List<Artifact>
 
     /**
      * Returns one artifact page limited to artifacts linked to the given project.

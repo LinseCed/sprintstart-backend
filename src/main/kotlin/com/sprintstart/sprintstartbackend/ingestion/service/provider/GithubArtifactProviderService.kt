@@ -12,6 +12,7 @@ import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepositor
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
+import java.util.UUID
 
 /**
  * Owns writes to the ingestion artifact store and the mutable parts of `IngestionRun`.
@@ -51,79 +52,23 @@ class GithubArtifactProviderService(
     fun persistArtifact(command: GithubArtifactCommand) {
         val runId = command.ingestionRunId
         val projectIds = githubRepositoryApi.getRepositoryProjectIdsById(command.metadata.repositoryId).toMutableSet()
-        var artifact: Artifact?
-        when (command.artifactType) {
-            ArtifactType.COMMIT,
-            -> {
-                artifact = artifactRepository.findBySourceId(command.sourceId)
-                if (artifact != null) {
-                    artifact.addProjectIds(projectIds)
-                    return
-                }
-            }
 
-            ArtifactType.FILE,
-            -> {
-                artifact = artifactRepository.findBySourceId(command.sourceId)
-                if (artifact != null) {
-                    artifact.addProjectIds(projectIds)
-                    if (artifact.hash != command.hash) {
-                        artifact.content = command.bodyText
-                        artifact.hash = command.hash
-                        val ingestionRun = ingestionRunRepository.findByIdForUpdate(runId).orElseThrow {
-                            IngestionRunNotFoundException(runId)
-                        }
-                        ingestionRun.updatedCount++
-                    }
-                    return
-                }
+        val existing = artifactRepository.findBySourceId(command.sourceId)
+        if (existing != null) {
+            existing.addProjectIds(projectIds)
+            when (command.artifactType) {
+                ArtifactType.COMMIT -> Unit
+                ArtifactType.FILE -> updateFile(existing, command, runId)
+                ArtifactType.ISSUE -> updateIssue(existing, command, runId)
+                ArtifactType.PULL_REQUEST -> updatePullRequest(existing, command, runId)
             }
-
-            ArtifactType.ISSUE,
-            -> {
-                artifact = artifactRepository.findBySourceId(command.sourceId)
-                if (artifact != null) {
-                    artifact.addProjectIds(projectIds)
-                    // State/labels are refreshed unconditionally, independent of the content
-                    // hash: an issue being closed or re-labeled doesn't change its title/body, so
-                    // gating this on hash equality (like title/content below) would silently miss
-                    // exactly the updates this exists for.
-                    artifact.state = command.state
-                    artifact.labels.clear()
-                    artifact.labels.addAll(command.labels)
-                    if (artifact.hash != command.hash) {
-                        artifact.title = command.title
-                        artifact.content = command.bodyText
-                        artifact.hash = command.hash
-                        val ingestionRun = ingestionRunRepository.findByIdForUpdate(runId).orElseThrow {
-                            IngestionRunNotFoundException(runId)
-                        }
-                        ingestionRun.updatedCount++
-                    }
-                    return
-                }
-            }
-
-            ArtifactType.PULL_REQUEST,
-            -> {
-                artifact = artifactRepository.findBySourceId(command.sourceId)
-                if (artifact != null) {
-                    artifact.addProjectIds(projectIds)
-                    artifact.title = command.title
-                    artifact.content = command.bodyText
-                    val ingestionRun = ingestionRunRepository.findByIdForUpdate(runId).orElseThrow {
-                        IngestionRunNotFoundException(runId)
-                    }
-                    ingestionRun.updatedCount++
-                    return
-                }
-            }
+            return
         }
 
         val ingestionRun = ingestionRunRepository.findByIdForUpdate(runId).orElseThrow {
             IngestionRunNotFoundException(runId)
         }
-        artifact = Artifact(
+        val artifact = Artifact(
             sourceSystem = command.sourceSystem,
             sourceId = command.sourceId,
             sourceUrl = command.sourceUrl,
@@ -140,9 +85,74 @@ class GithubArtifactProviderService(
             metadata = artifactMetadataJsonMapper.toJson(command.metadata),
             createdAtSource = null,
             updatedAtSource = null,
+            aiSyncRunId = runId,
         )
         artifactRepository.save(artifact)
         ingestionRun.ingestedCount++
+    }
+
+    /** Files are content-addressed: nothing to do unless the incoming hash differs. */
+    private fun updateFile(artifact: Artifact, command: GithubArtifactCommand, runId: UUID) {
+        if (artifact.hash == command.hash) {
+            return
+        }
+
+        artifact.content = command.bodyText
+        artifact.hash = command.hash
+        artifact.markAiSyncPending(runId)
+        countUpdate(runId)
+    }
+
+    /**
+     * Issues carry two independently changing parts: the hashed title/body, and `state`/`labels`.
+     *
+     * State and labels are refreshed regardless of the hash -- an issue being closed or re-labeled
+     * doesn't move its title/body, so gating them on hash equality would silently miss exactly the
+     * updates they exist for. They are compared first rather than overwritten blindly, because both
+     * are part of the AI payload: writing them unconditionally would mark every issue for
+     * re-embedding on every crawl.
+     */
+    private fun updateIssue(artifact: Artifact, command: GithubArtifactCommand, runId: UUID) {
+        val metadataChanged = artifact.state != command.state || artifact.labels != command.labels
+        artifact.state = command.state
+        artifact.labels.clear()
+        artifact.labels.addAll(command.labels)
+
+        if (artifact.hash != command.hash) {
+            artifact.title = command.title
+            artifact.content = command.bodyText
+            artifact.hash = command.hash
+            artifact.markAiSyncPending(runId)
+            countUpdate(runId)
+            return
+        }
+
+        if (metadataChanged) {
+            artifact.markAiSyncPending(runId)
+        }
+    }
+
+    /**
+     * Pull requests are treated as mutable and overwritten on every re-fetch (they carry no hash).
+     *
+     * The AI index only cares when the embedded text actually moved, though -- re-queuing every
+     * pull request on every crawl would keep the whole backlog permanently pending.
+     */
+    private fun updatePullRequest(artifact: Artifact, command: GithubArtifactCommand, runId: UUID) {
+        if (artifact.title != command.title || artifact.content != command.bodyText) {
+            artifact.markAiSyncPending(runId)
+        }
+
+        artifact.title = command.title
+        artifact.content = command.bodyText
+        countUpdate(runId)
+    }
+
+    private fun countUpdate(runId: UUID) {
+        val ingestionRun = ingestionRunRepository.findByIdForUpdate(runId).orElseThrow {
+            IngestionRunNotFoundException(runId)
+        }
+        ingestionRun.updatedCount++
     }
 
     /**
