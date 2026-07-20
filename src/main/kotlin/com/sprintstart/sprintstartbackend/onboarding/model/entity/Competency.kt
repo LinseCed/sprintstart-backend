@@ -41,6 +41,30 @@ class Competency(
     // classify as ChangeClassification.INVARIANT, pushing immediately regardless of shape.
     @Column(nullable = false)
     var invariant: Boolean = false,
+    /**
+     * The proficiency rank (1..4) a user must reach for this node to count as met.
+     *
+     * Node levels are *target-level and binary*: a node is met or it isn't, and this is the bar.
+     * Without it the projection had nothing to compare a ledger entry against and treated any
+     * non-zero level as mastery -- so a hire assessed as `beginner` was shown as done.
+     *
+     * Defaults to [DEFAULT_TARGET_LEVEL] (intermediate) because `beginner` is the level the
+     * interviewer records when it has the least to go on; a bar of 1 would make every such
+     * placement instantly master the node, which is the bug this column exists to fix. PMs author
+     * real per-node bars via graph editing.
+     */
+    @Column(name = "target_level", nullable = false)
+    var targetLevel: Int = DEFAULT_TARGET_LEVEL,
     @Column(nullable = false)
     val createdAt: Instant = Instant.now(),
-)
+) {
+    companion object {
+        /**
+         * The bar a competency gets until a PM authors one: intermediate (rank 2).
+         *
+         * Deliberately above `beginner`, which is what the interviewer records when it has the
+         * least evidence to go on.
+         */
+        const val DEFAULT_TARGET_LEVEL = 2
+    }
+}

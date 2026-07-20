@@ -19,6 +19,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencySt
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
@@ -81,9 +82,16 @@ class AssessmentService(
     suspend fun startAssessment(authId: String): StartAssessmentResponse {
         val userId = resolveUserId(authId)
 
-        withContext(Dispatchers.IO) {
-            readTxTemplate.execute { findResumableSession(userId) }
-        }?.let { return it }
+        // Reserve the session *before* the slow AI call. Resuming used to be checked against state
+        // that only existed after it, so a second start issued while the first was still generating
+        // saw nothing to resume and created its own -- four sessions for one assessment, three of
+        // them stranded IN_PROGRESS with a question nobody ever saw.
+        val reserved = withContext(Dispatchers.IO) {
+            txTemplate.execute { reserveSession(userId) }!!
+        }
+        reserved.openQuestion?.let {
+            return StartAssessmentResponse(sessionId = reserved.sessionId, question = it)
+        }
 
         val candidates = withContext(Dispatchers.IO) {
             readTxTemplate.execute { loadCandidateCompetencies() }.orEmpty()
@@ -101,15 +109,54 @@ class AssessmentService(
         val question = aiResponse.question ?: throw badGateway("start")
 
         return withContext(Dispatchers.IO) {
-            txTemplate.execute {
-                val session = SkillAssessmentSession(userId = userId)
-                session.turns.add(
-                    SkillAssessmentTurn(session = session, turnIndex = 0, question = question),
-                )
-                skillAssessmentSessionRepository.save(session)
-                StartAssessmentResponse(sessionId = session.id, question = question)
-            }!!
+            txTemplate.execute { openFirstTurn(reserved.sessionId, question) }!!
         }
+    }
+
+    private data class ReservedSession(
+        val sessionId: UUID,
+        val openQuestion: String?,
+    )
+
+    /**
+     * Returns the user's single in-progress session, creating an empty one if they have none.
+     *
+     * Runs in its own short write transaction so it is the serialization point for concurrent
+     * starts: whoever gets there first creates the row, everyone else finds it. A session reserved
+     * this way has no turn yet -- [openFirstTurn] fills that in once the interviewer answers.
+     */
+    private fun reserveSession(userId: UUID): ReservedSession {
+        val existing = skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+            userId,
+            SkillAssessmentSessionStatus.IN_PROGRESS,
+        )
+        if (existing != null) {
+            return ReservedSession(existing.id, existing.turns.lastOrNull { it.answer == null }?.question)
+        }
+
+        val session = skillAssessmentSessionRepository.save(SkillAssessmentSession(userId = userId))
+        return ReservedSession(session.id, null)
+    }
+
+    /**
+     * Writes the first question onto a reserved session, unless a racing start already did.
+     *
+     * Two concurrent starts can both reach the interviewer; only one question is kept, so both
+     * callers see the same interview rather than one silently overwriting the other's turn.
+     */
+    private fun openFirstTurn(sessionId: UUID, question: String): StartAssessmentResponse {
+        val session = skillAssessmentSessionRepository.findByIdOrNull(sessionId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Assessment session no longer exists")
+
+        session.turns.lastOrNull { it.answer == null }?.let {
+            return StartAssessmentResponse(sessionId = session.id, question = it.question)
+        }
+
+        session.turns.add(
+            SkillAssessmentTurn(session = session, turnIndex = session.turns.size, question = question),
+        )
+        session.updatedAt = Instant.now()
+        return StartAssessmentResponse(sessionId = session.id, question = question)
     }
 
     /**
@@ -161,7 +208,7 @@ class AssessmentService(
                     val validKeys = candidates.map { it.key }.toSet()
                     for (result in aiResponse.assessments.orEmpty()) {
                         if (result.key !in validKeys) continue
-                        writeCompetencyState(userId, result.key, result.level)
+                        writeCompetencyState(userId, result.key, result.level, result.confidence)
                     }
                     session.status = SkillAssessmentSessionStatus.COMPLETED
                     AnswerAssessmentResponse(done = true, question = null)
@@ -243,8 +290,8 @@ class AssessmentService(
      * re-assessment never lowers an already-recorded level -- reconciliation's "never un-earns
      * progress" invariant applies to the ledger itself, not just graph changes.
      */
-    private fun writeCompetencyState(userId: UUID, competencyKey: String, level: String) {
-        val rank = LEVEL_RANKS[level.trim().lowercase()] ?: 0
+    private fun writeCompetencyState(userId: UUID, competencyKey: String, level: String, confidence: Double) {
+        val rank = placementRank(level, confidence)
         val existing = userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, competencyKey)
         if (existing != null) {
             if (existing.source == CompetencySource.VERIFIED) return
@@ -263,6 +310,24 @@ class AssessmentService(
         }
     }
 
+    /**
+     * The rank a placement is allowed to record.
+     *
+     * A level the interviewer is not confident about is recorded as `0` -- "we asked, and saw no
+     * competence" -- rather than as the level it guessed. The interviewer is explicitly instructed
+     * to answer `beginner` with low confidence when a candidate says "I don't know", so without
+     * this floor a hire who told us they know nothing is credited with the competency.
+     *
+     * `0` is a real state elsewhere in the ledger (known-but-unplaced, filtered out of matching),
+     * so this records that the assessment happened without claiming a skill.
+     */
+    private fun placementRank(level: String, confidence: Double): Int {
+        if (confidence < MIN_PLACEMENT_CONFIDENCE) {
+            return 0
+        }
+        return LEVEL_RANKS[level.trim().lowercase()] ?: 0
+    }
+
     private fun resolveUserId(authId: String): UUID =
         userApi
             .getUserIdByAuthId(authId)
@@ -276,6 +341,10 @@ class AssessmentService(
 
     private companion object {
         const val MAX_TURNS = 6
+
+        // Below this, a placement records 0 rather than the level it guessed. The interviewer uses
+        // low confidence precisely to mean "no evidence either way".
+        const val MIN_PLACEMENT_CONFIDENCE = 0.4
 
         // Aligned 1:1 with the AI SKILL_LEVELS (beginner..expert -> 1..4); unknown -> 0.
         val LEVEL_RANKS = mapOf(

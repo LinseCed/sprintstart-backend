@@ -111,6 +111,8 @@ class AssessmentServiceTest {
                 AssessmentTurnResponse(done = false, question = "Walk me through a Kotlin null-safety pitfall.")
             val savedSlot = slot<SkillAssessmentSession>()
             every { skillAssessmentSessionRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
+            // The session is reserved first, then re-read to write its first turn onto.
+            every { skillAssessmentSessionRepository.findById(any()) } answers { Optional.of(savedSlot.captured) }
 
             val result = service.startAssessment(authId)
 
@@ -119,6 +121,49 @@ class AssessmentServiceTest {
             assertEquals(1, savedSlot.captured.turns.size)
             assertEquals(0, savedSlot.captured.turns[0].turnIndex)
             assertNull(savedSlot.captured.turns[0].answer)
+        }
+
+        @Test
+        fun `reuses the in-progress session instead of creating a second one`() = runTest {
+            setUpUser()
+            val reserved = SkillAssessmentSession(userId = userId)
+            every {
+                skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                    userId,
+                    SkillAssessmentSessionStatus.IN_PROGRESS,
+                )
+            } returns reserved
+            every { skillAssessmentSessionRepository.findById(reserved.id) } returns Optional.of(reserved)
+            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            coEvery { onboardingAiClient.assessTurn(any()) } returns
+                AssessmentTurnResponse(done = false, question = "q")
+
+            val result = service.startAssessment(authId)
+
+            // The session is reserved before the AI call, so a start racing another one joins it
+            // rather than creating the stranded duplicates this replaced.
+            assertEquals(reserved.id, result.sessionId)
+            verify(exactly = 0) { skillAssessmentSessionRepository.save(any()) }
+        }
+
+        @Test
+        fun `keeps the question a racing start already wrote`() = runTest {
+            setUpUser()
+            val reserved = SkillAssessmentSession(userId = userId)
+            reserved.turns.add(
+                SkillAssessmentTurn(session = reserved, turnIndex = 0, question = "the first question"),
+            )
+            every {
+                skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                    userId,
+                    SkillAssessmentSessionStatus.IN_PROGRESS,
+                )
+            } returns reserved
+
+            val result = service.startAssessment(authId)
+
+            assertEquals("the first question", result.question)
+            coVerify(exactly = 0) { onboardingAiClient.assessTurn(any()) }
         }
 
         @Test
@@ -141,6 +186,8 @@ class AssessmentServiceTest {
                 AssessmentTurnResponse(done = false, question = "q")
             val savedSlot = slot<SkillAssessmentSession>()
             every { skillAssessmentSessionRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
+            // The session is reserved first, then re-read to write its first turn onto.
+            every { skillAssessmentSessionRepository.findById(any()) } answers { Optional.of(savedSlot.captured) }
 
             service.startAssessment(authId)
 
@@ -162,6 +209,8 @@ class AssessmentServiceTest {
                 AssessmentTurnResponse(done = false, question = "q")
             val savedSlot = slot<SkillAssessmentSession>()
             every { skillAssessmentSessionRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
+            // The session is reserved first, then re-read to write its first turn onto.
+            every { skillAssessmentSessionRepository.findById(any()) } answers { Optional.of(savedSlot.captured) }
 
             service.startAssessment(authId)
 
@@ -248,6 +297,35 @@ class AssessmentServiceTest {
             assertEquals("kotlin", savedSlot.captured.competencyKey)
             assertEquals(3, savedSlot.captured.level)
             assertEquals(CompetencySource.ASSESSED, savedSlot.captured.source)
+        }
+
+        @Test
+        fun `records level 0 when the interviewer has no confidence in the placement`() = runTest {
+            setUpUser()
+            val session = sessionWithOpenTurn()
+            every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
+            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            coEvery { onboardingAiClient.assessTurn(any()) } returns
+                AssessmentTurnResponse(
+                    done = true,
+                    assessments = listOf(
+                        AssessmentResultSchema(
+                            key = "kotlin",
+                            level = "beginner",
+                            confidence = 0.1,
+                            evidence = "Candidate said they did not know.",
+                        ),
+                    ),
+                )
+            every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns null
+            val saved = slot<UserCompetencyState>()
+            every { userCompetencyStateRepository.save(capture(saved)) } answers { saved.captured }
+
+            service.answerAssessment(authId, session.id, "i dont know, i am a beginner")
+
+            // "I don't know" reaches us as beginner/low-confidence. Recording rank 1 would credit
+            // the hire with a competency they just told us they lack -- and the ledger is monotonic.
+            assertEquals(0, saved.captured.level)
         }
 
         @Test
