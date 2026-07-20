@@ -136,6 +136,7 @@ class BlueprintService(
                         targetLevel = entry.targetLevel?.takeIf { it in VALID_TARGET_LEVELS },
                         requirement = BlueprintRequirement.fromWire(entry.requirement),
                         invariant = entry.invariant,
+                        rationale = entry.rationale.takeIf { it.isNotBlank() },
                         position = index,
                     ),
                 )
@@ -225,6 +226,7 @@ class BlueprintService(
                     targetLevel = entry.targetLevel,
                     requirement = entry.requirement,
                     invariant = entry.invariant,
+                    rationale = entry.rationale,
                     position = entry.position,
                     status = entry.status,
                     decidedAt = entry.decidedAt,
