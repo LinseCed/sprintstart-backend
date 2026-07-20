@@ -9,6 +9,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkTaskProposalService
+import com.sprintstart.sprintstartbackend.onboarding.service.UserGoalService
 import io.mockk.coEvery
 import io.mockk.every
 import org.junit.jupiter.api.Test
@@ -37,6 +38,9 @@ class StarterWorkControllerTest(
 ) {
     @MockkBean
     private lateinit var starterWorkTaskProposalService: StarterWorkTaskProposalService
+
+    @MockkBean
+    private lateinit var userGoalService: UserGoalService
 
     @MockkBean
     private lateinit var jwtDecoder: JwtDecoder

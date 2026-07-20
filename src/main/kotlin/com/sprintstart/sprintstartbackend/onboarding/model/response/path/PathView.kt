@@ -38,4 +38,36 @@ data class PathView(
     val nodes: List<PathNode>,
     val edges: List<PathEdge>,
     val graphVersion: Int,
+    /**
+     * The contribution this path aims at, or `null` when the hire hasn't claimed one.
+     *
+     * Named in the payload rather than left for a client to infer by scanning for
+     * [CompetencyKind.CONTRIBUTION]: more than one contribution node can be on a path (the
+     * project's baseline may select some), and only this one is *theirs*. A client that guessed
+     * from `kind` would have no way to tell which.
+     *
+     * `null` is a real state with a next action ("pick something to work toward"), not a failure.
+     */
+    val goal: GoalView? = null,
+)
+
+/**
+ * The contribution a hire is working toward, and how far off it is.
+ *
+ * [remainingCount] counts the nodes on the path standing between the hire and this goal -- its
+ * unmet transitive prerequisites -- so a client can show progress toward *the destination* rather
+ * than toward the whole graph, which is what the north star actually measures.
+ */
+data class GoalView(
+    val competencyKey: String,
+    val label: String,
+    val summary: String? = null,
+    /** The underlying issue, so a hire can read the actual task. */
+    val sourceUrl: String? = null,
+    /** The starter-work proposal that minted this node, for fetching its full detail. */
+    val sourceProposalId: UUID? = null,
+    /** Prerequisites of this goal the hire has not yet met. */
+    val remainingCount: Int = 0,
+    /** Whether every prerequisite is cleared, so the contribution itself can be started. */
+    val isReachable: Boolean = false,
 )

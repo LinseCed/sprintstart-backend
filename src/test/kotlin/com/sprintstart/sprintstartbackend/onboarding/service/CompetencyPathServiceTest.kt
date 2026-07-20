@@ -4,16 +4,19 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.ChangeClassi
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ChangeType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Blueprint
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintCompetency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphChange
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphVersion
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGoal
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGraphPin
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
@@ -22,6 +25,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphC
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphVersionRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyModuleRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGraphPinRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
@@ -52,6 +56,8 @@ class CompetencyPathServiceTest {
     private val verificationRepository: VerificationRepository = mockk()
     private val competencyModuleRepository: CompetencyModuleRepository = mockk()
     private val blueprintRepository: BlueprintRepository = mockk()
+    private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository = mockk(relaxed = true)
+    private val userGoalService: UserGoalService = mockk()
     private val userApi: UserApi = mockk()
     private val service = CompetencyPathService(
         competencyRepository,
@@ -66,6 +72,9 @@ class CompetencyPathServiceTest {
         verificationRepository,
         competencyModuleRepository,
         blueprintRepository,
+        starterWorkTaskProposalRepository,
+        userGoalService,
+        GraphTraversalService(),
         userApi,
     )
 
@@ -77,6 +86,14 @@ class CompetencyPathServiceTest {
         every { competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE) } returns
             emptyList()
         every { verificationRepository.findAllByModuleIdIn(any()) } returns emptyList()
+        // Most cases are "hire hasn't claimed a goal"; the goal cases override this.
+        every { userGoalService.findForUser(userId, projectId, any()) } returns null
+    }
+
+    /** Stubs the hire as having claimed [key] as their goal for this project. */
+    private fun stubGoal(key: String) {
+        every { userGoalService.findForUser(userId, projectId, any()) } returns
+            UserGoal(userId = userId, projectId = projectId, competencyKey = key)
     }
 
     /**
@@ -237,6 +254,7 @@ class CompetencyPathServiceTest {
 
         @Test
         fun `points a node at the live module that teaches it`() {
+            every { userGoalService.findForUser(userId, projectId, any()) } returns null
             val moduleId = UUID.randomUUID()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubBaselineSelecting("git", "kotlin")
@@ -285,6 +303,156 @@ class CompetencyPathServiceTest {
             assertThat(result.nodes.first { it.key == "kotlin" }.verificationType)
                 .isEqualTo(VerificationType.ATTEST)
             assertThat(result.nodes.first { it.key == "git" }.verificationType).isNull()
+        }
+    }
+
+    @Nested
+    inner class Goal {
+        /**
+         * kotlin -> spring -> ship-it, plus an unrelated "policy" node.
+         * The goal is `ship-it`; `policy` is only on the path if the baseline selects it.
+         */
+        private fun stubGraph() {
+            every { competencyRepository.findAll() } returns listOf(
+                Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL),
+                Competency(key = "spring", label = "Spring", kind = CompetencyKind.SKILL),
+                Competency(key = "policy", label = "Security policy", kind = CompetencyKind.POLICY),
+                Competency(key = "ship-it", label = "Fix the login redirect", kind = CompetencyKind.CONTRIBUTION),
+            )
+            every { competencyEdgeRepository.findAll() } returns listOf(
+                CompetencyEdge(fromKey = "kotlin", toKey = "spring", kind = EdgeKind.PREREQUISITE),
+                CompetencyEdge(fromKey = "spring", toKey = "ship-it", kind = EdgeKind.PREREQUISITE),
+            )
+            every { competencyGraphVersionService.currentVersion() } returns 3
+            every { userGraphPinRepository.findByUserId(userId) } returns
+                UserGraphPin(userId = userId, pinnedVersion = 3)
+            every { competencyGraphVersionRepository.findAllByVersionGreaterThanOrderByVersionAsc(3) } returns
+                emptyList()
+            every { competencyGraphChangeRepository.findAll() } returns listOf(
+                CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "kotlin"),
+                CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "spring"),
+                CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "policy"),
+                CompetencyGraphChange(version = 1, changeType = ChangeType.NODE_ADDED, competencyKey = "ship-it"),
+                CompetencyGraphChange(
+                    version = 1,
+                    changeType = ChangeType.EDGE_ADDED,
+                    fromKey = "kotlin",
+                    toKey = "spring",
+                    edgeKind = EdgeKind.PREREQUISITE,
+                ),
+                CompetencyGraphChange(
+                    version = 1,
+                    changeType = ChangeType.EDGE_ADDED,
+                    fromKey = "spring",
+                    toKey = "ship-it",
+                    edgeKind = EdgeKind.PREREQUISITE,
+                ),
+            )
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { userCompetencyStateRepository.findAllByUserId(userId) } returns emptyList()
+        }
+
+        @Test
+        fun `narrows the path to the goal and its prerequisites`() {
+            stubNoModules()
+            stubGraph()
+            stubBaselineSelecting()
+            stubGoal("ship-it")
+
+            val result = service.getPathForMe(authId, projectId)
+
+            // The whole chain to the goal, and nothing else -- "policy" leads nowhere near it
+            // and no baseline entry asks for it.
+            assertThat(result.nodes.map { it.key })
+                .containsExactlyInAnyOrder("kotlin", "spring", "ship-it")
+            assertThat(result.nodes.map { it.key }).doesNotContain("policy")
+        }
+
+        @Test
+        fun `keeps baseline competencies that the goal does not require`() {
+            stubNoModules()
+            stubGraph()
+            // The PM mandates "policy" for everyone; it is not a prerequisite of this goal.
+            stubBaselineSelecting("policy")
+            stubGoal("ship-it")
+
+            val result = service.getPathForMe(authId, projectId)
+
+            // Union, not replacement: aiming at a contribution must not drop what the team
+            // requires of everybody.
+            assertThat(result.nodes.map { it.key })
+                .containsExactlyInAnyOrder("kotlin", "spring", "ship-it", "policy")
+        }
+
+        @Test
+        fun `names the goal in the payload`() {
+            stubNoModules()
+            stubGraph()
+            stubBaselineSelecting()
+            stubGoal("ship-it")
+
+            val result = service.getPathForMe(authId, projectId)
+
+            // Named, not inferred: more than one CONTRIBUTION node can be on a path, and only
+            // this one is theirs.
+            assertThat(result.goal).isNotNull
+            assertThat(result.goal!!.competencyKey).isEqualTo("ship-it")
+            assertThat(result.goal!!.label).isEqualTo("Fix the login redirect")
+        }
+
+        @Test
+        fun `counts only the goal's own unmet prerequisites as remaining`() {
+            stubNoModules()
+            stubGraph()
+            stubBaselineSelecting("policy")
+            stubGoal("ship-it")
+
+            val result = service.getPathForMe(authId, projectId)
+
+            // kotlin and spring block the goal; the mandated "policy" node is real work but is
+            // not between this hire and shipping this contribution.
+            assertThat(result.goal!!.remainingCount).isEqualTo(2)
+            assertThat(result.goal!!.isReachable).isFalse()
+        }
+
+        @Test
+        fun `reports the goal reachable once its prerequisites are met`() {
+            stubNoModules()
+            stubGraph()
+            stubBaselineSelecting()
+            stubGoal("ship-it")
+            every { userCompetencyStateRepository.findAllByUserId(userId) } returns listOf(
+                UserCompetencyState(
+                    userId = userId,
+                    competencyKey = "kotlin",
+                    level = 4,
+                    source = CompetencySource.VERIFIED,
+                ),
+                UserCompetencyState(
+                    userId = userId,
+                    competencyKey = "spring",
+                    level = 4,
+                    source = CompetencySource.VERIFIED,
+                ),
+            )
+
+            val result = service.getPathForMe(authId, projectId)
+
+            assertThat(result.goal!!.remainingCount).isEqualTo(0)
+            assertThat(result.goal!!.isReachable).isTrue()
+        }
+
+        @Test
+        fun `leaves the goal null and the path at the baseline when nothing is claimed`() {
+            stubNoModules()
+            stubGraph()
+            stubBaselineSelecting("policy")
+
+            val result = service.getPathForMe(authId, projectId)
+
+            // "No goal yet" is a real state with a next action, not a fallback to everything.
+            assertThat(result.goal).isNull()
+            assertThat(result.nodes.map { it.key }).containsExactly("policy")
         }
     }
 }
