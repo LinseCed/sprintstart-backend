@@ -6,19 +6,15 @@ import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModulePageKind
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.NodeState
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeResult
-import com.sprintstart.sprintstartbackend.onboarding.external.model.LessonContentSchema
-import com.sprintstart.sprintstartbackend.onboarding.external.model.LessonOutcome
-import com.sprintstart.sprintstartbackend.onboarding.external.model.LessonProvenanceSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhase
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingStep
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.ModulePage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.VerificationAttempt
@@ -27,7 +23,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.verification.
 import com.sprintstart.sprintstartbackend.onboarding.model.request.verification.UpsertVerificationRequest
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyModuleRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingStepRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationAttemptRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
@@ -50,13 +45,11 @@ import java.util.Optional
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class VerificationServiceTest {
     private val verificationRepository: VerificationRepository = mockk()
     private val verificationAttemptRepository: VerificationAttemptRepository = mockk()
-    private val onboardingStepRepository: OnboardingStepRepository = mockk()
     private val competencyModuleRepository: CompetencyModuleRepository = mockk()
     private val competencyRepository: CompetencyRepository = mockk()
     private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
@@ -68,7 +61,6 @@ class VerificationServiceTest {
     private val service = VerificationService(
         verificationRepository,
         verificationAttemptRepository,
-        onboardingStepRepository,
         competencyModuleRepository,
         competencyRepository,
         userCompetencyStateRepository,
@@ -99,35 +91,44 @@ class VerificationServiceTest {
         every { userApi.getGithubLoginByUserId(userId) } returns "octocat"
     }
 
-    private fun makeStep(
-        status: StepStatus = StepStatus.WAITING,
+    private val projectId = UUID.randomUUID()
+
+    /** A live module with one lesson page, which is what grading uses as grounded evidence. */
+    private fun makeModule(
         content: String? = null,
-    ): OnboardingStep {
-        val path = OnboardingPath(userId = userId, projectId = UUID.randomUUID())
-        val phase = OnboardingPhase(path = path, position = 0, title = "P", description = "d")
-        return OnboardingStep(
-            phase = phase,
-            position = 0,
-            title = "Learn Kotlin",
-            description = "d",
-            type = StepType.DOCUMENT,
-            estimatedMinutes = 10,
-            expectedOutcome = "e",
+        status: ModuleStatus = ModuleStatus.ACTIVE,
+    ): CompetencyModule {
+        val module = CompetencyModule(
+            competencyKey = "kotlin",
+            projectId = projectId,
+            version = 1,
             status = status,
-            content = content,
+            title = "Learn Kotlin",
         )
+        if (content != null) {
+            module.pages.add(
+                ModulePage(
+                    module = module,
+                    kind = ModulePageKind.LESSON,
+                    title = "Lesson",
+                    body = content,
+                    position = 0,
+                ),
+            )
+        }
+        return module
     }
 
     private fun makeVerification(
         type: VerificationType,
-        stepId: UUID,
+        moduleId: UUID,
         rubric: String? = null,
         canonicalAnswer: String? = null,
         repositoryConnectionId: UUID? = null,
         competencyKey: String = "kotlin",
         level: String = "beginner",
     ) = Verification(
-        stepId = stepId,
+        moduleId = moduleId,
         type = type,
         prompt = "Explain it",
         rubric = rubric,
@@ -137,15 +138,30 @@ class VerificationServiceTest {
         level = level,
     )
 
+    /**
+     * Stubs the reads a module submission makes: the live module, membership, and its check.
+     *
+     * The check is looked up twice on a submission -- once in the read transaction that builds the
+     * grading context, and again by id in the write transaction, because grading happens between
+     * the two and the row may have changed under it.
+     */
+    private fun stubModule(module: CompetencyModule, verification: Verification?) {
+        every { competencyModuleRepository.findById(module.id) } returns Optional.of(module)
+        every { userApi.userHasAccessToProject(authId, projectId) } returns true
+        every { verificationRepository.findByModuleId(module.id) } returns verification
+        if (verification != null) {
+            every { verificationRepository.findById(verification.id) } returns Optional.of(verification)
+        }
+    }
+
     @Nested
     inner class SubmitAttemptForMe {
         @Test
-        fun `EXACT pass writes VERIFIED ledger entry and finishes the step without calling the AI`() = runTest {
-            val step = makeStep()
-            val verification = makeVerification(VerificationType.EXACT, step.id, canonicalAnswer = "Chroma")
+        fun `EXACT pass writes a VERIFIED ledger entry, and nothing else, without calling the AI`() = runTest {
+            val module = makeModule()
+            val verification = makeVerification(VerificationType.EXACT, module.id, canonicalAnswer = "Chroma")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 3
             every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns null
@@ -153,10 +169,9 @@ class VerificationServiceTest {
             every { userCompetencyStateRepository.save(capture(savedState)) } answers { savedState.captured }
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
-            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("chroma"))
+            val result = service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("chroma"))
 
             assertTrue(result.passed)
-            assertEquals(StepStatus.FINISHED, step.status)
             assertEquals(CompetencySource.VERIFIED, savedState.captured.source)
             assertEquals(1, savedState.captured.level)
             assertEquals(3, result.graphVersion)
@@ -164,55 +179,34 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `EXACT fail logs an attempt with a hint and leaves the step unfinished`() = runTest {
-            val step = makeStep(status = StepStatus.IN_PROGRESS)
-            val verification = makeVerification(VerificationType.EXACT, step.id, canonicalAnswer = "Chroma")
+        fun `EXACT fail logs an attempt with a hint and writes no ledger entry`() = runTest {
+            val module = makeModule()
+            val verification = makeVerification(VerificationType.EXACT, module.id, canonicalAnswer = "Chroma")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 1
             val savedAttempt = slot<VerificationAttempt>()
             every { verificationAttemptRepository.save(capture(savedAttempt)) } answers { savedAttempt.captured }
 
-            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("pinecone"))
+            val result = service.submitModuleAttemptForMe(
+                authId,
+                module.id,
+                SubmitVerificationAttemptRequest("pinecone"),
+            )
 
             assertFalse(result.passed)
-            assertEquals(StepStatus.IN_PROGRESS, step.status)
             assertFalse(savedAttempt.captured.passed)
             assertThat(savedAttempt.captured.hint).isNotNull()
             verify(exactly = 0) { userCompetencyStateRepository.save(any()) }
         }
 
         @Test
-        fun `test-out - passing on a never-started step finishes it directly`() = runTest {
-            val step = makeStep(status = StepStatus.WAITING)
-            assertNull(step.startedAt)
-            val verification = makeVerification(VerificationType.ATTEST, step.id)
-            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
-            every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
-            every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns null
-            every { userCompetencyStateRepository.save(any()) } answers { firstArg() }
-            every { verificationAttemptRepository.save(any()) } answers { firstArg() }
-
-            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("I understand"))
-
-            assertTrue(result.passed)
-            assertEquals(StepStatus.FINISHED, step.status)
-            assertThat(step.startedAt).isNotNull()
-            assertThat(step.completedAt).isNotNull()
-        }
-
-        @Test
         fun `KNOWLEDGE delegates grading to the AI client`() = runTest {
-            val step = makeStep(content = "Kotlin is null-safe.")
-            val verification = makeVerification(VerificationType.KNOWLEDGE, step.id, rubric = "mentions null-safety")
+            val module = makeModule(content = "Kotlin is null-safe.")
+            val verification = makeVerification(VerificationType.KNOWLEDGE, module.id, rubric = "mentions null-safety")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery {
@@ -228,7 +222,7 @@ class VerificationServiceTest {
             every { userCompetencyStateRepository.save(any()) } answers { firstArg() }
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
-            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("ans"))
+            val result = service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("ans"))
 
             assertTrue(result.passed)
             coVerify(exactly = 1) { onboardingAiClient.gradeKnowledge(any(), any(), any(), any(), any()) }
@@ -236,18 +230,17 @@ class VerificationServiceTest {
 
         @Test
         fun `KNOWLEDGE surfaces 503 when the AI service is unavailable, without persisting an attempt`() = runTest {
-            val step = makeStep()
-            val verification = makeVerification(VerificationType.KNOWLEDGE, step.id, rubric = "mentions null-safety")
+            val module = makeModule()
+            val verification = makeVerification(VerificationType.KNOWLEDGE, module.id, rubric = "mentions null-safety")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery { onboardingAiClient.gradeKnowledge(any(), any(), any(), any(), any()) } throws
                 OnboardingAiException(503, "", "AI unavailable")
 
             assertThrows<ResponseStatusException> {
-                service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("ans"))
+                service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("ans"))
             }.also { assertEquals(503, it.statusCode.value()) }
 
             verify(exactly = 0) { verificationAttemptRepository.save(any()) }
@@ -256,10 +249,10 @@ class VerificationServiceTest {
         @Test
         fun `ARTIFACT fetches PR evidence and delegates grading to the AI client`() = runTest {
             val repositoryConnectionId = UUID.randomUUID()
-            val step = makeStep()
+            val module = makeModule()
             val verification = makeVerification(
                 VerificationType.ARTIFACT,
-                step.id,
+                module.id,
                 rubric = "closes the ticket",
                 repositoryConnectionId = repositoryConnectionId,
             )
@@ -273,8 +266,7 @@ class VerificationServiceTest {
                 authorLogin = "octocat",
             )
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) } returns evidence
@@ -284,7 +276,7 @@ class VerificationServiceTest {
             every { userCompetencyStateRepository.save(any()) } answers { firstArg() }
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
-            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("42"))
+            val result = service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("42"))
 
             assertTrue(result.passed)
             coVerify(exactly = 1) { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) }
@@ -294,10 +286,10 @@ class VerificationServiceTest {
         @Test
         fun `ARTIFACT rejects a PR opened by somebody else, without an AI call`() = runTest {
             val repositoryConnectionId = UUID.randomUUID()
-            val step = makeStep()
+            val module = makeModule()
             val verification = makeVerification(
                 VerificationType.ARTIFACT,
-                step.id,
+                module.id,
                 rubric = "closes the ticket",
                 repositoryConnectionId = repositoryConnectionId,
             )
@@ -311,14 +303,13 @@ class VerificationServiceTest {
                 authorLogin = "a-colleague",
             )
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) } returns evidence
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
-            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("42"))
+            val result = service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("42"))
 
             // The judge would pass this -- the PR genuinely satisfies the rubric. It just isn't
             // this user's work, which is not something a rubric can decide.
@@ -330,10 +321,10 @@ class VerificationServiceTest {
         @Test
         fun `ARTIFACT asks for a GitHub username when the submitter has none`() = runTest {
             val repositoryConnectionId = UUID.randomUUID()
-            val step = makeStep()
+            val module = makeModule()
             val verification = makeVerification(
                 VerificationType.ARTIFACT,
-                step.id,
+                module.id,
                 rubric = "closes the ticket",
                 repositoryConnectionId = repositoryConnectionId,
             )
@@ -348,14 +339,13 @@ class VerificationServiceTest {
             )
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { userApi.getGithubLoginByUserId(userId) } returns null
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) } returns evidence
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
-            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("42"))
+            val result = service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("42"))
 
             // Grading an unattributable PR anyway is exactly what let a hire pass with someone
             // else's work, so this asks for the missing identity instead.
@@ -367,16 +357,15 @@ class VerificationServiceTest {
         @Test
         fun `ARTIFACT rejects a PR another user already passed with, without a GitHub or AI call`() = runTest {
             val repositoryConnectionId = UUID.randomUUID()
-            val step = makeStep()
+            val module = makeModule()
             val verification = makeVerification(
                 VerificationType.ARTIFACT,
-                step.id,
+                module.id,
                 rubric = "closes the ticket",
                 repositoryConnectionId = repositoryConnectionId,
             )
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 1
             every {
@@ -388,7 +377,7 @@ class VerificationServiceTest {
             } returns true
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
-            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest(" 42 "))
+            val result = service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest(" 42 "))
 
             // One PR can't prove two people did the work, and the LLM judge would happily pass it
             // a second time -- so this never reaches GitHub or the AI service.
@@ -401,44 +390,46 @@ class VerificationServiceTest {
         @Test
         fun `ARTIFACT stores the PR number normalized so the reuse check can match it`() = runTest {
             val repositoryConnectionId = UUID.randomUUID()
-            val step = makeStep()
+            val module = makeModule()
             val verification = makeVerification(
                 VerificationType.ARTIFACT,
-                step.id,
+                module.id,
                 rubric = "closes the ticket",
                 repositoryConnectionId = repositoryConnectionId,
             )
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) } returns null
             val saved = slot<VerificationAttempt>()
             every { verificationAttemptRepository.save(capture(saved)) } answers { firstArg() }
 
-            service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("  42  "))
+            service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("  42  "))
 
             assertEquals("42", saved.captured.answer)
         }
 
         @Test
         fun `ARTIFACT fails locally without a GitHub or AI call when the answer isn't a PR number`() = runTest {
-            val step = makeStep()
+            val module = makeModule()
             val verification = makeVerification(
                 VerificationType.ARTIFACT,
-                step.id,
+                module.id,
                 rubric = "closes the ticket",
                 repositoryConnectionId = UUID.randomUUID(),
             )
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 1
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
-            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("not a number"))
+            val result = service.submitModuleAttemptForMe(
+                authId,
+                module.id,
+                SubmitVerificationAttemptRequest("not a number"),
+            )
 
             assertFalse(result.passed)
             coVerify(exactly = 0) { githubRepositoryApi.getPullRequestEvidence(any(), any()) }
@@ -448,22 +439,21 @@ class VerificationServiceTest {
         @Test
         fun `ARTIFACT fails locally without an AI call when the PR isn't found`() = runTest {
             val repositoryConnectionId = UUID.randomUUID()
-            val step = makeStep()
+            val module = makeModule()
             val verification = makeVerification(
                 VerificationType.ARTIFACT,
-                step.id,
+                module.id,
                 rubric = "closes the ticket",
                 repositoryConnectionId = repositoryConnectionId,
             )
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 99) } returns null
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
-            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("99"))
+            val result = service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("99"))
 
             assertFalse(result.passed)
             coVerify(exactly = 0) { onboardingAiClient.gradeArtifact(any(), any(), any()) }
@@ -471,25 +461,24 @@ class VerificationServiceTest {
 
         @Test
         fun `ARTIFACT throws 500 when repositoryConnectionId isn't configured`() = runTest {
-            val step = makeStep()
-            val verification = makeVerification(VerificationType.ARTIFACT, step.id, rubric = "closes the ticket")
+            val module = makeModule()
+            val verification = makeVerification(VerificationType.ARTIFACT, module.id, rubric = "closes the ticket")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
 
             assertThrows<ResponseStatusException> {
-                service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("1"))
+                service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("1"))
             }.also { assertEquals(500, it.statusCode.value()) }
         }
 
         @Test
         fun `ARTIFACT surfaces 503 when the AI service is unavailable, without persisting an attempt`() = runTest {
             val repositoryConnectionId = UUID.randomUUID()
-            val step = makeStep()
+            val module = makeModule()
             val verification = makeVerification(
                 VerificationType.ARTIFACT,
-                step.id,
+                module.id,
                 rubric = "closes the ticket",
                 repositoryConnectionId = repositoryConnectionId,
             )
@@ -503,67 +492,51 @@ class VerificationServiceTest {
                 authorLogin = "octocat",
             )
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 7) } returns evidence
             coEvery { onboardingAiClient.gradeArtifact(any(), any(), any()) } throws
                 OnboardingAiException(503, "", "AI unavailable")
 
             assertThrows<ResponseStatusException> {
-                service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("7"))
+                service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("7"))
             }.also { assertEquals(503, it.statusCode.value()) }
 
             verify(exactly = 0) { verificationAttemptRepository.save(any()) }
         }
 
         @Test
-        fun `throws 400 when the step is already finished`() = runTest {
-            val step = makeStep(status = StepStatus.FINISHED)
-            val verification = makeVerification(VerificationType.ATTEST, step.id)
+        fun `throws 404 when the module has no check configured`() = runTest {
+            val module = makeModule()
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, null)
 
             assertThrows<ResponseStatusException> {
-                service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("x"))
-            }.also { assertEquals(400, it.statusCode.value()) }
-        }
-
-        @Test
-        fun `throws 404 when the step has no verification configured`() = runTest {
-            val step = makeStep()
-            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns null
-
-            assertThrows<ResponseStatusException> {
-                service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("x"))
+                service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("x"))
             }.also { assertEquals(404, it.statusCode.value()) }
         }
 
         @Test
         fun `attemptNo increments across repeated submissions`() = runTest {
-            val step = makeStep()
-            val verification = makeVerification(VerificationType.ATTEST, step.id)
+            val module = makeModule()
+            val verification = makeVerification(VerificationType.ATTEST, module.id)
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 2
             every { competencyGraphVersionService.currentVersion() } returns 1
             every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns null
             every { userCompetencyStateRepository.save(any()) } answers { firstArg() }
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
-            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("x"))
+            val result = service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("x"))
 
             assertEquals(3, result.attemptNo)
         }
 
         @Test
         fun `passing a lower-level verification keeps the higher ledger level`() = runTest {
-            val step = makeStep()
-            val verification = makeVerification(VerificationType.ATTEST, step.id, level = "beginner")
+            val module = makeModule()
+            val verification = makeVerification(VerificationType.ATTEST, module.id, level = "beginner")
             val existing = UserCompetencyState(
                 userId = userId,
                 competencyKey = "kotlin",
@@ -571,14 +544,13 @@ class VerificationServiceTest {
                 source = CompetencySource.ASSESSED,
             )
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 1
             every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns existing
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
-            val result = service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("done"))
+            val result = service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("done"))
 
             assertTrue(result.passed)
             assertEquals(4, existing.level)
@@ -591,15 +563,14 @@ class VerificationServiceTest {
             // Regression coverage for "pass writes VERIFIED + unlocks dependents": feed the exact
             // ledger state this service writes into the real (pure) PathProjectionService and
             // confirm the dependent flips from LOCKED to AVAILABLE.
-            val step = makeStep()
+            val module = makeModule()
             // "intermediate" is what generated checks are pitched at, and it is what clears a
             // competency's default bar -- a beginner-level check against a default node passes
             // without mastering it, which is the point of the bar, not a regression.
             val verification =
-                makeVerification(VerificationType.ATTEST, step.id, competencyKey = "kotlin", level = "intermediate")
+                makeVerification(VerificationType.ATTEST, module.id, competencyKey = "kotlin", level = "intermediate")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { onboardingStepRepository.findByIdAndPhasePathUserId(step.id, userId) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
+            stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
             every { competencyGraphVersionService.currentVersion() } returns 1
             every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns null
@@ -607,7 +578,7 @@ class VerificationServiceTest {
             every { userCompetencyStateRepository.save(capture(savedState)) } answers { savedState.captured }
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
-            service.submitAttemptForMe(authId, step.id, SubmitVerificationAttemptRequest("done"))
+            service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("done"))
 
             val kotlin = Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL)
             val domainModel = Competency(key = "domain-model", label = "Domain model", kind = CompetencyKind.CONCEPT)
@@ -629,10 +600,9 @@ class VerificationServiceTest {
     inner class UpsertVerification {
         @Test
         fun `creates a verification when none exists`() {
-            val step = makeStep()
-            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
+            val module = makeModule(status = ModuleStatus.DRAFT)
             every { competencyRepository.existsByKey("kotlin") } returns true
-            every { verificationRepository.findByStepId(step.id) } returns null
+            stubModule(module, null)
             every { verificationRepository.save(any()) } answers { firstArg() }
 
             val request = UpsertVerificationRequest(
@@ -642,7 +612,7 @@ class VerificationServiceTest {
                 competencyKey = "kotlin",
                 level = "beginner",
             )
-            val result = service.upsertVerification(step.id, request)
+            val result = service.upsertModuleVerification(module.id, request)
 
             assertEquals(VerificationType.EXACT, result.type)
             assertEquals("kotlin", result.competencyKey)
@@ -650,8 +620,7 @@ class VerificationServiceTest {
 
         @Test
         fun `throws 400 when KNOWLEDGE has no rubric`() {
-            val step = makeStep()
-            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
+            val module = makeModule(status = ModuleStatus.DRAFT)
 
             val request = UpsertVerificationRequest(
                 type = VerificationType.KNOWLEDGE,
@@ -661,14 +630,13 @@ class VerificationServiceTest {
             )
 
             assertThrows<ResponseStatusException> {
-                service.upsertVerification(step.id, request)
+                service.upsertModuleVerification(module.id, request)
             }.also { assertEquals(400, it.statusCode.value()) }
         }
 
         @Test
         fun `throws 400 when EXACT has no canonicalAnswer`() {
-            val step = makeStep()
-            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
+            val module = makeModule(status = ModuleStatus.DRAFT)
 
             val request = UpsertVerificationRequest(
                 type = VerificationType.EXACT,
@@ -678,14 +646,13 @@ class VerificationServiceTest {
             )
 
             assertThrows<ResponseStatusException> {
-                service.upsertVerification(step.id, request)
+                service.upsertModuleVerification(module.id, request)
             }.also { assertEquals(400, it.statusCode.value()) }
         }
 
         @Test
         fun `throws 400 when level is not a known skill level`() {
-            val step = makeStep()
-            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
+            val module = makeModule(status = ModuleStatus.DRAFT)
 
             val request = UpsertVerificationRequest(
                 type = VerificationType.ATTEST,
@@ -695,14 +662,14 @@ class VerificationServiceTest {
             )
 
             assertThrows<ResponseStatusException> {
-                service.upsertVerification(step.id, request)
+                service.upsertModuleVerification(module.id, request)
             }.also { assertEquals(400, it.statusCode.value()) }
         }
 
         @Test
         fun `throws 404 when the referenced competency does not exist`() {
-            val step = makeStep()
-            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
+            val module = makeModule(status = ModuleStatus.DRAFT)
+            stubModule(module, null)
             every { competencyRepository.existsByKey("nope") } returns false
 
             val request = UpsertVerificationRequest(
@@ -713,14 +680,13 @@ class VerificationServiceTest {
             )
 
             assertThrows<ResponseStatusException> {
-                service.upsertVerification(step.id, request)
+                service.upsertModuleVerification(module.id, request)
             }.also { assertEquals(404, it.statusCode.value()) }
         }
 
         @Test
         fun `throws 400 when ARTIFACT has no rubric`() {
-            val step = makeStep()
-            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
+            val module = makeModule(status = ModuleStatus.DRAFT)
 
             val request = UpsertVerificationRequest(
                 type = VerificationType.ARTIFACT,
@@ -731,14 +697,13 @@ class VerificationServiceTest {
             )
 
             assertThrows<ResponseStatusException> {
-                service.upsertVerification(step.id, request)
+                service.upsertModuleVerification(module.id, request)
             }.also { assertEquals(400, it.statusCode.value()) }
         }
 
         @Test
         fun `throws 400 when ARTIFACT has no repositoryConnectionId`() {
-            val step = makeStep()
-            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
+            val module = makeModule(status = ModuleStatus.DRAFT)
 
             val request = UpsertVerificationRequest(
                 type = VerificationType.ARTIFACT,
@@ -749,17 +714,16 @@ class VerificationServiceTest {
             )
 
             assertThrows<ResponseStatusException> {
-                service.upsertVerification(step.id, request)
+                service.upsertModuleVerification(module.id, request)
             }.also { assertEquals(400, it.statusCode.value()) }
         }
 
         @Test
         fun `creates an ARTIFACT verification with a repositoryConnectionId`() {
-            val step = makeStep()
+            val module = makeModule(status = ModuleStatus.DRAFT)
             val repositoryConnectionId = UUID.randomUUID()
-            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
             every { competencyRepository.existsByKey("kotlin") } returns true
-            every { verificationRepository.findByStepId(step.id) } returns null
+            stubModule(module, null)
             val saved = slot<Verification>()
             every { verificationRepository.save(capture(saved)) } answers { saved.captured }
 
@@ -771,87 +735,10 @@ class VerificationServiceTest {
                 competencyKey = "kotlin",
                 level = "beginner",
             )
-            val result = service.upsertVerification(step.id, request)
+            val result = service.upsertModuleVerification(module.id, request)
 
             assertEquals(VerificationType.ARTIFACT, result.type)
             assertEquals(repositoryConnectionId, saved.captured.repositoryConnectionId)
-        }
-    }
-
-    @Nested
-    inner class SynthesizeContent {
-        @Test
-        fun `persists content and lesson fingerprint on a synthesized outcome`() = runTest {
-            val step = makeStep()
-            val verification = makeVerification(VerificationType.KNOWLEDGE, step.id, rubric = "r")
-            val competency = Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL)
-            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
-            every { competencyRepository.findByKey("kotlin") } returns competency
-            coEvery {
-                onboardingAiClient.synthesizeLesson("kotlin", "Kotlin", "", "beginner", null)
-            } returns LessonOutcome(
-                status = "synthesized",
-                lesson = LessonContentSchema(
-                    competencyKey = "kotlin",
-                    level = "beginner",
-                    title = "t",
-                    body = "grounded body",
-                ),
-                provenance = LessonProvenanceSchema(corpusFingerprint = "fp-1"),
-            )
-
-            service.synthesizeContent(step.id)
-
-            assertEquals("grounded body", step.content)
-            assertEquals("fp-1", step.lessonFingerprint)
-        }
-
-        @Test
-        fun `leaves the step untouched on an unchanged outcome`() = runTest {
-            val step = makeStep(content = "old content")
-            step.lessonFingerprint = "fp-old"
-            val verification = makeVerification(VerificationType.KNOWLEDGE, step.id, rubric = "r")
-            val competency = Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL)
-            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
-            every { competencyRepository.findByKey("kotlin") } returns competency
-            coEvery {
-                onboardingAiClient.synthesizeLesson("kotlin", "Kotlin", "", "beginner", "fp-old")
-            } returns LessonOutcome(status = "unchanged")
-
-            service.synthesizeContent(step.id)
-
-            assertEquals("old content", step.content)
-            assertEquals("fp-old", step.lessonFingerprint)
-        }
-
-        @Test
-        fun `omits the stored fingerprint when forceRegenerate is true`() = runTest {
-            val step = makeStep()
-            step.lessonFingerprint = "fp-old"
-            val verification = makeVerification(VerificationType.KNOWLEDGE, step.id, rubric = "r")
-            val competency = Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL)
-            every { onboardingStepRepository.findById(step.id) } returns Optional.of(step)
-            every { verificationRepository.findByStepId(step.id) } returns verification
-            every { competencyRepository.findByKey("kotlin") } returns competency
-            coEvery {
-                onboardingAiClient.synthesizeLesson("kotlin", "Kotlin", "", "beginner", null)
-            } returns LessonOutcome(
-                status = "synthesized",
-                lesson = LessonContentSchema(
-                    competencyKey = "kotlin",
-                    level = "beginner",
-                    title = "t",
-                    body = "fresh body",
-                ),
-                provenance = LessonProvenanceSchema(corpusFingerprint = "fp-new"),
-            )
-
-            service.synthesizeContent(step.id, forceRegenerate = true)
-
-            assertEquals("fresh body", step.content)
-            assertEquals("fp-new", step.lessonFingerprint)
         }
     }
 }

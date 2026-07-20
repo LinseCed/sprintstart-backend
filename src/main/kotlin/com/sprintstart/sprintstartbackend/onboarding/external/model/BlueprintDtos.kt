@@ -35,7 +35,7 @@ data class BaselineSchema(
     val version: String = "0",
     val source: String = "authored",
     val competencies: List<BaselineCompetencySchema> = emptyList(),
-    val provenance: BlueprintProvenanceSchema? = null,
+    val provenance: AiProvenanceSchema? = null,
 )
 
 @Serializable

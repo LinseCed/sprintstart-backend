@@ -1,34 +1,40 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingStep
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.ModulePage
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingFeedbackRepository
 import com.sprintstart.sprintstartbackend.shared.scheduler.ScheduledExecutor
 import org.springframework.stereotype.Service
 
 /**
- * Closes the content-quality loop: once a step's lesson accumulates enough "not helpful"
- * [com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingFeedback], triggers a
- * forced AI resynthesis of that lesson via [VerificationService.synthesizeContent].
+ * Closes the content-quality loop: once a module page accumulates enough "not helpful"
+ * [com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingFeedback], asks the AI to
+ * re-draft that module.
  *
- * Fires exactly once per threshold crossing (`count == threshold`, not `>=`) -- the unhelpful
- * count is cumulative and never resets, so an `>=` check would re-trigger a full forced
- * resynthesis on every subsequent unhelpful feedback for the same step. The actual AI call is
- * dispatched via [ScheduledExecutor] so the calling feedback-submission request never blocks on
- * AI latency, mirroring how [com.sprintstart.sprintstartbackend.connectors.github.GithubScheduledExecutor]
- * launches async work from a synchronous call site.
+ * The signal only became meaningful when pages became shared. Feedback used to hang off a per-user
+ * step, so three hires disliking the same lesson produced three unrelated counts of one, and a
+ * regeneration improved exactly one person's copy.
+ *
+ * The re-draft is a **proposal**, not a replacement: it lands as a new PROPOSED version for a PM to
+ * review, and what hires are reading right now is untouched until somebody approves it. Content
+ * people are graded against does not get silently rewritten because three of them clicked a thumb.
+ *
+ * Fires exactly once per threshold crossing (`count == threshold`, not `>=`) -- the unhelpful count
+ * is cumulative and never resets, so `>=` would re-propose on every subsequent unhelpful click. The
+ * AI call is dispatched via [ScheduledExecutor] so submitting feedback never blocks on AI latency.
  */
 @Service
 class ContentQualityService(
     private val onboardingFeedbackRepository: OnboardingFeedbackRepository,
-    private val verificationService: VerificationService,
+    private val competencyModuleService: CompetencyModuleService,
     private val scheduledExecutor: ScheduledExecutor,
 ) {
-    fun checkAndTriggerRegeneration(step: OnboardingStep) {
-        val unhelpfulCount = onboardingFeedbackRepository.countByStepIdAndHelpfulFalse(step.id)
-        if (unhelpfulCount == UNHELPFUL_FEEDBACK_THRESHOLD) {
-            scheduledExecutor.launch("Regenerating lesson content for step ${step.id}") {
-                verificationService.synthesizeContent(step.id, forceRegenerate = true)
-            }
+    fun checkAndTriggerRegeneration(page: ModulePage) {
+        val unhelpfulCount = onboardingFeedbackRepository.countByPageIdAndHelpfulFalse(page.id)
+        if (unhelpfulCount != UNHELPFUL_FEEDBACK_THRESHOLD) return
+
+        val module = page.module
+        scheduledExecutor.launch("Re-drafting the module for ${module.competencyKey}") {
+            competencyModuleService.proposeFromCorpus(module.competencyKey, module.projectId)
         }
     }
 

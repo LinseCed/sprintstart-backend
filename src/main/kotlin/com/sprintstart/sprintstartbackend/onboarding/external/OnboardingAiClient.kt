@@ -8,29 +8,23 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentHi
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BaselineSchema
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BlueprintSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateCompetencyGraphRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateOnboardingPathRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeArtifactRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeKnowledgeRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeResult
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GraphProposalOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.HireCompetencySchema
-import com.sprintstart.sprintstartbackend.onboarding.external.model.LessonOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.MatchHireToPoolRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.MineStarterWorkRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ModuleProposalOutcome
-import com.sprintstart.sprintstartbackend.onboarding.external.model.OnboardingAiPathEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposeModuleRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedStarterTaskSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.RankedStarterTaskSchema
-import com.sprintstart.sprintstartbackend.onboarding.external.model.SkillAssessmentSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
-import com.sprintstart.sprintstartbackend.onboarding.external.model.SynthesizeLessonRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
@@ -49,41 +43,6 @@ class OnboardingAiClient(
     private val applicationConfig: ApplicationConfig,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-
-    /**
-     * Opens an SSE stream against the AI service to generate a personalized onboarding path.
-     *
-     * The AI service is stateless, so the caller supplies the [blueprints] it should
-     * personalize against. Malformed SSE chunks are logged and skipped rather than
-     * terminating the stream.
-     *
-     * @param workingArea The user's working area scope (e.g. `backend`).
-     * @param skills The user's leveled skill assessments; lets proficiency drive personalization.
-     * @param blueprints The active blueprints the AI should personalize; empty yields a generic path.
-     * @return A cold [Flow] of [OnboardingAiPathEvent]s emitted as generation progresses.
-     */
-    fun generatePath(
-        workingArea: String,
-        skills: List<SkillAssessmentSchema> = emptyList(),
-        blueprints: List<BlueprintSchema> = emptyList(),
-    ): Flow<OnboardingAiPathEvent> =
-        webClient
-            .post()
-            .uri(uri("/api/v1/onboarding/path"))
-            .body(
-                GenerateOnboardingPathRequest(
-                    workingArea = workingArea,
-                    skills = skills,
-                    blueprints = blueprints,
-                ),
-            ).stream()
-            .perform<OnboardingAiPathEvent>(
-                terminationMarkers = setOf("[DONE]"),
-                onChunkError = { raw, err ->
-                    logger.warn("Skipping malformed SSE chunk '{}': {}", raw, err.message)
-                    true
-                },
-            )
 
     /**
      * Runs the AI service's batch blueprint generation job over the ingested corpus.
@@ -174,48 +133,6 @@ class OnboardingAiClient(
                 .perform<GraphProposalOutcome>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
             val msg = "Failed to propose competency graph (HTTP ${e.statusCode}): ${e.body}"
-            throw OnboardingAiException(e.statusCode, e.body, msg)
-        }
-
-    /**
-     * Synthesizes a grounded lesson for one (competency, level) pair (Phase 3, #8).
-     *
-     * Heavyweight/offline, matching [proposeCompetencyGraph]: one retrieval + LLM pass, intended
-     * for an admin-triggered content-authoring action, not the learner's request path.
-     * [lastFingerprint] is whatever fingerprint the caller last recorded for this exact lesson
-     * (idempotency is per-lesson, not corpus-wide). A non-2xx response is wrapped in an
-     * [OnboardingAiException] carrying the upstream status/body.
-     *
-     * @param competencyKey The competency this lesson teaches.
-     * @param competencyLabel The competency's display label.
-     * @param competencyDescription Optional extra context for grounding the lesson.
-     * @param level Target level to teach to (`beginner`/`intermediate`/`advanced`/`expert`).
-     * @param lastFingerprint The corpus fingerprint recorded from the last synthesis of this lesson, if any.
-     * @return The synthesis outcome returned by the AI service.
-     */
-    suspend fun synthesizeLesson(
-        competencyKey: String,
-        competencyLabel: String,
-        competencyDescription: String = "",
-        level: String = "beginner",
-        lastFingerprint: String? = null,
-    ): LessonOutcome =
-        try {
-            webClient
-                .post()
-                .uri(uri("/api/v1/onboarding/lessons/synthesize"))
-                .body(
-                    SynthesizeLessonRequest(
-                        competencyKey = competencyKey,
-                        competencyLabel = competencyLabel,
-                        competencyDescription = competencyDescription,
-                        level = level,
-                        lastFingerprint = lastFingerprint,
-                    ),
-                ).sync()
-                .perform<LessonOutcome>()
-        } catch (@Suppress("SwallowedException") e: WebClientException) {
-            val msg = "Failed to synthesize lesson (HTTP ${e.statusCode}): ${e.body}"
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 

@@ -1,16 +1,12 @@
-package com.sprintstart.sprintstartbackend.onboarding.service
+﻿package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.SkipStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ArtifactEvidenceDto
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.VerificationAttempt
@@ -23,7 +19,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.verification
 import com.sprintstart.sprintstartbackend.onboarding.model.response.verification.VerificationResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyModuleRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingStepRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationAttemptRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
@@ -41,7 +36,7 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Manages a step's "Verify" zone: config, grading orchestration, and the resulting unlock.
+ * Manages a module's graded check: config, grading orchestration, and the resulting unlock.
  *
  * [VerificationType.EXACT]/[VerificationType.ATTEST] are graded locally in Kotlin, mirroring the
  * AI service's own `grade_exact`/`grade_attest` logic exactly so a step behaves identically
@@ -53,20 +48,18 @@ import java.util.UUID
  * [GithubRepositoryApi]) for the PR number a hire submits as their answer, before handing that
  * evidence to the AI's judge -- the highest-rigor rung of the ladder.
  *
- * Passing writes [UserCompetencyState] with [CompetencySource.VERIFIED] and marks the step
- * [StepStatus.FINISHED] -- no separate "unlock" step is needed, since
+ * Passing writes [UserCompetencyState] with [CompetencySource.VERIFIED] and nothing else. There is
+ * no per-user row to complete and no separate "unlock":
  * [PathProjectionService][com.sprintstart.sprintstartbackend.onboarding.service.PathProjectionService]
- * already derives a competency's dependents' availability purely from the ledger. Submitting
- * works regardless of the step's current status (as long as it isn't already finished/skipped),
- * which is what makes "test-out" (passing without ever starting the lesson) just fall out of the
- * normal submission path rather than needing its own endpoint.
+ * derives a competency's state, and its dependents' availability, purely from the ledger. "Testing
+ * out" -- passing without ever opening the lesson -- therefore needs no special case; it is just a
+ * submission from somebody who read nothing.
  */
 @Suppress("TooManyFunctions")
 @Service
 class VerificationService(
     private val verificationRepository: VerificationRepository,
     private val verificationAttemptRepository: VerificationAttemptRepository,
-    private val onboardingStepRepository: OnboardingStepRepository,
     private val competencyModuleRepository: CompetencyModuleRepository,
     private val competencyRepository: CompetencyRepository,
     private val userCompetencyStateRepository: UserCompetencyStateRepository,
@@ -83,142 +76,6 @@ class VerificationService(
     private val logger = LoggerFactory.getLogger(javaClass)
 
 //  ========================== Methods for users ==========================
-
-    /**
-     * Returns the verification config for a step in the authenticated user's path, without
-     * revealing the rubric or canonical answer.
-     *
-     * @throws ResponseStatusException 404 if the user, step, or its verification doesn't exist.
-     */
-    @Transactional(readOnly = true)
-    fun getVerificationForMe(authId: String, stepId: UUID): VerificationResponse {
-        val userId = resolveUserId(authId)
-        findStepForUser(stepId, userId)
-        return findVerification(stepId).toResponse()
-    }
-
-    /**
-     * Grades a submitted answer and, on pass, writes the ledger and completes the step.
-     *
-     * Runs as two short transactions with the grading call in between, matching
-     * [AssessmentService.answerAssessment]'s shape: [VerificationType.KNOWLEDGE]/
-     * [VerificationType.ARTIFACT] grading is an AI (and, for artifacts, GitHub) round-trip, and
-     * holding a DB connection open across it would pin one pool connection per in-flight
-     * submission. The step's status is validated in both phases -- the write phase re-checks it
-     * so a submission racing a concurrent finish/skip fails with the same 400 instead of
-     * double-completing the step.
-     *
-     * @throws ResponseStatusException 404 if the user, step, or its verification doesn't exist;
-     * 400 if the step is already finished or skipped; 503 if [VerificationType.KNOWLEDGE] or
-     * [VerificationType.ARTIFACT] grading needs the AI service and it's unavailable.
-     */
-    suspend fun submitAttemptForMe(
-        authId: String,
-        stepId: UUID,
-        request: SubmitVerificationAttemptRequest,
-    ): SubmitVerificationAttemptResponse {
-        val context = withContext(Dispatchers.IO) {
-            readTxTemplate.execute { loadSubmissionContext(authId, stepId, request.answer) }!!
-        }
-
-        // An ARTIFACT answer is a PR number, and it is also the key the reuse check matches on, so
-        // it is stored in the same normalized form it was looked up with.
-        val answer = if (context.verification.type == VerificationType.ARTIFACT) {
-            request.answer.trim()
-        } else {
-            request.answer
-        }
-        val graded = grade(context, answer)
-
-        return withContext(Dispatchers.IO) {
-            txTemplate.execute { persistGradedAttempt(context, answer, graded) }!!
-        }
-    }
-
-    private data class SubmissionContext(
-        val userId: UUID,
-        val verification: Verification,
-        val lessonContent: String,
-        val attemptNo: Int,
-        /** The legacy per-user step being verified, or null for a module-owned check. */
-        val stepId: UUID? = null,
-        /**
-         * Another user already passed this verification with this exact answer.
-         *
-         * Only meaningful for `ARTIFACT`, where the answer is a pull request number. Resolved
-         * here, inside the read transaction, so grading itself stays free of repository access.
-         */
-        val answerAlreadyClaimed: Boolean = false,
-        /**
-         * The submitting user's declared GitHub login, or `null` when they have none. Only
-         * `ARTIFACT` uses it, to check that they actually opened the pull request they submitted.
-         */
-        val githubLogin: String? = null,
-    )
-
-    private fun loadSubmissionContext(authId: String, stepId: UUID, answer: String): SubmissionContext {
-        val userId = resolveUserId(authId)
-        val step = findStepForUser(stepId, userId)
-        val verification = findVerification(stepId)
-        requireStepNotConcluded(step)
-        val attemptNo = verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) + 1
-        return SubmissionContext(
-            userId = userId,
-            stepId = stepId,
-            verification = verification,
-            lessonContent = step.content ?: "",
-            attemptNo = attemptNo,
-            answerAlreadyClaimed = verification.type == VerificationType.ARTIFACT &&
-                verificationAttemptRepository.existsByVerificationIdAndAnswerAndPassedIsTrueAndUserIdNot(
-                    verification.id,
-                    answer.trim(),
-                    userId,
-                ),
-            githubLogin = if (verification.type == VerificationType.ARTIFACT) {
-                userApi.getGithubLoginByUserId(userId)
-            } else {
-                null
-            },
-        )
-    }
-
-    private fun persistGradedAttempt(
-        context: SubmissionContext,
-        answer: String,
-        graded: GradedResult,
-    ): SubmitVerificationAttemptResponse {
-        val stepId = requireNotNull(context.stepId) { "a step-owned submission always carries its step" }
-        val step = findStepForUser(stepId, context.userId)
-        val verification = findVerification(stepId)
-        requireStepNotConcluded(step)
-
-        val attempt = verificationAttemptRepository.save(
-            VerificationAttempt(
-                verification = verification,
-                userId = context.userId,
-                answer = answer,
-                passed = graded.passed,
-                score = graded.score,
-                feedback = graded.feedback,
-                hint = graded.hint,
-                attemptNo = context.attemptNo,
-                graphVersion = competencyGraphVersionService.currentVersion(),
-            ),
-        )
-
-        if (graded.passed) {
-            writeVerifiedCompetencyState(context.userId, verification.competencyKey, verification.level)
-            completeStep(step)
-        }
-
-        return attempt.toSubmitResponse(stepStatus = step.status)
-    }
-
-    private fun requireStepNotConcluded(step: OnboardingStep) {
-        if (step.status == StepStatus.FINISHED || step.status == StepStatus.SKIPPED) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "A finished or skipped step can't be verified")
-        }
-    }
 
 //  ================= Methods for users: module-owned checks =================
 
@@ -321,7 +178,7 @@ class VerificationService(
             writeVerifiedCompetencyState(context.userId, verification.competencyKey, verification.level)
         }
 
-        return attempt.toSubmitResponse(stepStatus = null)
+        return attempt.toSubmitResponse()
     }
 
     /**
@@ -345,6 +202,9 @@ class VerificationService(
      */
     @Transactional
     fun upsertModuleVerification(moduleId: UUID, request: UpsertVerificationRequest): VerificationResponse {
+        // The request is validated before anything is looked up: a malformed check is malformed
+        // whatever module it names, and saying so without a database round trip is the honest order.
+        validateGradingConfig(request)
         val module = competencyModuleRepository
             .findById(moduleId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No module found with id: $moduleId") }
@@ -354,7 +214,6 @@ class VerificationService(
                 "Module $moduleId is ${module.status}; create a new version to change its check",
             )
         }
-        validateGradingConfig(request)
         if (!competencyRepository.existsByKey(request.competencyKey)) {
             throw ResponseStatusException(
                 HttpStatus.NOT_FOUND,
@@ -384,101 +243,48 @@ class VerificationService(
         return verificationRepository.save(verification).toResponse()
     }
 
-    /**
-     * Creates or replaces the verification config for a step.
-     *
-     * @throws ResponseStatusException 404 if the step or referenced competency doesn't exist; 400
-     * if a type-required field ([Verification.rubric] for [VerificationType.KNOWLEDGE],
-     * [Verification.canonicalAnswer] for [VerificationType.EXACT], or [Verification.rubric] +
-     * [Verification.repositoryConnectionId] for [VerificationType.ARTIFACT]) is missing.
-     */
-    @Transactional
-    fun upsertVerification(stepId: UUID, request: UpsertVerificationRequest): VerificationResponse {
-        val step = findStep(stepId)
-        validateGradingConfig(request)
-        if (!competencyRepository.existsByKey(request.competencyKey)) {
-            throw ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "No competency found with key: ${request.competencyKey}",
-            )
-        }
-
-        val verification = verificationRepository.findByStepId(step.id)?.apply {
-            type = request.type
-            prompt = request.prompt
-            rubric = request.rubric
-            canonicalAnswer = request.canonicalAnswer
-            repositoryConnectionId = request.repositoryConnectionId
-            competencyKey = request.competencyKey
-            level = request.level
-        } ?: Verification(
-            stepId = step.id,
-            type = request.type,
-            prompt = request.prompt,
-            rubric = request.rubric,
-            canonicalAnswer = request.canonicalAnswer,
-            repositoryConnectionId = request.repositoryConnectionId,
-            competencyKey = request.competencyKey,
-            level = request.level,
-        )
-
-        return verificationRepository.save(verification).toResponse()
-    }
-
-    /**
-     * Triggers AI lesson synthesis for a step's verification and persists the grounded result.
-     *
-     * Runs outside any transaction for the AI call itself, matching
-     * [CompetencyProposalService.generate]. A no-op on `"unchanged"`/`"skipped"` outcomes -- the
-     * step's existing [OnboardingStep.content] is left untouched.
-     *
-     * @param forceRegenerate When true, omits the stored [OnboardingStep.lessonFingerprint] so the
-     * AI service resynthesizes even if the corpus is unchanged -- used by
-     * [ContentQualityService] to bypass idempotency once negative feedback crosses its threshold.
-     * @throws ResponseStatusException 404 if the step, its verification, or the referenced
-     * competency doesn't exist.
-     */
-    suspend fun synthesizeContent(stepId: UUID, forceRegenerate: Boolean = false) {
-        val context = withContext(Dispatchers.IO) {
-            readTxTemplate.execute { loadSynthesisContext(stepId) }!!
-        }
-        val outcome = onboardingAiClient.synthesizeLesson(
-            competencyKey = context.competency.key,
-            competencyLabel = context.competency.label,
-            competencyDescription = context.competency.description ?: "",
-            level = context.verification.level,
-            lastFingerprint = if (forceRegenerate) null else context.step.lessonFingerprint,
-        )
-        val lesson = outcome.lesson
-        if (outcome.status != "synthesized" || lesson == null) return
-
-        withContext(Dispatchers.IO) {
-            txTemplate.executeWithoutResult {
-                val step = findStep(stepId)
-                step.content = lesson.body
-                step.lessonFingerprint = outcome.provenance?.corpusFingerprint
-            }
-        }
-    }
-
 //  ========================== Helper Methods ==========================
 
-    private data class SynthesisContext(
-        val step: OnboardingStep,
+    private data class SubmissionContext(
+        val userId: UUID,
         val verification: Verification,
-        val competency: Competency,
+        val lessonContent: String,
+        val attemptNo: Int,
+        /**
+         * Another user already passed this check with this exact answer.
+         *
+         * Only meaningful for `ARTIFACT`, where the answer is a pull request number. Resolved
+         * inside the read transaction, so grading itself stays free of repository access.
+         */
+        val answerAlreadyClaimed: Boolean = false,
+        /**
+         * The submitting user's declared GitHub login, or `null` when they have none. Only
+         * `ARTIFACT` uses it, to check that they actually opened the pull request they submitted.
+         */
+        val githubLogin: String? = null,
     )
 
-    private fun loadSynthesisContext(stepId: UUID): SynthesisContext {
-        val step = findStep(stepId)
-        val verification = findVerification(stepId)
-        val competency = competencyRepository.findByKey(verification.competencyKey)
-            ?: throw ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "No competency found with key: ${verification.competencyKey}",
-            )
-        return SynthesisContext(step, verification, competency)
+    /**
+     * Resolves a module the authenticated user may open: it has to be live, and they have to be in
+     * its project. Membership is the whole access rule -- a shared module has no per-user row to
+     * look them up in.
+     */
+    private fun findModuleForUser(authId: String, moduleId: UUID): CompetencyModule {
+        val module = competencyModuleRepository
+            .findById(moduleId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No module found with id: $moduleId") }
+        if (module.status != ModuleStatus.ACTIVE) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "No module found with id: $moduleId")
+        }
+        if (!userApi.userHasAccessToProject(authId, module.projectId)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "User is not a member of this module's project")
+        }
+        return module
     }
+
+    private fun findModuleVerification(moduleId: UUID): Verification =
+        verificationRepository.findByModuleId(moduleId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No check configured for module: $moduleId")
 
     private data class GradedResult(
         val passed: Boolean,
@@ -708,19 +514,6 @@ class VerificationService(
         }
     }
 
-    /** Mirrors [OnboardingStepService.completeOnboardingStepForMe]'s completion logic. */
-    private fun completeStep(step: OnboardingStep) {
-        val completedAt = Instant.now()
-        if (step.startedAt == null) {
-            step.startedAt = completedAt
-        }
-        step.completedAt = completedAt
-        if (step.skips.isNotEmpty() && step.skips.last().status == SkipStatus.PENDING) {
-            step.skips.removeLast()
-        }
-        step.status = StepStatus.FINISHED
-    }
-
     @Suppress("ThrowsCount")
     private fun validateGradingConfig(request: UpsertVerificationRequest) {
         // An unrecognized level would rank to 0 on pass, which the projection never counts as
@@ -755,42 +548,6 @@ class VerificationService(
         userApi
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
-
-    private fun findStep(stepId: UUID): OnboardingStep =
-        onboardingStepRepository
-            .findById(stepId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No step found with id: $stepId") }
-
-    private fun findStepForUser(stepId: UUID, userId: UUID): OnboardingStep =
-        onboardingStepRepository
-            .findByIdAndPhasePathUserId(stepId, userId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No step found with id: $stepId") }
-
-    /**
-     * Resolves a module the authenticated user may open: it has to be live, and they have to be in
-     * its project. Membership is the whole access rule -- a shared module has no per-user row to
-     * look them up in.
-     */
-    private fun findModuleForUser(authId: String, moduleId: UUID): CompetencyModule {
-        val module = competencyModuleRepository
-            .findById(moduleId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No module found with id: $moduleId") }
-        if (module.status != ModuleStatus.ACTIVE) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "No module found with id: $moduleId")
-        }
-        if (!userApi.userHasAccessToProject(authId, module.projectId)) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "User is not a member of this module's project")
-        }
-        return module
-    }
-
-    private fun findModuleVerification(moduleId: UUID): Verification =
-        verificationRepository.findByModuleId(moduleId)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No check configured for module: $moduleId")
-
-    private fun findVerification(stepId: UUID): Verification =
-        verificationRepository.findByStepId(stepId)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No verification configured for step: $stepId")
 
     private companion object {
         val WHITESPACE = Regex("\\s+")

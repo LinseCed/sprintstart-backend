@@ -50,7 +50,7 @@ data class ProposedModuleSchema(
 data class ModuleProposalOutcome(
     val status: String,
     val module: ProposedModuleSchema? = null,
-    val provenance: LessonProvenanceSchema? = null,
+    val provenance: AiProvenanceSchema? = null,
     @SerialName("chunks_retrieved") val chunksRetrieved: Int = 0,
     @SerialName("pages_dropped") val pagesDropped: Int = 0,
     val notes: List<String> = emptyList(),

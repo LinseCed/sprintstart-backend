@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.mapper
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.VerificationAttempt
 import com.sprintstart.sprintstartbackend.onboarding.model.response.verification.SubmitVerificationAttemptResponse
@@ -9,7 +8,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.verification
 fun Verification.toResponse(): VerificationResponse =
     VerificationResponse(
         id = id,
-        stepId = stepId,
         moduleId = moduleId,
         type = type,
         prompt = prompt,
@@ -17,10 +15,9 @@ fun Verification.toResponse(): VerificationResponse =
         level = level,
     )
 
-fun VerificationAttempt.toSubmitResponse(stepStatus: StepStatus? = null): SubmitVerificationAttemptResponse =
+fun VerificationAttempt.toSubmitResponse(): SubmitVerificationAttemptResponse =
     SubmitVerificationAttemptResponse(
         attemptId = id,
-        stepId = verification.stepId,
         moduleId = verification.moduleId,
         passed = passed,
         score = score,
@@ -28,5 +25,4 @@ fun VerificationAttempt.toSubmitResponse(stepStatus: StepStatus? = null): Submit
         hint = hint,
         attemptNo = attemptNo,
         graphVersion = graphVersion,
-        stepStatus = stepStatus,
     )
