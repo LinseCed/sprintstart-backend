@@ -2,7 +2,9 @@ package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredArtifact
+import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMetadataJsonMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import org.springframework.stereotype.Service
@@ -48,6 +50,22 @@ internal class ArtifactIngestionApiService(
     @Transactional(readOnly = true)
     override fun getHash(artifactId: UUID): String? {
         return artifactRepository.findById(artifactId).orElse(null)?.hash
+    }
+
+    @Transactional(readOnly = true)
+    override fun getAuthoredPullRequests(projectId: UUID, authorLogin: String): List<AuthoredPullRequest> {
+        return artifactRepository
+            .findAllByProjectIdAndAuthorLogin(projectId, authorLogin.lowercase())
+            .filter { it.artifactType == ArtifactType.PULL_REQUEST }
+            .map {
+                AuthoredPullRequest(
+                    artifactId = it.id,
+                    openedAt = it.createdAtSource,
+                    firstResponseAt = it.firstResponseAtSource,
+                    mergedAt = it.mergedAtSource,
+                    state = it.state,
+                )
+            }
     }
 
     @Transactional(readOnly = true)

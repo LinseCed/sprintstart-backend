@@ -28,6 +28,7 @@ query GetPRDetails($owner: String!, $name: String!, $prNumber: Int!, $commentsCu
                 nodes {
                     body
                     state
+                    submittedAt
                     author { login }
                 }
             }

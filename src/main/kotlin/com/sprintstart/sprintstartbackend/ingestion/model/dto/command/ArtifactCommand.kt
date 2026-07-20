@@ -36,6 +36,10 @@ data class GithubArtifactCommand(
      * to the wrong person. Files have no single author at all.
      */
     val authorLogin: String? = null,
+    /** Merge time for pull requests; null for every other artifact type. */
+    val mergedAtSource: Instant? = null,
+    /** First response by someone other than the author; pull requests only. */
+    val firstResponseAtSource: Instant? = null,
 ) : ArtifactCommand
 
 data class UploadArtifactCommand(
