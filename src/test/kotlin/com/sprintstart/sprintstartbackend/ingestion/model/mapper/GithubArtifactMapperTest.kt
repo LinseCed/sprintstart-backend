@@ -124,6 +124,48 @@ class GithubArtifactMapperTest {
         assertThat(result.hash).isEqualTo("Bug report|Something broke".toByteArray().sha256())
         assertThat(result.state).isEqualTo("OPEN")
         assertThat(result.labels).containsExactly("bug", "good first issue")
+        assertThat(result.authorLogin).isEqualTo("alice")
+    }
+
+    @Test
+    fun `toCommand lower-cases the author login so it matches a declared identity`() {
+        val event = GithubIssueFetchedEvent(
+            transactionId = runId,
+            repositoryId = repositoryId,
+            repositoryOwner = "owner",
+            repositoryName = "repo",
+            number = 42,
+            title = "Bug report",
+            body = null,
+            state = "OPEN",
+            createdAt = "2024-01-01T00:00:00Z",
+            closedAt = null,
+            url = "https://github.com/owner/repo/issues/42",
+            author = "OctoCat",
+            labels = emptyList(),
+            assignees = emptyList(),
+            comments = emptyList(),
+        )
+
+        assertThat(mapper.toCommand(event).authorLogin).isEqualTo("octocat")
+    }
+
+    @Test
+    fun `toCommand does not treat a commit's git author name as a GitHub login`() {
+        val event = GithubCommitFetchedEvent(
+            transactionId = runId,
+            repositoryId = repositoryId,
+            repositoryOwner = "owner",
+            repositoryName = "repo",
+            author = "Ada Lovelace",
+            date = Instant.parse("2024-01-01T00:00:00Z"),
+            sha = "abc123",
+            msg = "fix: something",
+        )
+
+        // `git log --pretty=%an` yields a display name, not an account -- storing it as a login
+        // would attribute the commit to whoever happens to hold that handle on GitHub.
+        assertThat(mapper.toCommand(event).authorLogin).isNull()
     }
 
     @Test

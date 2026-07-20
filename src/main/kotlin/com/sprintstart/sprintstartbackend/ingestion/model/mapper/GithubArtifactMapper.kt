@@ -31,6 +31,10 @@ class GithubArtifactMapper {
      *
      * The commit title is intentionally shortened to keep list views compact while preserving the
      * full message in `bodyText`.
+     *
+     * `authorLogin` is deliberately left null: commits are parsed from `git log --pretty=%an`, so
+     * `event.author` is a git author *name*, not a GitHub login. Storing it as one would attribute
+     * a commit to whoever happens to hold that login.
      */
     fun toCommand(event: GithubCommitFetchedEvent): GithubArtifactCommand {
         return GithubArtifactCommand(
@@ -154,6 +158,7 @@ class GithubArtifactMapper {
             ),
             state = event.state,
             labels = event.labels,
+            authorLogin = event.author?.lowercase(),
         )
     }
 
@@ -190,6 +195,7 @@ class GithubArtifactMapper {
                     name = event.repositoryName,
                 ),
             ),
+            authorLogin = event.author?.lowercase(),
         )
     }
 

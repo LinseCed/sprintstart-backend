@@ -66,6 +66,20 @@ class Artifact(
     val ingestionRun: IngestionRun,
     @Column(name = "content_hash", length = 64)
     var hash: String?,
+    /**
+     * GitHub login of whoever authored this artifact at the source, lower-cased.
+     *
+     * Set for ISSUE and PULL_REQUEST only -- those come from the GraphQL API, which returns a real
+     * `author.login`. Commits are parsed from `git log --pretty=%an` (a git author *name*, not a
+     * GitHub account) and files have no single author, so both stay null rather than storing
+     * something that merely looks like a login.
+     *
+     * This is what lets a hire's own contributions be recognized: with their declared
+     * `User.githubLogin`, their activity in a project's connected repositories can be identified
+     * without asking GitHub anything new.
+     */
+    @Column(name = "author_login", nullable = true)
+    var authorLogin: String? = null,
     // --- AI sync outbox (see ArtifactAiSyncState) ---------------------------------------------
     @Enumerated(EnumType.STRING)
     @Column(name = "ai_sync_state", nullable = false)

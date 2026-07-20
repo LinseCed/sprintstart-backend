@@ -27,6 +27,15 @@ data class GithubArtifactCommand(
     // Only populated for ArtifactType.ISSUE today; null/empty for other GitHub artifact types.
     val state: String? = null,
     val labels: List<String> = emptyList(),
+    /**
+     * GitHub login of whoever authored this artifact at the source, lower-cased.
+     *
+     * Only ISSUE and PULL_REQUEST carry one: those come from the GraphQL API, which returns a real
+     * `author.login`. Commits are parsed out of `git log --pretty=%an`, which is a *git author
+     * name* ("Ada Lovelace"), not a GitHub account -- treating it as a login would attribute work
+     * to the wrong person. Files have no single author at all.
+     */
+    val authorLogin: String? = null,
 ) : ArtifactCommand
 
 data class UploadArtifactCommand(
