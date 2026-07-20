@@ -41,9 +41,31 @@ data class UserCompetencyStateResponse(
     val updatedAt: Instant,
 )
 
+/** A project role a user holds, echoed so a team list can label and filter by it. */
+data class DashboardProjectRoleResponse(
+    val id: UUID,
+    val name: String,
+)
+
+/** The project a user is a member of, echoed so a team list can group by it. */
+data class DashboardProjectResponse(
+    val id: UUID,
+    val name: String,
+)
+
+/**
+ * One user's ledger, plus the identity a team list needs to render them.
+ *
+ * [roles] and [projects] are echoed because this endpoint already *filters* by them
+ * (`roleIds`/`projectIds`) -- a client able to narrow by role but unable to show which role
+ * somebody holds is a strange half-contract, and the team list needs both to label and group.
+ */
 data class UserCompetencySummaryResponse(
     val userId: UUID,
     val firstname: String,
     val lastname: String,
+    val profileIcon: String?,
+    val roles: List<DashboardProjectRoleResponse>,
+    val projects: List<DashboardProjectResponse>,
     val competencies: List<UserCompetencyStateResponse>,
 )

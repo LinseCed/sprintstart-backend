@@ -7,6 +7,8 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetency
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
+import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
+import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import io.mockk.every
 import io.mockk.mockk
@@ -89,6 +91,38 @@ class CompetencyDashboardServiceTest {
 
     @Nested
     inner class GetUserCompetencySummaries {
+        @Test
+        fun `echoes the roles and projects the endpoint already filters by`() {
+            // The endpoint accepts roleIds/projectIds, so a client can narrow by role -- it must
+            // also be able to say which role somebody holds, or the team list has to invent it.
+            val userId = UUID.randomUUID()
+            val roleId = UUID.randomUUID()
+            val projectId = UUID.randomUUID()
+            every { userApi.searchUsers(null, null, null, pageable) } returns PageImpl(
+                listOf(
+                    UserDto(
+                        userId,
+                        "u-ada",
+                        "Ada",
+                        "Lovelace",
+                        null,
+                        "icon-1",
+                        setOf(ProjectDto(projectId, "Apollo", null)),
+                        listOf(ProjectRoleDto(roleId, "Backend Developer", "")),
+                    ),
+                ),
+            )
+            every { userCompetencyStateRepository.findAllByUserIdIn(listOf(userId)) } returns emptyList()
+            every { competencyRepository.findAll() } returns emptyList()
+
+            val summary = service.getUserCompetencySummaries(null, null, null, pageable).content.single()
+
+            assertEquals(listOf(roleId), summary.roles.map { it.id })
+            assertEquals(listOf("Backend Developer"), summary.roles.map { it.name })
+            assertEquals(listOf(projectId), summary.projects.map { it.id })
+            assertEquals("icon-1", summary.profileIcon)
+        }
+
         @Test
         fun `returns an empty page when no users match`() {
             every { userApi.searchUsers("nonexistent", null, null, pageable) } returns PageImpl(emptyList())
