@@ -14,6 +14,7 @@ fun StarterWorkTaskProposal.toResponse(): StarterWorkTaskProposalResponse =
         sourceUrl = sourceUrl,
         competencyKeys = competencyKeys.toList(),
         status = status,
+        taskZeroEligible = taskZeroEligible,
     )
 
 /** Maps a live proposal back into the wire shape the AI service's `/match` endpoint expects. */

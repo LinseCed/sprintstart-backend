@@ -9,4 +9,7 @@ interface StarterWorkTaskProposalRepository : JpaRepository<StarterWorkTaskPropo
     fun findAllByStatus(status: ProposalStatus): List<StarterWorkTaskProposal>
 
     fun findAllByStatusIn(statuses: Collection<ProposalStatus>): List<StarterWorkTaskProposal>
+
+    /** The Task-0-eligible pool: approved tasks a PM flagged as suitable for a hire's first task. */
+    fun findAllByStatusAndTaskZeroEligibleTrue(status: ProposalStatus): List<StarterWorkTaskProposal>
 }

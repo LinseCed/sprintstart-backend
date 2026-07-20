@@ -53,6 +53,15 @@ class StarterWorkTaskProposal(
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var status: ProposalStatus = ProposalStatus.PROPOSED,
+    /**
+     * Whether a PM has flagged this approved task as suitable for **Task 0** — the trivial first
+     * task a new hire is auto-assigned once their environment is ready, to walk the
+     * branch → PR → review → merge loop once while the stakes are nil. Only meaningful on an
+     * `APPROVED` proposal; a task nobody wanted is not a contribution, so this is a deliberate PM
+     * choice, not a default.
+     */
+    @Column(name = "task_zero_eligible", nullable = false)
+    var taskZeroEligible: Boolean = false,
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now(),
     @Column(name = "decided_at", nullable = true)
