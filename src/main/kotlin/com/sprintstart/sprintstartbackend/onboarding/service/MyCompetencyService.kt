@@ -52,6 +52,7 @@ class MyCompetencyService(
                     label = competency.label,
                     kind = competency.kind,
                     level = state.level,
+                    targetLevel = competency.targetLevel,
                     source = state.source,
                     updatedAt = state.updatedAt,
                 )

@@ -58,6 +58,7 @@ class MyCompetencyControllerTest(
                 label = "Kotlin",
                 kind = CompetencyKind.SKILL,
                 level = 3,
+                targetLevel = 2,
                 source = CompetencySource.VERIFIED,
                 updatedAt = Instant.parse("2026-07-19T00:00:00Z"),
             ),
@@ -68,6 +69,8 @@ class MyCompetencyControllerTest(
             .andExpect(status().isOk)
             .andExpect(jsonPath("$[0].competencyKey").value("kotlin"))
             .andExpect(jsonPath("$[0].kind").value("SKILL"))
+            // The bar travels with the row so a client can tell "holds this" from "progressing".
+            .andExpect(jsonPath("$[0].targetLevel").value(2))
             .andExpect(jsonPath("$[0].source").value("VERIFIED"))
 
         verify(exactly = 1) { myCompetencyService.getMyCompetencies(authId) }

@@ -18,6 +18,14 @@ data class MyCompetencyResponse(
     val label: String,
     val kind: CompetencyKind,
     val level: Int,
+    /**
+     * The level [level] must reach for this competency to count as met.
+     *
+     * Carried so a client can tell "holds this" from "has made progress toward this" without a
+     * second graph fetch. Without it a skills list shows a partial level as a held skill, which is
+     * the same conflation that let a beginner placement render as mastery.
+     */
+    val targetLevel: Int,
     val source: CompetencySource,
     val updatedAt: Instant,
 )
