@@ -77,7 +77,6 @@ class GithubConnectorServiceTest {
             githubClient = githubClient,
             eventPublisher = eventPublisher,
             userApi = userApi,
-            self = null,
         )
     }
 
