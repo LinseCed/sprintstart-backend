@@ -10,7 +10,6 @@ import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.model.request.project.AssignProjectUsersRequest
 import com.sprintstart.sprintstartbackend.user.model.request.project.CreateAdminProjectRequest
 import com.sprintstart.sprintstartbackend.user.model.request.project.PatchAdminProjectRequest
-import com.sprintstart.sprintstartbackend.user.model.request.project.SetProjectManagerRequest
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRepository
 import com.sprintstart.sprintstartbackend.user.repository.ProjectUserAssignmentRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository

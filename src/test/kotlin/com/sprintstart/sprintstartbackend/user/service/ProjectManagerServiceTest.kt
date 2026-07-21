@@ -164,7 +164,6 @@ class ProjectManagerServiceTest {
         verify(exactly = 0) { projectRepository.findAllByManagerAuthId(any()) }
     }
 
-
     private fun project(
         id: UUID = UUID.randomUUID(),
         name: String = "SprintStart Frontend",
