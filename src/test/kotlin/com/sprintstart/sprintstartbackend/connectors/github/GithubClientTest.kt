@@ -1,16 +1,16 @@
-package com.sprintstart.sprintstartbackend.github
+package com.sprintstart.sprintstartbackend.connectors.github
 
 import com.sprintstart.sprintstartbackend.AiConfig
 import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.CryptoConfig
 import com.sprintstart.sprintstartbackend.GithubConfig
 import com.sprintstart.sprintstartbackend.UploadConfig
-import com.sprintstart.sprintstartbackend.connectors.github.GithubClient
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.connectors.github.util.GithubQueryLoader
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
+import com.sprintstart.sprintstartbackend.shared.web.WebClientException
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -35,20 +35,19 @@ class GithubClientTest {
     }
 
     private lateinit var githubClient: GithubClient
+    private lateinit var applicationConfig: ApplicationConfig
     private lateinit var queryLoader: GithubQueryLoader
 
     @BeforeEach
     fun setUp() {
         mockWebServer.start()
 
-        val baseUrl = mockWebServer.url("/graphql").toString()
-        val repoBaseUrl = mockWebServer.url("/repos").toString()
+        val baseUrl = mockWebServer.url("").toString()
 
-        val applicationConfig = ApplicationConfig(
+        applicationConfig = ApplicationConfig(
             ai = AiConfig(baseUrl = "http://unused"),
             github = GithubConfig(
                 baseUrl = baseUrl,
-                repoBaseUrl = repoBaseUrl,
                 cron = "0 0 * * *",
             ),
             crypto = CryptoConfig(masterKey = "unused", salt = "unused"),
@@ -343,6 +342,222 @@ class GithubClientTest {
         }
     }
 
+    @Nested
+    inner class DiscoverRepositoriesOfOrg {
+        @Test
+        fun `discoverRepositoriesOfOrg returns empty list when user has no repos`() {
+            mockWebServer.enqueue(emptyReposResponse())
+
+            val result = runBlocking {
+                githubClient.discoverRepositoriesOfOrg(
+                    org = "octocat",
+                    token = "test-token",
+                    page = 0,
+                    pageSize = 30,
+                )
+            }
+
+            assertThat(result.repositories).isEmpty()
+        }
+
+        @Test
+        fun `discoverRepositoriesOfOrg returns repositories from response`() {
+            mockWebServer.enqueue(reposResponse(listOf(repoJson(name = "repo-a"), repoJson(name = "repo-b"))))
+
+            val result = runBlocking {
+                githubClient.discoverRepositoriesOfOrg(
+                    org = "octocat",
+                    token = "test-token",
+                    page = 0,
+                    pageSize = 30,
+                )
+            }
+
+            assertThat(result.repositories).hasSize(2)
+            assertThat(result.repositories.map { it.name }).containsExactly("repo-a", "repo-b")
+        }
+
+        @Test
+        fun `discoverRepositoriesOfOrg requests correct path and query params`() {
+            mockWebServer.enqueue(emptyReposResponse())
+
+            runBlocking {
+                githubClient.discoverRepositoriesOfOrg(
+                    org = "octocat",
+                    token = "test-token",
+                    page = 0,
+                    pageSize = 30,
+                )
+            }
+
+            val recorded = mockWebServer.takeRequest()
+            assertThat(recorded.path?.drop(1)).isEqualTo("/orgs/octocat/repos?per_page=30&page=1")
+        }
+
+        @Test
+        fun `discoverRepositoriesOfOrg converts zero-based page to one-based page number in request`() {
+            mockWebServer.enqueue(emptyReposResponse())
+
+            runBlocking {
+                githubClient.discoverRepositoriesOfOrg(
+                    org = "octocat",
+                    token = "test-token",
+                    page = 2,
+                    pageSize = 10,
+                )
+            }
+
+            val recorded = mockWebServer.takeRequest()
+            assertThat(recorded.path).contains("page=3")
+        }
+
+        @Test
+        fun `discoverRepositoriesOfOrg sends auth header`() {
+            mockWebServer.enqueue(emptyReposResponse())
+
+            runBlocking {
+                githubClient.discoverRepositoriesOfOrg(
+                    org = "octocat",
+                    token = "test-token",
+                    page = 0,
+                    pageSize = 30,
+                )
+            }
+
+            val recorded = mockWebServer.takeRequest()
+            assertThat(recorded.getHeader("Authorization")).isEqualTo("Bearer test-token")
+        }
+
+        @Test
+        fun `discoverRepositoriesOfOrg throws WebClientException on non-2xx response`() {
+            mockWebServer.enqueue(
+                MockResponse()
+                    .setResponseCode(404)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""{"message":"Not Found"}"""),
+            )
+
+            assertThatThrownBy {
+                runBlocking {
+                    githubClient.discoverRepositoriesOfOrg(
+                        org = "missing-user",
+                        token = "test-token",
+                        page = 0,
+                        pageSize = 30,
+                    )
+                }
+            }.isInstanceOf(WebClientException::class.java)
+        }
+    }
+
+    @Nested
+    inner class DiscoverRepositoriesOfUser {
+        @Test
+        fun `discoverRepositoriesOfUser returns empty list when user has no repos`() {
+            mockWebServer.enqueue(emptyReposResponse())
+
+            val result = runBlocking {
+                githubClient.discoverRepositoriesOfUser(
+                    user = "octocat",
+                    token = "test-token",
+                    page = 0,
+                    pageSize = 30,
+                )
+            }
+
+            assertThat(result.repositories).isEmpty()
+        }
+
+        @Test
+        fun `discoverRepositoriesOfUser returns repositories from response`() {
+            mockWebServer.enqueue(reposResponse(listOf(repoJson(name = "repo-a"), repoJson(name = "repo-b"))))
+
+            val result = runBlocking {
+                githubClient.discoverRepositoriesOfUser(
+                    user = "octocat",
+                    token = "test-token",
+                    page = 0,
+                    pageSize = 30,
+                )
+            }
+
+            assertThat(result.repositories).hasSize(2)
+            assertThat(result.repositories.map { it.name }).containsExactly("repo-a", "repo-b")
+        }
+
+        @Test
+        fun `discoverRepositoriesOfUser requests correct path and query params`() {
+            mockWebServer.enqueue(emptyReposResponse())
+
+            runBlocking {
+                githubClient.discoverRepositoriesOfUser(
+                    user = "octocat",
+                    token = "test-token",
+                    page = 0,
+                    pageSize = 30,
+                )
+            }
+
+            val recorded = mockWebServer.takeRequest()
+            assertThat(recorded.path?.drop(1)).isEqualTo("/users/octocat/repos?per_page=30&page=1")
+        }
+
+        @Test
+        fun `discoverRepositoriesOfUser converts zero-based page to one-based page number in request`() {
+            mockWebServer.enqueue(emptyReposResponse())
+
+            runBlocking {
+                githubClient.discoverRepositoriesOfUser(
+                    user = "octocat",
+                    token = "test-token",
+                    page = 2,
+                    pageSize = 10,
+                )
+            }
+
+            val recorded = mockWebServer.takeRequest()
+            assertThat(recorded.path).contains("page=3")
+        }
+
+        @Test
+        fun `discoverRepositoriesOfUser sends auth header`() {
+            mockWebServer.enqueue(emptyReposResponse())
+
+            runBlocking {
+                githubClient.discoverRepositoriesOfUser(
+                    user = "octocat",
+                    token = "test-token",
+                    page = 0,
+                    pageSize = 30,
+                )
+            }
+
+            val recorded = mockWebServer.takeRequest()
+            assertThat(recorded.getHeader("Authorization")).isEqualTo("Bearer test-token")
+        }
+
+        @Test
+        fun `discoverRepositoriesOfUser throws WebClientException on non-2xx response`() {
+            mockWebServer.enqueue(
+                MockResponse()
+                    .setResponseCode(404)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody("""{"message":"Not Found"}"""),
+            )
+
+            assertThatThrownBy {
+                runBlocking {
+                    githubClient.discoverRepositoriesOfUser(
+                        user = "missing-user",
+                        token = "test-token",
+                        page = 0,
+                        pageSize = 30,
+                    )
+                }
+            }.isInstanceOf(WebClientException::class.java)
+        }
+    }
+
     // ── JSON helpers ──────────────────────────────────────────────────────────
 
     private fun issueJson(number: Int) =
@@ -446,4 +661,31 @@ class GithubClientTest {
         .setResponseCode(200)
         .setHeader("Content-Type", "application/json")
         .setBody("""{ "data": { "repository": { "pullRequest": null } } }""")
+
+    private fun emptyReposResponse(): MockResponse =
+        MockResponse()
+            .setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("[]")
+
+    private fun reposResponse(repoJsons: List<String>): MockResponse =
+        MockResponse()
+            .setResponseCode(200)
+            .setHeader("Content-Type", "application/json")
+            .setBody("[${repoJsons.joinToString(",")}]")
+
+    private fun repoJson(
+        id: Long = 1,
+        name: String = "repo",
+        fullName: String = "owner/$name",
+    ): String =
+        """
+        {
+          "id": $id,
+          "name": "$name",
+          "full_name": "$fullName",
+          "private": false,
+          "html_url": "https://github.com/$fullName"
+        }
+        """.trimIndent()
 }

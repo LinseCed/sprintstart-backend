@@ -53,7 +53,7 @@ class GithubClient(
      * @throws kotlinx.serialization.SerializationException if the response body cannot be deserialized
      */
     suspend fun repositoryExists(repository: GithubRepositoryConnection): Boolean {
-        val baseUrl = applicationConfig.github.repoBaseUrl
+        val baseUrl = applicationConfig.github.baseUrl + "/repos"
         return try {
             webClient
                 .get()
@@ -145,8 +145,10 @@ class GithubClient(
      *
      * @param org the name of the GitHub organization whose repositories are to be discovered.
      * @param token the personal access token (PAT) used for authenticating the request to the GitHub API.
-     * @return a [DiscoverRepositoriesResponse] object containing the list of repositories belonging to the organization.
-     * @throws WebClientException if there is an issue with the network or server response, such as a non-2xx status code.
+     * @return a [DiscoverRepositoriesResponse] object containing the list of repositories belonging to the
+     * organization.
+     * @throws WebClientException if there is an issue with the network or server response, such as a non-2xx status
+     * code.
      */
     suspend fun discoverRepositoriesOfOrg(
         org: String,
@@ -154,7 +156,7 @@ class GithubClient(
         page: Int,
         pageSize: Int,
     ): DiscoverRepositoriesResponse {
-        val uri = "https://api.github.com/orgs/$org/repos?per_page=$pageSize&page=${page + 1}"
+        val uri = "${applicationConfig.github.baseUrl}/orgs/$org/repos?per_page=$pageSize&page=${page + 1}"
         return discoverRepositories(uri, token)
     }
 
@@ -169,7 +171,8 @@ class GithubClient(
      * @param page the zero-based index of the page to fetch.
      * @param pageSize the number of repositories to fetch per page.
      * @return a [DiscoverRepositoriesResponse] object containing the list of repositories belonging to the user.
-     * @throws WebClientException if there is an issue with the network or server response, such as a non-2xx status code.
+     * @throws WebClientException if there is an issue with the network or server response, such as a non-2xx status
+     * code.
      */
     suspend fun discoverRepositoriesOfUser(
         user: String,
@@ -177,7 +180,7 @@ class GithubClient(
         page: Int,
         pageSize: Int,
     ): DiscoverRepositoriesResponse {
-        val uri = "https://api.github.com/users/$user/repos?per_page=$pageSize&page=${page + 1}"
+        val uri = "${applicationConfig.github.baseUrl}/users/$user/repos?per_page=$pageSize&page=${page + 1}"
         return discoverRepositories(uri, token)
     }
 
@@ -260,7 +263,7 @@ class GithubClient(
 
         val response = webClient
             .post()
-            .uri(applicationConfig.github.baseUrl)
+            .uri(applicationConfig.github.baseUrl + "/graphql")
             .header("Authorization", "Bearer ${repository.user.token}")
             .header("Content-Type", "application/json")
             .rawBody(objectMapper.writeValueAsString(body))
@@ -299,7 +302,7 @@ class GithubClient(
 
             val response = webClient
                 .post()
-                .uri(applicationConfig.github.baseUrl)
+                .uri(applicationConfig.github.baseUrl + "/graphql")
                 .header("Authorization", "Bearer $token")
                 .header("Content-Type", "application/json")
                 .rawBody(objectMapper.writeValueAsString(body))

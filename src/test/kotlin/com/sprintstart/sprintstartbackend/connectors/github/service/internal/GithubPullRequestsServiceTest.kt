@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.github.service.internal
+package com.sprintstart.sprintstartbackend.connectors.github.service.internal
 
 import com.sprintstart.sprintstartbackend.connectors.github.GithubClient
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.pullrequests.GithubPullRequestComment
@@ -24,7 +24,6 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphq
 import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphql.ThreadCommentNode
 import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphql.ThreadCommentsConnection
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
-import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubPullRequestsService
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.slot

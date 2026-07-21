@@ -1,11 +1,8 @@
-package com.sprintstart.sprintstartbackend.github.util
+package com.sprintstart.sprintstartbackend.connectors.github.util
 
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
-import com.sprintstart.sprintstartbackend.connectors.github.util.CustomOnDiskCache
-import com.sprintstart.sprintstartbackend.connectors.github.util.GitOperationRunner
-import com.sprintstart.sprintstartbackend.connectors.github.util.OnDiskOperations
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

@@ -95,12 +95,14 @@ internal class GithubConnectorController(
     /**
      * Discovers all GitHub repositories accessible to the specified user using a stored Personal Access Token (PAT).
      *
-     * @param jwt The authentication principal representing the JSON Web Token of the current user. This is injected automatically.
+     * @param jwt The authentication principal representing the JSON Web Token of the current user. This is injected
+     * automatically.
      * @param user The GitHub username whose repositories are to be discovered.
      * @param tokenName The name of the stored PAT that will be used for authenticating with the GitHub API.
      * @param page The page number for paginated results. Defaults to 0.
      * @param pageSize The number of repositories to include per page in the paginated results. Defaults to 20.
-     * @return A ResponseEntity containing the DiscoverRepositoriesResponse, which includes the list of discovered repositories.
+     * @return A ResponseEntity containing the DiscoverRepositoriesResponse, which includes the list of discovered
+     * repositories.
      */
     @Operation(
         summary = "Discover GitHub repositories of a user",

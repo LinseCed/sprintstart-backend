@@ -1,7 +1,5 @@
-package com.sprintstart.sprintstartbackend.github.models
+package com.sprintstart.sprintstartbackend.connectors.github.models
 
-import com.sprintstart.sprintstartbackend.connectors.github.models.ScheduleSpec
-import com.sprintstart.sprintstartbackend.connectors.github.models.ScheduleSpecJpaConverter
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test

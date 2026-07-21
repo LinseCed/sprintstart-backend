@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.github.service
+package com.sprintstart.sprintstartbackend.connectors.github.service
 
 import com.sprintstart.sprintstartbackend.connectors.github.GithubClient
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.initial.GithubRepositoryConnectionInitiatedEvent
@@ -7,12 +7,15 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.GithubReposit
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.DiscoverRepositoriesRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoverRepositoriesResponse
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoveredRepository
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.SourceNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConfigRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
-import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubCommitsService
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubFileService
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubIssuesService
@@ -74,6 +77,7 @@ class GithubConnectorServiceTest {
             githubClient = githubClient,
             eventPublisher = eventPublisher,
             userApi = userApi,
+            self = null,
         )
     }
 
@@ -272,7 +276,7 @@ class GithubConnectorServiceTest {
         }
 
         @Test
-        fun `patchSource throws RuntimeException when source not found`() {
+        fun `patchSource throws SourceNotFoundException when source not found`() {
             val source = ConnectorSource(
                 id = "unknown/repo",
                 name = "repo",
@@ -281,7 +285,110 @@ class GithubConnectorServiceTest {
             )
             every { repoConnectionRepository.findAll() } returns emptyList()
 
-            assertFailsWith<RuntimeException> { service.patchSource(source, true) }
+            assertFailsWith<SourceNotFoundException> { service.patchSource(source, true) }
+        }
+    }
+
+    @Nested
+    inner class DiscoverRepositories {
+        @Test
+        fun `discoverRepositoriesOfOrg returns discovered repositories with metadata`() = testScope.runTest {
+            val request = DiscoverRepositoriesRequest(
+                owner = "org",
+                userId = "user-id",
+                tokenName = "my-pat",
+                page = 0,
+                pageSize = 20,
+            )
+            val token = GithubUser(GithubUserPat("user-id", "my-pat"), token = "pat-token")
+            val discovered = listOf(
+                DiscoveredRepository("repo1", false, "https://github.com/org/repo1"),
+                DiscoveredRepository("repo2", true, "https://github.com/org/repo2"),
+            )
+            val connectedRepo = GithubRepositoryConnection(owner = "org", name = "repo1", user = token)
+                .apply { sourceEnabled = true }
+
+            every { githubUserRepository.findById(GithubUserPat("user-id", "my-pat")) } returns Optional.of(token)
+            coEvery {
+                githubClient.discoverRepositoriesOfOrg("org", "pat-token", 0, 20)
+            } returns DiscoverRepositoriesResponse(discovered)
+            every { repoConnectionRepository.findByOwnerAndName("org", "repo1") } returns connectedRepo
+            every { repoConnectionRepository.findByOwnerAndName("org", "repo2") } returns null
+
+            val result = service.discoverRepositoriesOfOrg(request)
+
+            assertThat(result.repositories).hasSize(2)
+            assertThat(result.repositories[0].alreadyConnected).isTrue()
+            assertThat(result.repositories[0].isEnabled).isTrue()
+            assertThat(result.repositories[1].alreadyConnected).isFalse()
+            assertThat(result.repositories[1].isEnabled).isNull()
+        }
+
+        @Test
+        fun `discoverRepositoriesOfOrg marks connected disabled repo with isEnabled false`() = testScope.runTest {
+            val request = DiscoverRepositoriesRequest(
+                owner = "org",
+                userId = "user-id",
+                tokenName = "my-pat",
+                page = 0,
+                pageSize = 20,
+            )
+            val token = GithubUser(GithubUserPat("user-id", "my-pat"), token = "pat-token")
+            val discovered = listOf(DiscoveredRepository("repo", false, "https://github.com/org/repo"))
+            val connectedRepo = GithubRepositoryConnection(owner = "org", name = "repo", user = token)
+                .apply { sourceEnabled = false }
+
+            every { githubUserRepository.findById(GithubUserPat("user-id", "my-pat")) } returns Optional.of(token)
+            coEvery {
+                githubClient.discoverRepositoriesOfOrg("org", "pat-token", 0, 20)
+            } returns DiscoverRepositoriesResponse(discovered)
+            every { repoConnectionRepository.findByOwnerAndName("org", "repo") } returns connectedRepo
+
+            val result = service.discoverRepositoriesOfOrg(request)
+
+            assertThat(result.repositories[0].alreadyConnected).isTrue()
+            assertThat(result.repositories[0].isEnabled).isFalse()
+        }
+
+        @Test
+        fun `discoverRepositoriesOfUser calls user endpoint and maps metadata`() = testScope.runTest {
+            val request = DiscoverRepositoriesRequest(
+                owner = "ghuser",
+                userId = "user-id",
+                tokenName = "my-pat",
+                page = 2,
+                pageSize = 10,
+            )
+            val token = GithubUser(GithubUserPat("user-id", "my-pat"), token = "pat-token")
+            val discovered = listOf(DiscoveredRepository("repo", false, "https://github.com/ghuser/repo"))
+
+            every { githubUserRepository.findById(GithubUserPat("user-id", "my-pat")) } returns Optional.of(token)
+            coEvery {
+                githubClient.discoverRepositoriesOfUser("ghuser", "pat-token", 2, 10)
+            } returns DiscoverRepositoriesResponse(discovered)
+            every { repoConnectionRepository.findByOwnerAndName("ghuser", "repo") } returns null
+
+            val result = service.discoverRepositoriesOfUser(request)
+
+            assertThat(result.repositories).hasSize(1)
+            assertThat(result.repositories[0].alreadyConnected).isFalse()
+            assertThat(result.repositories[0].isEnabled).isNull()
+        }
+
+        @Test
+        fun `discoverRepositoriesOfOrg throws GithubUserPatNotFoundException when pat missing`() = testScope.runTest {
+            val request = DiscoverRepositoriesRequest(
+                owner = "org",
+                userId = "user-id",
+                tokenName = "missing-pat",
+                page = 0,
+                pageSize = 20,
+            )
+            every { githubUserRepository.findById(GithubUserPat("user-id", "missing-pat")) } returns Optional.empty()
+
+            assertFailsWith<GithubUserPatNotFoundException> {
+                service.discoverRepositoriesOfOrg(request)
+            }
         }
     }
 
