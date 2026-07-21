@@ -100,6 +100,31 @@ class StarterWorkControllerTest(
     }
 
     @Test
+    fun `create should return 200 and the created task for a PM`() {
+        every { starterWorkTaskProposalService.createTask(any()) } returns taskResponse()
+
+        mockMvc
+            .perform(
+                post("/api/v1/onboarding/starter-work")
+                    .with(pmJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(mapOf("title" to "Add dark mode"))),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.status").value("APPROVED"))
+    }
+
+    @Test
+    fun `create should return 403 for a plain USER`() {
+        mockMvc
+            .perform(
+                post("/api/v1/onboarding/starter-work")
+                    .with(userJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(mapOf("title" to "Add dark mode"))),
+            ).andExpect(status().isForbidden)
+    }
+
+    @Test
     fun `approve should return 200 for a PM`() {
         every { starterWorkTaskProposalService.approve(taskId) } returns taskResponse()
 

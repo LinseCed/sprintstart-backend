@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphChange
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyEdgeRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.UpdateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphChangeRepository
@@ -70,6 +71,10 @@ class CompetencyGraphAuthoringServiceTest {
         }
         every { competencyRepository.findAll() } returns competencies
         every { competencyEdgeRepository.findAll() } returns edges
+        // Relaxed mocks answer a nullable reference return with a child mock, not null, so a
+        // create against a fresh key would "find" a ghost row. Default to no existing row; the
+        // soft-removed-reuse test overrides this for its specific key.
+        every { competencyRepository.findByKey(any()) } returns null
         // A relaxed mock returns a bare Object from the generic save(S): S, which the checkcast
         // Kotlin inserts at the call site rejects -- echo the argument back instead.
         every { competencyRepository.save(any()) } answers { firstArg() }
@@ -181,6 +186,131 @@ class CompetencyGraphAuthoringServiceTest {
 
             assertTrue(response.competencies.isEmpty())
             assertTrue(response.edges.isEmpty())
+        }
+    }
+
+    @Nested
+    inner class CreateCompetency {
+        @Test
+        fun `saves a new node and records NODE_ADDED`() {
+            stageGraph()
+
+            val response = service.createCompetency(
+                CreateCompetencyRequest(key = "docker", label = "Docker", kind = CompetencyKind.SKILL),
+            )
+
+            assertEquals("docker", response.key)
+            assertEquals("Docker", response.label)
+            verify(exactly = 1) { competencyRepository.save(any()) }
+            // A node written without a change row is a permanently invisible ghost.
+            verify(exactly = 1) { competencyGraphVersionService.recordNodeAdded("docker") }
+            verify(exactly = 1) { competencyGraphVersionService.bump() }
+        }
+
+        @Test
+        fun `slugifies a hand-typed key into the house style`() {
+            stageGraph()
+
+            val response = service.createCompetency(
+                CreateCompetencyRequest(key = "Docker Compose!", label = "Docker Compose", kind = CompetencyKind.SKILL),
+            )
+
+            assertEquals("docker-compose", response.key)
+            verify(exactly = 1) { competencyGraphVersionService.recordNodeAdded("docker-compose") }
+        }
+
+        @Test
+        fun `defaults the target level to the intermediate bar when omitted`() {
+            stageGraph()
+
+            val response = service.createCompetency(
+                CreateCompetencyRequest(key = "docker", label = "Docker", kind = CompetencyKind.SKILL),
+            )
+
+            assertEquals(Competency.DEFAULT_TARGET_LEVEL, response.targetLevel)
+        }
+
+        @Test
+        fun `rejects a key that is blank once slugified`() {
+            stageGraph()
+
+            val exception = assertThrows<ResponseStatusException> {
+                service.createCompetency(
+                    CreateCompetencyRequest(key = "  !! ", label = "X", kind = CompetencyKind.SKILL),
+                )
+            }
+
+            assertEquals(HttpStatus.BAD_REQUEST, exception.statusCode)
+            verify(exactly = 0) { competencyGraphVersionService.bump() }
+        }
+
+        @Test
+        fun `rejects a blank label`() {
+            stageGraph()
+
+            val exception = assertThrows<ResponseStatusException> {
+                service.createCompetency(
+                    CreateCompetencyRequest(key = "docker", label = "  ", kind = CompetencyKind.SKILL),
+                )
+            }
+
+            assertEquals(HttpStatus.BAD_REQUEST, exception.statusCode)
+        }
+
+        @Test
+        fun `rejects a target level outside 1 to 4`() {
+            stageGraph()
+
+            val exception = assertThrows<ResponseStatusException> {
+                service.createCompetency(
+                    CreateCompetencyRequest(
+                        key = "docker",
+                        label = "Docker",
+                        kind = CompetencyKind.SKILL,
+                        targetLevel = 0,
+                    ),
+                )
+            }
+
+            assertEquals(HttpStatus.BAD_REQUEST, exception.statusCode)
+            verify(exactly = 0) { competencyGraphVersionService.bump() }
+        }
+
+        @Test
+        fun `409s when a visible competency already has the key`() {
+            stageGraph(competencies = listOf(competency("kotlin")))
+
+            val exception = assertThrows<ResponseStatusException> {
+                service.createCompetency(
+                    CreateCompetencyRequest(key = "Kotlin", label = "Kotlin", kind = CompetencyKind.SKILL),
+                )
+            }
+
+            assertEquals(HttpStatus.CONFLICT, exception.statusCode)
+            verify(exactly = 0) { competencyRepository.save(any()) }
+        }
+
+        @Test
+        fun `reuses a soft-removed row instead of inserting a duplicate`() {
+            // The row survived removal, so a fresh insert would violate the unique key constraint.
+            val removed = competency("kotlin")
+            stageGraph(
+                competencies = listOf(removed),
+                extraChanges = listOf(
+                    CompetencyGraphChange(version = 2, changeType = ChangeType.NODE_REMOVED, competencyKey = "kotlin"),
+                ),
+            )
+            every { competencyRepository.findByKey("kotlin") } returns removed
+
+            val response = service.createCompetency(
+                CreateCompetencyRequest(key = "kotlin", label = "Kotlin Reloaded", kind = CompetencyKind.CONCEPT),
+            )
+
+            // Not a 409 -- the key is not visible -- and the existing row is re-authored, not duplicated.
+            assertEquals("kotlin", response.key)
+            assertEquals("Kotlin Reloaded", response.label)
+            assertEquals(CompetencyKind.CONCEPT, response.kind)
+            verify(exactly = 1) { competencyGraphVersionService.recordNodeAdded("kotlin") }
         }
     }
 
