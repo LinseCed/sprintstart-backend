@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.controller
 
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.RejectProposalRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.ClaimGoalRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GoalView
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.GenerateStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.ProposedStarterWorkResponse
@@ -66,6 +67,33 @@ class StarterWorkController(
     @PostMapping("/generate")
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     suspend fun generate(): GenerateStarterWorkResponse = starterWorkTaskProposalService.generate()
+
+    /**
+     * Creates a hand-authored starter-work task, with no AI mining in the loop.
+     *
+     * The origination counterpart to [approve]: mining fills the pool from ingested issues, this
+     * adds a task the corpus never surfaced. Born APPROVED -- a PM authoring a task is the review --
+     * and its CONTRIBUTION node lands in the graph immediately.
+     */
+    @Operation(
+        summary = "Create a starter-work task by hand",
+        description = "Hand-authors an approved starter-work task and its CONTRIBUTION node, with no AI mining — " +
+            "AI help is optional",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Task created and its contribution node added"),
+            ApiResponse(responseCode = "400", description = "Blank title"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun create(
+        @RequestBody request: CreateStarterWorkTaskRequest,
+    ): StarterWorkTaskProposalResponse = starterWorkTaskProposalService.createTask(request)
 
     /**
      * Lists the starter-work tasks currently awaiting PM review.

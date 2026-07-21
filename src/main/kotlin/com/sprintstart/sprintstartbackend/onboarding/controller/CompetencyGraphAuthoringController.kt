@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.controller
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyEdgeRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.UpdateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyGraphResponse
@@ -84,6 +85,33 @@ class CompetencyGraphAuthoringController(
     @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
     fun getCompetency(@PathVariable key: String): CompetencyResponse {
         return competencyGraphAuthoringService.getCompetency(key)
+    }
+
+    /**
+     * Creates a hand-authored competency node, with no AI proposal in the loop.
+     *
+     * The origination counterpart to [CompetencyGraphProposalController]'s approve: AI mining is
+     * one way to seed the graph, this is the other. Returns the created node, whose `key` may
+     * differ from what was sent -- it is slugified into the graph's house style.
+     */
+    @Operation(
+        summary = "Create a competency by hand",
+        description = "Hand-authors a new competency node in the live graph, with no AI proposal — AI help is optional",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Competency created"),
+            ApiResponse(responseCode = "400", description = "Blank key or label, or target level outside 1..4"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "409", description = "A competency with this key already exists in the graph"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/competencies")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun createCompetency(@RequestBody request: CreateCompetencyRequest): CompetencyResponse {
+        return competencyGraphAuthoringService.createCompetency(request)
     }
 
     /**

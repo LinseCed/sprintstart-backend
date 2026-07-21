@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.GenerateStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.ProposedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
@@ -42,6 +43,7 @@ import java.util.UUID
  * a hire has built the skills it requires.
  */
 @Service
+@Suppress("TooManyFunctions")
 class StarterWorkTaskProposalService(
     private val onboardingAiClient: OnboardingAiClient,
     private val competencyRepository: CompetencyRepository,
@@ -140,6 +142,54 @@ class StarterWorkTaskProposalService(
     @Transactional
     fun approve(id: UUID): StarterWorkTaskProposalResponse {
         val proposal = findPendingProposal(id)
+        materialiseContributionNode(proposal)
+        proposal.status = ProposalStatus.APPROVED
+        proposal.decidedAt = Instant.now()
+        return proposal.toResponse()
+    }
+
+    /**
+     * Creates a hand-authored starter-work task, with no AI mining in the loop.
+     *
+     * Born `APPROVED` and materialised straight away: a PM authoring a task is the review, so there
+     * is nothing to approve back to them (the same reasoning as direct baseline authoring). The task
+     * has no ingested source, so a stable synthetic [sourceId] is minted -- unique per task, and by
+     * design not a `github:owner/name:...` id, so fit-ranking's repository-responsiveness and
+     * ingested-label lookups simply find nothing for it rather than misattributing it, both of which
+     * already degrade gracefully to "no signal".
+     *
+     * @throws ResponseStatusException 400 if the title is blank.
+     */
+    @Transactional
+    fun createTask(request: CreateStarterWorkTaskRequest): StarterWorkTaskProposalResponse {
+        if (request.title.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "title must not be blank")
+        }
+        val proposal = starterWorkTaskProposalRepository.save(
+            StarterWorkTaskProposal(
+                sourceId = HAND_AUTHORED_SOURCE_PREFIX + UUID.randomUUID(),
+                title = request.title.trim(),
+                summary = request.summary?.trim()?.takeIf { it.isNotBlank() },
+                rationale = null,
+                sourceUrl = request.sourceUrl?.trim()?.takeIf { it.isNotBlank() },
+                competencyKeys = request.competencyKeys.toMutableList(),
+                status = ProposalStatus.APPROVED,
+                decidedAt = Instant.now(),
+            ),
+        )
+        materialiseContributionNode(proposal)
+        return proposal.toResponse()
+    }
+
+    /**
+     * Creates the `CONTRIBUTION` [Competency] a task becomes and wires a `PREREQUISITE` edge from
+     * each tagged key that is a live competency, then bumps the graph version.
+     *
+     * Shared by [approve] and [createTask] so a mined and a hand-authored task land in the graph
+     * identically. A tagged key that isn't a live competency is skipped rather than blocking, and an
+     * already-present node or edge is left alone -- both paths are idempotent w.r.t. the graph.
+     */
+    private fun materialiseContributionNode(proposal: StarterWorkTaskProposal) {
         val contributionKey = contributionKeyFor(proposal.sourceId)
 
         if (!competencyRepository.existsByKey(contributionKey)) {
@@ -173,9 +223,6 @@ class StarterWorkTaskProposalService(
             }
 
         competencyGraphVersionService.bump()
-        proposal.status = ProposalStatus.APPROVED
-        proposal.decidedAt = Instant.now()
-        return proposal.toResponse()
     }
 
     /**
@@ -315,6 +362,14 @@ class StarterWorkTaskProposalService(
         /** Namespaces used by `GithubHistoryPrior.signals`; see that entity's docs. */
         private const val REPO_SIGNAL_PREFIX = "repo:"
         private const val LABEL_SIGNAL_PREFIX = "label:"
+
+        /**
+         * Source-id namespace for a hand-authored task, deliberately not the `github:owner/name:...`
+         * shape a mined task carries. [repositoryOf] finds no `owner/name` in it (so fit-ranking
+         * attaches no repository-responsiveness signal) and `ArtifactIngestionApi.getTaskSource`
+         * finds no ingested artifact -- both degrade to "no signal" rather than misattributing.
+         */
+        private const val HAND_AUTHORED_SOURCE_PREFIX = "authored:"
 
         /**
          * Derives a stable, deterministic competency key for the CONTRIBUTION node an approved

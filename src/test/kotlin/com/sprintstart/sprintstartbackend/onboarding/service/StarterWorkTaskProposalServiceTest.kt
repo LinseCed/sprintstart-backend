@@ -14,6 +14,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.GithubHistoryPrior
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
+import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
@@ -203,6 +204,65 @@ class StarterWorkTaskProposalServiceTest {
             val ex = assertThrows<ResponseStatusException> { service.approve(proposal.id) }
 
             assertEquals(HttpStatus.CONFLICT, ex.statusCode)
+        }
+    }
+
+    @Nested
+    inner class CreateTask {
+        @Test
+        fun `creates an APPROVED task and materialises its contribution node`() {
+            val slot = slot<StarterWorkTaskProposal>()
+            every { starterWorkTaskProposalRepository.save(capture(slot)) } answers { slot.captured }
+            every { competencyRepository.existsByKey(any()) } returns false
+            every { competencyRepository.save(any<Competency>()) } answers { firstArg() }
+            every { competencyRepository.findAllByKeyIn(any()) } returns emptyList()
+
+            val result = service.createTask(CreateStarterWorkTaskRequest(title = "Add dark mode"))
+
+            // A PM authoring a task is the review -- it is born approved, not proposed.
+            assertEquals(ProposalStatus.APPROVED, result.status)
+            assertEquals("Add dark mode", result.title)
+            // The synthetic source id is deliberately not a github: id, so ranking finds no repo for it.
+            assertTrue(slot.captured.sourceId.startsWith("authored:"))
+            verify(exactly = 1) {
+                competencyRepository.save(
+                    match<Competency> { it.kind == CompetencyKind.CONTRIBUTION && it.label == "Add dark mode" },
+                )
+            }
+            verify(exactly = 1) { competencyGraphVersionService.recordNodeAdded(any()) }
+            verify(exactly = 1) { competencyGraphVersionService.bump() }
+        }
+
+        @Test
+        fun `wires prerequisite edges for keys that are live competencies and skips the rest`() {
+            val slot = slot<StarterWorkTaskProposal>()
+            every { starterWorkTaskProposalRepository.save(capture(slot)) } answers { slot.captured }
+            every { competencyRepository.existsByKey(any()) } returns false
+            every { competencyRepository.save(any<Competency>()) } answers { firstArg() }
+            every { competencyRepository.findAllByKeyIn(listOf("kotlin", "ghost")) } returns
+                listOf(Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL))
+            every {
+                competencyEdgeRepository.existsByFromKeyAndToKeyAndKind(eq("kotlin"), any(), EdgeKind.PREREQUISITE)
+            } returns false
+            every { competencyEdgeRepository.save(any()) } answers { firstArg() }
+
+            service.createTask(
+                CreateStarterWorkTaskRequest(title = "Add dark mode", competencyKeys = listOf("kotlin", "ghost")),
+            )
+
+            // "kotlin" is live -> an edge; "ghost" is not a competency -> skipped, not an error.
+            verify(exactly = 1) { competencyEdgeRepository.save(match { it.fromKey == "kotlin" }) }
+            verify(exactly = 0) { competencyEdgeRepository.save(match { it.fromKey == "ghost" }) }
+        }
+
+        @Test
+        fun `rejects a blank title`() {
+            val ex = assertThrows<ResponseStatusException> {
+                service.createTask(CreateStarterWorkTaskRequest(title = "   "))
+            }
+
+            assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+            verify(exactly = 0) { starterWorkTaskProposalRepository.save(any()) }
         }
     }
 

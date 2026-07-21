@@ -105,6 +105,39 @@ class CompetencyGraphAuthoringControllerTest(
     }
 
     @Test
+    fun `createCompetency should return 200 and the created node for a PM`() {
+        every { competencyGraphAuthoringService.createCompetency(any()) } returns liveCompetencyResponse()
+
+        mockMvc
+            .perform(
+                post("/api/v1/onboarding/competency-graph/competencies")
+                    .with(pmJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            mapOf("key" to "kotlin", "label" to "Kotlin Basics", "kind" to "SKILL"),
+                        ),
+                    ),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.key").value("kotlin"))
+    }
+
+    @Test
+    fun `createCompetency should return 403 for HR, which reviews but does not author`() {
+        mockMvc
+            .perform(
+                post("/api/v1/onboarding/competency-graph/competencies")
+                    .with(hrJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        objectMapper.writeValueAsString(
+                            mapOf("key" to "kotlin", "label" to "Kotlin Basics", "kind" to "SKILL"),
+                        ),
+                    ),
+            ).andExpect(status().isForbidden)
+    }
+
+    @Test
     fun `updateCompetency should return 200 for a PM`() {
         every { competencyGraphAuthoringService.updateCompetency("kotlin", any()) } returns liveCompetencyResponse()
 

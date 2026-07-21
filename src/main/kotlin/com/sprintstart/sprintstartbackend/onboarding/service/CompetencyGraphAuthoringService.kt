@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyEdgeRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.UpdateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyGraphResponse
@@ -53,6 +54,7 @@ import org.springframework.web.server.ResponseStatusException
  * `competency_graph_changes` does not carry. Documented rather than implied away.
  */
 @Service
+@Suppress("TooManyFunctions")
 class CompetencyGraphAuthoringService(
     private val competencyRepository: CompetencyRepository,
     private val competencyEdgeRepository: CompetencyEdgeRepository,
@@ -115,6 +117,63 @@ class CompetencyGraphAuthoringService(
             edges = graph.edges.map { it.toAuthoringResponse() },
             graphVersion = competencyGraphVersionService.currentVersion(),
         )
+    }
+
+    /**
+     * Creates a hand-authored competency node, with no AI proposal in the loop.
+     *
+     * The counterpart to approving a proposal: a PM who wants a node the AI never suggested had, so
+     * far, no way to add one -- they could only edit or remove what was already there. This makes
+     * AI genuinely optional for the graph rather than merely reviewable.
+     *
+     * The key is slugified (see [CreateCompetencyRequest]) so it matches the house style and is
+     * URL-safe. If a row already exists for that key from a node a PM removed earlier, this reuses
+     * it rather than inserting a duplicate -- removal only records a change row, so the row and its
+     * unique key survive, exactly as [createEdge] handles a re-added edge. A key that is *currently
+     * visible* is a real conflict.
+     *
+     * @throws ResponseStatusException 400 if the key or label is blank or `targetLevel` is outside
+     * 1..4; 409 if a visible competency already has this key.
+     */
+    @Transactional
+    fun createCompetency(request: CreateCompetencyRequest): CompetencyResponse {
+        val key = slugifyKey(request.key)
+        if (key.isBlank()) reject(HttpStatus.BAD_REQUEST, "key must not be blank")
+        if (request.label.isBlank()) reject(HttpStatus.BAD_REQUEST, "label must not be blank")
+        val targetLevel = request.targetLevel ?: Competency.DEFAULT_TARGET_LEVEL
+        if (targetLevel !in MIN_TARGET_LEVEL..MAX_TARGET_LEVEL) {
+            reject(
+                HttpStatus.BAD_REQUEST,
+                "targetLevel must be between $MIN_TARGET_LEVEL and $MAX_TARGET_LEVEL, got $targetLevel",
+            )
+        }
+        if (headGraph().competencies.any { it.key == key }) {
+            reject(HttpStatus.CONFLICT, "A competency with key $key already exists in the graph")
+        }
+
+        val label = request.label.trim()
+        val description = request.description?.trim()?.takeIf(String::isNotBlank)
+        // Reuse a soft-removed row so re-adding a key a PM removed does not hit the unique
+        // constraint -- the same reason createEdge checks existsBy before saving.
+        val competency = competencyRepository.findByKey(key)?.apply {
+            this.label = label
+            this.description = description
+            this.kind = request.kind
+            this.targetLevel = targetLevel
+            this.invariant = request.invariant
+        } ?: Competency(
+            key = key,
+            label = label,
+            description = description,
+            kind = request.kind,
+            targetLevel = targetLevel,
+            invariant = request.invariant,
+        )
+
+        competencyRepository.save(competency)
+        competencyGraphVersionService.recordNodeAdded(key)
+        competencyGraphVersionService.bump()
+        return competency.toAuthoringResponse()
     }
 
     /**
@@ -275,6 +334,15 @@ class CompetencyGraphAuthoringService(
     private fun findVisibleCompetency(key: String, graph: EffectiveGraph): Competency =
         graph.competencies.firstOrNull { it.key == key }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No competency found with key: $key")
+
+    /**
+     * Normalises a hand-typed competency key into the graph's house style: lower-cased, with runs
+     * of non-alphanumeric characters collapsed to a single `-` and edge dashes trimmed. Matches
+     * `StarterWorkTaskProposalService.contributionKeyFor`, so every key in the graph -- mined,
+     * proposed or hand-authored -- shares one shape and is safe to carry in a URL path.
+     */
+    private fun slugifyKey(raw: String): String =
+        raw.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 
     companion object {
         private const val MIN_TARGET_LEVEL = 1
