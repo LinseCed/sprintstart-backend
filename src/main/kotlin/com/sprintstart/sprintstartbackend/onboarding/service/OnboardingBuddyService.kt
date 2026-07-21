@@ -6,7 +6,10 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.Atte
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionSeverity
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.BuddyAssignmentResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.MenteeAlertResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.MenteeResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.MyBuddyResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.MyMenteesResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectAttentionResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyContactRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingBuddyRepository
@@ -199,6 +202,68 @@ class OnboardingBuddyService(
                 note = note?.trim()?.takeIf { it.isNotBlank() },
             ),
         )
+    }
+
+    /**
+     * The hires counting on this buddy, worst first — the buddy's own side of the loop.
+     *
+     * Reuses the exact same [attentionFor] the project attention list runs on, then keeps only the
+     * items that are the buddy's move ([AttentionItemResponse.ownedByBuddy]): a review kept waiting,
+     * a cadence gone quiet, a stall. A mentee with nothing outstanding is still returned, calm — the
+     * surface is "who am I responsible for", not only "who is on fire". Spans every project the
+     * buddy mentors in, since a person can hold that role in more than one.
+     */
+    @Transactional(readOnly = true)
+    fun getMenteesFor(buddyId: UUID): MyMenteesResponse {
+        val now = clock.instant()
+
+        val mentees = onboardingBuddyRepository
+            .findAllByBuddyId(buddyId)
+            .groupBy { it.projectId }
+            .flatMap { (projectId, assignments) ->
+                val members = projectMembershipApi.getProjectMembers(projectId).associateBy { it.userId }
+                val lastContactByHire = buddyContactRepository
+                    .findAllByProjectId(projectId)
+                    .groupBy { it.hireId }
+                    .mapValues { (_, list) -> list.maxOf { it.occurredAt } }
+                val timelines = onboardingMetricsService.getProjectMetrics(projectId).hires.associateBy { it.userId }
+
+                assignments.map { assignment ->
+                    val hireName = members[assignment.hireId]?.displayName ?: UNKNOWN
+                    val alerts = timelines[assignment.hireId]
+                        ?.let { attentionFor(it, hireName, assignment, members, lastContactByHire, now) }
+                        .orEmpty()
+                        .filter { it.ownedByBuddy }
+                        .sortedBy { it.severity }
+                        .map { MenteeAlertResponse(reason = it.reason, severity = it.severity, days = it.days) }
+
+                    val lastContact = lastContactByHire[assignment.hireId]
+                    val days = daysBetween(lastContact ?: assignment.assignedAt, now)
+                    MenteeResponse(
+                        hireId = assignment.hireId,
+                        hireName = hireName,
+                        hireGithubLogin = members[assignment.hireId]?.githubLogin,
+                        projectId = projectId,
+                        cadenceTargetDays = assignment.cadenceTargetDays,
+                        assignedAt = assignment.assignedAt,
+                        lastContactAt = lastContact,
+                        daysSinceContact = days,
+                        overdue = days > assignment.cadenceTargetDays,
+                        alerts = alerts,
+                    )
+                }
+            }
+            // The order a buddy would work the list in: anyone with something outstanding first
+            // (blocked before drifting), then the longest silence among the rest.
+            .sortedWith(
+                compareBy(
+                    { if (it.alerts.isEmpty()) 1 else 0 },
+                    { it.alerts.firstOrNull()?.severity ?: AttentionSeverity.DRIFTING },
+                    { -it.daysSinceContact },
+                ),
+            )
+
+        return MyMenteesResponse(mentees = mentees)
     }
 
     /**

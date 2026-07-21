@@ -330,4 +330,104 @@ class OnboardingBuddyServiceTest {
             assertTrue(items.any { it.reason == "No GitHub username on record" })
         }
     }
+
+    @Nested
+    inner class Mentees {
+        @Test
+        fun `a caller who mentors nobody gets an empty list, not an error`() {
+            every { onboardingBuddyRepository.findAllByBuddyId(buddyId) } returns emptyList()
+
+            assertTrue(service.getMenteesFor(buddyId).mentees.isEmpty())
+        }
+
+        @Test
+        fun `a mentee on track is returned calm, with no alerts`() {
+            every { onboardingBuddyRepository.findAllByBuddyId(buddyId) } returns
+                listOf(assignment(cadenceDays = 7, assignedDaysAgo = 2))
+            stageAttention()
+
+            val mentee = service.getMenteesFor(buddyId).mentees.single()
+
+            assertEquals(hireId, mentee.hireId)
+            assertEquals("hire", mentee.hireGithubLogin)
+            assertFalse(mentee.overdue)
+            assertTrue(mentee.alerts.isEmpty())
+        }
+
+        @Test
+        fun `a review kept waiting is surfaced as the buddy's move`() {
+            every { onboardingBuddyRepository.findAllByBuddyId(buddyId) } returns
+                listOf(assignment(assignedDaysAgo = 1))
+            stageAttention(hire = timeline(longestOpenWaitHours = 72))
+
+            val alerts = service
+                .getMenteesFor(buddyId)
+                .mentees
+                .single()
+                .alerts
+
+            assertTrue(alerts.any { it.severity == AttentionSeverity.BLOCKED })
+        }
+
+        @Test
+        fun `a cadence gone quiet is overdue and alerts`() {
+            every { onboardingBuddyRepository.findAllByBuddyId(buddyId) } returns
+                listOf(assignment(cadenceDays = 7, assignedDaysAgo = 20))
+            stageAttention()
+
+            val mentee = service.getMenteesFor(buddyId).mentees.single()
+
+            assertTrue(mentee.overdue)
+            assertTrue(mentee.alerts.any { it.severity == AttentionSeverity.DRIFTING })
+        }
+
+        @Test
+        fun `mentees with something outstanding sort ahead of calm ones`() {
+            val blockedHire = UUID.randomUUID()
+            val calmHire = UUID.randomUUID()
+            every { onboardingBuddyRepository.findAllByBuddyId(buddyId) } returns listOf(
+                OnboardingBuddy(
+                    hireId = calmHire,
+                    projectId = projectId,
+                    buddyId = buddyId,
+                    cadenceTargetDays = 7,
+                    assignedAt = daysAgo(1),
+                ),
+                OnboardingBuddy(
+                    hireId = blockedHire,
+                    projectId = projectId,
+                    buddyId = buddyId,
+                    cadenceTargetDays = 7,
+                    assignedAt = daysAgo(1),
+                ),
+            )
+            every { projectMembershipApi.getProjectMembers(projectId) } returns listOf(
+                ProjectMember(blockedHire, "Blocked Hire", "blocked", daysAgo(30)),
+                ProjectMember(calmHire, "Calm Hire", "calm", daysAgo(30)),
+                ProjectMember(buddyId, "A Buddy", "buddy", daysAgo(400)),
+            )
+            every { buddyContactRepository.findAllByProjectId(projectId) } returns emptyList()
+            every { onboardingMetricsService.getProjectMetrics(projectId) } returns
+                ProjectOnboardingMetricsResponse(
+                    projectId = projectId,
+                    memberCount = 3,
+                    unattributableMemberCount = 0,
+                    hiresWithMergedPullRequest = 0,
+                    medianHoursToFirstMergedPullRequest = null,
+                    medianHoursToFirstResponse = null,
+                    p90HoursToFirstResponse = null,
+                    stalledCount = 0,
+                    waitingOnResponseCount = 0,
+                    hires = listOf(
+                        timeline(longestOpenWaitHours = 72).copy(userId = blockedHire, displayName = "Blocked Hire"),
+                        timeline().copy(userId = calmHire, displayName = "Calm Hire"),
+                    ),
+                )
+
+            val mentees = service.getMenteesFor(buddyId).mentees
+
+            assertEquals(blockedHire, mentees.first().hireId)
+            assertTrue(mentees.last().alerts.isEmpty())
+        }
+    }
 }

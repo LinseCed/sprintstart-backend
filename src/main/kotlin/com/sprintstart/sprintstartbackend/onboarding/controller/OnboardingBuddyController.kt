@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.AssignB
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.LogBuddyContactRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.BuddyAssignmentResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.MyBuddyResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.MyMenteesResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectAttentionResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingBuddyService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -62,6 +63,25 @@ class OnboardingBuddyController(
         @AuthenticationPrincipal jwt: Jwt,
         @RequestParam projectId: UUID,
     ): MyBuddyResponse? = onboardingBuddyService.getBuddyFor(resolveUserId(jwt), projectId)
+
+    @Operation(
+        summary = "The hires counting on me",
+        description = "Everyone I am the buddy for, worst first: a review kept waiting, a cadence " +
+            "gone quiet, a stall. The other side of /me/buddy — so the person who actually closes " +
+            "the loop can see who is waiting, not only the hire and the project lead.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Mentees returned (empty when I mentor nobody)"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/me/mentees")
+    @PreAuthorize("hasAnyRole('USER', 'PM', 'HR', 'ADMIN')")
+    fun getMyMentees(
+        @AuthenticationPrincipal jwt: Jwt,
+    ): MyMenteesResponse = onboardingBuddyService.getMenteesFor(resolveUserId(jwt))
 
     @Operation(
         summary = "Log a conversation with my buddy",
