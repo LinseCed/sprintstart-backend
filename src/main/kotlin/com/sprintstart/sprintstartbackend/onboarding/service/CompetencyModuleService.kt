@@ -221,21 +221,32 @@ class CompetencyModuleService(
 
         competencyModuleRepository.save(module)
 
-        proposed.verification?.let { check ->
-            verificationRepository.save(
-                Verification(
-                    moduleId = module.id,
-                    type = parseVerificationType(check.type),
-                    prompt = check.prompt,
-                    rubric = check.rubric,
-                    competencyKey = competencyKey,
-                    level = LEVEL_NAMES[
-                        competencyRepository.findByKey(competencyKey)?.targetLevel
-                            ?: Competency.DEFAULT_TARGET_LEVEL,
-                    ] ?: LEVEL_NAMES.getValue(Competency.DEFAULT_TARGET_LEVEL),
-                ),
-            )
-        }
+        // Generation no longer manufactures a gate. A recall quiz (KNOWLEDGE/EXACT) auto-created
+        // for every module made the *default* rigor tier a memory test -- the exact thing the
+        // north star disavows, while artifact-first is the stated intent. A node with no check is
+        // more honest than a node gated by recall: it says "we have not defined a proof for this"
+        // rather than "answer these questions". Only real proof is persisted -- ARTIFACT (a merged
+        // PR, the preferred rung) and ATTEST (a self-confirmation for what genuinely cannot be
+        // shown in a PR: a policy read, an access granted, a person met). Anything else the AI
+        // proposes as a check is dropped, and the module ships as content without a gate.
+        proposed.verification
+            ?.let { check -> parseVerificationType(check.type) to check }
+            ?.takeIf { (type, _) -> type in HONEST_CHECK_TYPES }
+            ?.let { (type, check) ->
+                verificationRepository.save(
+                    Verification(
+                        moduleId = module.id,
+                        type = type,
+                        prompt = check.prompt,
+                        rubric = check.rubric,
+                        competencyKey = competencyKey,
+                        level = LEVEL_NAMES[
+                            competencyRepository.findByKey(competencyKey)?.targetLevel
+                                ?: Competency.DEFAULT_TARGET_LEVEL,
+                        ] ?: LEVEL_NAMES.getValue(Competency.DEFAULT_TARGET_LEVEL),
+                    ),
+                )
+            }
 
         return module.toResponseWithJoins()
     }
@@ -522,6 +533,14 @@ class CompetencyModuleService(
 
 /** Ledger ranks back to the level names the AI service and Verification.level speak. */
 private val LEVEL_NAMES = mapOf(1 to "beginner", 2 to "intermediate", 3 to "advanced", 4 to "expert")
+
+/**
+ * The check types module generation will persist. ARTIFACT is real proof (a merged PR); ATTEST is
+ * a self-confirmation for what cannot be shown in a PR. KNOWLEDGE and EXACT are recall gates and
+ * are deliberately not auto-created -- a node with no check is more honest than one gated by a quiz
+ * nobody chose to write.
+ */
+private val HONEST_CHECK_TYPES = setOf(VerificationType.ARTIFACT, VerificationType.ATTEST)
 
 /** The page kinds that carry lesson prose, used as grounded evidence when grading a check. */
 val LESSON_PAGE_KINDS = setOf(ModulePageKind.CONTEXT, ModulePageKind.LESSON, ModulePageKind.WALKTHROUGH)

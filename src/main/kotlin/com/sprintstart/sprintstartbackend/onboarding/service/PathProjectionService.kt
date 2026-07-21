@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.NodeState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
@@ -66,10 +65,6 @@ class PathProjectionService(
 
         val orderedKeys = graphTraversalService.topologicalOrder(relevantKeys, edges)
 
-        val directPrerequisitesByKey = edges
-            .filter { it.kind == EdgeKind.PREREQUISITE && it.fromKey in relevantKeys && it.toKey in relevantKeys }
-            .groupBy({ it.toKey }, { it.fromKey })
-
         val states = mutableMapOf<String, NodeState>()
         for (key in orderedKeys) {
             val level = ledger[key] ?: 0
@@ -79,11 +74,12 @@ class PathProjectionService(
             val targetLevel = targetLevelOverrides[key]
                 ?: competenciesByKey[key]?.targetLevel
                 ?: Competency.DEFAULT_TARGET_LEVEL
-            states[key] = when {
-                level >= targetLevel -> NodeState.MASTERED
-                directPrerequisitesByKey[key].orEmpty().all { states[it] == NodeState.MASTERED } -> NodeState.AVAILABLE
-                else -> NodeState.LOCKED
-            }
+            // A prerequisite edge no longer *locks* a node -- it ranks the work a hire is nudged
+            // toward, it never tells them "not yet". Nothing in the evidence supports gating a
+            // person out of work they want to attempt; attempting the work is how the learning
+            // happens (R5). So a node is either met or it is standing-and-available, and the edges
+            // survive in the returned view to explain ordering, not to bar anything.
+            states[key] = if (level >= targetLevel) NodeState.MASTERED else NodeState.AVAILABLE
         }
 
         val nodes = orderedKeys.map { key ->

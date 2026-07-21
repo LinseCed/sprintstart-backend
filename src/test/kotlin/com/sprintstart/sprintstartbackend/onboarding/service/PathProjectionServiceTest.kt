@@ -47,7 +47,7 @@ class PathProjectionServiceTest {
         }
 
         @Test
-        fun `a node with an unmet prerequisite is locked`() {
+        fun `a node with an unmet prerequisite is available, not locked -- an edge ranks, it never bars`() {
             val result = service.project(
                 competencies = listOf(node("git"), node("kotlin")),
                 edges = listOf(prerequisite("git", "kotlin")),
@@ -56,7 +56,23 @@ class PathProjectionServiceTest {
                 graphVersion = 1,
             )
 
-            assertThat(stateOf(result, "kotlin")).isEqualTo(NodeState.LOCKED)
+            // The prerequisite still travels on the view to explain ordering, but it no longer
+            // gates: a hire is never told "not yet", only "this one fits better".
+            assertThat(stateOf(result, "kotlin")).isEqualTo(NodeState.AVAILABLE)
+            assertThat(result.edges).containsExactly(PathEdge("git", "kotlin"))
+        }
+
+        @Test
+        fun `no node is ever unreachable because of an edge`() {
+            val result = service.project(
+                competencies = listOf(node("git"), node("kotlin"), node("domain-model")),
+                edges = listOf(prerequisite("git", "kotlin"), prerequisite("kotlin", "domain-model")),
+                targetKeys = setOf("domain-model"),
+                ledger = emptyMap(),
+                graphVersion = 1,
+            )
+
+            assertThat(result.nodes.map { it.state }).allMatch { it == NodeState.AVAILABLE }
         }
 
         @Test
@@ -122,7 +138,7 @@ class PathProjectionServiceTest {
         }
 
         @Test
-        fun `a level-0 ledger entry never masters or unlocks anything`() {
+        fun `a level-0 ledger entry is not mastery`() {
             val result = service.project(
                 competencies = listOf(node("git"), node("kotlin")),
                 edges = listOf(prerequisite("git", "kotlin")),
@@ -131,9 +147,10 @@ class PathProjectionServiceTest {
                 graphVersion = 1,
             )
 
-            // 0 means "we asked and saw no competence" -- it must not unlock dependents.
+            // 0 means "we asked and saw no competence" -- it is not mastery. The dependent is
+            // available regardless: an unmet prerequisite ranks the work, it does not lock it.
             assertThat(stateOf(result, "git")).isEqualTo(NodeState.AVAILABLE)
-            assertThat(stateOf(result, "kotlin")).isEqualTo(NodeState.LOCKED)
+            assertThat(stateOf(result, "kotlin")).isEqualTo(NodeState.AVAILABLE)
         }
 
         @Test
@@ -168,7 +185,7 @@ class PathProjectionServiceTest {
     @Nested
     inner class Legibility {
         @Test
-        fun `a fuller ledger yields a superset of mastered nodes and a subset of locked ones`() {
+        fun `a fuller ledger yields a superset of mastered nodes and a subset of still-open ones`() {
             val competencies = listOf(node("git"), node("kotlin"), node("spring-boot"), node("domain-model"))
             val edges = listOf(
                 prerequisite("kotlin", "domain-model"),
@@ -188,15 +205,17 @@ class PathProjectionServiceTest {
                     .map { it.key }
                     .toSet()
 
+            // Standing, not permission: a node is either shown (MASTERED) or still open (AVAILABLE).
+            // A fuller ledger has strictly more mastered nodes and strictly fewer still-open ones.
             val seniorMastered = keysInState(seniorPath, NodeState.MASTERED)
             val juniorMastered = keysInState(juniorPath, NodeState.MASTERED)
             assertThat(seniorMastered).containsAll(juniorMastered)
             assertThat(seniorMastered.size).isGreaterThan(juniorMastered.size)
 
-            val seniorLocked = keysInState(seniorPath, NodeState.LOCKED)
-            val juniorLocked = keysInState(juniorPath, NodeState.LOCKED)
-            assertThat(juniorLocked).containsAll(seniorLocked)
-            assertThat(seniorLocked.size).isLessThan(juniorLocked.size)
+            val seniorOpen = keysInState(seniorPath, NodeState.AVAILABLE)
+            val juniorOpen = keysInState(juniorPath, NodeState.AVAILABLE)
+            assertThat(juniorOpen).containsAll(seniorOpen)
+            assertThat(seniorOpen.size).isLessThan(juniorOpen.size)
         }
     }
 

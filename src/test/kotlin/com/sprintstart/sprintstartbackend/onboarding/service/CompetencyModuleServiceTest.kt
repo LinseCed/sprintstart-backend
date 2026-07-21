@@ -6,6 +6,10 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContentProve
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModulePageKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ModuleProposalOutcome
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedModulePageSchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedModuleSchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedModuleVerificationSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ModulePage
@@ -19,9 +23,12 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyReposi
 import com.sprintstart.sprintstartbackend.onboarding.repository.ModulePageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
+import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -167,6 +174,77 @@ class CompetencyModuleServiceTest {
             assertThat(result.pages.first().provenance).isEqualTo(ContentProvenance.PM)
             assertThat(savedCheck.captured.moduleId).isEqualTo(saved.captured.id)
             assertThat(savedCheck.captured.rubric).isEqualTo("Mentions the runbook")
+        }
+    }
+
+    @Nested
+    inner class ProposeFromCorpusChecks {
+        private fun proposalWith(checkType: String?): ModuleProposalOutcome {
+            val verification = checkType?.let {
+                ProposedModuleVerificationSchema(type = it, prompt = "Show it", rubric = "Rubric")
+            }
+            return ModuleProposalOutcome(
+                status = "proposed",
+                module = ProposedModuleSchema(
+                    competencyKey = key,
+                    level = "intermediate",
+                    title = "Deploying",
+                    pages = listOf(ProposedModulePageSchema(kind = "LESSON", title = "How", body = "text")),
+                    verification = verification,
+                ),
+            )
+        }
+
+        private fun stubProposal(outcome: ModuleProposalOutcome) {
+            stubKnownCompetency()
+            every {
+                competencyModuleRepository.findAllByCompetencyKeyAndProjectIdOrderByVersionDesc(key, projectId)
+            } returns emptyList()
+            every { competencyModuleRepository.save(any<CompetencyModule>()) } answers { firstArg() }
+            every { verificationRepository.findByModuleId(any()) } returns null
+            coEvery { onboardingAiClient.proposeModule(any(), any(), any(), any(), any()) } returns outcome
+        }
+
+        @Test
+        fun `does not persist an auto-created KNOWLEDGE recall check`() = runTest {
+            stubProposal(proposalWith("KNOWLEDGE"))
+
+            service.proposeFromCorpus(key, projectId)
+
+            // A node with no check is more honest than one gated by recall -- the quiz is dropped
+            // and the module still ships as content.
+            verify(exactly = 0) { verificationRepository.save(any()) }
+        }
+
+        @Test
+        fun `does not persist an EXACT recall check`() = runTest {
+            stubProposal(proposalWith("EXACT"))
+
+            service.proposeFromCorpus(key, projectId)
+
+            verify(exactly = 0) { verificationRepository.save(any()) }
+        }
+
+        @Test
+        fun `persists an ARTIFACT check -- real proof stays the preferred rung`() = runTest {
+            stubProposal(proposalWith("ARTIFACT"))
+            val saved = slot<Verification>()
+            every { verificationRepository.save(capture(saved)) } answers { saved.captured }
+
+            service.proposeFromCorpus(key, projectId)
+
+            assertThat(saved.captured.type).isEqualTo(VerificationType.ARTIFACT)
+        }
+
+        @Test
+        fun `persists an ATTEST check -- a lightweight attestation for what a PR cannot show`() = runTest {
+            stubProposal(proposalWith("ATTEST"))
+            val saved = slot<Verification>()
+            every { verificationRepository.save(capture(saved)) } answers { saved.captured }
+
+            service.proposeFromCorpus(key, projectId)
+
+            assertThat(saved.captured.type).isEqualTo(VerificationType.ATTEST)
         }
     }
 
