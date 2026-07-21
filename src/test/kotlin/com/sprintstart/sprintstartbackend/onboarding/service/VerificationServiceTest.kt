@@ -559,10 +559,11 @@ class VerificationServiceTest {
         }
 
         @Test
-        fun `passing unlocks a dependent competency on the graph`() = runTest {
-            // Regression coverage for "pass writes VERIFIED + unlocks dependents": feed the exact
-            // ledger state this service writes into the real (pure) PathProjectionService and
-            // confirm the dependent flips from LOCKED to AVAILABLE.
+        fun `passing masters the node and its dependent stays available`() = runTest {
+            // Regression coverage for "pass writes VERIFIED": feed the exact ledger state this
+            // service writes into the real (pure) PathProjectionService and confirm the node reads
+            // MASTERED. The dependent is AVAILABLE either way now -- prerequisite edges rank the
+            // work, they no longer lock it -- so this pins that passing does not regress that.
             val module = makeModule()
             // "intermediate" is what generated checks are pitched at, and it is what clears a
             // competency's default bar -- a beginner-level check against a default node passes
