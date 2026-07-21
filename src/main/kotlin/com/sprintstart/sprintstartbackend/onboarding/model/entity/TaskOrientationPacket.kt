@@ -1,8 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.entity
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
 import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.OneToMany
 import jakarta.persistence.OrderBy
@@ -27,6 +30,10 @@ import java.util.UUID
  *
  * One packet per `(taskProposalId, projectId)`, not per hire: orientation is a property of the task,
  * so two people who claim it read the same thing and can talk about it.
+ *
+ * [origin] decides which of the above applies. Everything in this doc describes an [OrientationOrigin.AI]
+ * packet; a [OrientationOrigin.HUMAN] packet is a person's own words, served as-is and exempt from the
+ * whole staleness dance -- see [OrientationOrigin].
  */
 @Entity
 @Table(
@@ -52,6 +59,13 @@ class TaskOrientationPacket(
     val projectId: UUID,
     @Column(name = "task_title", nullable = false)
     var taskTitle: String,
+    /**
+     * Who authored this packet. AI-assembled packets are cached and revalidated against the corpus;
+     * a HUMAN packet is served as-is and never re-assembled or auto-deleted (see [OrientationOrigin]).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    var origin: OrientationOrigin = OrientationOrigin.AI,
     @Column(nullable = true, columnDefinition = "TEXT")
     var summary: String? = null,
     /** The corpus fingerprint this packet was assembled from; drives staleness. */

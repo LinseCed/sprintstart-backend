@@ -130,6 +130,20 @@ class StarterWorkTaskProposalService(
         )
 
     /**
+     * Returns the approved starter-work pool, for a PM choosing a task to author orientation for.
+     *
+     * The whole approved set, ordered by title, not scoped to a project: approved tasks are a global
+     * pool (the entity has no `projectId`), and orientation is per-`(task, project)` only because the
+     * corpus a packet is grounded in is per-project.
+     */
+    @Transactional(readOnly = true)
+    fun listApproved(): List<StarterWorkTaskProposalResponse> =
+        starterWorkTaskProposalRepository
+            .findAllByStatus(ProposalStatus.APPROVED)
+            .sortedBy { it.title }
+            .map { it.toResponse() }
+
+    /**
      * Approves a proposed starter-work task, creating a real `CONTRIBUTION` [Competency] and
      * wiring `PREREQUISITE` edges from each of its tagged competency keys.
      *
