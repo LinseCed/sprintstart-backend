@@ -95,7 +95,6 @@ class GithubConnectorService(
     private val githubClient: GithubClient,
     private val eventPublisher: ApplicationEventPublisher,
     private val userApi: UserApi,
-    @Lazy private val self: GithubConnectorService?,
 ) {
     /**
      * Retrieves all 'sources' in the connector overview sense.
