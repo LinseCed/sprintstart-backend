@@ -23,6 +23,46 @@ data class MyBuddyResponse(
     val overdue: Boolean,
 )
 
+/**
+ * The other end of the relationship: the hires who are counting on *me*, as their buddy sees them.
+ *
+ * The whole point of the slice is that mentoring is the highest-evidence lever, and it only works
+ * if the mentor knows a hire is waiting. Until now the overdue-contact and waiting-on-a-review
+ * signals reached the hire (who cannot act on their own move) and the project's lead (who has to
+ * relay it) — but never the buddy, the one person who closes the loop in real life.
+ */
+data class MyMenteesResponse(
+    val mentees: List<MenteeResponse>,
+)
+
+/** One hire this buddy is responsible for, with whatever is currently their move to make. */
+data class MenteeResponse(
+    val hireId: UUID,
+    val hireName: String,
+    /** The hire's GitHub handle when known — the concrete way to reach them; null → usual channel. */
+    val hireGithubLogin: String?,
+    val projectId: UUID,
+    val cadenceTargetDays: Int,
+    val assignedAt: Instant,
+    val lastContactAt: Instant?,
+    /** Days since the last contact, or since assignment when there has never been one. */
+    val daysSinceContact: Long,
+    /** True once that gap has passed the cadence target — the pair is due a conversation. */
+    val overdue: Boolean,
+    /**
+     * The items that are this buddy's move, worst first: a review kept waiting, a cadence gone
+     * quiet, a stall. Empty when the pair is on track — the calm state is a real answer, not a gap.
+     */
+    val alerts: List<MenteeAlertResponse>,
+)
+
+/** One thing a buddy could do for a hire right now. Always the buddy's move — the list is filtered. */
+data class MenteeAlertResponse(
+    val reason: String,
+    val severity: AttentionSeverity,
+    val days: Long,
+)
+
 /** One hire and their buddy, as whoever is responsible for the project sees it. */
 data class BuddyAssignmentResponse(
     val hireId: UUID,
