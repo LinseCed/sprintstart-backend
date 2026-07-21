@@ -1,7 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationStep
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.MyOrientationResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationCitationResponse
@@ -12,18 +14,22 @@ import com.sprintstart.sprintstartbackend.onboarding.service.TaskOrientationServ
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.coEvery
 import io.mockk.every
+import io.mockk.justRun
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
+import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.request
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -59,6 +65,18 @@ class TaskOrientationControllerTest(
             }.authorities(roles.map { SimpleGrantedAuthority("ROLE_$it") })
 
     private val userJwt = jwtWithSubject(authId, "USER")
+    private val pmJwt = jwtWithSubject(authId, "PM")
+
+    private val objectMapper = jacksonObjectMapper()
+
+    private fun authorBody() = objectMapper.writeValueAsString(
+        mapOf(
+            "summary" to "How to do it.",
+            "sections" to listOf(
+                mapOf("step" to "SET_UP", "title" to "Run it", "body" to "make dev", "citations" to emptyList<Any>()),
+            ),
+        ),
+    )
 
     private fun packet() = OrientationPacketResponse(
         taskId = taskId,
@@ -76,6 +94,7 @@ class TaskOrientationControllerTest(
         ),
         sources = listOf(OrientationSourceResponse("README.md", "https://example.test/README.md", "FILE")),
         assembledAt = Instant.parse("2026-07-21T12:00:00Z"),
+        origin = OrientationOrigin.AI,
     )
 
     // A suspend handler is dispatched asynchronously, so the real (post-authorization) status is
@@ -134,5 +153,89 @@ class TaskOrientationControllerTest(
         mockMvc
             .perform(get("/api/v1/onboarding/me/orientation").param("projectId", projectId.toString()))
             .andExpect(status().isUnauthorized)
+    }
+
+    // ========================== Human authoring ==========================
+
+    @Test
+    fun `a hire can fix their own orientation in place`() {
+        every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+        every { taskOrientationService.authorForHire(userId, projectId, any()) } returns
+            packet().copy(origin = OrientationOrigin.HUMAN)
+
+        mockMvc
+            .perform(
+                put("/api/v1/onboarding/me/orientation")
+                    .param("projectId", projectId.toString())
+                    .with(userJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(authorBody()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.origin").value("HUMAN"))
+    }
+
+    @Test
+    fun `a hire can revert their own orientation to AI`() {
+        every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+        justRun { taskOrientationService.revertForHire(userId, projectId) }
+
+        mockMvc
+            .perform(
+                delete("/api/v1/onboarding/me/orientation")
+                    .param("projectId", projectId.toString())
+                    .with(userJwt),
+            ).andExpect(status().isNoContent)
+    }
+
+    @Test
+    fun `a PM can read a task's orientation for authoring`() {
+        every { taskOrientationService.getForAuthoring(taskId, projectId) } returns
+            MyOrientationResponse(taskId, "Fix the stale cache header", null, packet(), null)
+
+        mockMvc
+            .perform(
+                get("/api/v1/onboarding/orientation/tasks/$taskId")
+                    .param("projectId", projectId.toString())
+                    .with(pmJwt),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.taskId").value(taskId.toString()))
+    }
+
+    @Test
+    fun `a PM can author a task's orientation`() {
+        every { taskOrientationService.authorPacket(taskId, projectId, any()) } returns
+            packet().copy(origin = OrientationOrigin.HUMAN)
+
+        mockMvc
+            .perform(
+                put("/api/v1/onboarding/orientation/tasks/$taskId")
+                    .param("projectId", projectId.toString())
+                    .with(pmJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(authorBody()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.origin").value("HUMAN"))
+    }
+
+    @Test
+    fun `a PM can revert a task's orientation`() {
+        justRun { taskOrientationService.revertToAi(taskId, projectId) }
+
+        mockMvc
+            .perform(
+                delete("/api/v1/onboarding/orientation/tasks/$taskId")
+                    .param("projectId", projectId.toString())
+                    .with(pmJwt),
+            ).andExpect(status().isNoContent)
+    }
+
+    @Test
+    fun `a plain USER cannot reach the PM authoring surface`() {
+        mockMvc
+            .perform(
+                get("/api/v1/onboarding/orientation/tasks/$taskId")
+                    .param("projectId", projectId.toString())
+                    .with(userJwt),
+            ).andExpect(status().isForbidden)
     }
 }

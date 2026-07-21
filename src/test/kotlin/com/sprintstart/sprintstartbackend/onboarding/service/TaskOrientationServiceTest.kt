@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.TaskSourceArtifact
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationStep
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProvenanceSchema
@@ -17,6 +18,9 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskOrientatio
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskOrientationSection
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskZeroAssignment
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
+import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.AuthorOrientationCitationRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.AuthorOrientationRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.AuthorOrientationSectionRequest
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.TaskOrientationPacketRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.TaskZeroAssignmentRepository
@@ -31,6 +35,7 @@ import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import org.springframework.http.HttpStatus
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
@@ -113,10 +118,14 @@ class TaskOrientationServiceTest {
         citations = listOf(CitationRefSchema("README.md", "c1", "https://example.test/README.md")),
     )
 
-    private fun cachedPacket(fingerprint: String) = TaskOrientationPacket(
+    private fun cachedPacket(
+        fingerprint: String,
+        origin: OrientationOrigin = OrientationOrigin.AI,
+    ) = TaskOrientationPacket(
         taskProposalId = proposal.id,
         projectId = projectId,
         taskTitle = proposal.title,
+        origin = origin,
         summary = "A cached packet.",
         corpusFingerprint = fingerprint,
         assembledAt = now.minus(Duration.ofDays(1)),
@@ -329,5 +338,208 @@ class TaskOrientationServiceTest {
         assertTrue(saved.captured.sections.all { it.citations.isNotEmpty() })
         assertEquals("fp-1", saved.captured.corpusFingerprint)
         assertEquals(now, saved.captured.assembledAt)
+    }
+
+    // ========================== Human authoring ==========================
+
+    private fun authorRequest() = AuthorOrientationRequest(
+        summary = "  How to do it.  ",
+        sections = listOf(
+            AuthorOrientationSectionRequest(
+                step = OrientationStep.SET_UP,
+                title = "  Run it  ",
+                body = "  make dev  ",
+                citations = listOf(AuthorOrientationCitationRequest("README.md", "https://example.test/README.md")),
+            ),
+            AuthorOrientationSectionRequest(
+                step = OrientationStep.OPEN_THE_PR,
+                title = "Open the PR",
+                body = "Push and open a PR.",
+                citations = emptyList(),
+            ),
+        ),
+    )
+
+    private fun proposalExists() {
+        every { proposalRepository.findById(proposal.id) } returns Optional.of(proposal)
+        every { packetRepository.findByTaskProposalIdAndProjectId(proposal.id, projectId) } returns null
+        every { packetRepository.save(any()) } answers { firstArg() }
+    }
+
+    @Test
+    fun `a human-authored cached packet is served as-is, with no AI call`() = runTest {
+        hasTask(cached = cachedPacket("fp-old", origin = OrientationOrigin.HUMAN))
+
+        val result = service.getForHire(hireId, projectId)
+
+        assertEquals(OrientationOrigin.HUMAN, assertNotNull(result.packet).origin)
+        assertEquals("Cached section", result.packet!!.sections[0].title)
+        // The whole staleness dance is skipped: no assembly, no fingerprint, no delete, no re-store.
+        coVerify(exactly = 0) { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { packetRepository.save(any()) }
+        verify(exactly = 0) { packetRepository.deleteByTaskProposalIdAndProjectId(any(), any()) }
+    }
+
+    @Test
+    fun `authorPacket pins a HUMAN packet, trims it, and stores empty chunk ids`() = runTest {
+        proposalExists()
+        val saved = slot<TaskOrientationPacket>()
+        every { packetRepository.save(capture(saved)) } answers { firstArg() }
+
+        val result = service.authorPacket(proposal.id, projectId, authorRequest())
+
+        assertEquals(OrientationOrigin.HUMAN, result.origin)
+        assertEquals(OrientationOrigin.HUMAN, saved.captured.origin)
+        assertEquals("How to do it.", saved.captured.summary)
+        assertNull(saved.captured.corpusFingerprint)
+        val steps = saved.captured.sections.map { it.step }
+        assertEquals(listOf(OrientationStep.SET_UP, OrientationStep.OPEN_THE_PR), steps)
+        assertEquals("Run it", saved.captured.sections[0].title)
+        assertEquals("make dev", saved.captured.sections[0].body)
+        // A human citation has no retrieval chunk; the column stays non-null via an empty string.
+        val firstCitation = saved.captured.sections[0].citations[0]
+        assertEquals("", firstCitation.chunkId)
+        assertEquals(now, saved.captured.assembledAt)
+    }
+
+    @Test
+    fun `authorPacket derives sources from the distinct citation links`() = runTest {
+        proposalExists()
+        val saved = slot<TaskOrientationPacket>()
+        every { packetRepository.save(capture(saved)) } answers { firstArg() }
+
+        service.authorPacket(proposal.id, projectId, authorRequest())
+
+        // The one section with a citation gives the one source; the citationless section adds none.
+        assertEquals(listOf("README.md"), saved.captured.sources.map { it.filename })
+        assertEquals("https://example.test/README.md", saved.captured.sources[0].sourceUrl)
+    }
+
+    @Test
+    fun `authorPacket replaces an existing packet wholesale`() = runTest {
+        val existing = cachedPacket("fp-old")
+        every { proposalRepository.findById(proposal.id) } returns Optional.of(proposal)
+        every { packetRepository.findByTaskProposalIdAndProjectId(proposal.id, projectId) } returns existing
+        every { packetRepository.save(any()) } answers { firstArg() }
+
+        service.authorPacket(proposal.id, projectId, authorRequest())
+
+        verify(exactly = 1) { packetRepository.delete(existing) }
+        verify(exactly = 1) { packetRepository.save(any()) }
+    }
+
+    @Test
+    fun `authorPacket 404s when the task does not exist`() = runTest {
+        every { proposalRepository.findById(proposal.id) } returns Optional.empty()
+
+        val error = assertThrows<ResponseStatusException> {
+            service.authorPacket(proposal.id, projectId, authorRequest())
+        }
+        assertEquals(HttpStatus.NOT_FOUND, error.statusCode)
+        verify(exactly = 0) { packetRepository.save(any()) }
+    }
+
+    @Test
+    fun `authorPacket 400s on no sections`() = runTest {
+        every { proposalRepository.findById(proposal.id) } returns Optional.of(proposal)
+
+        val error = assertThrows<ResponseStatusException> {
+            service.authorPacket(proposal.id, projectId, AuthorOrientationRequest(sections = emptyList()))
+        }
+        assertEquals(HttpStatus.BAD_REQUEST, error.statusCode)
+    }
+
+    @Test
+    fun `authorPacket 400s on a blank section body`() = runTest {
+        every { proposalRepository.findById(proposal.id) } returns Optional.of(proposal)
+
+        val request = AuthorOrientationRequest(
+            sections = listOf(AuthorOrientationSectionRequest(OrientationStep.SET_UP, "Title", "   ")),
+        )
+        val error = assertThrows<ResponseStatusException> { service.authorPacket(proposal.id, projectId, request) }
+        assertEquals(HttpStatus.BAD_REQUEST, error.statusCode)
+    }
+
+    @Test
+    fun `revertToAi deletes the packet so the next read re-assembles`() = runTest {
+        every { proposalRepository.findById(proposal.id) } returns Optional.of(proposal)
+
+        service.revertToAi(proposal.id, projectId)
+
+        verify(exactly = 1) { packetRepository.deleteByTaskProposalIdAndProjectId(proposal.id, projectId) }
+    }
+
+    @Test
+    fun `revertToAi 404s when the task does not exist`() = runTest {
+        every { proposalRepository.findById(proposal.id) } returns Optional.empty()
+
+        assertThrows<ResponseStatusException> { service.revertToAi(proposal.id, projectId) }
+        verify(exactly = 0) { packetRepository.deleteByTaskProposalIdAndProjectId(any(), any()) }
+    }
+
+    @Test
+    fun `getForAuthoring returns the cached packet to edit`() = runTest {
+        every { proposalRepository.findById(proposal.id) } returns Optional.of(proposal)
+        every { packetRepository.findByTaskProposalIdAndProjectId(proposal.id, projectId) } returns
+            cachedPacket("fp-old", origin = OrientationOrigin.HUMAN)
+
+        val result = service.getForAuthoring(proposal.id, projectId)
+
+        assertEquals(proposal.id, result.taskId)
+        assertEquals(OrientationOrigin.HUMAN, assertNotNull(result.packet).origin)
+        // Authoring never assembles: no AI call is made when a PM opens the editor.
+        coVerify(exactly = 0) { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `getForAuthoring returns a shell to start from blank`() = runTest {
+        every { proposalRepository.findById(proposal.id) } returns Optional.of(proposal)
+        every { packetRepository.findByTaskProposalIdAndProjectId(proposal.id, projectId) } returns null
+
+        val result = service.getForAuthoring(proposal.id, projectId)
+
+        assertEquals(proposal.title, result.taskTitle)
+        assertEquals(proposal.sourceUrl, result.taskUrl)
+        assertNull(result.packet)
+    }
+
+    @Test
+    fun `authorForHire resolves the hire's current task and pins it`() = runTest {
+        hasTask()
+        val saved = slot<TaskOrientationPacket>()
+        every { packetRepository.save(capture(saved)) } answers { firstArg() }
+
+        val result = service.authorForHire(hireId, projectId, authorRequest())
+
+        assertEquals(OrientationOrigin.HUMAN, result.origin)
+        assertEquals(proposal.id, saved.captured.taskProposalId)
+    }
+
+    @Test
+    fun `authorForHire 404s when the hire has no current task`() = runTest {
+        isMember()
+        every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
+
+        val error = assertThrows<ResponseStatusException> {
+            service.authorForHire(hireId, projectId, authorRequest())
+        }
+        assertEquals(HttpStatus.NOT_FOUND, error.statusCode)
+        verify(exactly = 0) { packetRepository.save(any()) }
+    }
+
+    @Test
+    fun `authorForHire 404s when the hire is not a member`() = runTest {
+        every { projectMembershipApi.getProjectMembers(projectId) } returns emptyList()
+
+        assertThrows<ResponseStatusException> { service.authorForHire(hireId, projectId, authorRequest()) }
+    }
+
+    @Test
+    fun `revertForHire deletes the packet for the hire's current task`() = runTest {
+        hasTask()
+
+        service.revertForHire(hireId, projectId)
+
+        verify(exactly = 1) { packetRepository.deleteByTaskProposalIdAndProjectId(proposal.id, projectId) }
     }
 }

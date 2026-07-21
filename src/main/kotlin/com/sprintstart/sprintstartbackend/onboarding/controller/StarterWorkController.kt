@@ -115,6 +115,26 @@ class StarterWorkController(
     fun listProposed(): ProposedStarterWorkResponse = starterWorkTaskProposalService.listProposed()
 
     /**
+     * Lists the approved starter-work tasks, for a PM choosing one to author orientation for.
+     */
+    @Operation(
+        summary = "List approved starter-work tasks",
+        description = "Returns starter-work tasks in APPROVED state — the pool a PM can author task " +
+            "orientation for",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Approved tasks returned"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/approved")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun listApproved(): List<StarterWorkTaskProposalResponse> = starterWorkTaskProposalService.listApproved()
+
+    /**
      * Approves a proposed starter-work task, creating it as a real `CONTRIBUTION` node in the
      * live graph.
      */

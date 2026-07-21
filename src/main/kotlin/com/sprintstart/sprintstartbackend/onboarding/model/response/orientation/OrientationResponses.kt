@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.response.orientation
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationStep
 import java.time.Instant
 import java.util.UUID
@@ -33,6 +34,11 @@ data class OrientationPacketResponse(
     val sections: List<OrientationSectionResponse>,
     val sources: List<OrientationSourceResponse>,
     val assembledAt: Instant,
+    /**
+     * Who authored this packet. The client badges a [OrientationOrigin.HUMAN] packet as
+     * human-written and treats it as authoritative rather than offering to regenerate it.
+     */
+    val origin: OrientationOrigin,
 )
 
 /**

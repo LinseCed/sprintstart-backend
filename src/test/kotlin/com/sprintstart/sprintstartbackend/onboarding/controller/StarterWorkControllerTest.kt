@@ -100,6 +100,23 @@ class StarterWorkControllerTest(
     }
 
     @Test
+    fun `listApproved should return 200 for a PM`() {
+        every { starterWorkTaskProposalService.listApproved() } returns listOf(taskResponse())
+
+        mockMvc
+            .perform(get("/api/v1/onboarding/starter-work/approved").with(pmJwt))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].status").value("APPROVED"))
+    }
+
+    @Test
+    fun `listApproved should return 403 for a plain USER`() {
+        mockMvc
+            .perform(get("/api/v1/onboarding/starter-work/approved").with(userJwt))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
     fun `create should return 200 and the created task for a PM`() {
         every { starterWorkTaskProposalService.createTask(any()) } returns taskResponse()
 

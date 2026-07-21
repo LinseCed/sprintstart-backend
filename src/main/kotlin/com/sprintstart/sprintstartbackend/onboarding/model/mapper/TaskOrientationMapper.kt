@@ -33,4 +33,5 @@ fun TaskOrientationPacket.toResponse(): OrientationPacketResponse =
         sections = sections.sortedBy { it.position }.map { it.toResponse() },
         sources = sources.sortedBy { it.position }.map { it.toResponse() },
         assembledAt = assembledAt,
+        origin = origin,
     )
