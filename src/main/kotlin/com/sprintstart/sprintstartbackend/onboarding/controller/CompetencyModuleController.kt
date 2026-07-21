@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.request.module.CreateCompetencyModuleRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.module.CreateModulePageRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.module.RejectCompetencyModuleRequest
@@ -18,7 +19,9 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import kotlinx.coroutines.flow.Flow
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -120,6 +123,29 @@ class CompetencyModuleController(
         @RequestParam competencyKey: String,
         @RequestParam projectId: UUID,
     ): CompetencyModuleResponse? = competencyModuleService.proposeFromCorpus(competencyKey, projectId)
+
+    @Operation(
+        summary = "Watch a module being drafted (streaming)",
+        description = "The same draft as `POST /propose`, streamed as Server-Sent Events so a PM can " +
+            "watch it build: retrieve/generate/ground stages and a page as it clears grounding, then " +
+            "a terminal `done` once the proposal is stored. The stored proposal is identical to the " +
+            "non-streaming path — the stream is a view, so a client reloads the module list on `done`.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Progress stream started"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "No competency found with the given key"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/propose/stream", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    suspend fun streamProposeFromCorpus(
+        @RequestParam competencyKey: String,
+        @RequestParam projectId: UUID,
+    ): Flow<AiProgressEvent> = competencyModuleService.streamProposalFromCorpus(competencyKey, projectId)
 
     @Operation(summary = "Edit a module", description = "Updates a draft module's title or summary")
     @ApiResponses(

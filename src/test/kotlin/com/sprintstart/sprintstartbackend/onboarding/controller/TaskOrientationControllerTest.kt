@@ -5,6 +5,7 @@ import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationStep
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.MyOrientationResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationCitationResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationPacketResponse
@@ -15,6 +16,7 @@ import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.justRun
+import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -29,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.request
@@ -36,6 +39,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
 import java.util.Optional
 import java.util.UUID
+import kotlin.test.assertTrue
 
 @WebMvcTest(TaskOrientationController::class)
 @Import(SecurityConfig::class)
@@ -152,6 +156,41 @@ class TaskOrientationControllerTest(
     fun `requires authentication`() {
         mockMvc
             .perform(get("/api/v1/onboarding/me/orientation").param("projectId", projectId.toString()))
+            .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `streams orientation progress events`() {
+        every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+        coEvery { taskOrientationService.streamForHire(userId, projectId) } returns
+            flowOf(
+                AiProgressEvent(type = "stage", operation = "orientation", stage = "retrieving", label = "…"),
+                AiProgressEvent(type = "done", operation = "orientation", label = "Orientation ready"),
+            )
+
+        val async = mockMvc
+            .perform(
+                post("/api/v1/onboarding/me/orientation/stream")
+                    .param("projectId", projectId.toString())
+                    .with(userJwt),
+            ).andExpect(request().asyncStarted())
+            .andReturn()
+
+        val body = mockMvc
+            .perform(asyncDispatch(async))
+            .andExpect(status().isOk)
+            .andReturn()
+            .response
+            .contentAsString
+
+        assertTrue(body.contains("\"type\":\"stage\""))
+        assertTrue(body.contains("\"type\":\"done\""))
+    }
+
+    @Test
+    fun `the orientation stream requires authentication`() {
+        mockMvc
+            .perform(post("/api/v1/onboarding/me/orientation/stream").param("projectId", projectId.toString()))
             .andExpect(status().isUnauthorized)
     }
 

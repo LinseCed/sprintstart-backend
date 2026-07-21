@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationStep
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProvenanceSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.CitationRefSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OrientationOutcome
@@ -32,7 +33,12 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.http.HttpStatus
@@ -56,6 +62,7 @@ class TaskOrientationServiceTest {
     private val projectMembershipApi: ProjectMembershipApi = mockk()
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
     private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val json: Json = Json { ignoreUnknownKeys = true }
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
 
     private val now: Instant = Instant.parse("2026-07-21T12:00:00Z")
@@ -69,6 +76,7 @@ class TaskOrientationServiceTest {
         projectMembershipApi,
         artifactIngestionApi,
         onboardingAiClient,
+        json,
         transactionManager,
         Clock.fixed(now, ZoneOffset.UTC),
     )
@@ -541,5 +549,92 @@ class TaskOrientationServiceTest {
         service.revertForHire(hireId, projectId)
 
         verify(exactly = 1) { packetRepository.deleteByTaskProposalIdAndProjectId(proposal.id, projectId) }
+    }
+
+    // ========================== Streaming ==========================
+
+    private fun assembledOutcome() = OrientationOutcome(
+        status = "assembled",
+        packet = OrientationPacketSchema(
+            taskTitle = proposal.title,
+            summary = "What you need.",
+            sections = listOf(
+                OrientationSectionSchema(
+                    step = "SET_UP",
+                    title = "Run it locally",
+                    body = "make dev",
+                    citations = listOf(CitationRefSchema("README.md", "c1", "https://example.test/README.md")),
+                ),
+            ),
+            sources = listOf(OrientationSourceSchema("README.md", "https://example.test/README.md", "FILE")),
+        ),
+        provenance = AiProvenanceSchema(corpusFingerprint = "fp-new", model = "test-model"),
+    )
+
+    private fun doneEvent(outcome: OrientationOutcome) = AiProgressEvent(
+        type = "done",
+        operation = "orientation",
+        result = json.encodeToJsonElement(outcome),
+    )
+
+    @Test
+    fun `streams the assembly events through and persists the packet on done`() = runTest {
+        hasTask()
+        val saved = slot<TaskOrientationPacket>()
+        every { packetRepository.save(capture(saved)) } answers { firstArg() }
+        every { onboardingAiClient.streamOrientation(any(), any(), any(), any(), any()) } returns
+            flowOf(
+                AiProgressEvent(type = "stage", operation = "orientation", stage = "retrieving", label = "…"),
+                AiProgressEvent(
+                    type = "item",
+                    operation = "orientation",
+                    item = json.parseToJsonElement("""{"step":"SET_UP","title":"Run it locally"}"""),
+                    label = "setting up",
+                ),
+                doneEvent(assembledOutcome()),
+            )
+
+        val events = service.streamForHire(hireId, projectId).toList()
+
+        // Every AI event is relayed to the caller, in order.
+        assertEquals(listOf("stage", "item", "done"), events.map { it.type })
+        // The done persisted the packet through the same path getForHire uses.
+        verify(exactly = 1) { packetRepository.save(any()) }
+        assertEquals("fp-new", saved.captured.corpusFingerprint)
+        assertEquals(OrientationOrigin.AI, saved.captured.origin)
+    }
+
+    @Test
+    fun `a human-authored packet streams a single done and calls no AI`() = runTest {
+        hasTask(cached = cachedPacket("fp-old", origin = OrientationOrigin.HUMAN))
+
+        val events = service.streamForHire(hireId, projectId).toList()
+
+        assertEquals(listOf("done"), events.map { it.type })
+        verify(exactly = 0) { onboardingAiClient.streamOrientation(any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { packetRepository.save(any()) }
+    }
+
+    @Test
+    fun `no current task streams a single done and calls no AI`() = runTest {
+        isMember()
+        every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
+
+        val events = service.streamForHire(hireId, projectId).toList()
+
+        assertEquals(listOf("done"), events.map { it.type })
+        verify(exactly = 0) { onboardingAiClient.streamOrientation(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `a failing AI stream ends in a synthesised error event`() = runTest {
+        hasTask()
+        every { onboardingAiClient.streamOrientation(any(), any(), any(), any(), any()) } returns
+            flow { throw OnboardingAiException(503, "", "AI is down") }
+
+        val events = service.streamForHire(hireId, projectId).toList()
+
+        assertEquals("error", events.last().type)
+        verify(exactly = 0) { packetRepository.save(any()) }
     }
 }

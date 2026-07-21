@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContentProve
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModulePageKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ModuleProposalOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedModulePageSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedModuleSchema
@@ -28,7 +29,11 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -38,6 +43,7 @@ import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.web.server.ResponseStatusException
 import java.util.Optional
 import java.util.UUID
+import kotlin.test.assertFailsWith
 
 class CompetencyModuleServiceTest {
     private val competencyModuleRepository: CompetencyModuleRepository = mockk(relaxed = true)
@@ -46,6 +52,7 @@ class CompetencyModuleServiceTest {
     private val verificationRepository: VerificationRepository = mockk(relaxed = true)
     private val userApi: UserApi = mockk()
     private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val json: Json = Json { ignoreUnknownKeys = true }
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
     private val service = CompetencyModuleService(
         competencyModuleRepository,
@@ -54,6 +61,7 @@ class CompetencyModuleServiceTest {
         verificationRepository,
         userApi,
         onboardingAiClient,
+        json,
         transactionManager,
     )
 
@@ -245,6 +253,70 @@ class CompetencyModuleServiceTest {
             service.proposeFromCorpus(key, projectId)
 
             assertThat(saved.captured.type).isEqualTo(VerificationType.ATTEST)
+        }
+    }
+
+    @Nested
+    inner class StreamProposalFromCorpus {
+        private fun proposedOutcome() = ModuleProposalOutcome(
+            status = "proposed",
+            module = ProposedModuleSchema(
+                competencyKey = key,
+                level = "intermediate",
+                title = "Deploying",
+                pages = listOf(ProposedModulePageSchema(kind = "LESSON", title = "How", body = "text")),
+            ),
+        )
+
+        private fun doneEvent(outcome: ModuleProposalOutcome) = AiProgressEvent(
+            type = "done",
+            operation = "module",
+            result = json.encodeToJsonElement(outcome),
+        )
+
+        private fun stubStream(vararg events: AiProgressEvent) {
+            stubKnownCompetency()
+            every {
+                competencyModuleRepository.findAllByCompetencyKeyAndProjectIdOrderByVersionDesc(key, projectId)
+            } returns emptyList()
+            every { competencyModuleRepository.save(any<CompetencyModule>()) } answers { firstArg() }
+            every { verificationRepository.findByModuleId(any()) } returns null
+            every { onboardingAiClient.streamModule(any(), any(), any(), any(), any()) } returns flowOf(*events)
+        }
+
+        @Test
+        fun `relays the events and persists the proposal on done`() = runTest {
+            stubStream(
+                AiProgressEvent(type = "stage", operation = "module", stage = "retrieving", label = "…"),
+                doneEvent(proposedOutcome()),
+            )
+
+            val events = service.streamProposalFromCorpus(key, projectId).toList()
+
+            assertThat(events.map { it.type }).containsExactly("stage", "done")
+            // The done persisted the proposal through the very same persistProposal the sync path uses.
+            verify(exactly = 1) { competencyModuleRepository.save(any<CompetencyModule>()) }
+        }
+
+        @Test
+        fun `a skipped outcome streams its done but persists nothing`() = runTest {
+            stubStream(doneEvent(ModuleProposalOutcome(status = "skipped")))
+
+            val events = service.streamProposalFromCorpus(key, projectId).toList()
+
+            assertThat(events.map { it.type }).containsExactly("done")
+            verify(exactly = 0) { competencyModuleRepository.save(any<CompetencyModule>()) }
+        }
+
+        @Test
+        fun `404s when the competency does not exist`() = runTest {
+            every { competencyRepository.findByKey("ghost") } returns null
+
+            val ex = assertFailsWith<ResponseStatusException> {
+                service.streamProposalFromCorpus("ghost", projectId)
+            }
+
+            assertThat(ex.statusCode).isEqualTo(HttpStatus.NOT_FOUND)
         }
     }
 

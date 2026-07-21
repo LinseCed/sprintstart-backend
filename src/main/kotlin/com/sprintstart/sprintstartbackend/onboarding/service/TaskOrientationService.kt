@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionAp
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationStep
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OrientationOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OrientationPacketSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
@@ -21,7 +22,13 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.TaskOrientationP
 import com.sprintstart.sprintstartbackend.onboarding.repository.TaskZeroAssignmentRepository
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -69,6 +76,7 @@ class TaskOrientationService(
     private val projectMembershipApi: ProjectMembershipApi,
     private val artifactIngestionApi: ArtifactIngestionApi,
     private val onboardingAiClient: OnboardingAiClient,
+    private val json: Json,
     transactionManager: PlatformTransactionManager,
     private val clock: Clock = Clock.systemUTC(),
 ) {
@@ -113,6 +121,63 @@ class TaskOrientationService(
             txTemplate.execute { apply(context, outcome) }!!
         }
     }
+
+    /**
+     * Streams the assembly of the hire's current-task orientation as [AiProgressEvent]s.
+     *
+     * The live twin of [getForHire]: it relays the AI's stage/item/warning events to the caller and,
+     * on the terminal `done`, persists the packet **exactly as [getForHire] would** — the same
+     * [apply] against the same cache — before the `done` reaches the browser, so a client that
+     * re-reads on `done` sees the committed result. A human-authored packet and a hire with no task
+     * are both handled without touching the AI, each a single synthesised `done`.
+     *
+     * @throws ResponseStatusException 404 when the hire is not a member of the project.
+     */
+    suspend fun streamForHire(hireId: UUID, projectId: UUID): Flow<AiProgressEvent> {
+        val context = withContext(Dispatchers.IO) {
+            readTxTemplate.execute { loadContext(hireId, projectId) }
+        } ?: return flowOf(AiProgressEvent.done(ORIENTATION, "You have no current task yet"))
+
+        // A human-authored packet is served as-is: nothing to assemble, nothing to persist.
+        if (context.cachedPacket?.origin == OrientationOrigin.HUMAN) {
+            return flowOf(
+                AiProgressEvent.done(ORIENTATION, "This task's orientation was written by a person"),
+            )
+        }
+
+        return onboardingAiClient
+            .streamOrientation(
+                taskTitle = context.title,
+                taskBody = context.body,
+                labels = context.labels,
+                touchedPaths = emptyList(),
+                lastFingerprint = context.cachedFingerprint,
+            ).onEach { event ->
+                // Persist on `done`, before the event is relayed downstream, so the cache is committed
+                // by the time the client reacts. Decoding the same OrientationOutcome the sync path
+                // gets and running the same `apply` is what keeps the streamed result identical.
+                if (event.type == AiProgressEvent.DONE) {
+                    decodeOutcome(event)?.let { outcome ->
+                        withContext(Dispatchers.IO) { txTemplate.execute { apply(context, outcome) } }
+                    }
+                }
+            }.catch { cause ->
+                logger.warn(
+                    "Orientation stream failed for hire {} on project {}: {}",
+                    hireId,
+                    projectId,
+                    cause.message,
+                )
+                emit(AiProgressEvent.error(ORIENTATION, "Orientation is temporarily unavailable"))
+            }
+    }
+
+    private fun decodeOutcome(event: AiProgressEvent): OrientationOutcome? =
+        event.result?.let {
+            runCatching { json.decodeFromJsonElement<OrientationOutcome>(it) }
+                .onFailure { e -> logger.warn("Could not decode streamed orientation result: {}", e.message) }
+                .getOrNull()
+        }
 
     // ========================== Human authoring ==========================
     //
@@ -440,6 +505,7 @@ class TaskOrientationService(
     }
 
     private companion object {
+        const val ORIENTATION = "orientation"
         const val ASSEMBLED = "assembled"
         const val UNCHANGED = "unchanged"
         const val NOT_ASSEMBLED = "No orientation could be assembled from this project's material"

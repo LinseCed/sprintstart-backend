@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContentProve
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModulePageKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ModuleProposalOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedModuleSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
@@ -26,7 +27,12 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.ModulePageReposi
 import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -58,6 +64,7 @@ class CompetencyModuleService(
     private val verificationRepository: VerificationRepository,
     private val userApi: UserApi,
     private val onboardingAiClient: OnboardingAiClient,
+    private val json: Json,
     transactionManager: PlatformTransactionManager,
 ) {
     // The AI call is a long-running suspend operation, so it must not run inside a
@@ -150,6 +157,64 @@ class CompetencyModuleService(
             txTemplate.execute { persistProposal(competencyKey, projectId, proposed, outcome) }
         }
     }
+
+    /**
+     * Streams the AI drafting a module as [AiProgressEvent]s, persisting the proposal on `done`.
+     *
+     * The live twin of [proposeFromCorpus]: a PM watches the module take shape (retrieve → write →
+     * ground, a page landing at a time) instead of waiting on a spinner. The AI's stage/item/warning
+     * events are relayed as-is; on the terminal `done` the outcome is persisted with the very same
+     * [persistProposal] the non-streaming path uses, before the event reaches the browser — so the
+     * stored proposal is identical whether or not anyone watched. Nothing is stored for an empty
+     * corpus, an unchanged corpus, or an ungroundable competency, exactly as [proposeFromCorpus].
+     *
+     * @throws ResponseStatusException 404 if the competency does not exist in the graph.
+     */
+    suspend fun streamProposalFromCorpus(competencyKey: String, projectId: UUID): Flow<AiProgressEvent> {
+        val context = withContext(Dispatchers.IO) {
+            readTxTemplate.execute { loadProposalContext(competencyKey, projectId) }!!
+        }
+        return onboardingAiClient
+            .streamModule(
+                competencyKey = competencyKey,
+                competencyLabel = context.label,
+                competencyDescription = context.description,
+                level = context.level,
+                lastFingerprint = context.lastFingerprint,
+            ).onEach { event ->
+                if (event.type == AiProgressEvent.DONE) {
+                    val outcome = decodeOutcome(event) ?: return@onEach
+                    val proposed = outcome.module
+                    if (outcome.status == "proposed" && proposed != null) {
+                        withContext(Dispatchers.IO) {
+                            txTemplate.execute { persistProposal(competencyKey, projectId, proposed, outcome) }
+                        }
+                    } else {
+                        logger.info(
+                            "No module proposed for {} in project {}: {}",
+                            competencyKey,
+                            projectId,
+                            outcome.notes.firstOrNull() ?: outcome.status,
+                        )
+                    }
+                }
+            }.catch { cause ->
+                logger.warn(
+                    "Module stream failed for {} on project {}: {}",
+                    competencyKey,
+                    projectId,
+                    cause.message,
+                )
+                emit(AiProgressEvent.error(MODULE, "Module generation is temporarily unavailable"))
+            }
+    }
+
+    private fun decodeOutcome(event: AiProgressEvent): ModuleProposalOutcome? =
+        event.result?.let {
+            runCatching { json.decodeFromJsonElement<ModuleProposalOutcome>(it) }
+                .onFailure { e -> logger.warn("Could not decode streamed module result: {}", e.message) }
+                .getOrNull()
+        }
 
     private data class ProposalContext(
         val label: String,
@@ -533,6 +598,9 @@ class CompetencyModuleService(
 
 /** Ledger ranks back to the level names the AI service and Verification.level speak. */
 private val LEVEL_NAMES = mapOf(1 to "beginner", 2 to "intermediate", 3 to "advanced", 4 to "expert")
+
+/** The `operation` tag on this service's [AiProgressEvent]s. */
+private const val MODULE = "module"
 
 /**
  * The check types module generation will persist. ARTIFACT is real proof (a merged PR); ATTEST is
