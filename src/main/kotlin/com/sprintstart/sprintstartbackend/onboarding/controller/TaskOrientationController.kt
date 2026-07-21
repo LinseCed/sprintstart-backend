@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.AuthorOrientationRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.MyOrientationResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationPacketResponse
@@ -10,13 +11,16 @@ import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import kotlinx.coroutines.flow.Flow
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -71,6 +75,31 @@ class TaskOrientationController(
         @AuthenticationPrincipal jwt: Jwt,
         @RequestParam projectId: UUID,
     ): MyOrientationResponse = taskOrientationService.getForHire(resolveUserId(jwt), projectId)
+
+    @Operation(
+        summary = "Watch my orientation being assembled (streaming)",
+        description = "The same assembly as `GET /me/orientation`, streamed as Server-Sent Events so " +
+            "a hire can watch it happen: a stage per retrieval step, a section as it clears grounding, " +
+            "and a terminal `done` once the packet is cached. The cached packet is identical to what " +
+            "the plain read returns — the stream is a view, so a client re-reads `GET /me/orientation` " +
+            "on `done` for the authoritative result. Having no task, or a human-written packet, is a " +
+            "single `done` with no AI call.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Progress stream started"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "404", description = "You are not a member of that project"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/me/orientation/stream", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    @PreAuthorize("hasAnyRole('USER', 'PM', 'HR', 'ADMIN')")
+    suspend fun streamMyOrientation(
+        @Parameter(hidden = true)
+        @AuthenticationPrincipal jwt: Jwt,
+        @RequestParam projectId: UUID,
+    ): Flow<AiProgressEvent> = taskOrientationService.streamForHire(resolveUserId(jwt), projectId)
 
     @Operation(
         summary = "Fix my current task's orientation in place",

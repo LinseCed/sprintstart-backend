@@ -3,6 +3,7 @@
 import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompetencySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveEdgeSchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ArtifactEvidenceDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssembleOrientationRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentHistoryEntrySchema
@@ -386,6 +387,78 @@ class OnboardingAiClient(
     // embedding tie-break cannot say -- so ranking moved into `StarterWorkMatcher`, which is
     // deterministic, local and self-explaining. The AI service's /match endpoint now has no caller
     // and is a candidate for removal in slice 5.
+
+    /**
+     * Streams the AI service assembling an orientation packet (live-AI-visibility, #94/ai#36).
+     *
+     * The streaming twin of [assembleOrientation]: same inputs and same result, but the AI emits
+     * [AiProgressEvent]s as it works (a `stage` per retrieval step, an `item` per grounded section,
+     * a terminal `done` carrying the whole outcome). Unlike [streamBuddy] an `error` chunk is *not*
+     * turned into an exception -- it is a terminal event the caller relays to the browser, so a hire
+     * watching the assembly sees it fail rather than the connection dropping. The persisted packet
+     * is taken from the `done` event's `result`, so it is byte-for-byte what the cached call returns.
+     */
+    fun streamOrientation(
+        taskTitle: String,
+        taskBody: String = "",
+        labels: List<String> = emptyList(),
+        touchedPaths: List<String> = emptyList(),
+        lastFingerprint: String? = null,
+    ): Flow<AiProgressEvent> =
+        streamProgress(
+            "/api/v1/onboarding/orientation/stream",
+            AssembleOrientationRequest(
+                taskTitle = taskTitle,
+                taskBody = taskBody,
+                labels = labels,
+                touchedPaths = touchedPaths,
+                lastFingerprint = lastFingerprint,
+            ),
+        )
+
+    /**
+     * Streams the AI service proposing a competency module (live-AI-visibility, #94/ai#36).
+     *
+     * The streaming twin of [proposeModule]: the AI emits `stage`/`item`/`warning` events as it
+     * writes and grounds pages, and a terminal `done` carrying the outcome the backend persists.
+     */
+    fun streamModule(
+        competencyKey: String,
+        competencyLabel: String,
+        competencyDescription: String = "",
+        level: String = "beginner",
+        lastFingerprint: String? = null,
+    ): Flow<AiProgressEvent> =
+        streamProgress(
+            "/api/v1/onboarding/modules/propose/stream",
+            ProposeModuleRequest(
+                competencyKey = competencyKey,
+                competencyLabel = competencyLabel,
+                competencyDescription = competencyDescription,
+                level = level,
+                lastFingerprint = lastFingerprint,
+            ),
+        )
+
+    /**
+     * Opens an SSE stream of [AiProgressEvent]s against [path], POSTing [body].
+     *
+     * The reusable passthrough behind every streaming operation. A malformed chunk is logged and
+     * skipped (never kills the stream); the AI's own terminal `error` event passes straight through,
+     * because progress errors are shown, not thrown.
+     */
+    private inline fun <reified B> streamProgress(path: String, body: B): Flow<AiProgressEvent> =
+        webClient
+            .post()
+            .uri(uri(path))
+            .body(body)
+            .stream()
+            .perform<AiProgressEvent>(
+                onChunkError = { raw, err ->
+                    logger.warn("Skipping malformed AI progress chunk '{}': {}", raw, err.message)
+                    true
+                },
+            )
 
     /** Builds an absolute URI for [path] against the configured AI service base URL. */
     private fun uri(path: String): URI = URI.create("${applicationConfig.ai.baseUrl}$path")
