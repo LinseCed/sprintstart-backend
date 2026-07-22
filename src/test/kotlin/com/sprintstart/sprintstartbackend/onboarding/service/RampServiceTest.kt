@@ -7,15 +7,15 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySo
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.RampStage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.AutonomyMilestone
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyContact
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.KnowledgeRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskZeroAssignment
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGoal
 import com.sprintstart.sprintstartbackend.onboarding.repository.AutonomyMilestoneRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyContactRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.KnowledgeRequestRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.TaskZeroAssignmentRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
@@ -49,7 +49,7 @@ class RampServiceTest {
     private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk(relaxed = true)
     private val competencyRepository: CompetencyRepository = mockk()
     private val autonomyMilestoneRepository: AutonomyMilestoneRepository = mockk(relaxed = true)
-    private val buddyContactRepository: BuddyContactRepository = mockk()
+    private val knowledgeRequestRepository: KnowledgeRequestRepository = mockk()
     private val projectMembershipApi: ProjectMembershipApi = mockk()
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
 
@@ -64,7 +64,7 @@ class RampServiceTest {
         userCompetencyStateRepository,
         competencyRepository,
         autonomyMilestoneRepository,
-        buddyContactRepository,
+        knowledgeRequestRepository,
         projectMembershipApi,
         artifactIngestionApi,
         Clock.fixed(now, ZoneOffset.UTC),
@@ -104,8 +104,8 @@ class RampServiceTest {
         every { userGoalRepository.findByUserIdAndProjectId(hireId, projectId) } returns null
     }
 
-    private fun noContacts() {
-        every { buddyContactRepository.findAllByHireIdAndProjectIdOrderByOccurredAtDesc(hireId, projectId) } returns
+    private fun noEscalations() {
+        every { knowledgeRequestRepository.findAllByHireIdAndProjectId(hireId, projectId) } returns
             emptyList()
     }
 
@@ -142,7 +142,7 @@ class RampServiceTest {
         isMember()
         pullRequests(pullRequest())
         claimedGoal("kotlin")
-        noContacts()
+        noEscalations()
         noMilestone()
         every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(hireId, "kotlin") } returns null
         val saved = slot<UserCompetencyState>()
@@ -164,7 +164,7 @@ class RampServiceTest {
         noGoal()
         every { taskZeroAssignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns
             TaskZeroAssignment(hireId = hireId, projectId = projectId, proposalId = UUID.randomUUID(), assignedAt = now)
-        noContacts()
+        noEscalations()
         noMilestone()
 
         val result = service.getForHire(hireId, projectId)
@@ -178,7 +178,7 @@ class RampServiceTest {
         isMember()
         pullRequests(pullRequest())
         claimedGoal("kotlin")
-        noContacts()
+        noEscalations()
         noMilestone()
         val existing = UserCompetencyState(
             userId = hireId,
@@ -198,7 +198,7 @@ class RampServiceTest {
         isMember()
         pullRequests(pullRequest(opened = daysAgo(12), merged = daysAgo(10)))
         claimedGoal("kotlin", claimedAt = daysAgo(6))
-        noContacts()
+        noEscalations()
         noMilestone()
 
         val result = service.getForHire(hireId, projectId)
@@ -214,7 +214,7 @@ class RampServiceTest {
         pullRequests(pullRequest(merged = null))
         noGoal()
         every { taskZeroAssignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
-        noContacts()
+        noEscalations()
         noMilestone()
 
         val result = service.getForHire(hireId, projectId)
@@ -228,7 +228,7 @@ class RampServiceTest {
         isMember()
         noGoal()
         every { taskZeroAssignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
-        noContacts()
+        noEscalations()
 
         every { autonomyMilestoneRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
         every { autonomyMilestoneRepository.save(any()) } answers { firstArg() }
@@ -249,7 +249,7 @@ class RampServiceTest {
         isMember()
         pullRequests(pullRequest(changesRequested = 2))
         noGoal()
-        noContacts()
+        noEscalations()
         noMilestone()
 
         val result = service.getForHire(hireId, projectId)
@@ -260,17 +260,17 @@ class RampServiceTest {
     }
 
     @Test
-    fun `autonomy is not granted when the buddy stepped in during that change`() {
+    fun `autonomy is not granted when a person was pulled in during that change`() {
         isMember()
         pullRequests(pullRequest(opened = daysAgo(5), merged = daysAgo(3)))
         noGoal()
-        every { buddyContactRepository.findAllByHireIdAndProjectIdOrderByOccurredAtDesc(hireId, projectId) } returns
+        every { knowledgeRequestRepository.findAllByHireIdAndProjectId(hireId, projectId) } returns
             listOf(
-                BuddyContact(
-                    hireId = hireId,
+                KnowledgeRequest(
                     projectId = projectId,
-                    recordedBy = UUID.randomUUID(),
-                    occurredAt = daysAgo(4),
+                    hireId = hireId,
+                    question = "How do we run this locally?",
+                    createdAt = daysAgo(4),
                 ),
             )
         noMilestone()
@@ -278,7 +278,7 @@ class RampServiceTest {
         val result = service.getForHire(hireId, projectId)
 
         assertFalse(result.autonomy.reached)
-        assertTrue(result.autonomy.blockers.any { it.contains("buddy") })
+        assertTrue(result.autonomy.blockers.any { it.contains("pulled in a person") })
     }
 
     @Test
@@ -287,13 +287,13 @@ class RampServiceTest {
         pullRequests(pullRequest(opened = daysAgo(5), merged = daysAgo(3)))
         noGoal()
         // Week one needed help; this change did not. That is exactly what the exit asks about.
-        every { buddyContactRepository.findAllByHireIdAndProjectIdOrderByOccurredAtDesc(hireId, projectId) } returns
+        every { knowledgeRequestRepository.findAllByHireIdAndProjectId(hireId, projectId) } returns
             listOf(
-                BuddyContact(
-                    hireId = hireId,
+                KnowledgeRequest(
                     projectId = projectId,
-                    recordedBy = UUID.randomUUID(),
-                    occurredAt = daysAgo(15),
+                    hireId = hireId,
+                    question = "Where does the config live?",
+                    createdAt = daysAgo(15),
                 ),
             )
         noMilestone()
@@ -307,7 +307,7 @@ class RampServiceTest {
         val mergedAt = daysAgo(3)
         pullRequests(pullRequest(merged = mergedAt))
         noGoal()
-        noContacts()
+        noEscalations()
         val saved = slot<AutonomyMilestone>()
         every { autonomyMilestoneRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
         every { autonomyMilestoneRepository.save(capture(saved)) } answers { firstArg() }
@@ -342,7 +342,7 @@ class RampServiceTest {
         pullRequests()
         noGoal()
         every { taskZeroAssignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
-        noContacts()
+        noEscalations()
         noMilestone()
 
         val result = service.getForHire(hireId, projectId)
@@ -357,7 +357,7 @@ class RampServiceTest {
         isMember(login = null)
         noGoal()
         every { taskZeroAssignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
-        noContacts()
+        noEscalations()
         noMilestone()
 
         val result = service.getForHire(hireId, projectId)

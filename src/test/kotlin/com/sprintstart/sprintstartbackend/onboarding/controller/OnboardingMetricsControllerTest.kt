@@ -4,6 +4,7 @@ import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingMetricsService
+import com.sprintstart.sprintstartbackend.onboarding.service.ProjectAttentionService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
 import io.mockk.verify
@@ -31,6 +32,9 @@ class OnboardingMetricsControllerTest(
 ) {
     @MockkBean
     private lateinit var onboardingMetricsService: OnboardingMetricsService
+
+    @MockkBean
+    private lateinit var projectAttentionService: ProjectAttentionService
 
     @MockkBean
     private lateinit var userApi: UserApi

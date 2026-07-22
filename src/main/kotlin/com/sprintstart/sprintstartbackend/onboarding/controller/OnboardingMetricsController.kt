@@ -1,8 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectAttentionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectOnboardingMetricsResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingMetricsService
+import com.sprintstart.sprintstartbackend.onboarding.service.ProjectAttentionService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -36,6 +38,7 @@ import java.util.UUID
 )
 class OnboardingMetricsController(
     private val onboardingMetricsService: OnboardingMetricsService,
+    private val projectAttentionService: ProjectAttentionService,
     private val userApi: UserApi,
 ) {
     @Operation(
@@ -113,4 +116,23 @@ class OnboardingMetricsController(
                 HttpStatus.NOT_FOUND,
                 "User $userId is not a member of project $projectId",
             )
+
+    @Operation(
+        summary = "Who needs a human today",
+        description = "Blocked before drifting, longest wait first: pull requests kept waiting on a " +
+            "response (somebody else's move) and stalls the metrics found. Escalation to a person " +
+            "runs through flag-to-PM, not an assigned buddy.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Attention list returned"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/projects/{projectId}/attention")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
+    fun getAttention(@PathVariable projectId: UUID): ProjectAttentionResponse =
+        projectAttentionService.getAttention(projectId)
 }

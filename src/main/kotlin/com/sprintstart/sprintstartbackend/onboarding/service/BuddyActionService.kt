@@ -37,11 +37,10 @@ import java.util.UUID
  * project the buddy did not scope it to, nor act as another hire.
  */
 @Service
-@Suppress("TooManyFunctions") // Six wrapped actions, each with a propose + a perform helper.
+@Suppress("TooManyFunctions") // Five wrapped actions, each with a propose + a perform helper.
 class BuddyActionService(
     private val taskZeroService: TaskZeroService,
     private val taskOrientationService: TaskOrientationService,
-    private val onboardingBuddyService: OnboardingBuddyService,
     private val knowledgeBaseService: KnowledgeBaseService,
     private val userGoalService: UserGoalService,
     private val verificationService: VerificationService,
@@ -53,7 +52,6 @@ class BuddyActionService(
             FLAG_TO_PM_SPEC,
             CLAIM_TASK_ZERO_SPEC,
             OPEN_ORIENTATION_SPEC,
-            LOG_BUDDY_CONTACT_SPEC,
             CLAIM_GOAL_SPEC,
             SUBMIT_VERIFICATION_SPEC,
         )
@@ -183,8 +181,6 @@ class BuddyActionService(
             else -> withContext(Dispatchers.IO) {
                 when (type) {
                     BuddyActionType.CLAIM_TASK_ZERO -> claimTaskZero(resolved.userId, resolved.projectId)
-                    BuddyActionType.LOG_BUDDY_CONTACT ->
-                        logContact(resolved.userId, resolved.projectId, request.note)
                     BuddyActionType.FLAG_TO_PM -> flagToPm(authId, resolved.projectId, request.question)
                     BuddyActionType.CLAIM_GOAL -> claimGoal(authId, resolved.projectId, request.taskId)
                     BuddyActionType.OPEN_ORIENTATION,
@@ -268,20 +264,6 @@ class BuddyActionService(
         }
     }
 
-    private fun logContact(userId: UUID, projectId: UUID, note: String?): BuddyActionResponse {
-        onboardingBuddyService.logContact(
-            projectId = projectId,
-            hireId = userId,
-            recordedBy = userId,
-            occurredAt = null,
-            note = note,
-        )
-        return BuddyActionResponse(
-            ok = true,
-            message = "Logged that you reached out to your buddy — staying in touch is the thing that helps most.",
-        )
-    }
-
     private fun flagToPm(authId: String, projectId: UUID, question: String?): BuddyActionResponse {
         val trimmed = question?.trim().orEmpty()
         if (trimmed.isBlank()) {
@@ -357,7 +339,6 @@ class BuddyActionService(
             BuddyActionType.FLAG_TO_PM -> "flag this to a PM"
             BuddyActionType.CLAIM_TASK_ZERO -> "start Task 0"
             BuddyActionType.OPEN_ORIENTATION -> "open a task packet"
-            BuddyActionType.LOG_BUDDY_CONTACT -> "log buddy contact"
             BuddyActionType.CLAIM_GOAL -> "claim a goal"
             BuddyActionType.SUBMIT_VERIFICATION -> "submit an answer"
         }
@@ -443,22 +424,6 @@ class BuddyActionService(
                 "PR. Proposes only; the hire confirms. Use when they ask how to start the task they have. Takes " +
                 "no arguments.",
             parameters = noArgs(),
-        )
-
-        val LOG_BUDDY_CONTACT_SPEC = BuddyToolSpecDto(
-            name = BuddyActionType.LOG_BUDDY_CONTACT.toolName,
-            description = "Offer to log that the hire reached out to their human buddy/mentor. Proposes only; the " +
-                "hire confirms. Use when the hire says they've contacted or plan to contact their buddy. An " +
-                "optional `note` can capture what it was about.",
-            parameters = buildJsonObject {
-                put("type", "object")
-                putJsonObject("properties") {
-                    putJsonObject("note") {
-                        put("type", "string")
-                        put("description", "Optional short note on what the contact was about.")
-                    }
-                }
-            },
         )
 
         val CLAIM_GOAL_SPEC = BuddyToolSpecDto(

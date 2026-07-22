@@ -8,7 +8,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.SetupR
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyProposalRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingBuddyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import org.springframework.stereotype.Service
@@ -16,10 +15,11 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * "Is this project ready to onboard someone?" answered as a ladder of the four setup stages the
- * onboarding module owns: an approved skill map, a chosen baseline, a stocked pool of starter tasks,
- * and a buddy for every hire. (The corpus stage lives in the ingestion module; see
- * [SetupReadinessResponse].)
+ * "Is this project ready to onboard someone?" answered as a ladder of the three setup stages the
+ * onboarding module owns: an approved skill map, a chosen baseline, and a stocked pool of starter
+ * tasks. (The corpus stage lives in the ingestion module; see [SetupReadinessResponse]. The
+ * fourth stage this used to check — a buddy for every hire — went away with the human-buddy loop:
+ * the AI buddy needs no assignment.)
  *
  * Every number is composed on read from the same rows each stage's own page reads, so this can never
  * disagree with those pages -- and the bug that motivated it (proposals generated but never approved,
@@ -33,7 +33,6 @@ class SetupReadinessService(
     private val competencyEdgeProposalRepository: CompetencyEdgeProposalRepository,
     private val blueprintRepository: BlueprintRepository,
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
-    private val onboardingBuddyRepository: OnboardingBuddyRepository,
     private val projectMembershipApi: ProjectMembershipApi,
 ) {
     @Transactional(readOnly = true)
@@ -43,7 +42,6 @@ class SetupReadinessService(
             skillMapRung(approvedCompetencies),
             baselineRung(projectId, approvedCompetencies),
             starterTasksRung(),
-            humanLoopRung(projectId),
         )
         return SetupReadinessResponse(
             projectId = projectId,
@@ -135,37 +133,6 @@ class SetupReadinessService(
         }
     }
 
-    private fun humanLoopRung(projectId: UUID): SetupRungResponse {
-        val hires = projectMembershipApi.getProjectMembers(projectId)
-        val hiresWithBuddy = onboardingBuddyRepository
-            .findAllByProjectId(projectId)
-            .map { it.hireId }
-            .toSet()
-        val covered = hires.count { it.userId in hiresWithBuddy }
-        val total = hires.size
-        return when {
-            total == 0 -> rung(
-                HUMAN_LOOP,
-                RungState.WARN,
-                0,
-                "No hires on this project yet.",
-            )
-            covered == total -> rung(
-                HUMAN_LOOP,
-                RungState.OK,
-                covered,
-                "Every hire has a buddy ($covered of $total).",
-            )
-            else -> rung(
-                HUMAN_LOOP,
-                RungState.WARN,
-                covered,
-                "${total - covered} ${hireWord(total - covered)} still ${needsWord(total - covered)} " +
-                    "a buddy ($covered of $total).",
-            )
-        }
-    }
-
     private fun rung(key: String, state: RungState, count: Int, detail: String) =
         SetupRungResponse(key = key, state = state, count = count, detail = detail)
 
@@ -175,14 +142,9 @@ class SetupReadinessService(
 
     private fun taskWord(n: Int) = if (n == 1) "task" else "tasks"
 
-    private fun hireWord(n: Int) = if (n == 1) "hire" else "hires"
-
-    private fun needsWord(n: Int) = if (n == 1) "needs" else "need"
-
     private companion object {
         const val SKILL_MAP = "skill-map"
         const val BASELINE = "baseline"
         const val STARTER_TASKS = "starter-tasks"
-        const val HUMAN_LOOP = "human-loop"
     }
 }

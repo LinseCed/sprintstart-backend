@@ -11,8 +11,8 @@ import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.ramp.AutonomyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.ramp.MyRampResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.AutonomyMilestoneRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyContactRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.KnowledgeRequestRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.TaskZeroAssignmentRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
@@ -42,11 +42,11 @@ import java.util.UUID
  * credit it. That is deliberate: its job is confidence and mechanics, and a ledger entry for
  * "opened a pull request once" would be a lie about competence.
  *
- * **Autonomy is an event, not a state.** The exit condition is a task completed with no buddy
- * intervention and no review rework, which is the honest operational definition of "can be left
- * alone here" — not "all nodes mastered". The moment is recorded once ([AutonomyMilestone]) so it
- * can be announced and dated; recomputing it would only ever yield a boolean, and a boolean cannot
- * be announced.
+ * **Autonomy is an event, not a state.** The exit condition is a task completed with no help from
+ * a person (an escalation to the PM, the surviving human channel) and no review rework, which is
+ * the honest operational definition of "can be left alone here" — not "all nodes mastered". The
+ * moment is recorded once ([AutonomyMilestone]) so it can be announced and dated; recomputing it
+ * would only ever yield a boolean, and a boolean cannot be announced.
  */
 @Service
 class RampService(
@@ -56,7 +56,7 @@ class RampService(
     private val userCompetencyStateRepository: UserCompetencyStateRepository,
     private val competencyRepository: CompetencyRepository,
     private val autonomyMilestoneRepository: AutonomyMilestoneRepository,
-    private val buddyContactRepository: BuddyContactRepository,
+    private val knowledgeRequestRepository: KnowledgeRequestRepository,
     private val projectMembershipApi: ProjectMembershipApi,
     private val artifactIngestionApi: ArtifactIngestionApi,
     private val clock: Clock = Clock.systemUTC(),
@@ -180,7 +180,7 @@ class RampService(
      *
      * The condition is evaluated against the **most recent merged pull request**, because autonomy
      * is a claim about how somebody works now. Both halves must hold on that one task: no review
-     * asked for changes, and no buddy contact was logged between opening it and merging it.
+     * asked for changes, and no person was pulled in between opening it and merging it.
      */
     private fun evaluateAutonomy(
         hireId: UUID,
@@ -209,7 +209,7 @@ class RampService(
             blockers += "Your last merged change was sent back for rework"
         }
         if (neededHelp(hireId, projectId, latest)) {
-            blockers += "Your buddy stepped in while you were on your last change"
+            blockers += "You pulled in a person while you were on your last change"
         }
         if (blockers.isNotEmpty()) {
             return AutonomyResponse(
@@ -239,17 +239,20 @@ class RampService(
     }
 
     /**
-     * Whether a buddy was involved while this change was open.
+     * Whether the hire needed a person while this change was open.
      *
      * Scoped to the change's own window rather than "ever": a hire who needed help in week one and
      * shipped week four's change alone has demonstrated exactly what the exit condition asks about.
+     * "Help" is what the surviving human channel records: the assigned-buddy loop is retired, so
+     * this is now an escalation to the PM (flag-to-PM) during the window — the only reaching out
+     * a hire can still do.
      */
     private fun neededHelp(hireId: UUID, projectId: UUID, pullRequest: AuthoredPullRequest): Boolean {
         val opened = pullRequest.openedAt ?: return false
         val merged = pullRequest.mergedAt ?: return false
-        return buddyContactRepository
-            .findAllByHireIdAndProjectIdOrderByOccurredAtDesc(hireId, projectId)
-            .any { !it.occurredAt.isBefore(opened) && !it.occurredAt.isAfter(merged) }
+        return knowledgeRequestRepository
+            .findAllByHireIdAndProjectId(hireId, projectId)
+            .any { !it.createdAt.isBefore(opened) && !it.createdAt.isAfter(merged) }
     }
 
     /**
