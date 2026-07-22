@@ -5,8 +5,13 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpe
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.user.external.UserApi
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import org.springframework.stereotype.Component
 import java.util.UUID
 
@@ -23,11 +28,17 @@ class BuddyToolExecutor(
     private val onboardingMetricsService: OnboardingMetricsService,
     private val myCompetencyService: MyCompetencyService,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
+    private val knowledgeBaseService: KnowledgeBaseService,
     private val userApi: UserApi,
 ) {
     /** The backend tools the AI reasoner is told it may call. */
     fun toolSpecs(): List<BuddyToolSpecDto> =
-        listOf(GET_MY_METRICS_SPEC, GET_MY_COMPETENCIES_SPEC, GET_SUGGESTED_TASKS_SPEC)
+        listOf(
+            GET_MY_METRICS_SPEC,
+            GET_MY_COMPETENCIES_SPEC,
+            GET_SUGGESTED_TASKS_SPEC,
+            SEARCH_CANONICAL_ANSWERS_SPEC,
+        )
 
     /** Executes [call] on behalf of [userId], returning a plain-text result for the model. */
     fun execute(call: BuddyToolCallDto, userId: UUID): String =
@@ -35,6 +46,7 @@ class BuddyToolExecutor(
             GET_MY_METRICS -> getMyMetrics(userId)
             GET_MY_COMPETENCIES -> getMyCompetencies(userId)
             GET_SUGGESTED_TASKS -> getSuggestedTasks(userId)
+            SEARCH_CANONICAL_ANSWERS -> searchCanonicalAnswers(userId, call.stringArg("query"))
             else -> "Unknown tool: ${call.name}."
         }
 
@@ -118,10 +130,24 @@ class BuddyToolExecutor(
         }.joinToString("\n\n")
     }
 
+    private fun searchCanonicalAnswers(userId: UUID, query: String): String {
+        if (query.isBlank()) return "No search query was provided."
+        val matches = knowledgeBaseService.searchForUser(userId, query)
+        if (matches.isEmpty()) {
+            return "No teammate has answered anything like this yet."
+        }
+        return matches.joinToString("\n\n") { "Q: ${it.question}\nA: ${it.answer}" }
+    }
+
+    /** Reads a string argument the model passed to a tool, or "" when it is missing/non-text. */
+    private fun BuddyToolCallDto.stringArg(name: String): String =
+        (arguments[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
+
     private companion object {
         const val GET_MY_METRICS = "get_my_metrics"
         const val GET_MY_COMPETENCIES = "get_my_competencies"
         const val GET_SUGGESTED_TASKS = "get_suggested_tasks"
+        const val SEARCH_CANONICAL_ANSWERS = "search_canonical_answers"
         const val MAX_SUGGESTED_TASKS = 3
 
         // No-argument JSON schema shared by every caller-scoped tool: the agent never says whose
@@ -158,6 +184,25 @@ class BuddyToolExecutor(
                 "on?' or 'what's a good first task for me?'. Present the reasons, never a score. " +
                 "Takes no arguments — it always ranks for the caller.",
             parameters = noArgs(),
+        )
+
+        val SEARCH_CANONICAL_ANSWERS_SPEC = BuddyToolSpecDto(
+            name = SEARCH_CANONICAL_ANSWERS,
+            description = "Durable answers a teammate previously gave to questions the buddy could " +
+                "not answer from the docs — how-we-do-things, conventions, tribal knowledge. These " +
+                "are authoritative and human-written: prefer them, and quote them faithfully. " +
+                "Search here alongside the docs for any 'how do we…' or 'what's our…' question. " +
+                "If neither the docs nor these cover it, say so plainly so the hire can escalate.",
+            parameters = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("query") {
+                        put("type", "string")
+                        put("description", "What the hire is asking, as a search query.")
+                    }
+                }
+                putJsonArray("required") { add("query") }
+            },
         )
     }
 }
