@@ -312,20 +312,6 @@ class OnboardingAiClient(
         }
 
     /**
-     * Opens an SSE stream against the AI service's persistent-buddy endpoint.
-     *
-     * Stateless like every other onboarding endpoint: the caller (backend) owns conversation
-     * history and passes the full transcript on every call, same contract as [assessTurn]. Each
-     * emitted [BuddyStreamEvent] has already been interpreted for type -- `token`, `citation`, and
-     * `tool_use` chunks pass through; `done` terminates the stream normally; an `error` chunk
-     * terminates the stream with [OnboardingAiException] (status `502`, since this is an in-band
-     * stream failure reported by the AI service, not a rejected HTTP request).
-     *
-     * @param question The hire's message.
-     * @param history The conversation so far, oldest first.
-     * @return A cold [Flow] of [BuddyStreamEvent]s; the connection opens on collection.
-     */
-    /**
      * Runs one turn of the tool-using buddy agent.
      *
      * Stateless: the backend carries [BuddyAgentRequest.messages] between turns and executes the

@@ -155,14 +155,19 @@ class KnowledgeBaseService(
      */
     @Transactional(readOnly = true)
     fun searchForUser(userId: UUID, query: String): List<CanonicalAnswer> {
-        val projectIds = userApi.getUsersByIds(listOf(userId))
-            .firstOrNull()?.projects?.map { it.projectId }.orEmpty()
+        val projectIds = userApi
+            .getUsersByIds(listOf(userId))
+            .firstOrNull()
+            ?.projects
+            ?.map { it.projectId }
+            .orEmpty()
         if (projectIds.isEmpty()) return emptyList()
 
         val tokens = tokenize(query)
         if (tokens.isEmpty()) return emptyList()
 
-        return canonicalAnswerRepository.findAllByProjectIdIn(projectIds)
+        return canonicalAnswerRepository
+            .findAllByProjectIdIn(projectIds)
             .map { it to score(it, tokens) }
             .filter { it.second > 0 }
             .sortedByDescending { it.second }
@@ -171,7 +176,11 @@ class KnowledgeBaseService(
     }
 
     private fun tokenize(text: String): Set<String> =
-        text.lowercase().split(Regex("[^a-z0-9]+")).filter { it.length >= MIN_TOKEN_LENGTH }.toSet()
+        text
+            .lowercase()
+            .split(Regex("[^a-z0-9]+"))
+            .filter { it.length >= MIN_TOKEN_LENGTH }
+            .toSet()
 
     private fun score(answer: CanonicalAnswer, tokens: Set<String>): Int {
         val haystack = "${answer.question} ${answer.answer}".lowercase()

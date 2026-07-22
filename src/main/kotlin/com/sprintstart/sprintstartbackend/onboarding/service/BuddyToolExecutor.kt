@@ -2,7 +2,6 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.serialization.json.JsonPrimitive
@@ -51,15 +50,21 @@ class BuddyToolExecutor(
         }
 
     private fun getMyMetrics(userId: UUID): String {
-        val projects = userApi.getUsersByIds(listOf(userId)).firstOrNull()?.projects.orEmpty()
+        val projects = userApi
+            .getUsersByIds(listOf(userId))
+            .firstOrNull()
+            ?.projects
+            .orEmpty()
         if (projects.isEmpty()) {
             return "You are not a member of any project yet, so there are no onboarding metrics."
         }
         val described = projects.mapNotNull { project ->
-            onboardingMetricsService.getHireTimeline(userId, project.projectId)
+            onboardingMetricsService
+                .getHireTimeline(userId, project.projectId)
                 ?.let { describe(project.name, it) }
         }
-        return described.ifEmpty { listOf("No onboarding metrics are available for you yet.") }
+        return described
+            .ifEmpty { listOf("No onboarding metrics are available for you yet.") }
             .joinToString("\n\n")
     }
 
@@ -102,7 +107,11 @@ class BuddyToolExecutor(
     }
 
     private fun getSuggestedTasks(userId: UUID): String {
-        val projects = userApi.getUsersByIds(listOf(userId)).firstOrNull()?.projects.orEmpty()
+        val projects = userApi
+            .getUsersByIds(listOf(userId))
+            .firstOrNull()
+            ?.projects
+            .orEmpty()
         if (projects.isEmpty()) {
             return "You are not a member of any project yet, so there are no suggested tasks."
         }
@@ -125,9 +134,10 @@ class BuddyToolExecutor(
                 }.trim()
             }
         }
-        return sections.ifEmpty {
-            listOf("There are no approved starter-work tasks to suggest yet.")
-        }.joinToString("\n\n")
+        return sections
+            .ifEmpty {
+                listOf("There are no approved starter-work tasks to suggest yet.")
+            }.joinToString("\n\n")
     }
 
     private fun searchCanonicalAnswers(userId: UUID, query: String): String {

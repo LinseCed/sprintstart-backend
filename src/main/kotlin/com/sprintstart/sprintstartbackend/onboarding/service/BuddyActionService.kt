@@ -1,0 +1,342 @@
+package com.sprintstart.sprintstartbackend.onboarding.service
+
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyActionType
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
+import com.sprintstart.sprintstartbackend.user.external.UserApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
+import org.springframework.http.HttpStatus
+import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.stereotype.Service
+import org.springframework.web.server.ResponseStatusException
+import java.util.UUID
+
+/**
+ * The buddy's *action* tools: the buddy stops only advising and starts doing — always on the hire's
+ * explicit confirmation.
+ *
+ * The one rule that makes this safe: **a tool call never mutates.** When the AI reasoner calls an
+ * action tool during a turn, [propose] resolves the concrete action and hands back a proposal the
+ * frontend renders as a confirm button — nothing changes. Only [perform], reached by a separate
+ * confirm request after the hire clicks, runs the real `/me/...` operation. Both ends read the same
+ * [BuddyActionType] catalog, so the proposal and the execution can never name different actions.
+ *
+ * Every action is executed strictly on behalf of the resolved caller and scoped to the caller's own
+ * project, re-resolved server-side at confirm time — a client can never confirm an action against a
+ * project the buddy did not scope it to, nor act as another hire.
+ */
+@Service
+@Suppress("TooManyFunctions") // Four wrapped actions, each with a propose + a perform helper.
+class BuddyActionService(
+    private val taskZeroService: TaskZeroService,
+    private val taskOrientationService: TaskOrientationService,
+    private val onboardingBuddyService: OnboardingBuddyService,
+    private val knowledgeBaseService: KnowledgeBaseService,
+    private val userApi: UserApi,
+) {
+    /** The action tools the AI reasoner is told it may propose, alongside the read-only tools. */
+    fun actionSpecs(): List<BuddyToolSpecDto> =
+        listOf(FLAG_TO_PM_SPEC, CLAIM_TASK_ZERO_SPEC, OPEN_ORIENTATION_SPEC, LOG_BUDDY_CONTACT_SPEC)
+
+    /** Whether [toolName] is an action tool (handled by [propose]) rather than a read-only tool. */
+    fun isAction(toolName: String): Boolean = BuddyActionType.fromToolName(toolName) != null
+
+    /**
+     * Turns an action tool call into a proposal for the hire to confirm — **without mutating**.
+     *
+     * Returns the [ProposeOutcome.toolResult] to feed back to the AI (so it relays "I can do X —
+     * confirm below", never "done"), and a [ProposeOutcome.proposal] to emit to the client when the
+     * action can be offered. When it can't (no project, or a missing question), there is no proposal
+     * and the tool result is the legible reason.
+     */
+    fun propose(call: BuddyToolCallDto, userId: UUID): ProposeOutcome {
+        val type = BuddyActionType.fromToolName(call.name)
+            ?: return ProposeOutcome("Unknown action: ${call.name}.", null)
+
+        val project = when (val resolution = resolveProject(userId)) {
+            is ProjectResolution.Resolved -> resolution
+            ProjectResolution.None ->
+                return ProposeOutcome(
+                    "The hire is not on a project yet, so there is nothing to ${type.gerund()} for them.",
+                    null,
+                )
+            ProjectResolution.Ambiguous ->
+                return ProposeOutcome(
+                    "The hire is onboarding on more than one project. Ask which one before offering to " +
+                        "${type.gerund()}.",
+                    null,
+                )
+        }
+
+        return when (type) {
+            BuddyActionType.FLAG_TO_PM -> {
+                val question = call.stringArg("question").trim()
+                if (question.isBlank()) {
+                    ProposeOutcome(
+                        "No question was provided to flag. Ask the hire what they want answered first.",
+                        null,
+                    )
+                } else {
+                    proposed(type, project.name, question)
+                }
+            }
+            else -> proposed(type, project.name, question = null)
+        }
+    }
+
+    /**
+     * Runs a confirmed action on behalf of [jwt]'s user, scoped to their re-resolved project.
+     *
+     * Never throws for a handled outcome: an expected precondition failure ("no eligible Task 0",
+     * "not a member") comes back as `ok = false` with a legible message, so the buddy always has a
+     * line to relay. Only a genuinely unexpected failure propagates. Blocking work runs on the IO
+     * dispatcher; opening orientation is itself suspend and manages its own transactions.
+     */
+    suspend fun perform(request: BuddyActionRequest, jwt: Jwt): BuddyActionResponse {
+        val authId = jwt.subject
+
+        val type = BuddyActionType.fromToolName(request.action)
+            ?: return BuddyActionResponse(ok = false, message = "That action isn't recognised.")
+
+        val context = withContext(Dispatchers.IO) { resolveContext(authId) }
+        val resolved = when (context) {
+            is CallerContext.Resolved -> context
+            CallerContext.NoProject ->
+                return BuddyActionResponse(ok = false, message = "You're not on a project yet.")
+            CallerContext.MultipleProjects ->
+                return BuddyActionResponse(
+                    ok = false,
+                    message = "You're onboarding on more than one project — tell me which one and I'll set it up.",
+                )
+        }
+
+        return try {
+            when (type) {
+                BuddyActionType.OPEN_ORIENTATION -> openOrientation(resolved.userId, resolved.projectId)
+                else -> withContext(Dispatchers.IO) {
+                    when (type) {
+                        BuddyActionType.CLAIM_TASK_ZERO -> claimTaskZero(resolved.userId, resolved.projectId)
+                        BuddyActionType.LOG_BUDDY_CONTACT ->
+                            logContact(resolved.userId, resolved.projectId, request.note)
+                        BuddyActionType.FLAG_TO_PM -> flagToPm(authId, resolved.projectId, request.question)
+                        BuddyActionType.OPEN_ORIENTATION -> error("handled above")
+                    }
+                }
+            }
+        } catch (ex: ResponseStatusException) {
+            // A precondition the underlying route enforces (not a member, blank question, …). Relay
+            // its reason rather than failing the whole confirm with an HTTP error.
+            BuddyActionResponse(ok = false, message = ex.reason ?: "That didn't go through — try again in a moment.")
+        }
+    }
+
+    private fun claimTaskZero(userId: UUID, projectId: UUID): BuddyActionResponse {
+        val result = taskZeroService.getForHire(userId, projectId)
+        val task = result.task
+        return if (task != null) {
+            BuddyActionResponse(
+                ok = true,
+                message = "Task 0 is yours: “${task.title}”. Open the task packet when you're ready to start.",
+            )
+        } else {
+            BuddyActionResponse(
+                ok = false,
+                message = "There's no eligible Task 0 to start yet — your PM marks a starter task as Task 0.",
+            )
+        }
+    }
+
+    private suspend fun openOrientation(userId: UUID, projectId: UUID): BuddyActionResponse {
+        val orientation = taskOrientationService.getForHire(userId, projectId)
+        return if (orientation.packet != null) {
+            BuddyActionResponse(
+                ok = true,
+                message = "I've put together your task orientation for “${orientation.taskTitle}” — " +
+                    "the step-by-step, cited guide is on your First Week page, under your first task.",
+            )
+        } else {
+            BuddyActionResponse(
+                ok = false,
+                message = orientation.reason ?: "There's no current task to open a packet for yet.",
+            )
+        }
+    }
+
+    private fun logContact(userId: UUID, projectId: UUID, note: String?): BuddyActionResponse {
+        onboardingBuddyService.logContact(
+            projectId = projectId,
+            hireId = userId,
+            recordedBy = userId,
+            occurredAt = null,
+            note = note,
+        )
+        return BuddyActionResponse(
+            ok = true,
+            message = "Logged that you reached out to your buddy — staying in touch is the thing that helps most.",
+        )
+    }
+
+    private fun flagToPm(authId: String, projectId: UUID, question: String?): BuddyActionResponse {
+        val trimmed = question?.trim().orEmpty()
+        if (trimmed.isBlank()) {
+            return BuddyActionResponse(ok = false, message = "I need the question to flag — tell me what to ask.")
+        }
+        knowledgeBaseService.escalate(authId, projectId, trimmed)
+        return BuddyActionResponse(
+            ok = true,
+            message = "Flagged to your PM. Their answer will show up here once they reply.",
+        )
+    }
+
+    private fun proposed(type: BuddyActionType, projectName: String, question: String?): ProposeOutcome =
+        ProposeOutcome(
+            toolResult = "Proposed to the hire on $projectName: “${type.label}”. They will see a confirm " +
+                "button; the action runs only if they click it. Offer it — do not claim it is done.",
+            proposal = BuddyActionProposal(action = type.toolName, label = type.label, question = question),
+        )
+
+    private fun resolveProject(userId: UUID): ProjectResolution {
+        val projects = userApi
+            .getUsersByIds(listOf(userId))
+            .firstOrNull()
+            ?.projects
+            .orEmpty()
+        return when {
+            projects.isEmpty() -> ProjectResolution.None
+            projects.size > 1 -> ProjectResolution.Ambiguous
+            else -> projects.first().let { ProjectResolution.Resolved(it.projectId, it.name) }
+        }
+    }
+
+    /** Resolves the caller's id and single onboarding project in one read, for the confirm path. */
+    private fun resolveContext(authId: String): CallerContext {
+        val userId = resolveUserId(authId)
+        return when (val resolution = resolveProject(userId)) {
+            is ProjectResolution.Resolved -> CallerContext.Resolved(userId, resolution.projectId, resolution.name)
+            ProjectResolution.None -> CallerContext.NoProject
+            ProjectResolution.Ambiguous -> CallerContext.MultipleProjects
+        }
+    }
+
+    private fun resolveUserId(authId: String): UUID =
+        userApi
+            .getUserIdByAuthId(authId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
+
+    /** Reads a string argument the model passed to a tool, or "" when it is missing/non-text. */
+    private fun BuddyToolCallDto.stringArg(name: String): String =
+        (arguments[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
+
+    /** A verb phrase for the reason lines, e.g. "start Task 0", "flag this to a PM". */
+    private fun BuddyActionType.gerund(): String =
+        when (this) {
+            BuddyActionType.FLAG_TO_PM -> "flag this to a PM"
+            BuddyActionType.CLAIM_TASK_ZERO -> "start Task 0"
+            BuddyActionType.OPEN_ORIENTATION -> "open a task packet"
+            BuddyActionType.LOG_BUDDY_CONTACT -> "log buddy contact"
+        }
+
+    /** The result of proposing an action: what to tell the AI, and the proposal to show the hire (if any). */
+    data class ProposeOutcome(
+        val toolResult: String,
+        val proposal: BuddyActionProposal?,
+    )
+
+    /** A proposed action for the hire to confirm — carried on the stream as an `action_proposal` event. */
+    data class BuddyActionProposal(
+        val action: String,
+        val label: String,
+        val question: String?,
+    )
+
+    private sealed interface ProjectResolution {
+        data class Resolved(
+            val projectId: UUID,
+            val name: String,
+        ) : ProjectResolution
+
+        data object None : ProjectResolution
+
+        data object Ambiguous : ProjectResolution
+    }
+
+    private sealed interface CallerContext {
+        data class Resolved(
+            val userId: UUID,
+            val projectId: UUID,
+            val projectName: String,
+        ) : CallerContext
+
+        data object NoProject : CallerContext
+
+        data object MultipleProjects : CallerContext
+    }
+
+    private companion object {
+        private fun noArgs() = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject { })
+        }
+
+        val FLAG_TO_PM_SPEC = BuddyToolSpecDto(
+            name = BuddyActionType.FLAG_TO_PM.toolName,
+            description = "Offer to escalate the hire's question to their project's PM, when neither the docs " +
+                "nor the canonical answers cover it. This does NOT send anything — it shows the hire a confirm " +
+                "button, and only they can send it. Provide the question to ask, phrased clearly, in `question`. " +
+                "Use this as the last resort when you genuinely cannot ground an answer.",
+            parameters = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("question") {
+                        put("type", "string")
+                        put("description", "The question to send to the PM, phrased clearly for a person to answer.")
+                    }
+                }
+                putJsonArray("required") { add("question") }
+            },
+        )
+
+        val CLAIM_TASK_ZERO_SPEC = BuddyToolSpecDto(
+            name = BuddyActionType.CLAIM_TASK_ZERO.toolName,
+            description = "Offer to start the hire's Task 0 — their first assigned starter task. This does NOT " +
+                "assign anything by itself; it shows the hire a confirm button and runs only if they click. Use " +
+                "when the hire is ready to begin their first piece of real work. Takes no arguments.",
+            parameters = noArgs(),
+        )
+
+        val OPEN_ORIENTATION_SPEC = BuddyToolSpecDto(
+            name = BuddyActionType.OPEN_ORIENTATION.toolName,
+            description = "Offer to assemble the task orientation packet for the hire's current task — a " +
+                "step-by-step, cited guide to setting up, finding the code, making the change, and opening the " +
+                "PR. Proposes only; the hire confirms. Use when they ask how to start the task they have. Takes " +
+                "no arguments.",
+            parameters = noArgs(),
+        )
+
+        val LOG_BUDDY_CONTACT_SPEC = BuddyToolSpecDto(
+            name = BuddyActionType.LOG_BUDDY_CONTACT.toolName,
+            description = "Offer to log that the hire reached out to their human buddy/mentor. Proposes only; the " +
+                "hire confirms. Use when the hire says they've contacted or plan to contact their buddy. An " +
+                "optional `note` can capture what it was about.",
+            parameters = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("note") {
+                        put("type", "string")
+                        put("description", "Optional short note on what the contact was about.")
+                    }
+                }
+            },
+        )
+    }
+}

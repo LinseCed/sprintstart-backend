@@ -37,6 +37,7 @@ class BuddyService(
     private val buddyMessageRepository: BuddyMessageRepository,
     private val onboardingAiClient: OnboardingAiClient,
     private val buddyToolExecutor: BuddyToolExecutor,
+    private val buddyActionService: BuddyActionService,
     private val userApi: UserApi,
 ) {
     /** Finds or creates a user's one ongoing buddy session. */
@@ -74,7 +75,9 @@ class BuddyService(
             BuddyMessage(session = session, role = BuddyMessageRole.USER, content = content),
         )
 
-        val tools = buddyToolExecutor.toolSpecs()
+        // The AI reasoner sees the read-only tools *and* the action tools it may propose. An action
+        // tool call never mutates here — it produces a proposal the hire must confirm out-of-band.
+        val tools = buddyToolExecutor.toolSpecs() + buddyActionService.actionSpecs()
 
         return flow {
             var messages = history + BuddyAgentMessageDto(role = "user", content = content)
@@ -95,8 +98,26 @@ class BuddyService(
                     // the result back as a `tool` message appended to the running conversation.
                     val next = response.messages.toMutableList()
                     for (call in response.pendingToolCalls) {
-                        emit(BuddyStreamEvent(type = "tool_use", name = call.name, kind = "tool"))
-                        val result = buddyToolExecutor.execute(call, userId)
+                        val result = if (buddyActionService.isAction(call.name)) {
+                            // An action tool: propose it to the hire (never mutate). The proposal, if
+                            // one can be offered, goes out as its own event the client gates behind a
+                            // confirm button; the AI is told it was proposed, not performed.
+                            val outcome = buddyActionService.propose(call, userId)
+                            outcome.proposal?.let { proposal ->
+                                emit(
+                                    BuddyStreamEvent(
+                                        type = "action_proposal",
+                                        action = proposal.action,
+                                        label = proposal.label,
+                                        question = proposal.question,
+                                    ),
+                                )
+                            }
+                            outcome.toolResult
+                        } else {
+                            emit(BuddyStreamEvent(type = "tool_use", name = call.name, kind = "tool"))
+                            buddyToolExecutor.execute(call, userId)
+                        }
                         next.add(
                             BuddyAgentMessageDto(role = "tool", content = result, toolCallId = call.id),
                         )
