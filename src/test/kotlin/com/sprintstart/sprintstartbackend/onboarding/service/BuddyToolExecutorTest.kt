@@ -2,9 +2,13 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
@@ -18,13 +22,20 @@ import java.util.UUID
 class BuddyToolExecutorTest {
     private val onboardingMetricsService: OnboardingMetricsService = mockk()
     private val myCompetencyService: MyCompetencyService = mockk()
+    private val starterWorkTaskProposalService: StarterWorkTaskProposalService = mockk()
     private val userApi: UserApi = mockk()
-    private val executor = BuddyToolExecutor(onboardingMetricsService, myCompetencyService, userApi)
+    private val executor = BuddyToolExecutor(
+        onboardingMetricsService,
+        myCompetencyService,
+        starterWorkTaskProposalService,
+        userApi,
+    )
 
     private val userId = UUID.randomUUID()
     private val projectId = UUID.randomUUID()
     private val metricsCall = BuddyToolCallDto(id = "c0", name = "get_my_metrics")
     private val competenciesCall = BuddyToolCallDto(id = "c0", name = "get_my_competencies")
+    private val suggestedTasksCall = BuddyToolCallDto(id = "c0", name = "get_suggested_tasks")
 
     private fun userWith(vararg projects: ProjectDto) = UserDto(
         id = userId,
@@ -77,10 +88,32 @@ class BuddyToolExecutorTest {
         updatedAt = Instant.EPOCH,
     )
 
+    private fun rankedTask(
+        title: String,
+        reasons: List<String>,
+        sourceUrl: String? = null,
+    ) = RankedStarterWorkTaskResponse(
+        task = StarterWorkTaskProposalResponse(
+            id = UUID.randomUUID(),
+            sourceId = "src-$title",
+            title = title,
+            summary = null,
+            rationale = null,
+            sourceUrl = sourceUrl,
+            competencyKeys = emptyList(),
+            status = ProposalStatus.APPROVED,
+            taskZeroEligible = false,
+        ),
+        score = 1.0,
+        matchedCompetencyKeys = emptyList(),
+        taskType = TaskType.BUG,
+        reasons = reasons,
+    )
+
     @Test
     fun `exposes the caller-scoped hire-state tools`() {
         assertThat(executor.toolSpecs().map { it.name })
-            .containsExactly("get_my_metrics", "get_my_competencies")
+            .containsExactly("get_my_metrics", "get_my_competencies", "get_suggested_tasks")
     }
 
     @Test
@@ -129,6 +162,39 @@ class BuddyToolExecutorTest {
         val result = executor.execute(competenciesCall, userId)
 
         assertThat(result).contains("no demonstrated competencies")
+    }
+
+    @Test
+    fun `suggests ranked tasks with their reasons and never a score`() {
+        every { userApi.getUsersByIds(listOf(userId)) } returns
+            listOf(userWith(ProjectDto(projectId, "Checkout", null)))
+        every { starterWorkTaskProposalService.matchForUserId(userId, projectId) } returns listOf(
+            rankedTask(
+                "Fix the login redirect",
+                reasons = listOf("Matches a skill you hold (Kotlin)", "Labelled 'good first issue'"),
+                sourceUrl = "https://example.test/issues/1",
+            ),
+        )
+
+        val result = executor.execute(suggestedTasksCall, userId)
+
+        assertThat(result).contains("Checkout")
+        assertThat(result).contains("Fix the login redirect")
+        assertThat(result).contains("Matches a skill you hold (Kotlin)")
+        assertThat(result).contains("https://example.test/issues/1")
+        // The ranker's score must never surface — a number is not a reason a hire can act on.
+        assertThat(result).doesNotContain("1.0")
+    }
+
+    @Test
+    fun `says so when there are no approved tasks to suggest`() {
+        every { userApi.getUsersByIds(listOf(userId)) } returns
+            listOf(userWith(ProjectDto(projectId, "Checkout", null)))
+        every { starterWorkTaskProposalService.matchForUserId(userId, projectId) } returns emptyList()
+
+        val result = executor.execute(suggestedTasksCall, userId)
+
+        assertThat(result).contains("no approved starter-work tasks")
     }
 
     @Test

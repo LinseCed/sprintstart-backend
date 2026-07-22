@@ -22,16 +22,19 @@ import java.util.UUID
 class BuddyToolExecutor(
     private val onboardingMetricsService: OnboardingMetricsService,
     private val myCompetencyService: MyCompetencyService,
+    private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val userApi: UserApi,
 ) {
     /** The backend tools the AI reasoner is told it may call. */
-    fun toolSpecs(): List<BuddyToolSpecDto> = listOf(GET_MY_METRICS_SPEC, GET_MY_COMPETENCIES_SPEC)
+    fun toolSpecs(): List<BuddyToolSpecDto> =
+        listOf(GET_MY_METRICS_SPEC, GET_MY_COMPETENCIES_SPEC, GET_SUGGESTED_TASKS_SPEC)
 
     /** Executes [call] on behalf of [userId], returning a plain-text result for the model. */
     fun execute(call: BuddyToolCallDto, userId: UUID): String =
         when (call.name) {
             GET_MY_METRICS -> getMyMetrics(userId)
             GET_MY_COMPETENCIES -> getMyCompetencies(userId)
+            GET_SUGGESTED_TASKS -> getSuggestedTasks(userId)
             else -> "Unknown tool: ${call.name}."
         }
 
@@ -86,9 +89,40 @@ class BuddyToolExecutor(
         }.trim()
     }
 
+    private fun getSuggestedTasks(userId: UUID): String {
+        val projects = userApi.getUsersByIds(listOf(userId)).firstOrNull()?.projects.orEmpty()
+        if (projects.isEmpty()) {
+            return "You are not a member of any project yet, so there are no suggested tasks."
+        }
+        val sections = projects.mapNotNull { project ->
+            val ranked = starterWorkTaskProposalService
+                .matchForUserId(userId, project.projectId)
+                .take(MAX_SUGGESTED_TASKS)
+            if (ranked.isEmpty()) {
+                null
+            } else {
+                buildString {
+                    appendLine("On ${project.name}, good next tasks (best first):")
+                    ranked.forEach { match ->
+                        appendLine("- ${match.task.title}")
+                        // Show the reasons, never the score: a number is not a reason a hire can act
+                        // on, and the ranker exists to explain itself.
+                        match.reasons.forEach { appendLine("    · $it") }
+                        match.task.sourceUrl?.let { appendLine("    ($it)") }
+                    }
+                }.trim()
+            }
+        }
+        return sections.ifEmpty {
+            listOf("There are no approved starter-work tasks to suggest yet.")
+        }.joinToString("\n\n")
+    }
+
     private companion object {
         const val GET_MY_METRICS = "get_my_metrics"
         const val GET_MY_COMPETENCIES = "get_my_competencies"
+        const val GET_SUGGESTED_TASKS = "get_suggested_tasks"
+        const val MAX_SUGGESTED_TASKS = 3
 
         // No-argument JSON schema shared by every caller-scoped tool: the agent never says whose
         // data to read, so there is nothing to pass.
@@ -114,6 +148,15 @@ class BuddyToolExecutor(
                 "not yet met. Use this for questions about where the hire stands or what they have " +
                 "shown, e.g. 'where do I stand?' or 'what have I proven so far?'. Takes no " +
                 "arguments — it always reads the caller.",
+            parameters = noArgs(),
+        )
+
+        val GET_SUGGESTED_TASKS_SPEC = BuddyToolSpecDto(
+            name = GET_SUGGESTED_TASKS,
+            description = "Good next starter-work tasks for the hire, ranked by fit, each with the " +
+                "plain reasons it was suggested. Use this for questions like 'what should I work " +
+                "on?' or 'what's a good first task for me?'. Present the reasons, never a score. " +
+                "Takes no arguments — it always ranks for the caller.",
             parameters = noArgs(),
         )
     }
