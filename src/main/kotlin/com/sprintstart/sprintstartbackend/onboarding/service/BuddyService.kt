@@ -6,6 +6,8 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMe
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCitationDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
@@ -14,6 +16,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepo
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -60,6 +63,13 @@ class BuddyService(
      * The user's message is persisted immediately; the assistant's reply is persisted only once the
      * agent loop finishes, so a stream that errors or is cancelled leaves no garbage reply behind.
      *
+     * The AI never receives the whole transcript: only the window after the session's
+     * [BuddySession.summarizedCount] cursor, plus the running summary standing in for the rest.
+     * When the window outgrows [WINDOW], the first agent hop asks the AI to fold the oldest part
+     * into the summary (`summarizeUpto`); the returned summary and the advanced cursor are
+     * persisted with the reply. An AI that never returns an updated summary simply leaves the
+     * cursor where it is — the conversation still works, it just hasn't compacted yet.
+     *
      * @throws ResponseStatusException 404 if the authenticated user doesn't exist.
      */
     suspend fun sendMessageForMe(authId: String, content: String): Flow<BuddyStreamEvent> {
@@ -67,8 +77,10 @@ class BuddyService(
         val session = getOrCreateSession(userId)
 
         // Read history before saving the new message so it isn't sent to the AI service twice.
+        // Everything the summary already covers stays out of the prompt.
         val history = buddyMessageRepository
             .findAllBySessionIdOrderByCreatedAtAsc(session.id)
+            .drop(session.summarizedCount)
             .map { BuddyAgentMessageDto(role = it.role.toHistoryRole(), content = it.content) }
 
         buddyMessageRepository.save(
@@ -79,18 +91,25 @@ class BuddyService(
         // tool call never mutates here — it produces a proposal the hire must confirm out-of-band.
         val tools = buddyToolExecutor.toolSpecs() + buddyActionService.actionSpecs()
 
+        // Fold the oldest part of the window into the summary once it outgrows the window. The
+        // cursor arithmetic never reaches the just-sent user message (summarizeUpto <= the window's
+        // persisted prefix), so nothing is summarized before it is durably stored.
+        val summarizeUpto = (history.size + 1 - WINDOW).takeIf { it > 0 }
+
         return flow {
             var messages = history + BuddyAgentMessageDto(role = "user", content = content)
             var citations: List<BuddyCitationDto> = emptyList()
             var answer: String? = null
             var step = 0
+            var updatedSummary: String? = null
 
             while (answer == null && step < MAX_AGENT_STEPS) {
                 step++
                 val response = onboardingAiClient.buddyAgentTurn(
-                    BuddyAgentRequest(messages = messages, backendTools = tools),
+                    agentRequest(messages, tools, step, session, summarizeUpto),
                 )
                 citations = response.citations
+                response.updatedSummary?.let { updatedSummary = it }
                 if (response.final) {
                     answer = response.text
                 } else {
@@ -98,28 +117,12 @@ class BuddyService(
                     // the result back as a `tool` message appended to the running conversation.
                     val next = response.messages.toMutableList()
                     for (call in response.pendingToolCalls) {
-                        val result = if (buddyActionService.isAction(call.name)) {
-                            // An action tool: propose it to the hire (never mutate). The proposal, if
-                            // one can be offered, goes out as its own event the client gates behind a
-                            // confirm button; the AI is told it was proposed, not performed.
-                            val outcome = buddyActionService.propose(call, userId)
-                            outcome.proposal?.let { proposal ->
-                                emit(
-                                    BuddyStreamEvent(
-                                        type = "action_proposal",
-                                        action = proposal.action,
-                                        label = proposal.label,
-                                        question = proposal.question,
-                                    ),
-                                )
-                            }
-                            outcome.toolResult
-                        } else {
-                            emit(BuddyStreamEvent(type = "tool_use", name = call.name, kind = "tool"))
-                            buddyToolExecutor.execute(call, userId)
-                        }
                         next.add(
-                            BuddyAgentMessageDto(role = "tool", content = result, toolCallId = call.id),
+                            BuddyAgentMessageDto(
+                                role = "tool",
+                                content = runToolCall(call, userId),
+                                toolCallId = call.id,
+                            ),
                         )
                     }
                     messages = next
@@ -148,8 +151,62 @@ class BuddyService(
             buddyMessageRepository.save(
                 BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = reply),
             )
+            updatedSummary?.let {
+                session.summary = it
+                session.summarizedCount += summarizeUpto ?: 0
+                buddySessionRepository.save(session)
+            }
         }
     }
+
+    /**
+     * Builds one agent request. Summary fields go on the first hop only: after that the AI has
+     * folded them into the running conversation it returns, and re-sending would double-fold
+     * messages already inside the summary.
+     */
+    private fun agentRequest(
+        messages: List<BuddyAgentMessageDto>,
+        tools: List<BuddyToolSpecDto>,
+        step: Int,
+        session: BuddySession,
+        summarizeUpto: Int?,
+    ): BuddyAgentRequest =
+        BuddyAgentRequest(
+            messages = messages,
+            backendTools = tools,
+            priorSummary = if (step == 1) session.summary else null,
+            summarizeUpto = if (step == 1) summarizeUpto else null,
+        )
+
+    /**
+     * Runs one tool the AI asked for, emitting the event(s) the client needs to see, and returns
+     * the plain-text result fed back to the model. An action tool never mutates here: it produces
+     * a proposal the hire gates behind a confirm button, and the AI is told it was proposed.
+     */
+    private suspend fun FlowCollector<BuddyStreamEvent>.runToolCall(
+        call: BuddyToolCallDto,
+        userId: UUID,
+    ): String =
+        if (buddyActionService.isAction(call.name)) {
+            val outcome = buddyActionService.propose(call, userId)
+            outcome.proposal?.let { proposal ->
+                emit(
+                    BuddyStreamEvent(
+                        type = "action_proposal",
+                        action = proposal.action,
+                        label = proposal.label,
+                        question = proposal.question,
+                        taskId = proposal.taskId?.toString(),
+                        moduleId = proposal.moduleId?.toString(),
+                        answer = proposal.answer,
+                    ),
+                )
+            }
+            outcome.toolResult
+        } else {
+            emit(BuddyStreamEvent(type = "tool_use", name = call.name, kind = "tool"))
+            buddyToolExecutor.execute(call, userId)
+        }
 
     private fun BuddyMessageRole.toHistoryRole(): String =
         when (this) {
@@ -167,6 +224,12 @@ class BuddyService(
         // answer with what we have. The AI service has its own internal search budget; this bounds
         // only the backend-tool hops so a loop can never run unbounded.
         const val MAX_AGENT_STEPS = 5
+
+        // The most messages (user + assistant) the AI is ever sent. Older turns reach it only
+        // through the session's running summary -- the transcript is durable, the prompt is
+        // bounded. 20 keeps ~10 exchanges verbatim, plenty for immediate context.
+        const val WINDOW = 20
+
         const val FALLBACK_REPLY =
             "I wasn't able to finish answering that one — could you rephrase or add a little detail?"
 

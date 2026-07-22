@@ -26,4 +26,17 @@ class BuddySession(
     val userId: UUID,
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now(),
+    /**
+     * The AI-written running summary of this conversation's oldest [summarizedCount] messages.
+     *
+     * Now that the buddy is the hire's front door, conversations only get longer — re-sending the
+     * whole transcript every turn is unbounded. Only the window after [summarizedCount] is sent,
+     * with this summary standing in for the rest. It is a prompt-shaping device, never the
+     * record: the full transcript stays in `buddy_messages`.
+     */
+    @Column(nullable = true, columnDefinition = "TEXT")
+    var summary: String? = null,
+    /** How many of the oldest persisted messages [summary] covers. */
+    @Column(name = "summarized_count", nullable = false)
+    var summarizedCount: Int = 0,
 )

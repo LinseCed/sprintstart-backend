@@ -11,6 +11,8 @@ data class PathNode(
     val kind: CompetencyKind,
     val state: NodeState,
     val level: Int? = null,
+    /** The bar [level] is held to for this node on this path (baseline overrides applied). */
+    val targetLevel: Int,
     // The live CompetencyModule that teaches this node in this project, if one has been approved
     // -- what a client opens when the hire clicks the node. Null when nobody has published a
     // module for this competency yet, which is a real and visible state: the node is on the path
