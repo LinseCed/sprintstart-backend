@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import java.util.UUID
 
 /**
  * Serves the authenticated user their own durable competency ledger.
@@ -36,7 +37,20 @@ class MyCompetencyService(
         val userId = userApi
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
+        return getCompetenciesForUser(userId)
+    }
 
+    /**
+     * Returns [userId]'s full competency ledger, labeled and typed from the catalog.
+     *
+     * The already-resolved-user counterpart of [getMyCompetencies], for callers that hold a user id
+     * rather than an auth subject (e.g. the buddy agent reading the caller's own ledger).
+     *
+     * @param userId Internal SprintStart user identifier.
+     * @return The user's ledger rows; empty when the user has no ledger yet.
+     */
+    @Transactional(readOnly = true)
+    fun getCompetenciesForUser(userId: UUID): List<MyCompetencyResponse> {
         val states = userCompetencyStateRepository.findAllByUserId(userId)
         if (states.isEmpty()) return emptyList()
 

@@ -10,6 +10,8 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentHi
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BaselineSchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsRequest
@@ -323,6 +325,30 @@ class OnboardingAiClient(
      * @param history The conversation so far, oldest first.
      * @return A cold [Flow] of [BuddyStreamEvent]s; the connection opens on collection.
      */
+    /**
+     * Runs one turn of the tool-using buddy agent.
+     *
+     * Stateless: the backend carries [BuddyAgentRequest.messages] between turns and executes the
+     * tools only it can run. A non-final response returns the pending backend-tool calls plus the
+     * running message list to carry back with each tool result appended. A non-2xx response is
+     * wrapped in an [OnboardingAiException] carrying the upstream status/body.
+     *
+     * @param request The running conversation and the backend tools the AI may call.
+     * @return Either the final answer (`final=true`) or pending backend-tool calls (`final=false`).
+     */
+    suspend fun buddyAgentTurn(request: BuddyAgentRequest): BuddyAgentResponse =
+        try {
+            webClient
+                .post()
+                .uri(uri("/api/v1/onboarding/buddy/agent"))
+                .body(request)
+                .sync()
+                .perform<BuddyAgentResponse>()
+        } catch (@Suppress("SwallowedException") e: WebClientException) {
+            val msg = "Failed to run buddy agent turn (HTTP ${e.statusCode}): ${e.body}"
+            throw OnboardingAiException(e.statusCode, e.body, msg)
+        }
+
     fun streamBuddy(
         question: String,
         history: List<AssessmentHistoryEntrySchema> = emptyList(),
