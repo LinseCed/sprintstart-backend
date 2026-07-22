@@ -5,8 +5,8 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
@@ -21,6 +21,7 @@ import io.mockk.verify
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -33,17 +34,27 @@ class BuddyServiceTest {
     private val buddyMessageRepository: BuddyMessageRepository = mockk()
     private val onboardingAiClient: OnboardingAiClient = mockk()
     private val buddyToolExecutor: BuddyToolExecutor = mockk()
+    private val buddyActionService: BuddyActionService = mockk()
     private val userApi: UserApi = mockk()
     private val service = BuddyService(
         buddySessionRepository,
         buddyMessageRepository,
         onboardingAiClient,
         buddyToolExecutor,
+        buddyActionService,
         userApi,
     )
 
     private val userId = UUID.randomUUID()
     private val authId = "auth|test-user"
+
+    @BeforeEach
+    fun stubActionDefaults() {
+        // Default: no action tools, and every tool the AI calls is a read-only one. Tests that
+        // exercise an action override these.
+        every { buddyActionService.actionSpecs() } returns emptyList()
+        every { buddyActionService.isAction(any()) } returns false
+    }
 
     private fun finalReply(text: String) = BuddyAgentResponse(final = true, text = text)
 
@@ -222,6 +233,57 @@ class BuddyServiceTest {
             assertThat(events.map { it.type }).contains("tool_use", "token", "done")
             val streamed = events.filter { it.type == "token" }.joinToString("") { it.content ?: "" }
             assertThat(streamed).contains("52 hours")
+        }
+
+        @Test
+        fun `proposes an action the AI asks for as an event, and never runs it as a tool`() = runTest {
+            val session = BuddySession(userId = userId)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+
+            val actionCall = BuddyToolCallDto(id = "call_0", name = "claim_task_zero")
+            val paused = BuddyAgentResponse(
+                final = false,
+                messages = listOf(
+                    BuddyAgentMessageDto(role = "assistant", content = "", toolCalls = listOf(actionCall)),
+                ),
+                pendingToolCalls = listOf(actionCall),
+            )
+            val requests = mutableListOf<BuddyAgentRequest>()
+            coEvery { onboardingAiClient.buddyAgentTurn(capture(requests)) } returnsMany listOf(
+                paused,
+                finalReply("I can start Task 0 for you — confirm below."),
+            )
+            every { buddyActionService.isAction("claim_task_zero") } returns true
+            every { buddyActionService.propose(actionCall, userId) } returns
+                BuddyActionService.ProposeOutcome(
+                    toolResult = "Proposed to the hire; awaiting confirmation.",
+                    proposal = BuddyActionService.BuddyActionProposal(
+                        action = "claim_task_zero",
+                        label = "Start Task 0",
+                        question = null,
+                    ),
+                )
+
+            val events = service.sendMessageForMe(authId, "help me start my first task").toList()
+
+            // The proposal is emitted as its own gate-able event, carrying the action + button label...
+            val proposal = events.first { it.type == "action_proposal" }
+            assertThat(proposal.action).isEqualTo("claim_task_zero")
+            assertThat(proposal.label).isEqualTo("Start Task 0")
+            // ...the tool result (not a mutation) is threaded back into the resume conversation...
+            assertThat(requests[1].messages).contains(
+                BuddyAgentMessageDto(
+                    role = "tool",
+                    content = "Proposed to the hire; awaiting confirmation.",
+                    toolCallId = "call_0",
+                ),
+            )
+            // ...and an action tool is never executed as a read tool (that would mutate on a call).
+            verify(exactly = 0) { buddyToolExecutor.execute(any(), any()) }
         }
 
         @Test

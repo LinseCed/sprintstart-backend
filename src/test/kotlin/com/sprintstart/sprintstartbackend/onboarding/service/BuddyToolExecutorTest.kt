@@ -41,6 +41,7 @@ class BuddyToolExecutorTest {
     private val metricsCall = BuddyToolCallDto(id = "c0", name = "get_my_metrics")
     private val competenciesCall = BuddyToolCallDto(id = "c0", name = "get_my_competencies")
     private val suggestedTasksCall = BuddyToolCallDto(id = "c0", name = "get_suggested_tasks")
+
     private fun canonicalSearchCall(query: String) = BuddyToolCallDto(
         id = "c0",
         name = "search_canonical_answers",

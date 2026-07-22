@@ -5,8 +5,11 @@ import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.SendBuddyMessageRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
+import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyService
 import io.mockk.coEvery
 import io.mockk.every
@@ -41,6 +44,9 @@ class BuddyControllerTest(
 ) {
     @MockkBean
     private lateinit var buddyService: BuddyService
+
+    @MockkBean
+    private lateinit var buddyActionService: BuddyActionService
 
     @MockkBean
     private lateinit var jwtDecoder: JwtDecoder
@@ -132,5 +138,42 @@ class BuddyControllerTest(
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(SendBuddyMessageRequest("Hi"))),
             ).andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `performAction should return 200 with the outcome`() {
+        coEvery { buddyActionService.perform(any(), any()) } returns
+            BuddyActionResponse(ok = true, message = "Task 0 is yours.")
+
+        val asyncResult = mockMvc
+            .perform(
+                post("/api/v1/onboarding/me/buddy/actions")
+                    .with(userJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(BuddyActionRequest(action = "claim_task_zero"))),
+            ).andExpect(request().asyncStarted())
+            .andReturn()
+
+        mockMvc
+            .perform(asyncDispatch(asyncResult))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.ok").value(true))
+            .andExpect(jsonPath("$.message").value("Task 0 is yours."))
+    }
+
+    @Test
+    fun `performAction should return 403 for a non-USER role`() {
+        val asyncResult = mockMvc
+            .perform(
+                post("/api/v1/onboarding/me/buddy/actions")
+                    .with(noUserRoleJwt)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(BuddyActionRequest(action = "claim_task_zero"))),
+            ).andExpect(request().asyncStarted())
+            .andReturn()
+
+        mockMvc
+            .perform(asyncDispatch(asyncResult))
+            .andExpect(status().isForbidden)
     }
 }
