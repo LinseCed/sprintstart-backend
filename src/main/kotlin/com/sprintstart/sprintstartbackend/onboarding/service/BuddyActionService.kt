@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyActionT
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.verification.SubmitVerificationAttemptRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
@@ -36,17 +37,26 @@ import java.util.UUID
  * project the buddy did not scope it to, nor act as another hire.
  */
 @Service
-@Suppress("TooManyFunctions") // Four wrapped actions, each with a propose + a perform helper.
+@Suppress("TooManyFunctions") // Six wrapped actions, each with a propose + a perform helper.
 class BuddyActionService(
     private val taskZeroService: TaskZeroService,
     private val taskOrientationService: TaskOrientationService,
     private val onboardingBuddyService: OnboardingBuddyService,
     private val knowledgeBaseService: KnowledgeBaseService,
+    private val userGoalService: UserGoalService,
+    private val verificationService: VerificationService,
     private val userApi: UserApi,
 ) {
     /** The action tools the AI reasoner is told it may propose, alongside the read-only tools. */
     fun actionSpecs(): List<BuddyToolSpecDto> =
-        listOf(FLAG_TO_PM_SPEC, CLAIM_TASK_ZERO_SPEC, OPEN_ORIENTATION_SPEC, LOG_BUDDY_CONTACT_SPEC)
+        listOf(
+            FLAG_TO_PM_SPEC,
+            CLAIM_TASK_ZERO_SPEC,
+            OPEN_ORIENTATION_SPEC,
+            LOG_BUDDY_CONTACT_SPEC,
+            CLAIM_GOAL_SPEC,
+            SUBMIT_VERIFICATION_SPEC,
+        )
 
     /** Whether [toolName] is an action tool (handled by [propose]) rather than a read-only tool. */
     fun isAction(toolName: String): Boolean = BuddyActionType.fromToolName(toolName) != null
@@ -87,7 +97,37 @@ class BuddyActionService(
                         null,
                     )
                 } else {
-                    proposed(type, project.name, question)
+                    proposed(type, project.name, question = question)
+                }
+            }
+            BuddyActionType.CLAIM_GOAL -> {
+                val taskId = call.uuidArg("task_id")
+                if (taskId == null) {
+                    ProposeOutcome(
+                        "No task_id was provided. Read the suggested tasks and offer to claim one " +
+                            "by its task_id.",
+                        null,
+                    )
+                } else {
+                    proposed(type, project.name, question = null, taskId = taskId)
+                }
+            }
+            BuddyActionType.SUBMIT_VERIFICATION -> {
+                val moduleId = call.uuidArg("module_id")
+                val answer = call.stringArg("answer").trim()
+                when {
+                    moduleId == null ->
+                        ProposeOutcome(
+                            "No module_id was provided. Read the module and submit against its id.",
+                            null,
+                        )
+                    answer.isBlank() ->
+                        ProposeOutcome(
+                            "No answer was provided. Ask the hire for their answer (a pull " +
+                                "request number for an artifact check) before offering to submit.",
+                            null,
+                        )
+                    else -> proposed(type, project.name, question = null, moduleId = moduleId, answer = answer)
                 }
             }
             else -> proposed(type, project.name, question = null)
@@ -121,24 +161,38 @@ class BuddyActionService(
         }
 
         return try {
-            when (type) {
-                BuddyActionType.OPEN_ORIENTATION -> openOrientation(resolved.userId, resolved.projectId)
-                else -> withContext(Dispatchers.IO) {
-                    when (type) {
-                        BuddyActionType.CLAIM_TASK_ZERO -> claimTaskZero(resolved.userId, resolved.projectId)
-                        BuddyActionType.LOG_BUDDY_CONTACT ->
-                            logContact(resolved.userId, resolved.projectId, request.note)
-                        BuddyActionType.FLAG_TO_PM -> flagToPm(authId, resolved.projectId, request.question)
-                        BuddyActionType.OPEN_ORIENTATION -> error("handled above")
-                    }
-                }
-            }
+            dispatch(type, resolved, authId, request)
         } catch (ex: ResponseStatusException) {
             // A precondition the underlying route enforces (not a member, blank question, …). Relay
             // its reason rather than failing the whole confirm with an HTTP error.
             BuddyActionResponse(ok = false, message = ex.reason ?: "That didn't go through — try again in a moment.")
         }
     }
+
+    /** Runs the confirmed action itself. Suspend operations manage their own transactions. */
+    private suspend fun dispatch(
+        type: BuddyActionType,
+        resolved: CallerContext.Resolved,
+        authId: String,
+        request: BuddyActionRequest,
+    ): BuddyActionResponse =
+        when (type) {
+            BuddyActionType.OPEN_ORIENTATION -> openOrientation(resolved.userId, resolved.projectId)
+            BuddyActionType.SUBMIT_VERIFICATION ->
+                submitVerification(authId, request.moduleId, request.answer)
+            else -> withContext(Dispatchers.IO) {
+                when (type) {
+                    BuddyActionType.CLAIM_TASK_ZERO -> claimTaskZero(resolved.userId, resolved.projectId)
+                    BuddyActionType.LOG_BUDDY_CONTACT ->
+                        logContact(resolved.userId, resolved.projectId, request.note)
+                    BuddyActionType.FLAG_TO_PM -> flagToPm(authId, resolved.projectId, request.question)
+                    BuddyActionType.CLAIM_GOAL -> claimGoal(authId, resolved.projectId, request.taskId)
+                    BuddyActionType.OPEN_ORIENTATION,
+                    BuddyActionType.SUBMIT_VERIFICATION,
+                    -> error("handled above")
+                }
+            }
+        }
 
     private fun claimTaskZero(userId: UUID, projectId: UUID): BuddyActionResponse {
         val result = taskZeroService.getForHire(userId, projectId)
@@ -162,12 +216,54 @@ class BuddyActionService(
             BuddyActionResponse(
                 ok = true,
                 message = "I've put together your task orientation for “${orientation.taskTitle}” — " +
-                    "the step-by-step, cited guide is on your First Week page, under your first task.",
+                    "the step-by-step, cited guide is right here in our conversation.",
             )
         } else {
             BuddyActionResponse(
                 ok = false,
                 message = orientation.reason ?: "There's no current task to open a packet for yet.",
+            )
+        }
+    }
+
+    private fun claimGoal(authId: String, projectId: UUID, taskId: UUID?): BuddyActionResponse {
+        if (taskId == null) {
+            return BuddyActionResponse(ok = false, message = "No task was proposed to claim.")
+        }
+        val goal = userGoalService.claimForMe(authId, projectId, taskId)
+        return BuddyActionResponse(
+            ok = true,
+            message = "You're now working toward “${goal.label}” — I'll shape your next steps around it.",
+        )
+    }
+
+    /**
+     * Submits the hire's answer to a module's check through the ordinary attempt path — same
+     * grading, same ledger write as submitting from a module page. The buddy relays the verdict;
+     * it never grades.
+     */
+    private suspend fun submitVerification(
+        authId: String,
+        moduleId: UUID?,
+        answer: String?,
+    ): BuddyActionResponse {
+        if (moduleId == null || answer.isNullOrBlank()) {
+            return BuddyActionResponse(ok = false, message = "No module or answer was proposed to submit.")
+        }
+        val result = verificationService.submitModuleAttemptForMe(
+            authId,
+            moduleId,
+            SubmitVerificationAttemptRequest(answer = answer),
+        )
+        return if (result.passed) {
+            BuddyActionResponse(
+                ok = true,
+                message = "Passed — ${result.feedback} That's on your record now.",
+            )
+        } else {
+            BuddyActionResponse(
+                ok = false,
+                message = "Not yet — ${result.feedback}" + (result.hint?.let { " $it" } ?: ""),
             )
         }
     }
@@ -198,11 +294,25 @@ class BuddyActionService(
         )
     }
 
-    private fun proposed(type: BuddyActionType, projectName: String, question: String?): ProposeOutcome =
+    private fun proposed(
+        type: BuddyActionType,
+        projectName: String,
+        question: String?,
+        taskId: UUID? = null,
+        moduleId: UUID? = null,
+        answer: String? = null,
+    ): ProposeOutcome =
         ProposeOutcome(
             toolResult = "Proposed to the hire on $projectName: “${type.label}”. They will see a confirm " +
                 "button; the action runs only if they click it. Offer it — do not claim it is done.",
-            proposal = BuddyActionProposal(action = type.toolName, label = type.label, question = question),
+            proposal = BuddyActionProposal(
+                action = type.toolName,
+                label = type.label,
+                question = question,
+                taskId = taskId,
+                moduleId = moduleId,
+                answer = answer,
+            ),
         )
 
     private fun resolveProject(userId: UUID): ProjectResolution {
@@ -237,6 +347,10 @@ class BuddyActionService(
     private fun BuddyToolCallDto.stringArg(name: String): String =
         (arguments[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
 
+    /** Reads a UUID argument the model passed to a tool, or null when it is missing/unparseable. */
+    private fun BuddyToolCallDto.uuidArg(name: String): UUID? =
+        runCatching { UUID.fromString(stringArg(name)) }.getOrNull()
+
     /** A verb phrase for the reason lines, e.g. "start Task 0", "flag this to a PM". */
     private fun BuddyActionType.gerund(): String =
         when (this) {
@@ -244,6 +358,8 @@ class BuddyActionService(
             BuddyActionType.CLAIM_TASK_ZERO -> "start Task 0"
             BuddyActionType.OPEN_ORIENTATION -> "open a task packet"
             BuddyActionType.LOG_BUDDY_CONTACT -> "log buddy contact"
+            BuddyActionType.CLAIM_GOAL -> "claim a goal"
+            BuddyActionType.SUBMIT_VERIFICATION -> "submit an answer"
         }
 
     /** The result of proposing an action: what to tell the AI, and the proposal to show the hire (if any). */
@@ -257,6 +373,12 @@ class BuddyActionService(
         val action: String,
         val label: String,
         val question: String?,
+        // Confirm payloads for the actions that carry one: the client echoes them back verbatim,
+        // so the target of a confirmed action is the one the buddy proposed, never one the client
+        // picked.
+        val taskId: UUID? = null,
+        val moduleId: UUID? = null,
+        val answer: String? = null,
     )
 
     private sealed interface ProjectResolution {
@@ -335,6 +457,56 @@ class BuddyActionService(
                         put("type", "string")
                         put("description", "Optional short note on what the contact was about.")
                     }
+                }
+            },
+        )
+
+        val CLAIM_GOAL_SPEC = BuddyToolSpecDto(
+            name = BuddyActionType.CLAIM_GOAL.toolName,
+            description = "Offer to claim a suggested starter-work task as the hire's goal — the " +
+                "contribution their learning plan then aims at. This does NOT claim anything by " +
+                "itself; it shows the hire a confirm button and runs only if they click. Use when " +
+                "the hire picks one of the tasks get_suggested_tasks returned, passing that " +
+                "task's task_id.",
+            parameters = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("task_id") {
+                        put("type", "string")
+                        put("description", "The task_id of the suggested task the hire picked.")
+                    }
+                }
+                putJsonArray("required") { add("task_id") }
+            },
+        )
+
+        val SUBMIT_VERIFICATION_SPEC = BuddyToolSpecDto(
+            name = BuddyActionType.SUBMIT_VERIFICATION.toolName,
+            description = "Offer to submit the hire's answer to a module's check for grading — a " +
+                "pull request number for an artifact check, a statement for an attestation. This " +
+                "does NOT submit anything by itself; it shows the hire a confirm button and runs " +
+                "only if they click. Use when the hire has done the work a module's check asks " +
+                "for. Grading and the ledger write happen through the ordinary attempt path — " +
+                "you relay the verdict, you never judge the work yourself.",
+            parameters = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("module_id") {
+                        put("type", "string")
+                        put("description", "The id of the module whose check is being answered.")
+                    }
+                    putJsonObject("answer") {
+                        put("type", "string")
+                        put(
+                            "description",
+                            "The hire's answer: a pull request number for an artifact check, " +
+                                "their statement for an attestation.",
+                        )
+                    }
+                }
+                putJsonArray("required") {
+                    add("module_id")
+                    add("answer")
                 }
             },
         )

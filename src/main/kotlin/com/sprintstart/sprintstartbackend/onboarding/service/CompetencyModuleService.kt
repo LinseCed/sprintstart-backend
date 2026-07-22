@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedModu
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ModulePage
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.ModulePageCitation
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.request.module.CreateCompetencyModuleRequest
@@ -272,16 +273,29 @@ class CompetencyModuleService(
             // the same set, so this is the backend not trusting that.
             .mapNotNull { page -> parsePageKind(page.kind)?.let { it to page } }
             .forEachIndexed { index, (kind, page) ->
-                module.pages.add(
-                    ModulePage(
-                        module = module,
-                        kind = kind,
-                        title = page.title,
-                        body = page.body,
-                        position = index,
-                        provenance = ContentProvenance.AI,
-                    ),
+                val modulePage = ModulePage(
+                    module = module,
+                    kind = kind,
+                    title = page.title,
+                    body = page.body,
+                    position = index,
+                    provenance = ContentProvenance.AI,
                 )
+                // The grounding travels with the prose: the AI cites every claim it grounds, and a
+                // page whose citations were dropped on persist would read as content somebody made
+                // up. Stored the same way orientation packets store theirs.
+                page.citations.forEachIndexed { citationIndex, citation ->
+                    modulePage.citations.add(
+                        ModulePageCitation(
+                            page = modulePage,
+                            filename = citation.filename.trim(),
+                            chunkId = citation.chunkId.trim(),
+                            sourceUrl = citation.sourceUrl?.trim()?.takeIf { it.isNotBlank() },
+                            position = citationIndex,
+                        ),
+                    )
+                }
+                module.pages.add(modulePage)
             }
 
         competencyModuleRepository.save(module)

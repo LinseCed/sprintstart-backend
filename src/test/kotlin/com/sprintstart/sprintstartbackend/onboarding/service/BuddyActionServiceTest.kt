@@ -4,12 +4,15 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStat
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.MyOrientationResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GoalView
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.MyTaskZeroResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.verification.SubmitVerificationAttemptResponse
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -30,12 +33,16 @@ class BuddyActionServiceTest {
     private val taskOrientationService: TaskOrientationService = mockk()
     private val onboardingBuddyService: OnboardingBuddyService = mockk(relaxed = true)
     private val knowledgeBaseService: KnowledgeBaseService = mockk(relaxed = true)
+    private val userGoalService: UserGoalService = mockk()
+    private val verificationService: VerificationService = mockk()
     private val userApi: UserApi = mockk()
     private val service = BuddyActionService(
         taskZeroService,
         taskOrientationService,
         onboardingBuddyService,
         knowledgeBaseService,
+        userGoalService,
+        verificationService,
         userApi,
     )
 
@@ -91,15 +98,29 @@ class BuddyActionServiceTest {
         loopProven = false,
     )
 
+    private fun attempt(moduleId: UUID, passed: Boolean, feedback: String, hint: String? = null) =
+        SubmitVerificationAttemptResponse(
+            attemptId = UUID.randomUUID(),
+            moduleId = moduleId,
+            passed = passed,
+            score = if (passed) 1.0 else 0.0,
+            feedback = feedback,
+            hint = hint,
+            attemptNo = 1,
+            graphVersion = 1,
+        )
+
     // -- specs / dispatch -------------------------------------------------------------------------
 
     @Test
-    fun `exposes exactly the four action tools`() {
+    fun `exposes exactly the six action tools`() {
         assertThat(service.actionSpecs().map { it.name }).containsExactlyInAnyOrder(
             "flag_to_pm",
             "claim_task_zero",
             "open_orientation",
             "log_buddy_contact",
+            "claim_goal",
+            "submit_verification",
         )
     }
 
@@ -167,6 +188,59 @@ class BuddyActionServiceTest {
 
         assertThat(outcome.proposal).isNull()
         assertThat(outcome.toolResult).contains("more than one project")
+    }
+
+    @Test
+    fun `carries the picked task through a claim-goal proposal`() {
+        onOneProject()
+        val taskId = UUID.randomUUID()
+
+        val outcome = service.propose(call("claim_goal", mapOf("task_id" to taskId.toString())), userId)
+
+        assertThat(outcome.proposal?.action).isEqualTo("claim_goal")
+        assertThat(outcome.proposal?.taskId).isEqualTo(taskId)
+        assertThat(outcome.toolResult).contains("confirm")
+        // Proposing must not claim anything.
+        verify(exactly = 0) { userGoalService.claimForMe(any(), any(), any()) }
+    }
+
+    @Test
+    fun `does not propose claim-goal without a parseable task id`() {
+        onOneProject()
+
+        val outcome = service.propose(call("claim_goal", mapOf("task_id" to "not-a-uuid")), userId)
+
+        assertThat(outcome.proposal).isNull()
+        assertThat(outcome.toolResult).contains("task_id")
+    }
+
+    @Test
+    fun `carries module and answer through a submit-verification proposal`() {
+        onOneProject()
+        val moduleId = UUID.randomUUID()
+
+        val outcome = service.propose(
+            call("submit_verification", mapOf("module_id" to moduleId.toString(), "answer" to "42")),
+            userId,
+        )
+
+        assertThat(outcome.proposal?.action).isEqualTo("submit_verification")
+        assertThat(outcome.proposal?.moduleId).isEqualTo(moduleId)
+        assertThat(outcome.proposal?.answer).isEqualTo("42")
+        coVerify(exactly = 0) { verificationService.submitModuleAttemptForMe(any(), any(), any()) }
+    }
+
+    @Test
+    fun `does not propose submit-verification without an answer`() {
+        onOneProject()
+
+        val outcome = service.propose(
+            call("submit_verification", mapOf("module_id" to UUID.randomUUID().toString())),
+            userId,
+        )
+
+        assertThat(outcome.proposal).isNull()
+        assertThat(outcome.toolResult).contains("No answer")
     }
 
     // -- perform (the confirm round-trip) ---------------------------------------------------------
@@ -280,6 +354,82 @@ class BuddyActionServiceTest {
 
         assertThat(result.ok).isFalse()
         assertThat(result.message).contains("isn't recognised")
+    }
+
+    @Test
+    fun `claiming a goal reports what the hire now works toward`() = runTest {
+        asHire()
+        onOneProject()
+        val taskId = UUID.randomUUID()
+        every { userGoalService.claimForMe(authId, projectId, taskId) } returns GoalView(
+            competencyKey = "contrib-fix-login",
+            label = "Fix the login redirect",
+        )
+
+        val result = service.perform(BuddyActionRequest(action = "claim_goal", taskId = taskId), jwt)
+
+        assertThat(result.ok).isTrue()
+        assertThat(result.message).contains("Fix the login redirect")
+    }
+
+    @Test
+    fun `claiming a goal relays why an unapproved task cannot be claimed`() = runTest {
+        asHire()
+        onOneProject()
+        val taskId = UUID.randomUUID()
+        every { userGoalService.claimForMe(authId, projectId, taskId) } throws
+            ResponseStatusException(HttpStatus.CONFLICT, "only an approved task can be claimed as a goal")
+
+        val result = service.perform(BuddyActionRequest(action = "claim_goal", taskId = taskId), jwt)
+
+        assertThat(result.ok).isFalse()
+        assertThat(result.message).contains("approved")
+    }
+
+    @Test
+    fun `submitting a passing verification answer relays the pass`() = runTest {
+        asHire()
+        onOneProject()
+        val moduleId = UUID.randomUUID()
+        coEvery { verificationService.submitModuleAttemptForMe(authId, moduleId, any()) } returns
+            attempt(moduleId, passed = true, feedback = "The PR satisfies the rubric.")
+
+        val result = service.perform(
+            BuddyActionRequest(action = "submit_verification", moduleId = moduleId, answer = "42"),
+            jwt,
+        )
+
+        assertThat(result.ok).isTrue()
+        assertThat(result.message).contains("Passed")
+    }
+
+    @Test
+    fun `submitting a failing verification answer relays the feedback and hint`() = runTest {
+        asHire()
+        onOneProject()
+        val moduleId = UUID.randomUUID()
+        coEvery { verificationService.submitModuleAttemptForMe(authId, moduleId, any()) } returns
+            attempt(moduleId, passed = false, feedback = "CI is failing.", hint = "Fix the red check first.")
+
+        val result = service.perform(
+            BuddyActionRequest(action = "submit_verification", moduleId = moduleId, answer = "42"),
+            jwt,
+        )
+
+        assertThat(result.ok).isFalse()
+        assertThat(result.message).contains("CI is failing")
+        assertThat(result.message).contains("Fix the red check first")
+    }
+
+    @Test
+    fun `submitting verification without its payload is a handled failure`() = runTest {
+        asHire()
+        onOneProject()
+
+        val result = service.perform(BuddyActionRequest(action = "submit_verification"), jwt)
+
+        assertThat(result.ok).isFalse()
+        coVerify(exactly = 0) { verificationService.submitModuleAttemptForMe(any(), any(), any()) }
     }
 
     @Test

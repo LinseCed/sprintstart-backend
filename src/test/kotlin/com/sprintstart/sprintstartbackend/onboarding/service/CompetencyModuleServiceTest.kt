@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModulePageKi
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
+import com.sprintstart.sprintstartbackend.onboarding.external.model.CitationRefSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ModuleProposalOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedModulePageSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedModuleSchema
@@ -253,6 +254,46 @@ class CompetencyModuleServiceTest {
             service.proposeFromCorpus(key, projectId)
 
             assertThat(saved.captured.type).isEqualTo(VerificationType.ATTEST)
+        }
+
+        @Test
+        fun `persists each page's citations -- grounding survives the trip to the database`() = runTest {
+            stubProposal(
+                ModuleProposalOutcome(
+                    status = "proposed",
+                    module = ProposedModuleSchema(
+                        competencyKey = key,
+                        level = "intermediate",
+                        title = "Deploying",
+                        pages = listOf(
+                            ProposedModulePageSchema(
+                                kind = "LESSON",
+                                title = "How",
+                                body = "text",
+                                citations = listOf(
+                                    CitationRefSchema(
+                                        filename = "docs/deploy.md",
+                                        chunkId = "chunk-7",
+                                        sourceUrl = "https://example.test/docs/deploy",
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+            val saved = slot<CompetencyModule>()
+            every { competencyModuleRepository.save(capture(saved)) } answers { saved.captured }
+
+            service.proposeFromCorpus(key, projectId)
+
+            val citations = saved.captured.pages
+                .single()
+                .citations
+            assertThat(citations).hasSize(1)
+            assertThat(citations.single().filename).isEqualTo("docs/deploy.md")
+            assertThat(citations.single().chunkId).isEqualTo("chunk-7")
+            assertThat(citations.single().sourceUrl).isEqualTo("https://example.test/docs/deploy")
         }
     }
 

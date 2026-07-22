@@ -67,8 +67,15 @@ class CompetencyPathService(
     private val userApi: UserApi,
 ) {
     @Transactional
-    fun getPathForMe(authId: String, projectId: UUID): PathView {
-        val userId = resolveUserId(authId)
+    fun getPathForMe(authId: String, projectId: UUID): PathView =
+        getPathForUser(resolveUserId(authId), projectId)
+
+    /**
+     * [getPathForMe] for a caller that already holds the resolved user id — the buddy's tools act
+     * on behalf of a hire they have already identified, and must never resolve somebody else's.
+     */
+    @Transactional
+    fun getPathForUser(userId: UUID, projectId: UUID): PathView {
         val currentVersion = competencyGraphVersionService.currentVersion()
         val pin = resolvePin(userId, currentVersion)
 

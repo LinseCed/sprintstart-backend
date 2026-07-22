@@ -27,7 +27,13 @@ data class BuddyStreamEvent(
     // Set only on an `action_proposal` event: the buddy is offering to *do* something, gated on the
     // hire's confirmation. [action] is the tool name the confirm endpoint expects, [label] the
     // button text, [question] the composed text carried through for the flag-to-PM action.
+    // [taskId]/[moduleId]/[answer] are the confirm payloads of the goal-claim and verification
+    // actions — the client echoes them back verbatim, so the concrete target of an action is the
+    // one the buddy proposed, never one the client picked.
     val action: String? = null,
     val label: String? = null,
     val question: String? = null,
+    @SerialName("task_id") val taskId: String? = null,
+    @SerialName("module_id") val moduleId: String? = null,
+    val answer: String? = null,
 )

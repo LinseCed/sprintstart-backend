@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySo
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
@@ -28,12 +29,14 @@ class BuddyToolExecutorTest {
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService = mockk()
     private val knowledgeBaseService: KnowledgeBaseService = mockk()
     private val userApi: UserApi = mockk()
+    private val buddyPlanTools: BuddyPlanTools = mockk(relaxed = true)
     private val executor = BuddyToolExecutor(
         onboardingMetricsService,
         myCompetencyService,
         starterWorkTaskProposalService,
         knowledgeBaseService,
         userApi,
+        buddyPlanTools,
     )
 
     private val userId = UUID.randomUUID()
@@ -123,12 +126,30 @@ class BuddyToolExecutorTest {
 
     @Test
     fun `exposes the caller-scoped hire-state tools`() {
+        every { buddyPlanTools.toolSpecs() } returns emptyList()
+
         assertThat(executor.toolSpecs().map { it.name }).containsExactly(
             "get_my_metrics",
             "get_my_competencies",
             "get_suggested_tasks",
             "search_canonical_answers",
         )
+    }
+
+    @Test
+    fun `aggregates the plan tools into the catalog and delegates their execution`() {
+        val planSpec = BuddyToolSpecDto(
+            name = "get_learning_plan",
+            description = "plan",
+            parameters = buildJsonObject { },
+        )
+        val planCall = BuddyToolCallDto(id = "c9", name = "get_learning_plan")
+        every { buddyPlanTools.toolSpecs() } returns listOf(planSpec)
+        every { buddyPlanTools.handles("get_learning_plan") } returns true
+        every { buddyPlanTools.execute(planCall, userId) } returns "the plan"
+
+        assertThat(executor.toolSpecs().map { it.name }).contains("get_learning_plan")
+        assertThat(executor.execute(planCall, userId)).isEqualTo("the plan")
     }
 
     @Test
@@ -206,16 +227,15 @@ class BuddyToolExecutorTest {
     }
 
     @Test
-    fun `suggests ranked tasks with their reasons and never a score`() {
+    fun `suggests ranked tasks with their reasons, their claim ids, and never a score`() {
         every { userApi.getUsersByIds(listOf(userId)) } returns
             listOf(userWith(ProjectDto(projectId, "Checkout", null)))
-        every { starterWorkTaskProposalService.matchForUserId(userId, projectId) } returns listOf(
-            rankedTask(
-                "Fix the login redirect",
-                reasons = listOf("Matches a skill you hold (Kotlin)", "Labelled 'good first issue'"),
-                sourceUrl = "https://example.test/issues/1",
-            ),
+        val task = rankedTask(
+            "Fix the login redirect",
+            reasons = listOf("Matches a skill you hold (Kotlin)", "Labelled 'good first issue'"),
+            sourceUrl = "https://example.test/issues/1",
         )
+        every { starterWorkTaskProposalService.matchForUserId(userId, projectId) } returns listOf(task)
 
         val result = executor.execute(suggestedTasksCall, userId)
 
@@ -223,7 +243,9 @@ class BuddyToolExecutorTest {
         assertThat(result).contains("Fix the login redirect")
         assertThat(result).contains("Matches a skill you hold (Kotlin)")
         assertThat(result).contains("https://example.test/issues/1")
-        // The ranker's score must never surface — a number is not a reason a hire can act on.
+        // The id the claim_goal action names the task by...
+        assertThat(result).contains("[task_id: ${task.task.id}]")
+        // ...and the ranker's score must never surface — a number is not a reason a hire can act on.
         assertThat(result).doesNotContain("1.0")
     }
 

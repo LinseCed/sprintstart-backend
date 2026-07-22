@@ -3,8 +3,13 @@ package com.sprintstart.sprintstartbackend.onboarding.model.mapper
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ModulePage
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.ModulePageCitation
 import com.sprintstart.sprintstartbackend.onboarding.model.response.module.CompetencyModuleResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.module.ModulePageCitationResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.module.ModulePageResponse
+
+fun ModulePageCitation.toResponse(): ModulePageCitationResponse =
+    ModulePageCitationResponse(filename = filename, chunkId = chunkId, sourceUrl = sourceUrl)
 
 fun ModulePage.toResponse(): ModulePageResponse =
     ModulePageResponse(
@@ -14,6 +19,7 @@ fun ModulePage.toResponse(): ModulePageResponse =
         body = body,
         position = position,
         provenance = provenance,
+        citations = citations.map { it.toResponse() },
         updatedAt = updatedAt,
     )
 

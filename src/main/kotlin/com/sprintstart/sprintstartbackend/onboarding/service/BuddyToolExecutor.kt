@@ -29,6 +29,7 @@ class BuddyToolExecutor(
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val knowledgeBaseService: KnowledgeBaseService,
     private val userApi: UserApi,
+    private val buddyPlanTools: BuddyPlanTools,
 ) {
     /** The backend tools the AI reasoner is told it may call. */
     fun toolSpecs(): List<BuddyToolSpecDto> =
@@ -37,16 +38,19 @@ class BuddyToolExecutor(
             GET_MY_COMPETENCIES_SPEC,
             GET_SUGGESTED_TASKS_SPEC,
             SEARCH_CANONICAL_ANSWERS_SPEC,
-        )
+        ) + buddyPlanTools.toolSpecs()
 
     /** Executes [call] on behalf of [userId], returning a plain-text result for the model. */
     fun execute(call: BuddyToolCallDto, userId: UUID): String =
-        when (call.name) {
-            GET_MY_METRICS -> getMyMetrics(userId)
-            GET_MY_COMPETENCIES -> getMyCompetencies(userId)
-            GET_SUGGESTED_TASKS -> getSuggestedTasks(userId)
-            SEARCH_CANONICAL_ANSWERS -> searchCanonicalAnswers(userId, call.stringArg("query"))
-            else -> "Unknown tool: ${call.name}."
+        when {
+            buddyPlanTools.handles(call.name) -> buddyPlanTools.execute(call, userId)
+            else -> when (call.name) {
+                GET_MY_METRICS -> getMyMetrics(userId)
+                GET_MY_COMPETENCIES -> getMyCompetencies(userId)
+                GET_SUGGESTED_TASKS -> getSuggestedTasks(userId)
+                SEARCH_CANONICAL_ANSWERS -> searchCanonicalAnswers(userId, call.stringArg("query"))
+                else -> "Unknown tool: ${call.name}."
+            }
         }
 
     private fun getMyMetrics(userId: UUID): String {
@@ -125,7 +129,10 @@ class BuddyToolExecutor(
                 buildString {
                     appendLine("On ${project.name}, good next tasks (best first):")
                     ranked.forEach { match ->
-                        appendLine("- ${match.task.title}")
+                        // The id is how the hire claims one: the claim_goal action names the task
+                        // by it, so the suggestion and the claim can never drift onto different
+                        // tasks.
+                        appendLine("- ${match.task.title} [task_id: ${match.task.id}]")
                         // Show the reasons, never the score: a number is not a reason a hire can act
                         // on, and the ranker exists to explain itself.
                         match.reasons.forEach { appendLine("    · $it") }
@@ -190,9 +197,10 @@ class BuddyToolExecutor(
         val GET_SUGGESTED_TASKS_SPEC = BuddyToolSpecDto(
             name = GET_SUGGESTED_TASKS,
             description = "Good next starter-work tasks for the hire, ranked by fit, each with the " +
-                "plain reasons it was suggested. Use this for questions like 'what should I work " +
-                "on?' or 'what's a good first task for me?'. Present the reasons, never a score. " +
-                "Takes no arguments — it always ranks for the caller.",
+                "plain reasons it was suggested and the task_id to claim it by. Use this for " +
+                "questions like 'what should I work on?' or 'what's a good first task for me?'. " +
+                "Present the reasons, never a score. When the hire picks one, offer to claim it " +
+                "as their goal with claim_goal. Takes no arguments — it always ranks for the caller.",
             parameters = noArgs(),
         )
 

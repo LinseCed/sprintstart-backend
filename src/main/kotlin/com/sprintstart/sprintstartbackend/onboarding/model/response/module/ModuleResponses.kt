@@ -7,6 +7,12 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.Verification
 import java.time.Instant
 import java.util.UUID
 
+data class ModulePageCitationResponse(
+    val filename: String,
+    val chunkId: String,
+    val sourceUrl: String? = null,
+)
+
 data class ModulePageResponse(
     val id: UUID,
     val kind: ModulePageKind,
@@ -16,6 +22,8 @@ data class ModulePageResponse(
     // Whether the AI or a human wrote this page. Shown to the author so they can see what a
     // re-synthesis pass would leave alone.
     val provenance: ContentProvenance,
+    // The page's grounding, kept on persist so a claim can be followed back to its source.
+    val citations: List<ModulePageCitationResponse> = emptyList(),
     val updatedAt: Instant,
 )
 

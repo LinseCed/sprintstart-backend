@@ -1,16 +1,23 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.request.buddy
 
+import java.util.UUID
+
 /**
  * A hire confirming a buddy-proposed action.
  *
  * [action] is the proposed action's tool name (see `BuddyActionType`). The project is **not**
  * carried here — it is re-resolved server-side from the caller, so a client can never confirm an
- * action against a project the buddy did not scope it to. [question] rides along only for the
- * flag-to-PM action (the text the buddy composed and showed the hire); [note] is an optional line
- * for logging buddy contact. Both are ignored by the actions that don't use them.
+ * action against a project the buddy did not scope it to. The remaining fields are the per-action
+ * confirm payloads the proposal carried, echoed back verbatim: [question] for flag-to-PM (the
+ * text the buddy composed and showed the hire), [note] for logging buddy contact, [taskId] for
+ * claiming a suggested goal, [moduleId] + [answer] for submitting a module check. All are ignored
+ * by the actions that don't use them.
  */
 data class BuddyActionRequest(
     val action: String,
     val question: String? = null,
     val note: String? = null,
+    val taskId: UUID? = null,
+    val moduleId: UUID? = null,
+    val answer: String? = null,
 )

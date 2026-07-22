@@ -319,5 +319,113 @@ class BuddyServiceTest {
 
             assertThat(events.last().type).isEqualTo("done")
         }
+
+        @Test
+        fun `sends only the window after the summary cursor, with the prior summary standing in`() = runTest {
+            val session = BuddySession(userId = userId).apply {
+                summary = "Earlier we got the repo building."
+                summarizedCount = 2
+            }
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
+                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "summarized 1"),
+                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "summarized 2"),
+                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "recent question"),
+                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "recent answer"),
+            )
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            val requests = mutableListOf<BuddyAgentRequest>()
+            coEvery { onboardingAiClient.buddyAgentTurn(capture(requests)) } returns finalReply("More detail.")
+
+            service.sendMessageForMe(authId, "Can you say more?").toList()
+
+            // The summarized prefix stays out of the prompt; the summary stands in for it...
+            assertThat(requests.first().messages.map { it.content }).containsExactly(
+                "recent question",
+                "recent answer",
+                "Can you say more?",
+            )
+            assertThat(requests.first().priorSummary).isEqualTo("Earlier we got the repo building.")
+            // ...and nothing needs folding: the window fits, so no compaction is requested.
+            assertThat(requests.first().summarizeUpto).isNull()
+        }
+
+        @Test
+        fun `folds the oldest messages into the summary when the window outgrows the limit`() = runTest {
+            val session = BuddySession(userId = userId)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            // 25 persisted messages + the new one: 6 over the window of 20.
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns
+                (1..25).map {
+                    BuddyMessage(
+                        session = session,
+                        role = if (it % 2 == 1) BuddyMessageRole.USER else BuddyMessageRole.ASSISTANT,
+                        content = "m$it",
+                    )
+                }
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+            every { buddySessionRepository.save(any()) } answers { firstArg() }
+            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            val requests = mutableListOf<BuddyAgentRequest>()
+            coEvery { onboardingAiClient.buddyAgentTurn(capture(requests)) } returns BuddyAgentResponse(
+                final = true,
+                text = "Picking up where we were.",
+                updatedSummary = "We covered m1 through m6.",
+            )
+
+            service.sendMessageForMe(authId, "m26").toList()
+
+            // The first (and only) hop asks the AI to fold the 6 oldest messages...
+            assertThat(requests.first().summarizeUpto).isEqualTo(6)
+            // ...and the returned summary plus the advanced cursor are persisted with the reply.
+            assertThat(session.summary).isEqualTo("We covered m1 through m6.")
+            assertThat(session.summarizedCount).isEqualTo(6)
+            verify { buddySessionRepository.save(session) }
+        }
+
+        @Test
+        fun `sends the summary fields on the first hop only, never re-folded on a resume`() = runTest {
+            val session = BuddySession(userId = userId)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns
+                (1..25).map {
+                    BuddyMessage(
+                        session = session,
+                        role = if (it % 2 == 1) BuddyMessageRole.USER else BuddyMessageRole.ASSISTANT,
+                        content = "m$it",
+                    )
+                }
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+            every { buddySessionRepository.save(any()) } answers { firstArg() }
+            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            val toolCall = BuddyToolCallDto(id = "call_0", name = "get_my_metrics")
+            val requests = mutableListOf<BuddyAgentRequest>()
+            coEvery { onboardingAiClient.buddyAgentTurn(capture(requests)) } returnsMany listOf(
+                BuddyAgentResponse(
+                    final = false,
+                    messages = listOf(
+                        BuddyAgentMessageDto(role = "assistant", content = "", toolCalls = listOf(toolCall)),
+                    ),
+                    pendingToolCalls = listOf(toolCall),
+                    updatedSummary = "We covered m1 through m6.",
+                ),
+                finalReply("Your PR is waiting on a review."),
+            )
+            every { buddyToolExecutor.execute(toolCall, userId) } returns "openPullRequestCount=1"
+
+            service.sendMessageForMe(authId, "m26").toList()
+
+            // Hop one carries the fold request...
+            assertThat(requests[0].summarizeUpto).isEqualTo(6)
+            // ...the resume carries neither field: the summary is already folded into the running
+            // conversation the AI returned, and re-sending would double-fold it.
+            assertThat(requests[1].summarizeUpto).isNull()
+            assertThat(requests[1].priorSummary).isNull()
+            assertThat(session.summarizedCount).isEqualTo(6)
+        }
     }
 }

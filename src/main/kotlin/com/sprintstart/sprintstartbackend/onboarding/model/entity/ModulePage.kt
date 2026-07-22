@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.model.entity
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContentProvenance
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModulePageKind
+import jakarta.persistence.CascadeType
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -9,6 +10,8 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
+import jakarta.persistence.OneToMany
+import jakarta.persistence.OrderBy
 import jakarta.persistence.Table
 import java.time.Instant
 import java.util.UUID
@@ -50,6 +53,10 @@ class ModulePage(
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var provenance: ContentProvenance = ContentProvenance.PM,
+    /** What each claim on this page restates — the grounding the AI produced, kept on persist. */
+    @OneToMany(mappedBy = "page", cascade = [CascadeType.ALL], orphanRemoval = true)
+    @OrderBy("position ASC")
+    val citations: MutableList<ModulePageCitation> = mutableListOf(),
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false)

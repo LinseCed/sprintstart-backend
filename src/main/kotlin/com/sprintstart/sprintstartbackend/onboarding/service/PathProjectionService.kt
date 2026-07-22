@@ -90,6 +90,9 @@ class PathProjectionService(
                 kind = competency.kind,
                 state = states.getValue(key),
                 level = ledger[key],
+                targetLevel = targetLevelOverrides[key]
+                    ?: competency.targetLevel
+                    ?: Competency.DEFAULT_TARGET_LEVEL,
                 moduleId = moduleIdByCompetencyKey[key],
                 verificationType = verificationTypeByCompetencyKey[key],
             )

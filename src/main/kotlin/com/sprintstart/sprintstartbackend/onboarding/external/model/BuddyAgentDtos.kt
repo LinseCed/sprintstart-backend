@@ -41,6 +41,18 @@ data class BuddyToolSpecDto(
 data class BuddyAgentRequest(
     val messages: List<BuddyAgentMessageDto>,
     @SerialName("backend_tools") val backendTools: List<BuddyToolSpecDto> = emptyList(),
+    /**
+     * The session's running summary of everything older than [messages] — the conversation the
+     * window no longer carries. Sent on the first hop of a turn; after that the AI has folded it
+     * into the running [messages] list it returns, so it round-trips on its own.
+     */
+    @SerialName("prior_summary") val priorSummary: String? = null,
+    /**
+     * When set, the AI must fold the first this-many messages of [messages] into the summary and
+     * return it as [BuddyAgentResponse.updatedSummary]. How the backend bounds an unbounded
+     * transcript: the window stays small, and the summary accretes what slides out of it.
+     */
+    @SerialName("summarize_upto") val summarizeUpto: Int? = null,
 )
 
 @Serializable
@@ -59,4 +71,9 @@ data class BuddyAgentResponse(
     val messages: List<BuddyAgentMessageDto> = emptyList(),
     @SerialName("pending_tool_calls") val pendingToolCalls: List<BuddyToolCallDto> = emptyList(),
     val citations: List<BuddyCitationDto> = emptyList(),
+    /**
+     * The accreted summary when the request asked for compaction (`summarize_upto`): covers the
+     * prior summary plus the folded messages. The backend persists it and advances its cursor.
+     */
+    @SerialName("updated_summary") val updatedSummary: String? = null,
 )

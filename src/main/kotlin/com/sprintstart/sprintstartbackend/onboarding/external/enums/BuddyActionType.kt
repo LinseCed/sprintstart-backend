@@ -16,6 +16,8 @@ enum class BuddyActionType(
     CLAIM_TASK_ZERO("claim_task_zero", "Start Task 0"),
     OPEN_ORIENTATION("open_orientation", "Open the task packet"),
     LOG_BUDDY_CONTACT("log_buddy_contact", "Log that you reached out"),
+    CLAIM_GOAL("claim_goal", "Work toward this task"),
+    SUBMIT_VERIFICATION("submit_verification", "Submit this answer"),
     ;
 
     companion object {
