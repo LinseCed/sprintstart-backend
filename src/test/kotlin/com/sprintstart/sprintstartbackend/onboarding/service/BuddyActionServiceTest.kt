@@ -31,7 +31,6 @@ import java.util.UUID
 class BuddyActionServiceTest {
     private val taskZeroService: TaskZeroService = mockk()
     private val taskOrientationService: TaskOrientationService = mockk()
-    private val onboardingBuddyService: OnboardingBuddyService = mockk(relaxed = true)
     private val knowledgeBaseService: KnowledgeBaseService = mockk(relaxed = true)
     private val userGoalService: UserGoalService = mockk()
     private val verificationService: VerificationService = mockk()
@@ -39,7 +38,6 @@ class BuddyActionServiceTest {
     private val service = BuddyActionService(
         taskZeroService,
         taskOrientationService,
-        onboardingBuddyService,
         knowledgeBaseService,
         userGoalService,
         verificationService,
@@ -113,12 +111,11 @@ class BuddyActionServiceTest {
     // -- specs / dispatch -------------------------------------------------------------------------
 
     @Test
-    fun `exposes exactly the six action tools`() {
+    fun `exposes exactly the five action tools`() {
         assertThat(service.actionSpecs().map { it.name }).containsExactlyInAnyOrder(
             "flag_to_pm",
             "claim_task_zero",
             "open_orientation",
-            "log_buddy_contact",
             "claim_goal",
             "submit_verification",
         )
@@ -292,22 +289,6 @@ class BuddyActionServiceTest {
 
         assertThat(result.ok).isFalse()
         verify(exactly = 0) { knowledgeBaseService.escalate(any(), any(), any()) }
-    }
-
-    @Test
-    fun `logging buddy contact records it on the hire's behalf`() = runTest {
-        asHire()
-        onOneProject()
-
-        val result = service.perform(
-            BuddyActionRequest(action = "log_buddy_contact", note = "quick sync"),
-            jwt,
-        )
-
-        assertThat(result.ok).isTrue()
-        verify(exactly = 1) {
-            onboardingBuddyService.logContact(projectId, userId, userId, null, "quick sync")
-        }
     }
 
     @Test

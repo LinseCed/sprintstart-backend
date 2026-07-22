@@ -14,4 +14,7 @@ interface KnowledgeRequestRepository : JpaRepository<KnowledgeRequest, UUID> {
 
     /** A hire's own escalations, newest first, so they can see what they asked and what came back. */
     fun findAllByHireIdOrderByCreatedAtDesc(hireId: UUID): List<KnowledgeRequest>
+
+    /** Every escalation a hire made on a project — the surviving "needed a person" signal. */
+    fun findAllByHireIdAndProjectId(hireId: UUID, projectId: UUID): List<KnowledgeRequest>
 }

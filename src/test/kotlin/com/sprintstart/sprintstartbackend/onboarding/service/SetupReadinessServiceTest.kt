@@ -6,7 +6,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintCompe
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdgeProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyProposal
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingBuddy
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyGraphResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.RungState
@@ -14,9 +13,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.SetupR
 import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyProposalRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingBuddyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
-import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every
 import io.mockk.mockk
@@ -30,7 +27,6 @@ class SetupReadinessServiceTest {
     private val edgeProposals: CompetencyEdgeProposalRepository = mockk()
     private val blueprints: BlueprintRepository = mockk()
     private val starterWork: StarterWorkTaskProposalRepository = mockk()
-    private val buddies: OnboardingBuddyRepository = mockk()
     private val membership: ProjectMembershipApi = mockk()
 
     private val projectId: UUID = UUID.randomUUID()
@@ -41,7 +37,6 @@ class SetupReadinessServiceTest {
         edgeProposals,
         blueprints,
         starterWork,
-        buddies,
         membership,
     )
 
@@ -82,9 +77,6 @@ class SetupReadinessServiceTest {
             List(pending) { mockk<StarterWorkTaskProposal>() }
     }
 
-    private fun member(userId: UUID = UUID.randomUUID()) =
-        ProjectMember(userId = userId, displayName = "A Hire", githubLogin = "hire", joinedAt = null)
-
     /** The bug that motivated this: proposals generated, none approved -> the baseline read "empty". */
     @Test
     fun `pending proposals surface as a review warning and block the baseline`() {
@@ -93,7 +85,6 @@ class SetupReadinessServiceTest {
         every { blueprints.findAllByStatus(BlueprintStatus.ACTIVE) } returns emptyList()
         starterTasks(approved = 0, pending = 0)
         every { membership.getProjectMembers(projectId) } returns emptyList()
-        every { buddies.findAllByProjectId(projectId) } returns emptyList()
 
         val response = service.getReadiness(projectId)
 
@@ -112,37 +103,12 @@ class SetupReadinessServiceTest {
         pendingGraph(nodes = 0, edges = 0)
         activeBaseline(approvedEntries = 3)
         starterTasks(approved = 2, pending = 0)
-        val hire = UUID.randomUUID()
-        every { membership.getProjectMembers(projectId) } returns listOf(member(hire))
-        every { buddies.findAllByProjectId(projectId) } returns
-            listOf(mockk<OnboardingBuddy> { every { hireId } returns hire })
 
         val response = service.getReadiness(projectId)
 
         assertThat(response.rungs.map { it.state }).containsOnly(RungState.OK)
         assertThat(response.ready).isTrue()
-        assertThat(rungOf(response, "human-loop").detail).contains("Every hire has a buddy")
-    }
-
-    @Test
-    fun `a hire without a buddy warns without blocking`() {
-        approvedCompetencies(6)
-        pendingGraph(nodes = 0, edges = 0)
-        activeBaseline(approvedEntries = 3)
-        starterTasks(approved = 2, pending = 0)
-        val withBuddy = UUID.randomUUID()
-        val withoutBuddy = UUID.randomUUID()
-        every { membership.getProjectMembers(projectId) } returns
-            listOf(member(withBuddy), member(withoutBuddy))
-        every { buddies.findAllByProjectId(projectId) } returns
-            listOf(mockk<OnboardingBuddy> { every { hireId } returns withBuddy })
-
-        val response = service.getReadiness(projectId)
-
-        val humanLoop = rungOf(response, "human-loop")
-        assertThat(humanLoop.state).isEqualTo(RungState.WARN)
-        assertThat(humanLoop.count).isEqualTo(1)
-        assertThat(humanLoop.detail).contains("1 hire still needs a buddy", "1 of 2")
-        assertThat(response.ready).isFalse()
+        // The human-loop rung is gone with the buddy loop itself: three onboarding stages remain.
+        assertThat(response.rungs.map { it.key }).containsExactly("skill-map", "baseline", "starter-tasks")
     }
 }

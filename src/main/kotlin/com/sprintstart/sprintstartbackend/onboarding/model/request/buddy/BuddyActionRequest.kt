@@ -9,14 +9,13 @@ import java.util.UUID
  * carried here — it is re-resolved server-side from the caller, so a client can never confirm an
  * action against a project the buddy did not scope it to. The remaining fields are the per-action
  * confirm payloads the proposal carried, echoed back verbatim: [question] for flag-to-PM (the
- * text the buddy composed and showed the hire), [note] for logging buddy contact, [taskId] for
- * claiming a suggested goal, [moduleId] + [answer] for submitting a module check. All are ignored
- * by the actions that don't use them.
+ * text the buddy composed and showed the hire), [taskId] for claiming a suggested goal,
+ * [moduleId] + [answer] for submitting a module check. All are ignored by the actions that don't
+ * use them.
  */
 data class BuddyActionRequest(
     val action: String,
     val question: String? = null,
-    val note: String? = null,
     val taskId: UUID? = null,
     val moduleId: UUID? = null,
     val answer: String? = null,
