@@ -22,10 +22,8 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 /**
- * PM-facing team-wide competency ledger signal (Phase 4, #9) -- aggregate and per-user, sourced
- * from [com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState] rather
- * than step completion (see the existing `GET /team-overview` in
- * [OnboardingStepController][com.sprintstart.sprintstartbackend.onboarding.controller.OnboardingStepController]).
+ * PM-facing team-wide competency ledger signal -- aggregate and per-user, sourced from
+ * [com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState].
  */
 @RestController
 @RequestMapping("/api/v1/onboarding/dashboard")

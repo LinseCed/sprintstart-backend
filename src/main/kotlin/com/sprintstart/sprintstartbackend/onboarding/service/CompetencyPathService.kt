@@ -34,7 +34,7 @@ import java.util.UUID
  * [UserGraphPin] holds back STRUCTURAL changes until their next session start while
  * ADDITIVE/INVARIANT changes stay visible immediately.
  *
- * The path is scoped to a project, and it aims at two things at once (backend#51):
+ * The path is scoped to a project, and it aims at two things at once:
  *
  * - the **baseline** -- the competency selection of that project's ACTIVE blueprints for the
  *   user's role scopes, which is the PM's mandatory floor for everybody;

@@ -15,6 +15,3 @@ fun StarterWorkTaskProposal.toResponse(): StarterWorkTaskProposalResponse =
         status = status,
         taskZeroEligible = taskZeroEligible,
     )
-
-// `toSchema()` mapped a proposal into the AI `/match` request shape. Removed with that call (#74):
-// ranking no longer leaves this service.

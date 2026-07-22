@@ -16,11 +16,9 @@ import java.util.UUID
  * One entry of a [Blueprint]: a competency everybody in the blueprint's scope must reach, and
  * the level that counts as reaching it.
  *
- * This is the whole content of a baseline. A blueprint used to hold prose *steps* -- a second
- * content model running in parallel to the competency graph, whose only structural job was to
- * carry a `competencyKey` so the path could work out what to aim at. The baseline's real job is
- * the one the design gave it: *which competencies must everyone here reach, and to what level*.
- * That is a selection over the graph, so the selection is what is stored.
+ * This is the whole content of a baseline: *which competencies must everyone in this scope reach,
+ * and to what level*. That is a selection over the competency graph, so the selection is what is
+ * stored -- no parallel content model of its own.
  *
  * Entries reference a competency by its stable [competencyKey], never by id -- same rule as the
  * ledger and the graph edges, so a selection survives renames and re-seeding.

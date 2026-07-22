@@ -100,7 +100,7 @@ class StarterWorkTaskProposalService(
     }
 
     /**
-     * The streaming twin of [generate] (live-AI-visibility, #95/ai#37).
+     * The streaming twin of [generate].
      *
      * Relays the AI's `stage`/`item` events so a PM watches the pool fill one task at a time, and
      * on the terminal `done` persists the tasks through the very same [persistProposals] the sync
@@ -330,11 +330,9 @@ class StarterWorkTaskProposalService(
     /**
      * Ranks the current (APPROVED) starter-work pool by fit for the authenticated user on a project.
      *
-     * **No longer an AI call.** Ranking used to delegate to the AI service, which scored competency
-     * overlap and broke ties on embeddings; #74 requires that a hire be told in one line why a task
-     * was suggested, and an embedding distance cannot say. The ranking is now deterministic, local
-     * and self-explaining (see [StarterWorkMatcher]) — which also takes a network round trip off a
-     * hire's request path.
+     * A hire must be told in one line why a task was suggested, and an embedding distance cannot
+     * say. The ranking is deterministic, local and self-explaining (see [StarterWorkMatcher]) —
+     * which also keeps a network round trip off a hire's request path.
      *
      * Project-scoped, unlike the previous version: two of the signals (prior involvement and
      * repository responsiveness) are only meaningful inside one project's ingested corpus.
@@ -467,9 +465,9 @@ class StarterWorkTaskProposalService(
          * task becomes.
          *
          * Deliberately a pure function of [sourceId] and nothing else, so the mapping from task to
-         * node survives everything a PM can change: since graph authoring (#50) a node's label,
-         * description and kind are all editable, so matching a task to its node on any of those
-         * would break the first time somebody renamed it.
+         * node survives everything a PM can change: a node's label, description and kind are all
+         * editable, so matching a task to its node on any of those would break the first time
+         * somebody renamed it.
          */
         fun contributionKeyFor(sourceId: String): String =
             sourceId.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')

@@ -36,8 +36,3 @@ data class StarterWorkOutcome(
     @SerialName("candidates_considered") val candidatesConsidered: Int = 0,
     val notes: List<String> = emptyList(),
 )
-
-// HireCompetencySchema / MatchHireToPoolRequest / RankedStarterTaskSchema are gone with
-// `OnboardingAiClient.matchHireToPool` (#74): ranking is deterministic and local now, so these
-// described a seam that no longer exists. Keeping serializable DTOs for an endpoint nothing calls
-// is how `repo_signal` and mining's `last_fingerprint` became dead wiring.

@@ -60,8 +60,8 @@ class AssessmentService(
     /**
      * Whether the authenticated user has ever completed an assessment session.
      *
-     * The frontend's "needs assessment" gate checks this instead of the retired self-reported
-     * skill-wizard data -- a COMPLETED session is the thing the assessment flow actually produces.
+     * The frontend's "needs assessment" gate checks this -- a COMPLETED session is the thing the
+     * assessment flow actually produces.
      *
      * @param authId The authenticated user's auth (JWT subject) id.
      * @throws ResponseStatusException 404 if no user exists for [authId].

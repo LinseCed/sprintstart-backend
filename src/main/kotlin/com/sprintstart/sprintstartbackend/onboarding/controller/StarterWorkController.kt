@@ -34,8 +34,8 @@ import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
 
 /**
- * Exposes the AI-mined starter-work pool (contribution-node sourcing, Phase 4 #9): PM review of
- * mined tasks, and hire-facing fit ranking of the approved pool.
+ * Exposes the AI-mined starter-work pool (contribution-node sourcing): PM review of mined tasks,
+ * and hire-facing fit ranking of the approved pool.
  */
 @RestController
 @RequestMapping("/api/v1/onboarding/starter-work")

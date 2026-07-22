@@ -13,10 +13,9 @@ import org.springframework.web.server.ResponseStatusException
  * Serves the authenticated user their own durable competency ledger.
  *
  * This is the self-serve equivalent of the PM-only
- * [CompetencyDashboardService.getUserCompetencyStates]: previously a user could only see their path
- * projection, never the ledger it is built from. The ledger is global (a proven skill transfers
- * across projects), so this view is not project-scoped. Every ledger row is returned, including
- * level-0 (placed-but-unknown) rows, so the client decides what to surface.
+ * [CompetencyDashboardService.getUserCompetencyStates]. The ledger is global (a proven skill
+ * transfers across projects), so this view is not project-scoped. Every ledger row is returned,
+ * including level-0 (placed-but-unknown) rows, so the client decides what to surface.
  */
 @Service
 class MyCompetencyService(

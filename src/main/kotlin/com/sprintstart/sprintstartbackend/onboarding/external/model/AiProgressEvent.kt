@@ -4,9 +4,9 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 /**
- * One SSE chunk of an AI generation's live progress — Seam 1 of the live-AI-visibility initiative
- * (tracker #93). The AI service emits these while it works; this backend deserialises them from the
- * upstream stream and relays them to the browser unchanged, persisting the final result on `done`.
+ * One SSE chunk of an AI generation's live progress. The AI service emits these while it works;
+ * this backend deserialises them from the upstream stream and relays them to the browser unchanged,
+ * persisting the final result on `done`.
  *
  * The load-bearing rules (enforced on the AI side, honoured here):
  * * an **`item`** carries a single element that has already cleared its grounding gate — never a

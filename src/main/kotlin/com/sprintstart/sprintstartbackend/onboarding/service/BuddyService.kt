@@ -21,7 +21,7 @@ import java.util.UUID
 
 /**
  * Manages a hire's ongoing onboarding buddy conversation: one continuous [BuddySession] per user,
- * durable across visits, backed by the stateless AI buddy endpoint (Phase 5, ai#6).
+ * durable across visits, backed by the stateless AI buddy endpoint.
  *
  * Mirrors [com.sprintstart.sprintstartbackend.chat.service.ChatService.prompt]'s persist-on-
  * stream-completion shape rather than [VerificationService]/[AssessmentService]'s explicit

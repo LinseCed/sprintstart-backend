@@ -15,9 +15,8 @@ import java.util.UUID
  * A graded check — the gate on a competency.
  *
  * Owned by a [CompetencyModule]: one shared check per module, so two hires proving the same
- * competency are held to the same bar. The per-user step that used to own checks is gone
- * (backend#53); [VerificationAttempt] rows survived that unchanged, because they always pointed at
- * a [Verification] rather than at its owner.
+ * competency are held to the same bar. [VerificationAttempt] rows point at a [Verification] rather
+ * than at its owner, so a check can change owner without touching a single attempt.
  *
  * A module has at most one [Verification] (enforced by the unique constraint), referenced by a
  * plain FK rather than a bidirectional JPA relationship, so this entity can be created/edited

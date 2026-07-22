@@ -136,7 +136,7 @@ class OnboardingAiClient(
         }
 
     /**
-     * Proposes the shared module one competency teaches (#49/ai#19).
+     * Proposes the shared module one competency teaches.
      *
      * Heavyweight/offline, matching [synthesizeLesson]: one retrieval + LLM pass, intended for an
      * authoring action rather than a hire's request path. Nothing about an individual hire is sent
@@ -178,7 +178,7 @@ class OnboardingAiClient(
         }
 
     /**
-     * Assembles the orientation packet for one task from the project's existing material (#73/ai#31).
+     * Assembles the orientation packet for one task from the project's existing material.
      *
      * Unlike [proposeModule] this *is* on a hire's request path â€” it is what somebody reads while
      * doing the task they just picked up â€” which is why the caller caches the result against the
@@ -227,7 +227,7 @@ class OnboardingAiClient(
         }
 
     /**
-     * Grades a free-text answer against a rubric via the AI service's LLM judge (Phase 3, #8).
+     * Grades a free-text answer against a rubric via the AI service's LLM judge.
      *
      * On the learner's request path, unlike [synthesizeLesson] -- called synchronously per
      * verification attempt. Only `knowledge`-type grading is delegated to the AI service;
@@ -270,8 +270,8 @@ class OnboardingAiClient(
         }
 
     /**
-     * Grades a hire-submitted PR's real state against a rubric via the AI service's LLM judge
-     * (Phase 4, #9), the highest-rigor rung of the verification ladder.
+     * Grades a hire-submitted PR's real state against a rubric via the AI service's LLM judge --
+     * the highest-rigor rung of the verification ladder.
      *
      * On the learner's request path, exactly like [gradeKnowledge] -- called synchronously per
      * verification attempt, after the backend has already gathered [evidence] from GitHub itself
@@ -310,7 +310,7 @@ class OnboardingAiClient(
         }
 
     /**
-     * Opens an SSE stream against the AI service's persistent-buddy endpoint (Phase 5, ai#6).
+     * Opens an SSE stream against the AI service's persistent-buddy endpoint.
      *
      * Stateless like every other onboarding endpoint: the caller (backend) owns conversation
      * history and passes the full transcript on every call, same contract as [assessTurn]. Each
@@ -350,7 +350,7 @@ class OnboardingAiClient(
             }
 
     /**
-     * Runs the AI service's batch starter-work mining job over the ingested corpus (Phase 4, #9).
+     * Runs the AI service's batch starter-work mining job over the ingested corpus.
      *
      * The AI service is stateless: [activeSourceIds] (issues already in the backend's pool,
      * proposed or approved) drive dedup, and [activeCompetencyKeys] (the backend's live graph
@@ -382,14 +382,8 @@ class OnboardingAiClient(
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 
-    // `matchHireToPool` used to live here, calling the AI service's /starter-work/match. It is gone
-    // rather than left unused: #74 requires that a hire be told why a task was suggested, and an
-    // embedding tie-break cannot say -- so ranking moved into `StarterWorkMatcher`, which is
-    // deterministic, local and self-explaining. The AI service's /match endpoint now has no caller
-    // and is a candidate for removal in slice 5.
-
     /**
-     * Streams the AI service assembling an orientation packet (live-AI-visibility, #94/ai#36).
+     * Streams the AI service assembling an orientation packet.
      *
      * The streaming twin of [assembleOrientation]: same inputs and same result, but the AI emits
      * [AiProgressEvent]s as it works (a `stage` per retrieval step, an `item` per grounded section,
@@ -417,7 +411,7 @@ class OnboardingAiClient(
         )
 
     /**
-     * Streams the AI service proposing a competency module (live-AI-visibility, #94/ai#36).
+     * Streams the AI service proposing a competency module.
      *
      * The streaming twin of [proposeModule]: the AI emits `stage`/`item`/`warning` events as it
      * writes and grounds pages, and a terminal `done` carrying the outcome the backend persists.
@@ -441,7 +435,7 @@ class OnboardingAiClient(
         )
 
     /**
-     * Streams the AI service proposing competency graph nodes/edges (live-AI-visibility, #95/ai#37).
+     * Streams the AI service proposing competency graph nodes/edges.
      *
      * The streaming twin of [proposeCompetencyGraph]: the AI emits a `stage` per pass, an `item`
      * per grounded competency then per accepted edge, and a terminal `done` carrying the whole
@@ -462,7 +456,7 @@ class OnboardingAiClient(
         )
 
     /**
-     * Streams the AI service mining starter-work candidates (live-AI-visibility, #95/ai#37).
+     * Streams the AI service mining starter-work candidates.
      *
      * The streaming twin of [proposeStarterWork]: the AI emits a `stage` per pass and an `item` per
      * task as it clears the scope-safety judgement, then a terminal `done` carrying the outcome the

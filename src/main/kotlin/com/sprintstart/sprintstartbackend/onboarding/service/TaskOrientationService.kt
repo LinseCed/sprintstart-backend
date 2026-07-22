@@ -55,7 +55,7 @@ import java.util.UUID
  *   evidence at all about staleness — so the last known good packet is still the most honest thing
  *   available, and losing orientation to a flaky call helps nobody.
  * * **Nothing is ever fabricated.** "No packet" is an ordinary returned state carrying the reason —
- *   never an empty packet, never an error (cf. the `fetchStep` mock-fallback bug, frontend#26).
+ *   never an empty packet, never an error.
  *
  * Reading orientation is not a gate and never assigns anything: the hire's current task is read
  * straight from the assignment table rather than through [TaskZeroService.getForHire], which assigns
