@@ -3,17 +3,11 @@ package com.sprintstart.sprintstartbackend.onboarding.external.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Request for the AI service's `POST /api/v1/onboarding/buddy` endpoint. */
-@Serializable
-data class BuddyStreamRequest(
-    val question: String,
-    val history: List<AssessmentHistoryEntrySchema> = emptyList(),
-)
-
 /**
- * One SSE chunk from the AI service's buddy stream -- mirrors `sprintstart-backend`'s own `chat`
- * module's `AiStreamMessage` shape field-for-field, since `/onboarding/buddy` emits the identical
- * `sse_event` vocabulary `/chat` does (`tool_use`/`token`/`citation`/`done`/`error`). Kept as its
+ * One SSE chunk the backend emits to the browser on the buddy stream -- mirrors `sprintstart-backend`'s
+ * own `chat` module's `AiStreamMessage` shape field-for-field, using the same
+ * `sse_event` vocabulary `/chat` does (`tool_use`/`token`/`citation`/`action_proposal`/`done`/`error`).
+ * Kept as its
  * own type in this module rather than reused from `chat` (that module's `AiStreamMessage` is
  * `internal` and this module owns its own AI-contract DTOs, same convention every other
  * `OnboardingAiClient` method follows).
