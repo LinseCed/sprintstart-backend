@@ -20,10 +20,8 @@ import java.util.UUID
 /**
  * A hire's path.
  *
- * There is nothing to create, generate or delete here any more: the path is **derived** on every
- * read from the competency graph, the project's baseline, and the hire's ledger. It used to be a
- * persisted per-user tree that had to be generated and could be thrown away and rebuilt; that tree
- * is gone (backend#53), and with it the whole generate/regenerate dance.
+ * There is nothing to create, generate or delete here: the path is **derived** on every read from
+ * the competency graph, the project's baseline, and the hire's ledger.
  *
  * An empty path is a real answer, not a 404: it means the project's baseline selects nothing
  * visible yet.

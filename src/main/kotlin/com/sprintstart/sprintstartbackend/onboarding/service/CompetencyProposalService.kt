@@ -105,7 +105,7 @@ class CompetencyProposalService(
     }
 
     /**
-     * The streaming twin of [generate] (live-AI-visibility, #95/ai#37).
+     * The streaming twin of [generate].
      *
      * Relays the AI's `stage`/`item` events so a PM watches the graph assemble (each grounded
      * competency then each accepted edge as an `item`), and on the terminal `done` persists the

@@ -10,9 +10,9 @@ import java.util.UUID
 
 /**
  * A hire's ongoing onboarding buddy companion -- one continuous conversation per user, unlike the
- * general-purpose `chat` module's multiple user-created chats. The AI buddy endpoint is stateless
- * (Phase 5, ai#6); this session plus its [BuddyMessage]s is what makes the conversation durable
- * across visits, mirroring how [SkillAssessmentSession] durably backs the stateless interviewer.
+ * general-purpose `chat` module's multiple user-created chats. The AI buddy endpoint is stateless;
+ * this session plus its [BuddyMessage]s is what makes the conversation durable across visits,
+ * mirroring how [SkillAssessmentSession] durably backs the stateless interviewer.
  */
 @Entity
 @Table(

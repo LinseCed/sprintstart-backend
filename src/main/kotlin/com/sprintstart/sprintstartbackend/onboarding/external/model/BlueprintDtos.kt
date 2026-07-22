@@ -25,9 +25,6 @@ data class BaselineCompetencySchema(
 
 /**
  * A baseline as sent to and received from the AI service: scope, version, and the selection.
- *
- * Distinct from [BlueprintSchema], which is the step-shaped payload path generation still
- * consumes. The two converge once the per-user step tree is retired (backend#53).
  */
 @Serializable
 data class BaselineSchema(

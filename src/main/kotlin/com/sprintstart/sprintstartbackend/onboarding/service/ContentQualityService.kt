@@ -10,10 +10,6 @@ import org.springframework.stereotype.Service
  * [com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingFeedback], asks the AI to
  * re-draft that module.
  *
- * The signal only became meaningful when pages became shared. Feedback used to hang off a per-user
- * step, so three hires disliking the same lesson produced three unrelated counts of one, and a
- * regeneration improved exactly one person's copy.
- *
  * The re-draft is a **proposal**, not a replacement: it lands as a new PROPOSED version for a PM to
  * review, and what hires are reading right now is untouched until somebody approves it. Content
  * people are graded against does not get silently rewritten because three of them clicked a thumb.

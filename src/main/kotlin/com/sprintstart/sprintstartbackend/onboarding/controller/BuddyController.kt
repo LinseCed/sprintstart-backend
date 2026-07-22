@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController
 
 /**
  * Exposes the hire's persistent onboarding buddy: one continuous, repo-grounded companion
- * conversation per user (Phase 5, #10/ai#6).
+ * conversation per user.
  */
 @RestController
 @RequestMapping("/api/v1/onboarding/me/buddy")

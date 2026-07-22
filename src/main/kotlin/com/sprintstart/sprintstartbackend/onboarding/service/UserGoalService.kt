@@ -55,8 +55,8 @@ class UserGoalService(
         }
 
         // Resolved through the same deterministic key derivation approval used, never by
-        // matching on label or URL -- a PM can rename a node (#50), and a goal that stopped
-        // resolving because somebody fixed a typo would be a very confusing bug.
+        // matching on label or URL -- a PM can rename a node, and a goal that stopped resolving
+        // because somebody fixed a typo would be a very confusing bug.
         //
         // Approval is what mints the node, so its absence means the graph and the proposal table
         // disagree: claim a goal that isn't a node and the path would silently aim at nothing.

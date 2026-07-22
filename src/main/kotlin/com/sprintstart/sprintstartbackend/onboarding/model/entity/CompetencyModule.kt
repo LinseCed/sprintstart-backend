@@ -19,12 +19,10 @@ import java.util.UUID
  * What a competency teaches: one shared, versioned, PM-authorable module per
  * `(competencyKey, projectId)`.
  *
- * **This is the artifact that did not exist before.** Content used to live on `OnboardingStep`,
- * which hangs off a per-user `OnboardingPath` — so there was no "the module for competency X",
- * only N independently generated private copies, one per hire. A PM editing a node's content was
- * editing one person's copy; two hires learning the same thing got different material; the
- * content-quality loop improved a single hire's lesson. Making the module the shared artifact is
- * what makes authoring, review, and quality work mean anything.
+ * The module is a *shared* artifact, not a per-hire copy: every hire learning competency X in a
+ * project reads the same module, a single PM edit changes it for everyone, and the content-quality
+ * loop improves one shared lesson. That shared identity is what makes authoring, review, and
+ * quality work mean anything.
  *
  * Scoped per project because content is grounded in *that project's* corpus, while the
  * [Competency] itself stays global — so "earn once, transfers across projects" is preserved: the

@@ -21,15 +21,9 @@ import java.util.UUID
 
 /**
  * PM-facing team-wide competency signal, sourced from the durable ledger
- * ([com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState]) rather than
- * step completion.
- *
- * The existing `GET /team-overview` (see
- * [OnboardingPathService][com.sprintstart.sprintstartbackend.onboarding.service.OnboardingPathService])
- * reports `progressPercentage` from `StepStatus.FINISHED`/`SKIPPED`, which conflates a real
- * verified check with an unconfigured step a hire simply marked done -- issue #9 explicitly asks
- * for a signal that isn't that. This service is intentionally standalone (not an extension of
- * `TeamOverviewUserDto`) rather than touching that existing, already-consumed response shape.
+ * ([com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState]): for every
+ * competency, who holds it and at what level, from verified/assessed evidence rather than any
+ * self-reported "marked done" state.
  */
 @Service
 class CompetencyDashboardService(
@@ -68,9 +62,8 @@ class CompetencyDashboardService(
     /**
      * Returns a paginated, per-user breakdown of each user's full competency ledger.
      *
-     * Filtering mirrors [OnboardingPathService.getTeamOverview]'s signature for consistency, but
-     * pagination is delegated straight to [UserApi.searchUsers] -- unlike that method, there is no
-     * computed-field sort to justify fetching every user up front.
+     * Pagination is delegated straight to [UserApi.searchUsers] -- there is no computed-field sort
+     * that would force fetching every user up front.
      */
     @Transactional(readOnly = true)
     fun getUserCompetencySummaries(
@@ -116,7 +109,7 @@ class CompetencyDashboardService(
 
     /**
      * Returns one user's full competency ledger, labeled -- the per-member view the PM member
-     * detail page shows now that the legacy self-reported skill assessments are retired.
+     * detail page shows.
      *
      * @throws ResponseStatusException 404 if no user matches [userId].
      */

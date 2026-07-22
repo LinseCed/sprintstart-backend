@@ -7,10 +7,10 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
  *
  * **Deterministic and pure, on purpose.** The previous ranking delegated to the AI service, which
  * scored competency-key overlap and broke ties on embeddings. Two things were wrong with that:
- * competency overlap was the *whole* score, and an embedding distance cannot explain itself. #74
- * requires that a hire can be told in one line why a task was suggested — a suggestion you cannot
- * interrogate is an instruction — and an explanation reconstructed after the fact from a score
- * nobody can see is a rationalisation. So each signal contributes both points *and* the sentence
+ * competency overlap was the *whole* score, and an embedding distance cannot explain itself. A
+ * hire must be told in one line why a task was suggested — a suggestion you cannot interrogate is
+ * an instruction — and an explanation reconstructed after the fact from a score nobody can see is
+ * a rationalisation. So each signal contributes both points *and* the sentence
  * justifying them, and the same inputs always give the same ranking.
  *
  * The signal set follows R7 (first issues a newcomer resolves cluster by task type, language and
