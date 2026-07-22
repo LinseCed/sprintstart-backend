@@ -10,9 +10,9 @@ class JiraConnector(
     private val service: JiraService,
 ) : IConnector {
     override val id: String
-        get() = TODO("Not yet implemented")
+        get() = "jira"
     override val displayName: String
-        get() = TODO("Not yet implemented")
+        get() = "Jira Connector"
 
     override fun getSources(): List<ConnectorSource> {
         TODO("Not yet implemented")
