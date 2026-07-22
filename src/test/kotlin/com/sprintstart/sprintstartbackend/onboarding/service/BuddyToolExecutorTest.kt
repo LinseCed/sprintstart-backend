@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySo
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
@@ -14,6 +15,8 @@ import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -23,11 +26,13 @@ class BuddyToolExecutorTest {
     private val onboardingMetricsService: OnboardingMetricsService = mockk()
     private val myCompetencyService: MyCompetencyService = mockk()
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService = mockk()
+    private val knowledgeBaseService: KnowledgeBaseService = mockk()
     private val userApi: UserApi = mockk()
     private val executor = BuddyToolExecutor(
         onboardingMetricsService,
         myCompetencyService,
         starterWorkTaskProposalService,
+        knowledgeBaseService,
         userApi,
     )
 
@@ -36,6 +41,11 @@ class BuddyToolExecutorTest {
     private val metricsCall = BuddyToolCallDto(id = "c0", name = "get_my_metrics")
     private val competenciesCall = BuddyToolCallDto(id = "c0", name = "get_my_competencies")
     private val suggestedTasksCall = BuddyToolCallDto(id = "c0", name = "get_suggested_tasks")
+    private fun canonicalSearchCall(query: String) = BuddyToolCallDto(
+        id = "c0",
+        name = "search_canonical_answers",
+        arguments = buildJsonObject { put("query", query) },
+    )
 
     private fun userWith(vararg projects: ProjectDto) = UserDto(
         id = userId,
@@ -112,8 +122,38 @@ class BuddyToolExecutorTest {
 
     @Test
     fun `exposes the caller-scoped hire-state tools`() {
-        assertThat(executor.toolSpecs().map { it.name })
-            .containsExactly("get_my_metrics", "get_my_competencies", "get_suggested_tasks")
+        assertThat(executor.toolSpecs().map { it.name }).containsExactly(
+            "get_my_metrics",
+            "get_my_competencies",
+            "get_suggested_tasks",
+            "search_canonical_answers",
+        )
+    }
+
+    @Test
+    fun `serves a teammate's canonical answer faithfully`() {
+        every { knowledgeBaseService.searchForUser(userId, "how do we deploy") } returns listOf(
+            CanonicalAnswer(
+                projectId = projectId,
+                question = "How do we deploy?",
+                answer = "Run ./deploy.sh from main after CI is green.",
+                authorId = UUID.randomUUID(),
+            ),
+        )
+
+        val result = executor.execute(canonicalSearchCall("how do we deploy"), userId)
+
+        assertThat(result).contains("How do we deploy?")
+        assertThat(result).contains("Run ./deploy.sh from main after CI is green.")
+    }
+
+    @Test
+    fun `reports no canonical answer so the buddy knows to suggest escalation`() {
+        every { knowledgeBaseService.searchForUser(userId, "obscure thing") } returns emptyList()
+
+        val result = executor.execute(canonicalSearchCall("obscure thing"), userId)
+
+        assertThat(result).contains("No teammate has answered")
     }
 
     @Test
