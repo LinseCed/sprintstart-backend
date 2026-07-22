@@ -154,8 +154,12 @@ class OnboardingMetricsService(
         firstMergedAt: Instant?,
         now: Instant,
     ): String? {
+        // A missing GitHub username is an optional setup item, not a stall: onboarding must not be
+        // blocked on it. It also means we cannot attribute this hire's pull requests at all, so we
+        // have no basis to judge progress — the "no pull request opened" check below would fire
+        // falsely on work we simply cannot see. Treat it as "unknown, not stalled".
         if (member.githubLogin.isNullOrBlank()) {
-            return "No GitHub username on record, so none of their work can be attributed"
+            return null
         }
 
         val waitingSince = pullRequests
