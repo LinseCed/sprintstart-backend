@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
+import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
@@ -30,6 +32,7 @@ class BuddyToolExecutorTest {
     private val knowledgeBaseService: KnowledgeBaseService = mockk()
     private val userApi: UserApi = mockk()
     private val buddyPlanTools: BuddyPlanTools = mockk(relaxed = true)
+    private val artifactIngestionApi: ArtifactIngestionApi = mockk()
     private val executor = BuddyToolExecutor(
         onboardingMetricsService,
         myCompetencyService,
@@ -37,13 +40,32 @@ class BuddyToolExecutorTest {
         knowledgeBaseService,
         userApi,
         buddyPlanTools,
+        artifactIngestionApi,
     )
 
     private val userId = UUID.randomUUID()
     private val projectId = UUID.randomUUID()
     private val metricsCall = BuddyToolCallDto(id = "c0", name = "get_my_metrics")
     private val competenciesCall = BuddyToolCallDto(id = "c0", name = "get_my_competencies")
+    private val openPullRequestsCall = BuddyToolCallDto(id = "c0", name = "get_my_open_pull_requests")
     private val suggestedTasksCall = BuddyToolCallDto(id = "c0", name = "get_suggested_tasks")
+
+    private fun openPullRequest(
+        number: Int?,
+        title: String?,
+        openedHoursAgo: Long?,
+        firstResponseAt: Instant? = null,
+        sourceUrl: String? = null,
+    ) = AuthoredPullRequest(
+        artifactId = UUID.randomUUID(),
+        openedAt = openedHoursAgo?.let { Instant.now().minusSeconds(it * 3600) },
+        firstResponseAt = firstResponseAt,
+        mergedAt = null,
+        state = "OPEN",
+        number = number,
+        title = title,
+        sourceUrl = sourceUrl,
+    )
 
     private fun canonicalSearchCall(query: String) = BuddyToolCallDto(
         id = "c0",
@@ -131,9 +153,76 @@ class BuddyToolExecutorTest {
         assertThat(executor.toolSpecs().map { it.name }).containsExactly(
             "get_my_metrics",
             "get_my_competencies",
+            "get_my_open_pull_requests",
             "get_suggested_tasks",
             "search_canonical_answers",
         )
+    }
+
+    @Test
+    fun `names the hire's open pull requests, longest wait first, with links`() {
+        every { userApi.getGithubLoginByUserId(userId) } returns "sam"
+        every { userApi.getUsersByIds(listOf(userId)) } returns
+            listOf(userWith(ProjectDto(projectId, "Checkout", null)))
+        every { artifactIngestionApi.getAuthoredPullRequests(projectId, "sam") } returns listOf(
+            openPullRequest(
+                number = 128,
+                title = "Add null-reviewer guard",
+                openedHoursAgo = 10,
+                sourceUrl = "https://example.test/pull/128",
+            ),
+            openPullRequest(number = 141, title = "Diff scoring", openedHoursAgo = 1514),
+        )
+
+        val result = executor.execute(openPullRequestsCall, userId)
+
+        assertThat(result).contains("#128 Add null-reviewer guard")
+        assertThat(result).contains("#141 Diff scoring")
+        assertThat(result).contains("https://example.test/pull/128")
+        assertThat(result).contains("waiting 1514 hours for a first review")
+        // Longest-waiting (the 1514h one) is listed before the 10h one.
+        assertThat(result.indexOf("#141")).isLessThan(result.indexOf("#128"))
+    }
+
+    @Test
+    fun `does not call a pull request answered by someone as still waiting`() {
+        every { userApi.getGithubLoginByUserId(userId) } returns "sam"
+        every { userApi.getUsersByIds(listOf(userId)) } returns
+            listOf(userWith(ProjectDto(projectId, "Checkout", null)))
+        every { artifactIngestionApi.getAuthoredPullRequests(projectId, "sam") } returns listOf(
+            openPullRequest(
+                number = 128,
+                title = "Add null-reviewer guard",
+                openedHoursAgo = 50,
+                firstResponseAt = Instant.now(),
+            ),
+        )
+
+        val result = executor.execute(openPullRequestsCall, userId)
+
+        assertThat(result).contains("#128 Add null-reviewer guard")
+        assertThat(result).doesNotContain("waiting")
+    }
+
+    @Test
+    fun `asks for a GitHub username before it can list pull requests`() {
+        every { userApi.getGithubLoginByUserId(userId) } returns null
+
+        val result = executor.execute(openPullRequestsCall, userId)
+
+        assertThat(result).contains("GitHub username")
+    }
+
+    @Test
+    fun `says plainly when there are no open pull requests`() {
+        every { userApi.getGithubLoginByUserId(userId) } returns "sam"
+        every { userApi.getUsersByIds(listOf(userId)) } returns
+            listOf(userWith(ProjectDto(projectId, "Checkout", null)))
+        every { artifactIngestionApi.getAuthoredPullRequests(projectId, "sam") } returns emptyList()
+
+        val result = executor.execute(openPullRequestsCall, userId)
+
+        assertThat(result).contains("no open pull requests")
     }
 
     @Test
