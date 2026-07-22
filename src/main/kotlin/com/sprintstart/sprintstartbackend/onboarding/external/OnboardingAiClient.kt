@@ -6,14 +6,11 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveEdgeSc
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ArtifactEvidenceDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssembleOrientationRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentHistoryEntrySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BaselineSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateCompetencyGraphRequest
@@ -30,7 +27,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.Onboarding
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.net.URI
@@ -335,32 +331,6 @@ class OnboardingAiClient(
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 
-    fun streamBuddy(
-        question: String,
-        history: List<AssessmentHistoryEntrySchema> = emptyList(),
-    ): Flow<BuddyStreamEvent> =
-        webClient
-            .post()
-            .uri(uri("/api/v1/onboarding/buddy"))
-            .body(BuddyStreamRequest(question = question, history = history))
-            .stream()
-            .perform<BuddyStreamEvent>(
-                terminationMarkers = setOf("[DONE]"),
-                onChunkError = { raw, err ->
-                    logger.warn("Skipping malformed SSE chunk '{}': {}", raw, err.message)
-                    true
-                },
-            ).map { chunk ->
-                if (chunk.type == "error") {
-                    throw OnboardingAiException(
-                        BUDDY_STREAM_ERROR_STATUS,
-                        chunk.message ?: "",
-                        "AI buddy responded with error: ${chunk.message}",
-                    )
-                }
-                chunk
-            }
-
     /**
      * Runs the AI service's batch starter-work mining job over the ingested corpus.
      *
@@ -508,8 +478,4 @@ class OnboardingAiClient(
 
     /** Builds an absolute URI for [path] against the configured AI service base URL. */
     private fun uri(path: String): URI = URI.create("${applicationConfig.ai.baseUrl}$path")
-
-    private companion object {
-        const val BUDDY_STREAM_ERROR_STATUS = 502
-    }
 }
