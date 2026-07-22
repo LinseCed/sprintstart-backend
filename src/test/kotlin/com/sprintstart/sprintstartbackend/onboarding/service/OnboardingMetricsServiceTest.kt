@@ -141,20 +141,18 @@ class OnboardingMetricsServiceTest {
     @Nested
     inner class Attribution {
         @Test
-        fun `a member with no GitHub login is flagged, not reported as inactive`() {
+        fun `a member with no GitHub login is counted as unattributable, but not stalled`() {
+            // A missing GitHub username is an optional setup item, not a stall — onboarding is not
+            // blocked on it. It is still surfaced separately via unattributableMemberCount so a PM
+            // can see whose work cannot be measured, without calling the hire stuck.
             every { projectMembershipApi.getProjectMembers(projectId) } returns listOf(member(login = null))
             every { userGoalRepository.findByUserIdAndProjectId(any(), projectId) } returns null
 
             val metrics = service.getProjectMetrics(projectId)
 
             assertEquals(1, metrics.unattributableMemberCount)
-            assertTrue(metrics.hires.single().stalled)
-            assertTrue(
-                metrics.hires
-                    .single()
-                    .stalledReason!!
-                    .contains("GitHub username"),
-            )
+            assertFalse(metrics.hires.single().stalled)
+            assertNull(metrics.hires.single().stalledReason)
         }
     }
 
