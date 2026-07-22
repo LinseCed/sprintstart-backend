@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.RejectProposalRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.ClaimGoalRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
@@ -15,7 +16,9 @@ import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import kotlinx.coroutines.flow.Flow
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
@@ -67,6 +70,32 @@ class StarterWorkController(
     @PostMapping("/generate")
     @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
     suspend fun generate(): GenerateStarterWorkResponse = starterWorkTaskProposalService.generate()
+
+    /**
+     * The streaming twin of [generate]: watch the starter-work pool fill one task at a time.
+     *
+     * Same mining and same stored pool as `POST /generate`, streamed as Server-Sent Events so a PM
+     * sees each task land as it clears the scope-safety judgement, with a terminal `done` once the
+     * proposals are stored. The stream is a view — a client reloads the proposal queue on `done`.
+     */
+    @Operation(
+        summary = "Watch starter-work tasks being mined (streaming)",
+        description = "The same mining as `POST /generate`, streamed as Server-Sent Events so a PM can " +
+            "watch the pool fill: a `stage` per pass, an `item` per task as it clears scope safety, and " +
+            "a terminal `done` once the proposals are stored. The stored pool is identical to the " +
+            "non-streaming path.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Progress stream started"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/generate/stream", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
+    suspend fun streamGenerate(): Flow<AiProgressEvent> = starterWorkTaskProposalService.streamGenerate()
 
     /**
      * Creates a hand-authored starter-work task, with no AI mining in the loop.

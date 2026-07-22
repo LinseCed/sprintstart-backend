@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompetencySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveEdgeSchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GraphProposalOutcome
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdgeProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyProposal
@@ -22,7 +23,12 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRe
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -51,6 +57,7 @@ import java.util.UUID
  * Not solved here -- documented rather than silently worked around.
  */
 @Service
+@Suppress("TooManyFunctions")
 class CompetencyProposalService(
     private val onboardingAiClient: OnboardingAiClient,
     private val competencyRepository: CompetencyRepository,
@@ -58,6 +65,7 @@ class CompetencyProposalService(
     private val competencyProposalRepository: CompetencyProposalRepository,
     private val competencyEdgeProposalRepository: CompetencyEdgeProposalRepository,
     private val competencyGraphVersionService: CompetencyGraphVersionService,
+    private val json: Json,
     transactionManager: PlatformTransactionManager,
 ) {
     // The AI call is a long-running suspend operation, so it must not run inside a
@@ -85,22 +93,75 @@ class CompetencyProposalService(
             activeEdges = activeEdges,
             lastFingerprint = lastFingerprint,
         )
-        withContext(Dispatchers.IO) {
-            txTemplate.executeWithoutResult {
-                persistProposals(outcome)
-            }
+        val persisted = withContext(Dispatchers.IO) {
+            txTemplate.execute { persistProposals(outcome) }!!
         }
         return GenerateCompetencyGraphResponse(
             status = outcome.status,
-            competenciesProposed = outcome.competencies.size,
-            edgesProposed = outcome.edges.size,
-            notes = outcome.notes,
+            competenciesProposed = persisted.competenciesPersisted,
+            edgesProposed = persisted.edgesPersisted,
+            notes = outcome.notes + persisted.skipped,
         )
     }
 
-    private fun persistProposals(outcome: GraphProposalOutcome) {
+    /**
+     * The streaming twin of [generate] (live-AI-visibility, #95/ai#37).
+     *
+     * Relays the AI's `stage`/`item` events so a PM watches the graph assemble (each grounded
+     * competency then each accepted edge as an `item`), and on the terminal `done` persists the
+     * proposals through the very same [persistProposals] the sync path uses — so the stored result
+     * equals the non-streaming path (invariant 2). An item the backend re-gates away on persist
+     * (already a live node/edge) is announced as a `warning` before the `done`, never silently
+     * dropped (invariant 1). A stream failure becomes a synthesised terminal `error`.
+     */
+    suspend fun streamGenerate(): Flow<AiProgressEvent> {
+        val active = withContext(Dispatchers.IO) { readTxTemplate.execute { loadActiveState() }!! }
+        return flow {
+            onboardingAiClient
+                .streamCompetencyGraph(
+                    activeCompetencies = active.competencies,
+                    activeEdges = active.edges,
+                    lastFingerprint = active.lastFingerprint,
+                ).collect { event ->
+                    if (event.type == AiProgressEvent.DONE) {
+                        decodeOutcome(event)?.let { outcome ->
+                            val persisted = withContext(Dispatchers.IO) {
+                                txTemplate.execute { persistProposals(outcome) }!!
+                            }
+                            persisted.skipped.forEach { emit(AiProgressEvent.warning(GRAPH, it)) }
+                        }
+                    }
+                    emit(event)
+                }
+        }.catch { cause ->
+            logger.warn("Competency graph proposal stream failed: {}", cause.message)
+            emit(AiProgressEvent.error(GRAPH, "Competency graph generation is temporarily unavailable"))
+        }
+    }
+
+    private fun decodeOutcome(event: AiProgressEvent): GraphProposalOutcome? =
+        event.result?.let {
+            runCatching { json.decodeFromJsonElement<GraphProposalOutcome>(it) }
+                .onFailure { e -> logger.warn("Could not decode streamed graph result: {}", e.message) }
+                .getOrNull()
+        }
+
+    /**
+     * Persists the outcome's competencies/edges as PROPOSED rows, re-applying the backend's own
+     * gate: an element already present in the *live* graph is not re-proposed (the AI dedupes
+     * against the active graph the caller sends, but this is the authoritative check at write time).
+     * Returns how many of each landed and a human note per skipped element, so the streaming path
+     * can surface each skip as a `warning`.
+     */
+    private fun persistProposals(outcome: GraphProposalOutcome): PersistResult {
         val fingerprint = outcome.provenance?.corpusFingerprint
+        val skipped = mutableListOf<String>()
+        var competencies = 0
         outcome.competencies.forEach { proposed ->
+            if (competencyRepository.existsByKey(proposed.key)) {
+                skipped.add("${proposed.label} (${proposed.key}) is already in the graph — not re-proposed")
+                return@forEach
+            }
             competencyProposalRepository.save(
                 CompetencyProposal(
                     key = proposed.key,
@@ -111,19 +172,34 @@ class CompetencyProposalService(
                     corpusFingerprint = fingerprint,
                 ),
             )
+            competencies++
         }
+        var edges = 0
         outcome.edges.forEach { proposed ->
+            val kind = EdgeKind.valueOf(proposed.kind)
+            if (competencyEdgeRepository.existsByFromKeyAndToKeyAndKind(proposed.fromKey, proposed.toKey, kind)) {
+                skipped.add("${proposed.fromKey} → ${proposed.toKey} is already in the graph — not re-proposed")
+                return@forEach
+            }
             competencyEdgeProposalRepository.save(
                 CompetencyEdgeProposal(
                     fromKey = proposed.fromKey,
                     toKey = proposed.toKey,
-                    kind = EdgeKind.valueOf(proposed.kind),
+                    kind = kind,
                     rationale = proposed.rationale.takeIf { it.isNotBlank() },
                     corpusFingerprint = fingerprint,
                 ),
             )
+            edges++
         }
+        return PersistResult(competencies, edges, skipped)
     }
+
+    private data class PersistResult(
+        val competenciesPersisted: Int,
+        val edgesPersisted: Int,
+        val skipped: List<String>,
+    )
 
     private data class ActiveState(
         val competencies: List<ActiveCompetencySchema>,
@@ -316,5 +392,10 @@ class CompetencyProposalService(
             )
         }
         return proposal
+    }
+
+    private companion object {
+        // Matches the AI service's operation name and the frontend consumer's switch.
+        const val GRAPH = "competency_graph"
     }
 }

@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.ApproveGraphBatchRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.RejectProposalRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.ApproveGraphBatchResponse
@@ -13,7 +14,9 @@ import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import kotlinx.coroutines.flow.Flow
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -57,6 +60,33 @@ class CompetencyGraphProposalController(
     suspend fun generate(): GenerateCompetencyGraphResponse {
         return competencyProposalService.generate()
     }
+
+    /**
+     * The streaming twin of [generate]: watch the graph assemble node-by-node then edge-by-edge.
+     *
+     * Same generation and same stored proposals as `POST /generate`, streamed as Server-Sent
+     * Events so a PM sees each grounded competency and accepted edge land as it clears its gate,
+     * with a terminal `done` once the proposals are stored. The stream is a view — a client
+     * reloads the proposal queue on `done`.
+     */
+    @Operation(
+        summary = "Watch competency graph proposals being generated (streaming)",
+        description = "The same generation as `POST /generate`, streamed as Server-Sent Events so a PM " +
+            "can watch the graph assemble: a `stage` per pass, an `item` per grounded competency then " +
+            "per accepted edge, and a terminal `done` once the proposals are stored. The stored " +
+            "proposals are identical to the non-streaming path.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Progress stream started"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/generate/stream", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
+    suspend fun streamGenerate(): Flow<AiProgressEvent> = competencyProposalService.streamGenerate()
 
     /**
      * Lists the competencies and edges currently awaiting PM review.

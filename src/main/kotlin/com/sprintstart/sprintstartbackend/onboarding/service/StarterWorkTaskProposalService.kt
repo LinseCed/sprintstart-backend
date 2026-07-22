@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKi
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
@@ -22,7 +23,13 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskP
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
@@ -54,6 +61,7 @@ class StarterWorkTaskProposalService(
     private val githubHistoryPriorService: GithubHistoryPriorService,
     private val artifactIngestionApi: ArtifactIngestionApi,
     private val userApi: UserApi,
+    private val json: Json,
     transactionManager: PlatformTransactionManager,
 ) {
     // The AI call is a long-running suspend operation, so it must not run inside a
@@ -61,6 +69,7 @@ class StarterWorkTaskProposalService(
     // reasoning as CompetencyProposalService.
     private val txTemplate = TransactionTemplate(transactionManager)
     private val readTxTemplate = TransactionTemplate(transactionManager).apply { isReadOnly = true }
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
      * Triggers AI starter-work mining and persists the results as PROPOSED.
@@ -80,15 +89,55 @@ class StarterWorkTaskProposalService(
             activeSourceIds = activeSourceIds,
             activeCompetencyKeys = activeCompetencyKeys,
         )
-        withContext(Dispatchers.IO) {
-            txTemplate.executeWithoutResult { persistProposals(outcome) }
+        val persisted = withContext(Dispatchers.IO) {
+            txTemplate.execute { persistProposals(outcome) }!!
         }
         return GenerateStarterWorkResponse(
             status = outcome.status,
-            tasksProposed = outcome.tasks.size,
-            notes = outcome.notes,
+            tasksProposed = persisted.tasksPersisted,
+            notes = outcome.notes + persisted.skipped,
         )
     }
+
+    /**
+     * The streaming twin of [generate] (live-AI-visibility, #95/ai#37).
+     *
+     * Relays the AI's `stage`/`item` events so a PM watches the pool fill one task at a time, and
+     * on the terminal `done` persists the tasks through the very same [persistProposals] the sync
+     * path uses — so the stored pool equals the non-streaming path (invariant 2). A task the backend
+     * re-gates away on persist (already pooled) is announced as a `warning` before the `done`, never
+     * silently dropped (invariant 1). A stream failure becomes a synthesised terminal `error`.
+     */
+    suspend fun streamGenerate(): Flow<AiProgressEvent> {
+        val active = withContext(Dispatchers.IO) { readTxTemplate.execute { loadActiveState() }!! }
+        return flow {
+            onboardingAiClient
+                .streamStarterWork(
+                    activeSourceIds = active.sourceIds,
+                    activeCompetencyKeys = active.competencyKeys,
+                ).collect { event ->
+                    if (event.type == AiProgressEvent.DONE) {
+                        decodeOutcome(event)?.let { outcome ->
+                            val persisted = withContext(Dispatchers.IO) {
+                                txTemplate.execute { persistProposals(outcome) }!!
+                            }
+                            persisted.skipped.forEach { emit(AiProgressEvent.warning(STARTER_WORK, it)) }
+                        }
+                    }
+                    emit(event)
+                }
+        }.catch { cause ->
+            logger.warn("Starter-work mining stream failed: {}", cause.message)
+            emit(AiProgressEvent.error(STARTER_WORK, "Starter-work mining is temporarily unavailable"))
+        }
+    }
+
+    private fun decodeOutcome(event: AiProgressEvent): StarterWorkOutcome? =
+        event.result?.let {
+            runCatching { json.decodeFromJsonElement<StarterWorkOutcome>(it) }
+                .onFailure { e -> logger.warn("Could not decode streamed starter-work result: {}", e.message) }
+                .getOrNull()
+        }
 
     private data class ActiveState(
         val sourceIds: List<String>,
@@ -103,8 +152,26 @@ class StarterWorkTaskProposalService(
         return ActiveState(sourceIds, competencyKeys)
     }
 
-    private fun persistProposals(outcome: StarterWorkOutcome) {
+    /**
+     * Persists the outcome's tasks as PROPOSED rows, re-applying the backend's own gate: a task
+     * whose issue is already in the pool (PROPOSED or APPROVED) is not re-proposed. The AI dedupes
+     * against the active pool the caller sends, but this is the authoritative check at write time —
+     * and it closes the window where a second mining run before a PM decides could double-pool an
+     * issue. Returns how many landed and a human note per skipped task, so the streaming path can
+     * surface each skip as a `warning`.
+     */
+    private fun persistProposals(outcome: StarterWorkOutcome): PersistResult {
+        val alreadyPooled = starterWorkTaskProposalRepository
+            .findAllByStatusIn(listOf(ProposalStatus.PROPOSED, ProposalStatus.APPROVED))
+            .map { it.sourceId }
+            .toMutableSet()
+        val skipped = mutableListOf<String>()
+        var tasks = 0
         outcome.tasks.forEach { proposed ->
+            if (!alreadyPooled.add(proposed.sourceId)) {
+                skipped.add("\"${proposed.title}\" is already in the pool — not re-proposed")
+                return@forEach
+            }
             starterWorkTaskProposalRepository.save(
                 StarterWorkTaskProposal(
                     sourceId = proposed.sourceId,
@@ -115,8 +182,15 @@ class StarterWorkTaskProposalService(
                     competencyKeys = proposed.competencyKeys.toMutableList(),
                 ),
             )
+            tasks++
         }
+        return PersistResult(tasks, skipped)
     }
+
+    private data class PersistResult(
+        val tasksPersisted: Int,
+        val skipped: List<String>,
+    )
 
     /**
      * Returns the starter-work tasks currently awaiting PM review.
@@ -373,6 +447,9 @@ class StarterWorkTaskProposalService(
         sourceId.split(':').getOrNull(1)?.takeIf { it.contains('/') }
 
     companion object {
+        // Matches the AI service's operation name and the frontend consumer's switch.
+        private const val STARTER_WORK = "starter_work"
+
         /** Namespaces used by `GithubHistoryPrior.signals`; see that entity's docs. */
         private const val REPO_SIGNAL_PREFIX = "repo:"
         private const val LABEL_SIGNAL_PREFIX = "label:"

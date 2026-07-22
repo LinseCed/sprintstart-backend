@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.ApproveGraphBatchResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyProposalResponse
@@ -13,7 +14,9 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.C
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.ProposedCompetencyGraphResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyGraphAuthoringService
 import com.sprintstart.sprintstartbackend.onboarding.service.CompetencyProposalService
+import io.mockk.coEvery
 import io.mockk.every
+import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -25,11 +28,14 @@ import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.request
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.util.UUID
+import kotlin.test.assertTrue
 
 @WebMvcTest(CompetencyGraphProposalController::class)
 @Import(SecurityConfig::class)
@@ -99,6 +105,45 @@ class CompetencyGraphProposalControllerTest(
         mockMvc
             .perform(post("/api/v1/onboarding/competency-graph/generate"))
             .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `streamGenerate should return 403 for a plain USER`() {
+        // A suspend + @PreAuthorize handler dispatches async, so the role denial is only observable
+        // after asyncDispatch — a single-step .andExpect would silently see the pre-auth 200.
+        val async = mockMvc
+            .perform(post("/api/v1/onboarding/competency-graph/generate/stream").with(userJwt))
+            .andExpect(request().asyncStarted())
+            .andReturn()
+
+        mockMvc
+            .perform(asyncDispatch(async))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `streamGenerate streams progress events for a PM`() {
+        coEvery { competencyProposalService.streamGenerate() } returns
+            flowOf(
+                AiProgressEvent(type = "stage", operation = "competency_graph", stage = "retrieving", label = "…"),
+                AiProgressEvent(type = "item", operation = "competency_graph", label = "Competency: Kotlin"),
+                AiProgressEvent(type = "done", operation = "competency_graph", label = "Proposed 1"),
+            )
+
+        val async = mockMvc
+            .perform(post("/api/v1/onboarding/competency-graph/generate/stream").with(pmJwt))
+            .andExpect(request().asyncStarted())
+            .andReturn()
+
+        val body = mockMvc
+            .perform(asyncDispatch(async))
+            .andExpect(status().isOk)
+            .andReturn()
+            .response
+            .contentAsString
+
+        assertTrue(body.contains("\"type\":\"item\""))
+        assertTrue(body.contains("\"type\":\"done\""))
     }
 
     @Test
