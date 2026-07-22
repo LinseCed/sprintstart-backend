@@ -344,6 +344,21 @@ class StarterWorkTaskProposalService(
         val userId = userApi.getUserIdByAuthId(authId).orElseThrow {
             ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId")
         }
+        return matchForUserId(userId, projectId)
+    }
+
+    /**
+     * Ranks the current (APPROVED) starter-work pool by fit for an already-resolved user on a
+     * project.
+     *
+     * The user-id counterpart of [matchForUser], for callers that hold a user id rather than an auth
+     * subject (e.g. the buddy agent ranking tasks for the caller).
+     *
+     * @param userId Internal SprintStart user identifier.
+     * @param projectId The project whose responsiveness/involvement signals score the pool.
+     */
+    @Transactional(readOnly = true)
+    fun matchForUserId(userId: UUID, projectId: UUID): List<RankedStarterWorkTaskResponse> {
         val pool = starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED)
         if (pool.isEmpty()) return emptyList()
 
