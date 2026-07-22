@@ -33,6 +33,7 @@ data class AiProgressEvent(
     companion object {
         const val DONE = "done"
         const val ERROR = "error"
+        const val WARNING = "warning"
 
         /** A terminal success the backend synthesises when there is nothing to stream from the AI. */
         fun done(operation: String, label: String): AiProgressEvent =
@@ -41,5 +42,13 @@ data class AiProgressEvent(
         /** A terminal failure the backend synthesises when the AI stream could not be served. */
         fun error(operation: String, message: String): AiProgressEvent =
             AiProgressEvent(type = ERROR, operation = operation, label = message, message = message)
+
+        /**
+         * An advisory the backend synthesises when an item it showed live is rejected on persist —
+         * so a validated item that fails the backend's own gate (dedupe, existing-node check) never
+         * silently vanishes from the watcher's view (invariant 1, held end-to-end).
+         */
+        fun warning(operation: String, message: String): AiProgressEvent =
+            AiProgressEvent(type = WARNING, operation = operation, label = message, message = message)
     }
 }

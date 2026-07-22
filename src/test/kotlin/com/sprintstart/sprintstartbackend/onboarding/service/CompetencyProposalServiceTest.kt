@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKi
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompetencySchema
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GraphProposalOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GraphProvenanceSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedCompetencySchema
@@ -24,7 +25,12 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -43,6 +49,7 @@ class CompetencyProposalServiceTest {
     private val competencyProposalRepository: CompetencyProposalRepository = mockk()
     private val competencyEdgeProposalRepository: CompetencyEdgeProposalRepository = mockk()
     private val competencyGraphVersionService: CompetencyGraphVersionService = mockk(relaxed = true)
+    private val json: Json = Json { ignoreUnknownKeys = true }
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
     private val service = CompetencyProposalService(
         onboardingAiClient,
@@ -51,6 +58,7 @@ class CompetencyProposalServiceTest {
         competencyProposalRepository,
         competencyEdgeProposalRepository,
         competencyGraphVersionService,
+        json,
         transactionManager,
     )
 
@@ -62,6 +70,8 @@ class CompetencyProposalServiceTest {
             every { competencyEdgeRepository.findAll() } returns emptyList()
             every { competencyProposalRepository.findTopByOrderByCreatedAtDesc() } returns null
             every { competencyEdgeProposalRepository.findTopByOrderByCreatedAtDesc() } returns null
+            every { competencyRepository.existsByKey(any()) } returns false
+            every { competencyEdgeRepository.existsByFromKeyAndToKeyAndKind(any(), any(), any()) } returns false
             coEvery { onboardingAiClient.proposeCompetencyGraph(any(), any(), any()) } returns
                 GraphProposalOutcome(
                     status = "proposed",
@@ -109,6 +119,79 @@ class CompetencyProposalServiceTest {
             service.generate()
 
             assertEquals(listOf("git"), activeSlot.captured.map { it.key })
+        }
+    }
+
+    @Nested
+    inner class StreamGenerate {
+        private fun stubActiveState() {
+            every { competencyRepository.findAll() } returns emptyList()
+            every { competencyEdgeRepository.findAll() } returns emptyList()
+            every { competencyProposalRepository.findTopByOrderByCreatedAtDesc() } returns null
+            every { competencyEdgeProposalRepository.findTopByOrderByCreatedAtDesc() } returns null
+        }
+
+        private fun proposedOutcome() = GraphProposalOutcome(
+            status = "proposed",
+            competencies = listOf(ProposedCompetencySchema(key = "kotlin", label = "Kotlin", kind = "SKILL")),
+            edges = listOf(ProposedEdgeSchema(fromKey = "kotlin", toKey = "git", rationale = "needed")),
+            provenance = GraphProvenanceSchema(corpusFingerprint = "fp-1"),
+        )
+
+        private fun doneEvent(outcome: GraphProposalOutcome) = AiProgressEvent(
+            type = "done",
+            operation = "competency_graph",
+            result = json.encodeToJsonElement(outcome),
+        )
+
+        @Test
+        fun `relays the events and persists the proposals on done`() = runTest {
+            stubActiveState()
+            every { competencyRepository.existsByKey(any()) } returns false
+            every { competencyEdgeRepository.existsByFromKeyAndToKeyAndKind(any(), any(), any()) } returns false
+            every { competencyProposalRepository.save(any()) } answers { firstArg() }
+            every { competencyEdgeProposalRepository.save(any()) } answers { firstArg() }
+            every { onboardingAiClient.streamCompetencyGraph(any(), any(), any()) } returns flowOf(
+                AiProgressEvent(type = "stage", operation = "competency_graph", stage = "retrieving", label = "…"),
+                AiProgressEvent(type = "item", operation = "competency_graph", label = "Competency: Kotlin"),
+                doneEvent(proposedOutcome()),
+            )
+
+            val events = service.streamGenerate().toList()
+
+            assertEquals(listOf("stage", "item", "done"), events.map { it.type })
+            verify(exactly = 1) { competencyProposalRepository.save(any()) }
+            verify(exactly = 1) { competencyEdgeProposalRepository.save(any()) }
+        }
+
+        @Test
+        fun `an item re-gated away on persist becomes a warning before the done`() = runTest {
+            stubActiveState()
+            // The competency is already live -> the backend gate skips it and must announce it.
+            every { competencyRepository.existsByKey("kotlin") } returns true
+            every { competencyEdgeRepository.existsByFromKeyAndToKeyAndKind(any(), any(), any()) } returns false
+            every { competencyEdgeProposalRepository.save(any()) } answers { firstArg() }
+            every { onboardingAiClient.streamCompetencyGraph(any(), any(), any()) } returns flowOf(
+                doneEvent(proposedOutcome()),
+            )
+
+            val events = service.streamGenerate().toList()
+
+            // A warning for the skipped node lands before the terminal done; the edge still persists.
+            assertEquals(listOf("warning", "done"), events.map { it.type })
+            verify(exactly = 0) { competencyProposalRepository.save(any()) }
+            verify(exactly = 1) { competencyEdgeProposalRepository.save(any()) }
+        }
+
+        @Test
+        fun `a stream failure becomes a synthesised terminal error`() = runTest {
+            stubActiveState()
+            every { onboardingAiClient.streamCompetencyGraph(any(), any(), any()) } returns
+                flow { throw RuntimeException("ai down") }
+
+            val events = service.streamGenerate().toList()
+
+            assertEquals("error", events.last().type)
         }
     }
 

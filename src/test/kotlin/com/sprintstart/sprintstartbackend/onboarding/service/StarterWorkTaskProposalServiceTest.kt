@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKi
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedStarterTaskSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
@@ -25,7 +26,12 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -49,6 +55,7 @@ class StarterWorkTaskProposalServiceTest {
     private val githubHistoryPriorService: GithubHistoryPriorService = mockk()
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
     private val userApi: UserApi = mockk()
+    private val json: Json = Json { ignoreUnknownKeys = true }
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
     private val service = StarterWorkTaskProposalService(
         onboardingAiClient,
@@ -60,6 +67,7 @@ class StarterWorkTaskProposalServiceTest {
         githubHistoryPriorService,
         artifactIngestionApi,
         userApi,
+        json,
         transactionManager,
     )
 
@@ -115,6 +123,76 @@ class StarterWorkTaskProposalServiceTest {
 
             assertEquals(listOf("s1", "s2"), sourceIdsSlot.captured)
             assertEquals(listOf("kotlin"), keysSlot.captured)
+        }
+    }
+
+    @Nested
+    inner class StreamGenerate {
+        private fun proposedOutcome() = StarterWorkOutcome(
+            status = "proposed",
+            tasks = listOf(
+                ProposedStarterTaskSchema(
+                    sourceId = "github:org/repo:ISSUE:1",
+                    title = "Fix typo",
+                    summary = "Fix a typo.",
+                    competencyKeys = listOf("docs"),
+                    rationale = "Small.",
+                ),
+            ),
+        )
+
+        private fun doneEvent(outcome: StarterWorkOutcome) = AiProgressEvent(
+            type = "done",
+            operation = "starter_work",
+            result = json.encodeToJsonElement(outcome),
+        )
+
+        @Test
+        fun `relays the events and persists the tasks on done`() = runTest {
+            every { starterWorkTaskProposalRepository.findAllByStatusIn(any()) } returns emptyList()
+            every { competencyRepository.findAll() } returns emptyList()
+            every { starterWorkTaskProposalRepository.save(any()) } answers { firstArg() }
+            every { onboardingAiClient.streamStarterWork(any(), any()) } returns flowOf(
+                AiProgressEvent(type = "stage", operation = "starter_work", stage = "retrieving", label = "…"),
+                AiProgressEvent(type = "item", operation = "starter_work", label = "Task: Fix typo"),
+                doneEvent(proposedOutcome()),
+            )
+
+            val events = service.streamGenerate().toList()
+
+            assertEquals(listOf("stage", "item", "done"), events.map { it.type })
+            verify(exactly = 1) { starterWorkTaskProposalRepository.save(any()) }
+        }
+
+        @Test
+        fun `a task already in the pool becomes a warning before the done`() = runTest {
+            // The issue is already pooled -> the backend gate skips it and must announce it.
+            every { starterWorkTaskProposalRepository.findAllByStatusIn(any()) } returns listOf(
+                StarterWorkTaskProposal(
+                    sourceId = "github:org/repo:ISSUE:1",
+                    title = "Fix typo",
+                    status = ProposalStatus.PROPOSED,
+                ),
+            )
+            every { competencyRepository.findAll() } returns emptyList()
+            every { onboardingAiClient.streamStarterWork(any(), any()) } returns flowOf(doneEvent(proposedOutcome()))
+
+            val events = service.streamGenerate().toList()
+
+            assertEquals(listOf("warning", "done"), events.map { it.type })
+            verify(exactly = 0) { starterWorkTaskProposalRepository.save(any()) }
+        }
+
+        @Test
+        fun `a stream failure becomes a synthesised terminal error`() = runTest {
+            every { starterWorkTaskProposalRepository.findAllByStatusIn(any()) } returns emptyList()
+            every { competencyRepository.findAll() } returns emptyList()
+            every { onboardingAiClient.streamStarterWork(any(), any()) } returns
+                flow { throw RuntimeException("ai down") }
+
+            val events = service.streamGenerate().toList()
+
+            assertEquals("error", events.last().type)
         }
     }
 

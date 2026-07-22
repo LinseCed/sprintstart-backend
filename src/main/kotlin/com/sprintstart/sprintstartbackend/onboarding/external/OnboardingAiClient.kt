@@ -441,6 +441,46 @@ class OnboardingAiClient(
         )
 
     /**
+     * Streams the AI service proposing competency graph nodes/edges (live-AI-visibility, #95/ai#37).
+     *
+     * The streaming twin of [proposeCompetencyGraph]: the AI emits a `stage` per pass, an `item`
+     * per grounded competency then per accepted edge, and a terminal `done` carrying the whole
+     * outcome the backend persists. The graph literally assembles, nodes-then-edges.
+     */
+    fun streamCompetencyGraph(
+        activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
+        activeEdges: List<ActiveEdgeSchema> = emptyList(),
+        lastFingerprint: String? = null,
+    ): Flow<AiProgressEvent> =
+        streamProgress(
+            "/api/v1/onboarding/competency-graph/propose/stream",
+            GenerateCompetencyGraphRequest(
+                activeCompetencies = activeCompetencies,
+                activeEdges = activeEdges,
+                lastFingerprint = lastFingerprint,
+            ),
+        )
+
+    /**
+     * Streams the AI service mining starter-work candidates (live-AI-visibility, #95/ai#37).
+     *
+     * The streaming twin of [proposeStarterWork]: the AI emits a `stage` per pass and an `item` per
+     * task as it clears the scope-safety judgement, then a terminal `done` carrying the outcome the
+     * backend persists — so a PM watches the pool fill one task at a time.
+     */
+    fun streamStarterWork(
+        activeSourceIds: List<String> = emptyList(),
+        activeCompetencyKeys: List<String> = emptyList(),
+    ): Flow<AiProgressEvent> =
+        streamProgress(
+            "/api/v1/onboarding/starter-work/mine/stream",
+            MineStarterWorkRequest(
+                activeSourceIds = activeSourceIds,
+                activeCompetencyKeys = activeCompetencyKeys,
+            ),
+        )
+
+    /**
      * Opens an SSE stream of [AiProgressEvent]s against [path], POSTing [body].
      *
      * The reusable passthrough behind every streaming operation. A malformed chunk is logged and

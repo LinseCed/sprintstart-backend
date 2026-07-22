@@ -5,6 +5,7 @@ import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.GenerateStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.ProposedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
@@ -13,6 +14,7 @@ import com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkTaskProp
 import com.sprintstart.sprintstartbackend.onboarding.service.UserGoalService
 import io.mockk.coEvery
 import io.mockk.every
+import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -31,6 +33,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.request
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.util.UUID
+import kotlin.test.assertTrue
 
 @WebMvcTest(StarterWorkController::class)
 @Import(SecurityConfig::class)
@@ -235,5 +238,42 @@ class StarterWorkControllerTest(
         mockMvc
             .perform(asyncDispatch(mvcResult))
             .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `streamGenerate should return 403 for a plain USER`() {
+        val mvcResult = mockMvc
+            .perform(post("/api/v1/onboarding/starter-work/generate/stream").with(userJwt))
+            .andExpect(request().asyncStarted())
+            .andReturn()
+
+        mockMvc
+            .perform(asyncDispatch(mvcResult))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `streamGenerate streams progress events for a PM`() {
+        coEvery { starterWorkTaskProposalService.streamGenerate() } returns
+            flowOf(
+                AiProgressEvent(type = "stage", operation = "starter_work", stage = "retrieving", label = "…"),
+                AiProgressEvent(type = "item", operation = "starter_work", label = "Task: Fix typo"),
+                AiProgressEvent(type = "done", operation = "starter_work", label = "Proposed 1"),
+            )
+
+        val mvcResult = mockMvc
+            .perform(post("/api/v1/onboarding/starter-work/generate/stream").with(pmJwt))
+            .andExpect(request().asyncStarted())
+            .andReturn()
+
+        val body = mockMvc
+            .perform(asyncDispatch(mvcResult))
+            .andExpect(status().isOk)
+            .andReturn()
+            .response
+            .contentAsString
+
+        assertTrue(body.contains("\"type\":\"item\""))
+        assertTrue(body.contains("\"type\":\"done\""))
     }
 }
