@@ -22,9 +22,12 @@ import java.util.UUID
 /**
  * Task 0: the trivial first task that proves the branch → PR → review → merge loop.
  *
- * Assignment is automatic once environment readiness is settled — a hire's first day should never
- * end with "pick something" — and undoable. The task comes from the same mined-and-approved pool as
- * every other, flagged as Task-0-suitable by a PM, because a task nobody wanted is not a
+ * Assignment is automatic on the hire's first read — a first day should never end with "pick
+ * something" — and undoable. Deliberately **not** gated on any environment-readiness signal:
+ * getting the project running is *part of* Task 0, not a wall in front of it, and gating the first
+ * task behind a setup check we can't reliably detect only strands a fresh hire (it also runs against
+ * the initiative's "retire the gates" decision). The task comes from the same mined-and-approved
+ * pool as every other, flagged as Task-0-suitable by a PM, because a task nobody wanted is not a
  * contribution and hires can tell.
  *
  * Completing it proves the loop and nothing else: there is **no** `UserCompetencyState` write
@@ -35,7 +38,6 @@ import java.util.UUID
 class TaskZeroService(
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val taskZeroAssignmentRepository: TaskZeroAssignmentRepository,
-    private val environmentReadinessService: EnvironmentReadinessService,
     private val projectMembershipApi: ProjectMembershipApi,
     private val artifactIngestionApi: ArtifactIngestionApi,
     private val clock: Clock = Clock.systemUTC(),
@@ -62,30 +64,18 @@ class TaskZeroService(
     }
 
     /**
-     * The hire's Task 0, assigning one if their environment is ready and none is assigned yet.
+     * The hire's Task 0, assigning one on read if none is assigned yet.
      *
-     * The assignment happens lazily here rather than on a background trigger, so it covers both
-     * reported and *derived* readiness (a hire who just opened their first pull request is ready
-     * without ever running the command). Not-ready, and ready-but-nothing-eligible, are both
-     * ordinary returned states.
+     * The assignment happens lazily here rather than on a background trigger. It is available from
+     * day one — no environment-readiness precondition — so `noneAvailable` (no PM has flagged a
+     * Task-0-suitable task yet) is the only "no task" state.
      *
      * @throws ResponseStatusException 404 when the hire is not a member of the project.
      */
     @Transactional
     fun getForHire(hireId: UUID, projectId: UUID): MyTaskZeroResponse {
         val member = requireMember(hireId, projectId)
-        val ready = environmentReadinessService.readyAtFor(member, projectId) != null
         val loopProven = hasMergedPullRequest(member, projectId)
-
-        if (!ready) {
-            return MyTaskZeroResponse(
-                ready = false,
-                task = null,
-                assignedAt = null,
-                noneAvailable = false,
-                loopProven = loopProven,
-            )
-        }
 
         taskZeroAssignmentRepository.findByHireIdAndProjectId(hireId, projectId)?.let { existing ->
             return existing.toResponse(loopProven)
@@ -93,7 +83,6 @@ class TaskZeroService(
 
         val candidate = nextEligibleTask()
             ?: return MyTaskZeroResponse(
-                ready = true,
                 task = null,
                 assignedAt = null,
                 noneAvailable = true,
@@ -109,7 +98,6 @@ class TaskZeroService(
             ),
         )
         return MyTaskZeroResponse(
-            ready = true,
             task = candidate.toResponse(),
             assignedAt = saved.assignedAt,
             noneAvailable = false,
@@ -119,7 +107,7 @@ class TaskZeroService(
 
     /**
      * Undoes a hire's Task 0 assignment, freeing the task for someone else. A no-op when nothing is
-     * assigned. Does not touch readiness or any earned progress — there is none to un-earn.
+     * assigned. Touches no earned progress — there is none to un-earn.
      */
     @Transactional
     fun unassign(hireId: UUID, projectId: UUID) {
@@ -155,7 +143,6 @@ class TaskZeroService(
     private fun TaskZeroAssignment.toResponse(loopProven: Boolean): MyTaskZeroResponse {
         val proposal = starterWorkTaskProposalRepository.findById(proposalId).orElse(null)
         return MyTaskZeroResponse(
-            ready = true,
             task = proposal?.toResponse(),
             assignedAt = assignedAt,
             noneAvailable = false,

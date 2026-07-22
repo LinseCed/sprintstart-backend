@@ -61,12 +61,11 @@ class TaskZeroControllerTest(
     fun `getMyTaskZero returns the caller's task-zero state`() {
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
         every { taskZeroService.getForHire(userId, projectId) } returns
-            MyTaskZeroResponse(ready = true, task = null, assignedAt = null, noneAvailable = true, loopProven = false)
+            MyTaskZeroResponse(task = null, assignedAt = null, noneAvailable = true, loopProven = false)
 
         mockMvc
             .perform(get("/api/v1/onboarding/me/task-zero").param("projectId", projectId.toString()).with(userJwt))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.ready").value(true))
             .andExpect(jsonPath("$.noneAvailable").value(true))
     }
 

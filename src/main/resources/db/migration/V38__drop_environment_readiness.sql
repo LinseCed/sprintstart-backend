@@ -1,0 +1,11 @@
+-- Retire environment readiness (Onboarding v2 follow-up).
+--
+-- The environment-readiness step promised something it could not keep: it showed a hard-coded setup
+-- command and claimed to detect a local build, while the only signal that ever fired was a pull
+-- request the hire authored -- which is also what gated Task 0. So a fresh hire could never become
+-- "ready" without a PR, and never got a Task 0 to produce one: a circular dead-end that also broke
+-- the initiative's "retire the gates" decision.
+--
+-- Task 0 is now available from day one and readiness gates nothing, so this table (and its derived
+-- timeline moment `env_ready_at`) has no remaining reader. Dropped rather than left dormant.
+DROP TABLE IF EXISTS environment_readiness;

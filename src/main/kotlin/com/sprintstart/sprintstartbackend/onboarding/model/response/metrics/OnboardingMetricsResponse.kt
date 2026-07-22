@@ -18,14 +18,9 @@ data class HireTimelineResponse(
     /** Null for assignments made before joining was recorded — "clock unknown", not "joined now". */
     val joinedAt: Instant?,
     /**
-     * When the hire's environment was settled as ready — reported evidence or, failing that,
-     * derived from a pull request they authored. Null while not ready; the first wall of week one.
-     */
-    val envReadyAt: Instant?,
-    /**
      * When the hire was auto-assigned their Task 0 — the trivial first task that proves the loop.
      * Distinct from [firstTaskClaimedAt], which is a goal the hire chose; this one is handed to them
-     * on readiness. Null when none has been assigned.
+     * on their first read. Null when none has been assigned.
      */
     val taskZeroAssignedAt: Instant?,
     val firstTaskClaimedAt: Instant?,

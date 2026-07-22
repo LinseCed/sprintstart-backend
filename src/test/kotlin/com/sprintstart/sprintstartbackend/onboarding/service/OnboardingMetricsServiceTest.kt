@@ -31,10 +31,6 @@ class OnboardingMetricsServiceTest {
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
     private val userGoalRepository: UserGoalRepository = mockk()
 
-    // Readiness derivation is exercised in EnvironmentReadinessServiceTest; here it defaults to
-    // "not ready" (null) so these timeline assertions stay about the pull-request-derived moments.
-    private val environmentReadinessService: EnvironmentReadinessService = mockk(relaxed = true)
-
     // Task-0 assignment is exercised in TaskZeroServiceTest; here it defaults to "none assigned".
     private val taskZeroService: TaskZeroService = mockk(relaxed = true)
 
@@ -49,7 +45,6 @@ class OnboardingMetricsServiceTest {
         projectMembershipApi,
         artifactIngestionApi,
         userGoalRepository,
-        environmentReadinessService,
         taskZeroService,
         rampService,
         Clock.fixed(now, ZoneOffset.UTC),
