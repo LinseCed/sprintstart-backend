@@ -71,6 +71,11 @@ internal class ArtifactIngestionApiService(
                     repositoryFullName = (
                         artifactMetadataJsonMapper.fromJson(it.metadata) as? GithubArtifactMetadata
                     )?.repositoryFullName,
+                    // Source ids are `github:owner/name:PULL_REQUEST:<number>`, so the number is
+                    // already in the identifier and needs no extra lookup.
+                    number = it.sourceId.substringAfterLast(':').toIntOrNull(),
+                    title = it.title,
+                    sourceUrl = it.sourceUrl,
                 )
             }
     }

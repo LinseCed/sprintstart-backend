@@ -145,6 +145,12 @@ data class AuthoredPullRequest(
      */
     val changesRequestedCount: Int = 0,
     val repositoryFullName: String? = null,
+    /** The pull request's own number (e.g. 142), parsed from its source id. Null if unparseable. */
+    val number: Int? = null,
+    /** The pull request title, so a hire can be told *which* pull request, not just how many. */
+    val title: String? = null,
+    /** A link straight to the pull request on the host, when the artifact recorded one. */
+    val sourceUrl: String? = null,
 )
 
 /**
