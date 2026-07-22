@@ -30,7 +30,6 @@ import kotlin.test.assertTrue
 class TaskZeroServiceTest {
     private val proposalRepository: StarterWorkTaskProposalRepository = mockk(relaxed = true)
     private val assignmentRepository: TaskZeroAssignmentRepository = mockk(relaxed = true)
-    private val environmentReadinessService: EnvironmentReadinessService = mockk()
     private val projectMembershipApi: ProjectMembershipApi = mockk()
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
 
@@ -41,7 +40,6 @@ class TaskZeroServiceTest {
     private val service = TaskZeroService(
         proposalRepository,
         assignmentRepository,
-        environmentReadinessService,
         projectMembershipApi,
         artifactIngestionApi,
         Clock.fixed(now, ZoneOffset.UTC),
@@ -52,10 +50,6 @@ class TaskZeroServiceTest {
 
     private fun isMember(login: String? = "hire") {
         every { projectMembershipApi.getProjectMembers(projectId) } returns listOf(member(login))
-    }
-
-    private fun ready(at: Instant? = now.minus(Duration.ofDays(1))) {
-        every { environmentReadinessService.readyAtFor(any(), projectId) } returns at
     }
 
     private fun noAuthoredPrs() {
@@ -99,22 +93,8 @@ class TaskZeroServiceTest {
     }
 
     @Test
-    fun `getForHire returns not-ready and assigns nothing when the environment is not up`() {
+    fun `getForHire auto-assigns the earliest eligible task on first read`() {
         isMember()
-        ready(at = null)
-        noAuthoredPrs()
-
-        val result = service.getForHire(hireId, projectId)
-
-        assertFalse(result.ready)
-        assertNull(result.task)
-        verify(exactly = 0) { assignmentRepository.save(any()) }
-    }
-
-    @Test
-    fun `getForHire auto-assigns the earliest eligible task once ready`() {
-        isMember()
-        ready()
         noAuthoredPrs()
         every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
         every { assignmentRepository.findAllAssignedProposalIds() } returns emptyList()
@@ -127,7 +107,6 @@ class TaskZeroServiceTest {
 
         val result = service.getForHire(hireId, projectId)
 
-        assertTrue(result.ready)
         assertFalse(result.noneAvailable)
         // The oldest eligible task is handed out first.
         assertEquals(older.id, saved.captured.proposalId)
@@ -136,7 +115,6 @@ class TaskZeroServiceTest {
     @Test
     fun `getForHire is a handled state, not an error, when nothing is eligible`() {
         isMember()
-        ready()
         noAuthoredPrs()
         every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
         every { assignmentRepository.findAllAssignedProposalIds() } returns emptyList()
@@ -144,7 +122,6 @@ class TaskZeroServiceTest {
 
         val result = service.getForHire(hireId, projectId)
 
-        assertTrue(result.ready)
         assertTrue(result.noneAvailable)
         assertNull(result.task)
         verify(exactly = 0) { assignmentRepository.save(any()) }
@@ -153,7 +130,6 @@ class TaskZeroServiceTest {
     @Test
     fun `getForHire never assigns the same task to two hires`() {
         isMember()
-        ready()
         noAuthoredPrs()
         every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
         val taken = task(createdDaysAgo = 5)
@@ -172,7 +148,6 @@ class TaskZeroServiceTest {
     @Test
     fun `getForHire returns the existing assignment without assigning again`() {
         isMember()
-        ready()
         noAuthoredPrs()
         val proposal = task()
         every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns
@@ -188,7 +163,6 @@ class TaskZeroServiceTest {
     @Test
     fun `getForHire reports the loop proven once the hire has merged a pull request`() {
         isMember()
-        ready()
         every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
         every { assignmentRepository.findAllAssignedProposalIds() } returns emptyList()
         every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.APPROVED) } returns emptyList()
