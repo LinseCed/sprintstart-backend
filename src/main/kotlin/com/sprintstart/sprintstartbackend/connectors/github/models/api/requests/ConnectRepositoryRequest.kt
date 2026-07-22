@@ -10,7 +10,7 @@ import java.util.UUID
  */
 data class ConnectRepositoriesRequest(
     @NotEmpty
-    val repositories: List<ConnectRepositoryRequest>,
+    val repositories: List<@Valid ConnectRepositoryRequest>,
 )
 
 /**
