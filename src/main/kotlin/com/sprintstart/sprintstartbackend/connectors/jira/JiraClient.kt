@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.connectors.jira
 
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.SearchResponse
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.ValuesResponse
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.GetIssuesOfProjectRequest
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.GetProjectsOfInstanceResponse
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentials
@@ -48,8 +50,6 @@ class JiraClient(
         return paginateSearch(baseUrl, jql, requestFields, requestExpand, credentials)
     }
 
-    // ── Issue comments (escape hatch when inline payload is too large) ───────
-
     suspend fun getIssueComments(
         baseUrl: String,
         credentials: JiraCredentials,
@@ -58,8 +58,6 @@ class JiraClient(
         val endpoint = "/rest/api/3/issue/${issueKey.encodePath()}/comment"
         return paginateValues(baseUrl, endpoint, credentials)
     }
-
-    // ── Issue changelog (escape hatch when not using expand=changelog) ───────
 
     suspend fun getIssueChangelog(
         baseUrl: String,
@@ -70,8 +68,6 @@ class JiraClient(
         return paginateValues(baseUrl, endpoint, credentials)
             .let { changelog: JiraChangelog -> changelog.histories }
     }
-
-    // ── Projects ────────────────────────────────────────────────────────────
 
     suspend fun getProjects(
         baseUrl: String,
@@ -86,8 +82,6 @@ class JiraClient(
             .perform()
     }
 
-    // ── Fields (needed to resolve custom field IDs) ─────────────────────────
-
     suspend fun getFields(
         baseUrl: String,
         credentials: JiraCredentials,
@@ -100,8 +94,6 @@ class JiraClient(
             .perform()
     }
 
-    // ── Sprints (Agile API) ────────────────────────────────────────────────
-
     suspend fun getSprints(
         baseUrl: String,
         credentials: JiraCredentials,
@@ -110,8 +102,6 @@ class JiraClient(
         val endpoint = "/rest/agile/1.0/board/$boardId/sprint"
         return paginateValues(baseUrl, endpoint, credentials)
     }
-
-    // ── Pagination ──────────────────────────────────────────────────────────
 
     private suspend inline fun <reified T> paginateSearch(
         baseUrl: String,
