@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.github.service.internal
+package com.sprintstart.sprintstartbackend.connectors.github.service.internal
 
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.files.GithubFileDeletedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.files.GithubFileFetchFailedEvent
@@ -12,7 +12,6 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubFileSnapshotRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
-import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubFileService
 import com.sprintstart.sprintstartbackend.connectors.github.util.CustomOnDiskCache
 import com.sprintstart.sprintstartbackend.connectors.github.util.GitOperationRunner
 import com.sprintstart.sprintstartbackend.connectors.github.util.OnDiskOperations

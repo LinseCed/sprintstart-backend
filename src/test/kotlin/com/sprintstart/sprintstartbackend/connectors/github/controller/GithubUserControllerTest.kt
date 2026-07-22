@@ -1,9 +1,8 @@
-package com.sprintstart.sprintstartbackend.github.controller
+package com.sprintstart.sprintstartbackend.connectors.github.controller
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.connectors.github.controller.GithubUserController
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.AddPatRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.RemovePatRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdatePatNameRequest

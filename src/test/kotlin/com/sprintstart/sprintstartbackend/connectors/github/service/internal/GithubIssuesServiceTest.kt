@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.github.service.internal
+package com.sprintstart.sprintstartbackend.connectors.github.service.internal
 
 import com.sprintstart.sprintstartbackend.connectors.github.GithubClient
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.issues.GithubIssueComment
@@ -17,7 +17,6 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphq
 import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphql.LabelNode
 import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphql.LabelsConnection
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
-import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubIssuesService
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.mockk

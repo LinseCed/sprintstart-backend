@@ -1,6 +1,5 @@
-package com.sprintstart.sprintstartbackend.github.util
+package com.sprintstart.sprintstartbackend.connectors.github.util
 
-import com.sprintstart.sprintstartbackend.connectors.github.util.OnDiskOperations
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach

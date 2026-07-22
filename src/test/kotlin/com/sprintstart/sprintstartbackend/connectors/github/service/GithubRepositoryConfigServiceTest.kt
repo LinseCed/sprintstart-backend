@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.github.service
+package com.sprintstart.sprintstartbackend.connectors.github.service
 
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConfig
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
@@ -11,8 +11,6 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryConfigNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConfigRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
-import com.sprintstart.sprintstartbackend.connectors.github.service.CronBuilder
-import com.sprintstart.sprintstartbackend.connectors.github.service.GithubRepositoryConfigService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
