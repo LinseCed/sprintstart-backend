@@ -40,16 +40,22 @@ class IngestionRunServiceTest {
             sourceUrl = "https://github.com/owner/repo/blob/main/App.kt",
             reason = "Not found",
         )
+        val repositoryId = UUID.randomUUID()
         val run = IngestionRun(
             id = UUID.randomUUID(),
             sourceSystem = SourceSystem.GITHUB,
+            repositoryId = repositoryId,
+            owner = "SprintStartProject",
+            name = "sprintstart-frontend",
             startedAt = Instant.parse("2024-01-01T00:00:00Z"),
             finishedAt = Instant.parse("2024-01-01T00:01:00Z"),
             ingestedCount = 3,
             updatedCount = 2,
+            deletedCount = 1,
             failedCount = 1,
             failedItems = mutableListOf(failedItem),
             status = IngestionRunStatus.PARTIAL,
+            failureReason = "Partial failure",
             aiSyncStatus = AiSyncStatus.FAILED,
             aiSyncFailureReason = "AI service unreachable",
         )
@@ -61,13 +67,38 @@ class IngestionRunServiceTest {
         val response = result.single()
         assertThat(response.runId).isEqualTo(run.id)
         assertThat(response.sourceSystem).isEqualTo(SourceSystem.GITHUB)
+        assertThat(response.sourceId).isEqualTo("SprintStartProject/sprintstart-frontend")
+        assertThat(response.owner).isEqualTo("SprintStartProject")
+        assertThat(response.name).isEqualTo("sprintstart-frontend")
+        assertThat(response.repositoryId).isEqualTo(repositoryId)
         assertThat(response.startedAt).isEqualTo(run.startedAt)
         assertThat(response.finishedAt).isEqualTo(run.finishedAt)
         assertThat(response.ingestedCount).isEqualTo(3)
         assertThat(response.updatedCount).isEqualTo(2)
+        assertThat(response.deletedCount).isEqualTo(1)
         assertThat(response.failedCount).isEqualTo(1)
         assertThat(response.failedItems).containsExactly(failedItem)
+        assertThat(response.failureReason).isEqualTo("Partial failure")
         assertThat(response.aiSyncStatus).isEqualTo(AiSyncStatus.FAILED)
         assertThat(response.aiSyncFailureReason).isEqualTo("AI service unreachable")
+    }
+
+    @Test
+    fun `getRecentRuns leaves sourceId null when repository metadata is absent`() {
+        val run = IngestionRun(
+            id = UUID.randomUUID(),
+            sourceSystem = SourceSystem.UPLOAD,
+            startedAt = Instant.parse("2024-01-01T00:00:00Z"),
+            status = IngestionRunStatus.COMPLETED,
+            aiSyncStatus = AiSyncStatus.SUCCEEDED,
+        )
+        every { ingestionRunRepository.findByOrderByStartedAtDesc(any()) } returns listOf(run)
+
+        val response = service.getRecentRuns(limit = 10).single()
+
+        assertThat(response.sourceId).isNull()
+        assertThat(response.owner).isNull()
+        assertThat(response.name).isNull()
+        assertThat(response.repositoryId).isNull()
     }
 }

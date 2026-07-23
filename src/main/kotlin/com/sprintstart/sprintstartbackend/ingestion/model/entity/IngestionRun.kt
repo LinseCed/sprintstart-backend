@@ -17,6 +17,11 @@ class IngestionRun(
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     val sourceSystem: SourceSystem,
+    // Concrete source instance this run belongs to. Nullable because non-repository
+    // sources (for example UPLOAD) have no repository, and older runs predate these columns.
+    var repositoryId: UUID? = null,
+    var owner: String? = null,
+    var name: String? = null,
     val startedAt: Instant = Instant.now(),
     var finishedAt: Instant? = null,
     @Column(nullable = false)

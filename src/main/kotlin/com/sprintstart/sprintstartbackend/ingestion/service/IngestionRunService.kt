@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.IngestionRunResponse
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import org.springframework.data.domain.PageRequest
@@ -32,19 +33,30 @@ class IngestionRunService(
         ingestionRunRepository
             .findByOrderByStartedAtDesc(
                 PageRequest.of(0, limit),
-            ).map {
-                IngestionRunResponse(
-                    it.id,
-                    sourceSystem = it.sourceSystem,
-                    startedAt = it.startedAt,
-                    finishedAt = it.finishedAt,
-                    ingestedCount = it.ingestedCount,
-                    updatedCount = it.updatedCount,
-                    failedCount = it.failedCount,
-                    failedItems = it.failedItems,
-                    status = it.status,
-                    aiSyncStatus = it.aiSyncStatus,
-                    aiSyncFailureReason = it.aiSyncFailureReason,
-                )
-            }
+            ).map { it.toResponse() }
 }
+
+/**
+ * Maps an ingestion run entity to its API representation, deriving the stable `sourceId`
+ * ("owner/name") from the persisted source-instance metadata when both parts are present.
+ */
+internal fun IngestionRun.toResponse(): IngestionRunResponse =
+    IngestionRunResponse(
+        runId = id,
+        sourceSystem = sourceSystem,
+        sourceId = if (owner != null && name != null) "$owner/$name" else null,
+        owner = owner,
+        name = name,
+        repositoryId = repositoryId,
+        startedAt = startedAt,
+        finishedAt = finishedAt,
+        ingestedCount = ingestedCount,
+        updatedCount = updatedCount,
+        deletedCount = deletedCount,
+        failedCount = failedCount,
+        failedItems = failedItems,
+        status = status,
+        failureReason = failureReason,
+        aiSyncStatus = aiSyncStatus,
+        aiSyncFailureReason = aiSyncFailureReason,
+    )
