@@ -19,6 +19,12 @@ interface IngestionRunRepository : JpaRepository<IngestionRun, UUID> {
     fun findFirstByOrderByStartedAtDesc(): IngestionRun?
 
     /**
+     * Latest run for a specific connected repository, used to attach up-to-date counters to the
+     * per-source-instance status view.
+     */
+    fun findFirstByRepositoryIdOrderByStartedAtDesc(repositoryId: UUID): IngestionRun?
+
+    /**
      * Loads a run with a database write lock for lifecycle paths that mutate counters or
      * collection-valued fields from independently delivered events.
      */
