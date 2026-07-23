@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
+import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
+import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.AiSyncStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
@@ -12,14 +14,23 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.PageImpl
+import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.domain.Specification
+import org.springframework.http.HttpStatus
+import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
+import java.util.Optional
 import java.util.UUID
 
 class IngestionRunServiceTest {
     private val ingestionRunRepository = mockk<IngestionRunRepository>()
-    private val service = IngestionRunService(ingestionRunRepository)
+    private val githubRepositoryConnectionRepository = mockk<GithubRepositoryConnectionRepository>()
+    private val service = IngestionRunService(ingestionRunRepository, githubRepositoryConnectionRepository)
 
     @Test
     fun `getRecentRuns returns empty list when repository has no runs`() {
@@ -100,5 +111,78 @@ class IngestionRunServiceTest {
         assertThat(response.owner).isNull()
         assertThat(response.name).isNull()
         assertThat(response.repositoryId).isNull()
+    }
+
+    @Test
+    fun `getRun maps the run when it exists`() {
+        val repositoryId = UUID.randomUUID()
+        val run = IngestionRun(
+            id = UUID.randomUUID(),
+            sourceSystem = SourceSystem.GITHUB,
+            repositoryId = repositoryId,
+            owner = "SprintStartProject",
+            name = "sprintstart-frontend",
+            startedAt = Instant.parse("2024-01-01T00:00:00Z"),
+            status = IngestionRunStatus.COMPLETED,
+            aiSyncStatus = AiSyncStatus.SUCCEEDED,
+        )
+        every { ingestionRunRepository.findById(run.id) } returns Optional.of(run)
+
+        val response = service.getRun(run.id)
+
+        assertThat(response.runId).isEqualTo(run.id)
+        assertThat(response.sourceId).isEqualTo("SprintStartProject/sprintstart-frontend")
+        assertThat(response.repositoryId).isEqualTo(repositoryId)
+    }
+
+    @Test
+    fun `getRun returns not found for an unknown run`() {
+        val runId = UUID.randomUUID()
+        every { ingestionRunRepository.findById(runId) } returns Optional.empty()
+
+        assertThatThrownBy { service.getRun(runId) }
+            .isInstanceOf(ResponseStatusException::class.java)
+            .extracting { (it as ResponseStatusException).statusCode }
+            .isEqualTo(HttpStatus.NOT_FOUND)
+    }
+
+    @Test
+    fun `getRuns returns a mapped page with metadata`() {
+        val pageable = slot<Pageable>()
+        val run = IngestionRun(
+            id = UUID.randomUUID(),
+            sourceSystem = SourceSystem.GITHUB,
+            startedAt = Instant.parse("2024-01-01T00:00:00Z"),
+            status = IngestionRunStatus.COMPLETED,
+            aiSyncStatus = AiSyncStatus.SUCCEEDED,
+        )
+        every {
+            ingestionRunRepository.findAll(any<Specification<IngestionRun>>(), capture(pageable))
+        } returns PageImpl(listOf(run), PageRequest.of(0, 20), 1)
+
+        val response = service.getRuns(page = 1, size = 20, status = IngestionRunStatus.COMPLETED)
+
+        assertThat(pageable.captured.pageNumber).isEqualTo(0)
+        assertThat(pageable.captured.pageSize).isEqualTo(20)
+        assertThat(response.items).hasSize(1)
+        assertThat(response.page.number).isEqualTo(1)
+        assertThat(response.page.totalElements).isEqualTo(1)
+        assertThat(response.page.hasNext).isFalse()
+    }
+
+    @Test
+    fun `getRuns resolves projectId to connected repository ids`() {
+        val projectId = UUID.randomUUID()
+        val repositoryId = UUID.randomUUID()
+        every { githubRepositoryConnectionRepository.findAllByProjectId(projectId) } returns
+            listOf(mockk<GithubRepositoryConnection> { every { id } returns repositoryId })
+        val emptyPage: Page<IngestionRun> = PageImpl(emptyList(), PageRequest.of(0, 20), 0)
+        every { ingestionRunRepository.findAll(any<Specification<IngestionRun>>(), any<Pageable>()) } returns emptyPage
+
+        val response = service.getRuns(page = 1, size = 20, projectId = projectId)
+
+        verify(exactly = 1) { githubRepositoryConnectionRepository.findAllByProjectId(projectId) }
+        assertThat(response.items).isEmpty()
+        assertThat(response.page.totalElements).isEqualTo(0)
     }
 }
