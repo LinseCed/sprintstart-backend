@@ -1,7 +1,6 @@
-package com.sprintstart.sprintstartbackend.github.service
+package com.sprintstart.sprintstartbackend.connectors.github.service
 
 import com.sprintstart.sprintstartbackend.connectors.github.models.ScheduleSpec
-import com.sprintstart.sprintstartbackend.connectors.github.service.CronBuilder
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test

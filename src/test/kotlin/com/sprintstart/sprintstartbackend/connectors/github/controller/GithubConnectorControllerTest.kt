@@ -1,23 +1,30 @@
-package com.sprintstart.sprintstartbackend.github.controller
+package com.sprintstart.sprintstartbackend.connectors.github.controller
 
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.connectors.github.controller.GithubConnectorController
-import com.sprintstart.sprintstartbackend.connectors.github.controller.GithubExceptionHandler
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoriesRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.DiscoverRepositoriesRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.ConnectRepositoriesResponse
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoverRepositoriesResponse
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoveredRepository
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
+import com.sprintstart.sprintstartbackend.connectors.github.service.GithubRepositoryConnectionOrchestrator
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubUpdatesService
 import io.mockk.coEvery
 import io.mockk.every
+import io.mockk.slot
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -30,6 +37,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.request
@@ -48,6 +56,9 @@ class GithubConnectorControllerTest {
 
     @MockkBean
     private lateinit var githubConnectorService: GithubConnectorService
+
+    @MockkBean
+    private lateinit var githubRepositoryConnectionOrchestrator: GithubRepositoryConnectionOrchestrator
 
     @MockkBean
     private lateinit var githubUpdateService: GithubUpdatesService
@@ -208,6 +219,158 @@ class GithubConnectorControllerTest {
                     post("/api/v1/github/connect")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request))
+                        .with(pmJwt),
+                ).andExpect(status().isBadRequest)
+        }
+    }
+
+    @Nested
+    inner class ConnectRepositories {
+        @Test
+        fun `should return 202 Accepted and repository map when connecting multiple repositories`() {
+            val request = ConnectRepositoriesRequest(
+                listOf(
+                    ConnectRepositoryRequest(
+                        owner = "spring-projects",
+                        name = "spring-modulith",
+                        tokenName = validTokenName,
+                        projectId = projectId,
+                    ),
+                    ConnectRepositoryRequest(
+                        owner = "spring-projects",
+                        name = "spring-framework",
+                        tokenName = validTokenName,
+                        projectId = projectId,
+                    ),
+                ),
+            )
+            val transactionIds = mapOf(
+                "spring-projects/spring-modulith" to UUID.randomUUID(),
+                "spring-projects/spring-framework" to UUID.randomUUID(),
+            )
+            val response = ConnectRepositoriesResponse(transactionIds)
+
+            coEvery {
+                githubRepositoryConnectionOrchestrator.connectRepositoriesIfExist("mockId", request)
+            } returns response
+
+            val asyncResult = mockMvc
+                .perform(
+                    post("/api/v1/github/connect/all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(pmJwt),
+                ).andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
+                .andExpect(status().isAccepted)
+                .andExpect(
+                    jsonPath("$.transactionIdsByRepositoryId['spring-projects/spring-modulith']")
+                        .value(transactionIds["spring-projects/spring-modulith"].toString()),
+                )
+        }
+
+        @Test
+        fun `should return 400 Bad Request when repository list is empty`() {
+            val request = ConnectRepositoriesRequest(emptyList())
+
+            mockMvc
+                .perform(
+                    post("/api/v1/github/connect/all")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(pmJwt),
+                ).andExpect(status().isBadRequest)
+        }
+    }
+
+    @Nested
+    inner class DiscoverRepositories {
+        @Test
+        fun `should return 200 with discovered repositories for an organization`() {
+            val response = DiscoverRepositoriesResponse(
+                listOf(
+                    DiscoveredRepository("repo1", false, "https://github.com/org/repo1"),
+                    DiscoveredRepository("repo2", true, "https://github.com/org/repo2"),
+                ),
+            )
+
+            val requestSlot = slot<DiscoverRepositoriesRequest>()
+            coEvery { githubConnectorService.discoverRepositoriesOfOrg(capture(requestSlot)) } returns response
+
+            val asyncResult = mockMvc
+                .perform(
+                    get("/api/v1/github/discover/org/myorg")
+                        .param("tokenName", validTokenName)
+                        .with(pmJwt),
+                ).andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.repositories[0].name").value("repo1"))
+                .andExpect(jsonPath("$.repositories[1].private").value(true))
+
+            assertThat(requestSlot.captured.userId).isEqualTo("mockId")
+            assertThat(requestSlot.captured.owner).isEqualTo("myorg")
+            assertThat(requestSlot.captured.tokenName).isEqualTo(validTokenName)
+            assertThat(requestSlot.captured.page).isEqualTo(0)
+            assertThat(requestSlot.captured.pageSize).isEqualTo(20)
+        }
+
+        @Test
+        fun `should return 200 with discovered repositories for a user`() {
+            val response = DiscoverRepositoriesResponse(
+                listOf(DiscoveredRepository("repo", false, "https://github.com/user/repo")),
+            )
+
+            val requestSlot = slot<DiscoverRepositoriesRequest>()
+            coEvery { githubConnectorService.discoverRepositoriesOfUser(capture(requestSlot)) } returns response
+
+            val asyncResult = mockMvc
+                .perform(
+                    get("/api/v1/github/discover/user/ghuser")
+                        .param("tokenName", validTokenName)
+                        .with(pmJwt),
+                ).andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.repositories[0].name").value("repo"))
+
+            assertThat(requestSlot.captured.userId).isEqualTo("mockId")
+            assertThat(requestSlot.captured.owner).isEqualTo("ghuser")
+            assertThat(requestSlot.captured.tokenName).isEqualTo(validTokenName)
+        }
+
+        @Test
+        fun `should return 404 when PAT is not found`() {
+            coEvery { githubConnectorService.discoverRepositoriesOfOrg(any()) }
+                .throws(GithubUserPatNotFoundException("missing", "mockId"))
+
+            val asyncResult = mockMvc
+                .perform(
+                    get("/api/v1/github/discover/org/myorg")
+                        .param("tokenName", "missing")
+                        .with(pmJwt),
+                ).andExpect(request().asyncStarted())
+                .andReturn()
+
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
+                .andExpect(status().isNotFound)
+        }
+
+        @Test
+        fun `should return 400 when tokenName is missing`() {
+            mockMvc
+                .perform(
+                    get("/api/v1/github/discover/org/myorg")
                         .with(pmJwt),
                 ).andExpect(status().isBadRequest)
         }

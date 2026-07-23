@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.github.service
+package com.sprintstart.sprintstartbackend.connectors.github.service
 
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUser
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubUserPat
@@ -11,7 +11,6 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.Gi
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatStillInUseException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
-import com.sprintstart.sprintstartbackend.connectors.github.service.GithubUserService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

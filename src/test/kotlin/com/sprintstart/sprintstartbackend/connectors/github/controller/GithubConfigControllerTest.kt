@@ -1,9 +1,7 @@
-package com.sprintstart.sprintstartbackend.github.controller
+package com.sprintstart.sprintstartbackend.connectors.github.controller
 
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.connectors.github.controller.GithubExceptionHandler
-import com.sprintstart.sprintstartbackend.connectors.github.controller.GithubRepositoryConfigController
 import com.sprintstart.sprintstartbackend.connectors.github.models.ScheduleSpec
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConfigureRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.GetRepositoryConfigRequest

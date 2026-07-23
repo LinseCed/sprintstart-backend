@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.Re
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.SourceNotFoundException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ControllerAdvice
@@ -115,6 +116,21 @@ class GithubExceptionHandler {
     fun handleGithubUserPatStillInUse(ex: GithubUserPatStillInUseException) =
         ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
+            .body(ErrorResponse(ex.message))
+
+    /**
+     * Handles exceptions of type [SourceNotFoundException] and maps them to a standardized
+     * error response with a 404 NOT FOUND HTTP status code.
+     *
+     * @param ex The exception containing details about the source that could not be found,
+     *           including its unique identifier.
+     * @return A [ResponseEntity] containing the [ErrorResponse] with the exception's message
+     *         and an HTTP status of 404 (NOT FOUND).
+     */
+    @ExceptionHandler(SourceNotFoundException::class)
+    fun handleSourceNotFound(ex: SourceNotFoundException) =
+        ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
             .body(ErrorResponse(ex.message))
 }
 

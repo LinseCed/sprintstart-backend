@@ -1,11 +1,16 @@
 package com.sprintstart.sprintstartbackend.connectors.github.controller
 
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoriesRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.DiscoverRepositoriesRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.ConnectRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.ConnectRepositoryResponse
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoverRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
+import com.sprintstart.sprintstartbackend.connectors.github.service.GithubRepositoryConnectionOrchestrator
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubUpdatesService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -19,9 +24,12 @@ import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.validation.annotation.Validated
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
@@ -33,9 +41,143 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/github")
 @Validated
 internal class GithubConnectorController(
-    val githubConnectorService: GithubConnectorService,
-    val githubUpdateService: GithubUpdatesService,
+    private val githubConnectorService: GithubConnectorService,
+    private val githubUpdateService: GithubUpdatesService,
+    private val connectionOrchestrator: GithubRepositoryConnectionOrchestrator,
 ) {
+    /**
+     * Discovers the GitHub repositories of a specified organization.
+     *
+     * This function retrieves all repositories of a GitHub organization to which the user
+     * has access using the provided Personal Access Token (PAT) stored in SprintStart.
+     *
+     * @param jwt The authentication principal extracted from the user's JWT token (hidden parameter).
+     * @param org The name of the GitHub organization whose repositories are to be discovered.
+     * @param tokenName The name of the stored PAT to be used for accessing the organization repositories.
+     * @param page The page number for paginated results. Defaults to 0 if not specified.
+     * @param pageSize The number of repositories per page. Defaults to 20 if not specified.
+     * @return A ResponseEntity containing a DiscoverRepositoriesResponse object with the list
+     *         of discovered repositories and pagination details.
+     */
+    @Operation(
+        summary = "Discover GitHub repositories of a org",
+        description = """
+            Given a GitHub organization name and the name of a PAT that is stored in SprintStart, this function discovers all 
+            GitHub repositories that the user has access to with the given PAT.
+            """,
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Discovery successful. Returns a list of DiscoveredRepository objects.",
+            ),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role to access this endpoint"),
+            ApiResponse(responseCode = "404", description = "PAT with given name not found"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/discover/org/{org}")
+    @PreAuthorize("hasRole('PM') or hasRole('ADMIN')")
+    suspend fun discoverRepositoriesOfOrg(
+        @Parameter(hidden = true) @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable org: String,
+        @RequestParam(required = true) tokenName: String,
+        @RequestParam(required = false, defaultValue = "0") page: Int,
+        @RequestParam(required = false, defaultValue = "20") pageSize: Int,
+    ): ResponseEntity<DiscoverRepositoriesResponse> {
+        val request = DiscoverRepositoriesRequest(org, jwt.subject, tokenName, page, pageSize)
+        val response = githubConnectorService.discoverRepositoriesOfOrg(request)
+        return ResponseEntity.ok(response)
+    }
+
+    /**
+     * Discovers all GitHub repositories accessible to the specified user using a stored Personal Access Token (PAT).
+     *
+     * @param jwt The authentication principal representing the JSON Web Token of the current user. This is injected
+     * automatically.
+     * @param user The GitHub username whose repositories are to be discovered.
+     * @param tokenName The name of the stored PAT that will be used for authenticating with the GitHub API.
+     * @param page The page number for paginated results. Defaults to 0.
+     * @param pageSize The number of repositories to include per page in the paginated results. Defaults to 20.
+     * @return A ResponseEntity containing the DiscoverRepositoriesResponse, which includes the list of discovered
+     * repositories.
+     */
+    @Operation(
+        summary = "Discover GitHub repositories of a user",
+        description = """
+            Given a GitHub username and the name of a PAT that is stored in SprintStart, this function discovers all 
+            GitHub repositories that the user has access to with the given PAT.
+            """,
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Discovery successful. Returns a list of DiscoveredRepository objects.",
+            ),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role to access this endpoint"),
+            ApiResponse(responseCode = "404", description = "PAT with given name not found"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/discover/user/{user}")
+    @PreAuthorize("hasRole('PM') or hasRole('ADMIN')")
+    suspend fun discoverRepositoriesOfUser(
+        @Parameter(hidden = true) @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable user: String,
+        @RequestParam(required = true) tokenName: String,
+        @RequestParam(required = false, defaultValue = "0") page: Int,
+        @RequestParam(required = false, defaultValue = "20") pageSize: Int,
+    ): ResponseEntity<DiscoverRepositoriesResponse> {
+        val request = DiscoverRepositoriesRequest(user, jwt.subject, tokenName, page, pageSize)
+        val response = githubConnectorService.discoverRepositoriesOfUser(request)
+        return ResponseEntity.ok(response)
+    }
+
+    /**
+     * Connects a list of repositories to the Github connector. This operation fetches
+     * all files, commits, issues, and pull requests from each specified repository.
+     *
+     * @param jwt the authentication principal representing the user making the request
+     * @param request the request object containing the list of repositories to be connected
+     * @return a ResponseEntity containing the result of the repository connection process
+     */
+    @Operation(
+        summary = "Connect a list of repositories to the Github connector",
+        description =
+            "Connects a list of repositories to the Github connector." +
+                " This will fetch all files, commits, issues, and prs from each repository",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "202",
+                description = "The connection of all repositories is accepted",
+            ),
+            ApiResponse(responseCode = "400", description = "Invalid request body"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role to access this endpoint"),
+            ApiResponse(responseCode = "404", description = "Repository not found"),
+        ],
+    )
+    @PostMapping("/connect/all")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @PreAuthorize("hasAnyRole('PM', 'ADMIN')")
+    suspend fun connectRepositories(
+        @Parameter(hidden = true)
+        @AuthenticationPrincipal
+        jwt: Jwt,
+        @Valid
+        @RequestBody
+        request: ConnectRepositoriesRequest,
+    ): ResponseEntity<ConnectRepositoriesResponse> {
+        val response = connectionOrchestrator.connectRepositoriesIfExist(jwt.subject, request)
+        return ResponseEntity.accepted().body(response)
+    }
+
     /**
      * Connects a GitHub repository to the SprintStart application.
      *

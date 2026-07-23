@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.github.service
+package com.sprintstart.sprintstartbackend.connectors.github.service
 
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.GithubRepositoryResourcesFetchingStartedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubAllRepositoriesUpdateStartedEvent
@@ -13,7 +13,6 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.Re
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositorySnapshotRepository
-import com.sprintstart.sprintstartbackend.connectors.github.service.GithubUpdatesService
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubCommitsService
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubFileService
 import com.sprintstart.sprintstartbackend.connectors.github.service.internal.GithubIssuesService
