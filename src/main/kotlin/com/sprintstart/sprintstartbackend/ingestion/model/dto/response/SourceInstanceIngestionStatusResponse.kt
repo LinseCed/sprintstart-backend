@@ -9,7 +9,8 @@ import java.util.UUID
 @Schema(
     description =
         "Ingestion health for a single connected source instance (for GitHub, one connected " +
-            "repository). Combines the connection's current status with the counters of its latest run.",
+            "repository). Combines the connection's current status with the counters of its latest " +
+            "run and the total number of stored artifacts for the instance.",
 )
 data class SourceInstanceIngestionStatusResponse(
     @field:Schema(description = "Source system the connected instance belongs to, for example GITHUB.")
@@ -44,6 +45,8 @@ data class SourceInstanceIngestionStatusResponse(
     val failedCount: Int = 0,
     @field:Schema(description = "Failed items captured for the latest run of this source instance.")
     val failedItems: List<FailedArtifact> = emptyList(),
+    @field:Schema(description = "Total number of ingested artifacts currently stored for this source instance.")
+    val artifactCount: Long = 0,
     @field:Schema(description = "Timestamp of the last commits snapshot. Null if no snapshot exists yet.")
     val lastCommitsSyncAt: Instant? = null,
     @field:Schema(description = "Timestamp of the last issues snapshot. Null if no snapshot exists yet.")

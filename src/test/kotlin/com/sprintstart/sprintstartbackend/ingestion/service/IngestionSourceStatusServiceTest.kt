@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.AiSyncStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
+import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -19,7 +20,9 @@ import java.util.UUID
 class IngestionSourceStatusServiceTest {
     private val githubRepositoryConnectionRepository = mockk<GithubRepositoryConnectionRepository>()
     private val ingestionRunRepository = mockk<IngestionRunRepository>()
-    private val service = IngestionSourceStatusService(githubRepositoryConnectionRepository, ingestionRunRepository)
+    private val artifactRepository = mockk<ArtifactRepository>()
+    private val service =
+        IngestionSourceStatusService(githubRepositoryConnectionRepository, ingestionRunRepository, artifactRepository)
 
     @Test
     fun `maps connected repository with its latest run counters and snapshot timestamps`() {
@@ -55,6 +58,7 @@ class IngestionSourceStatusServiceTest {
         )
         every { githubRepositoryConnectionRepository.findAll() } returns listOf(connection)
         every { ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(repositoryId) } returns run
+        every { artifactRepository.countByComponent("SprintStartProject/sprintstart-frontend") } returns 128
 
         val response = service.getStatusPerSourceInstance().single()
 
@@ -71,6 +75,7 @@ class IngestionSourceStatusServiceTest {
         assertThat(response.updatedCount).isEqualTo(3)
         assertThat(response.deletedCount).isEqualTo(1)
         assertThat(response.failedCount).isZero()
+        assertThat(response.artifactCount).isEqualTo(128)
         assertThat(response.lastCommitsSyncAt).isEqualTo(commitsAt)
         assertThat(response.lastIssuesSyncAt).isEqualTo(issuesAt)
         assertThat(response.lastPullRequestsSyncAt).isEqualTo(prAt)
@@ -89,6 +94,7 @@ class IngestionSourceStatusServiceTest {
         )
         every { githubRepositoryConnectionRepository.findAll() } returns listOf(connection)
         every { ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(repositoryId) } returns null
+        every { artifactRepository.countByComponent("owner/repo") } returns 0
 
         val response = service.getStatusPerSourceInstance().single()
 
@@ -96,6 +102,7 @@ class IngestionSourceStatusServiceTest {
         assertThat(response.enabled).isFalse()
         assertThat(response.lastRunTime).isNull()
         assertThat(response.ingestedCount).isZero()
+        assertThat(response.artifactCount).isZero()
         assertThat(response.failedItems).isEmpty()
         assertThat(response.lastCommitsSyncAt).isNull()
         assertThat(response.lastIssuesSyncAt).isNull()
@@ -116,11 +123,13 @@ class IngestionSourceStatusServiceTest {
         )
         every { githubRepositoryConnectionRepository.findAllByProjectId(projectId) } returns listOf(connection)
         every { ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(repositoryId) } returns null
+        every { artifactRepository.countByComponent("owner/repo") } returns 5
 
         val response = service.getStatusPerSourceInstance(projectId).single()
 
         assertThat(response.repositoryId).isEqualTo(repositoryId)
         assertThat(response.status).isEqualTo("OUT_OF_DATE")
+        assertThat(response.artifactCount).isEqualTo(5)
     }
 
     private fun connection(

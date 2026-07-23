@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRep
 import com.sprintstart.sprintstartbackend.connectors.github.service.toSourceStatus
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.SourceInstanceIngestionStatusResponse
+import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import org.springframework.stereotype.Service
@@ -23,6 +24,7 @@ import java.util.UUID
 class IngestionSourceStatusService(
     private val githubRepositoryConnectionRepository: GithubRepositoryConnectionRepository,
     private val ingestionRunRepository: IngestionRunRepository,
+    private val artifactRepository: ArtifactRepository,
 ) {
     /**
      * Returns one status row per connected GitHub repository.
@@ -47,15 +49,16 @@ class IngestionSourceStatusService(
     }
 
     private fun GithubRepositoryConnection.toStatusResponse(): SourceInstanceIngestionStatusResponse {
+        val component = "$owner/$name"
         val lastRun = ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(id)
         val snapshot = snapshot
         return SourceInstanceIngestionStatusResponse(
             sourceSystem = SourceSystem.GITHUB,
-            sourceId = "$owner/$name",
+            sourceId = component,
             repositoryId = id,
             owner = owner,
             name = name,
-            sourceUrl = "https://github.com/$owner/$name",
+            sourceUrl = "https://github.com/$component",
             status = toSourceStatus(),
             enabled = sourceEnabled,
             lastRunTime = lastRun?.startedAt,
@@ -64,6 +67,7 @@ class IngestionSourceStatusService(
             deletedCount = lastRun?.deletedCount ?: 0,
             failedCount = lastRun?.failedCount ?: 0,
             failedItems = lastRun?.failedItems ?: emptyList(),
+            artifactCount = artifactRepository.countByComponent(component),
             lastCommitsSyncAt = snapshot?.lastCommitsSyncAt,
             lastIssuesSyncAt = snapshot?.lastIssuesSyncAt,
             lastPullRequestsSyncAt = snapshot?.lastPullRequestsSyncAt,
