@@ -67,12 +67,13 @@ class OnboardingMetricsServiceTest {
         openedDaysAgo: Long? = 5,
         respondedDaysAgo: Long? = null,
         mergedDaysAgo: Long? = null,
+        state: String = if (mergedDaysAgo != null) "MERGED" else "OPEN",
     ) = AuthoredPullRequest(
         artifactId = UUID.randomUUID(),
         openedAt = openedDaysAgo?.let { daysAgo(it) },
         firstResponseAt = respondedDaysAgo?.let { daysAgo(it) },
         mergedAt = mergedDaysAgo?.let { daysAgo(it) },
-        state = if (mergedDaysAgo != null) "MERGED" else "OPEN",
+        state = state,
     )
 
     private fun stage(members: List<ProjectMember>, pullRequests: List<AuthoredPullRequest>) {
@@ -166,6 +167,19 @@ class OnboardingMetricsServiceTest {
 
             assertTrue(hire.stalled)
             assertTrue(hire.stalledReason!!.contains("4 days"))
+        }
+
+        @Test
+        fun `a pull request closed without merging is neither open nor a stall`() {
+            // Closed-unmerged PRs have a null mergedAt, so a merge-state-only check would miscount
+            // them as open and even report a long "waiting for review" stall on work that is done.
+            stage(listOf(member()), listOf(pullRequest(openedDaysAgo = 63, state = "CLOSED")))
+
+            val hire = service.getProjectMetrics(projectId).hires.single()
+
+            assertEquals(0, hire.openPullRequestCount)
+            assertFalse(hire.stalled)
+            assertNull(hire.longestOpenWaitHours)
         }
 
         @Test

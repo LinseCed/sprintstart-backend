@@ -151,7 +151,19 @@ data class AuthoredPullRequest(
     val title: String? = null,
     /** A link straight to the pull request on the host, when the artifact recorded one. */
     val sourceUrl: String? = null,
-)
+) {
+    /**
+     * Truly open: neither merged nor closed-without-merging.
+     *
+     * A pull request closed without merging also has a null [mergedAt], so merge state alone would
+     * miscount it as open — [state] is what separates a live pull request from a closed one. Merged
+     * pull requests carry a [mergedAt]; closed-unmerged ones report state `CLOSED`; only a genuinely
+     * open one is neither. An unknown ([state] null) unmerged pull request is treated as open, which
+     * only matters for data that predates state capture.
+     */
+    val isOpen: Boolean
+        get() = mergedAt == null && !"CLOSED".equals(state, ignoreCase = true)
+}
 
 /**
  * One artifact a person authored, reduced to what a prior can be built from.

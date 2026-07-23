@@ -107,7 +107,9 @@ class OnboardingMetricsService(
         val goalClaimedAt = userGoalRepository.findByUserIdAndProjectId(member.userId, projectId)?.claimedAt
 
         val longestOpenWait = pullRequests
-            .filter { it.firstResponseAt == null && it.mergedAt == null && it.openedAt != null }
+            // Only a still-open pull request is "waiting on a review": a closed one is done, not
+            // stuck, even though it never merged.
+            .filter { it.firstResponseAt == null && it.isOpen && it.openedAt != null }
             .mapNotNull { it.openedAt }
             .minOrNull()
             ?.let { hoursBetween(it, now) }
@@ -127,7 +129,9 @@ class OnboardingMetricsService(
             hoursToFirstMergedPullRequest = hoursBetween(member.joinedAt, merged),
             hoursToFirstResponse = hoursBetween(firstPullRequest?.openedAt, firstPullRequest?.firstResponseAt),
             mergedPullRequestCount = pullRequests.count { it.mergedAt != null },
-            openPullRequestCount = pullRequests.count { it.mergedAt == null },
+            // Open = still open, not merely unmerged: a pull request closed without merging is
+            // neither open nor merged and must not inflate the open count.
+            openPullRequestCount = pullRequests.count { it.isOpen },
             longestOpenWaitHours = longestOpenWait,
             stalled = stalledReason != null,
             stalledReason = stalledReason,
@@ -163,7 +167,8 @@ class OnboardingMetricsService(
         }
 
         val waitingSince = pullRequests
-            .filter { it.firstResponseAt == null && it.mergedAt == null }
+            // A closed-unmerged pull request is not waiting on anyone, so it cannot be the stall.
+            .filter { it.firstResponseAt == null && it.isOpen }
             .mapNotNull { it.openedAt }
             .minOrNull()
         if (waitingSince != null && hoursBetween(waitingSince, now)!! >= RESPONSE_SLA_HOURS) {
