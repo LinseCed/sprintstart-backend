@@ -122,6 +122,99 @@ class BuddyServiceTest {
     }
 
     @Nested
+    inner class OpenForMe {
+        @Test
+        fun `folds the previous window into memory, advances the cursor, and persists the greeting`() = runTest {
+            val session = BuddySession(userId = userId)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
+                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "how do I build?"),
+                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "use ./gradlew"),
+            )
+            every { buddyToolExecutor.stateSnapshot(userId) } returns "2 closed PRs"
+            coEvery { onboardingAiClient.buddyOpen(any()) } returns
+                com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenResponse(
+                    memory = "Sam asked how to build; taught ./gradlew.",
+                    greeting = "Welcome back, Sam!",
+                    action = null,
+                )
+            every { buddySessionRepository.save(any()) } answers { firstArg() }
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+
+            val result = service.openForMe(authId)
+
+            assertThat(result.greeting).isEqualTo("Welcome back, Sam!")
+            assertThat(session.summary).isEqualTo("Sam asked how to build; taught ./gradlew.")
+            assertThat(session.summarizedCount).isEqualTo(2)
+            verify { buddySessionRepository.save(session) }
+            verify {
+                buddyMessageRepository.save(
+                    match { it.role == BuddyMessageRole.ASSISTANT && it.content == "Welcome back, Sam!" },
+                )
+            }
+        }
+
+        @Test
+        fun `returns the suggested action when the AI provides one`() = runTest {
+            val session = BuddySession(userId = userId)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
+            every { buddyToolExecutor.stateSnapshot(userId) } returns "no PRs yet"
+            coEvery { onboardingAiClient.buddyOpen(any()) } returns
+                com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenResponse(
+                    memory = "m",
+                    greeting = "Hi!",
+                    action = com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenActionDto(
+                        label = "Find me a task",
+                        question = "What should I work on next?",
+                    ),
+                )
+            every { buddySessionRepository.save(any()) } answers { firstArg() }
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+
+            val result = service.openForMe(authId)
+
+            assertThat(result.action?.label).isEqualTo("Find me a task")
+            assertThat(result.action?.question).isEqualTo("What should I work on next?")
+        }
+
+        @Test
+        fun `degrades to a plain greeting and leaves memory untouched when the AI is unavailable`() = runTest {
+            val session = BuddySession(userId = userId, summary = "keep me", summarizedCount = 0)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
+                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "hi"),
+            )
+            every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
+            coEvery { onboardingAiClient.buddyOpen(any()) } throws
+                OnboardingAiException(503, "", "AI is down")
+
+            val result = service.openForMe(authId)
+
+            assertThat(result.greeting).isNotBlank()
+            assertThat(result.action).isNull()
+            // Memory and cursor are untouched, and nothing is persisted, so the unremembered window
+            // is folded on a later successful open.
+            assertThat(session.summary).isEqualTo("keep me")
+            assertThat(session.summarizedCount).isEqualTo(0)
+            verify(exactly = 0) { buddySessionRepository.save(any()) }
+            verify(exactly = 0) { buddyMessageRepository.save(any()) }
+        }
+
+        @Test
+        fun `throws 404 when the authenticated user does not exist`() = runTest {
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.empty()
+
+            assertThrows<ResponseStatusException> {
+                service.openForMe(authId)
+            }.also { assertThat(it.statusCode.value()).isEqualTo(404) }
+        }
+    }
+
+    @Nested
     inner class SendMessageForMe {
         @Test
         fun `persists the user message before calling the AI client`() = runTest {

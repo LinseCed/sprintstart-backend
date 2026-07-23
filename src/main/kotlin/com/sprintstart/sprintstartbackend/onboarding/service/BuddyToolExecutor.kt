@@ -26,6 +26,9 @@ import java.util.UUID
  * behalf of the resolved caller — the agent never supplies whose data to read, so one hire can
  * never read another's metrics through the buddy.
  */
+// One function per buddy tool (plus the shared state snapshot the opener grounds itself in); the
+// count tracks how much the buddy can read about the hire, not a class doing unrelated things.
+@Suppress("TooManyFunctions")
 @Component
 class BuddyToolExecutor(
     private val onboardingMetricsService: OnboardingMetricsService,
@@ -45,6 +48,19 @@ class BuddyToolExecutor(
             GET_SUGGESTED_TASKS_SPEC,
             SEARCH_CANONICAL_ANSWERS_SPEC,
         ) + buddyPlanTools.toolSpecs()
+
+    /**
+     * A plain-text snapshot of the hire's own onboarding, for the buddy's opening greeting to
+     * ground itself in. Reuses the exact reads the caller-scoped tools expose, so the opener and
+     * the tools can never describe different states.
+     */
+    fun stateSnapshot(userId: UUID): String =
+        listOf(
+            "Progress:\n" + getMyMetrics(userId),
+            "Open pull requests:\n" + getMyOpenPullRequests(userId),
+            "Suggested tasks:\n" + getSuggestedTasks(userId),
+            "Competencies:\n" + getMyCompetencies(userId),
+        ).joinToString("\n\n")
 
     /** Executes [call] on behalf of [userId], returning a plain-text result for the model. */
     fun execute(call: BuddyToolCallDto, userId: UUID): String =

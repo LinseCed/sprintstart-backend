@@ -62,6 +62,34 @@ data class BuddyCitationDto(
     @SerialName("start_page") val startPage: Int? = null,
 )
 
+/**
+ * DTOs for the AI service's `POST /api/v1/onboarding/buddy/open` endpoint.
+ *
+ * Opening a visit folds the previous visit ([recent]) into the mentor's durable [memory] and
+ * returns a warm, proactive [BuddyOpenResponse.greeting] grounded in [state] (a plain-text snapshot
+ * of the hire's pull requests, tasks and competencies). Stateless like every AI endpoint: the
+ * backend supplies the prior memory and persists the returned one.
+ */
+@Serializable
+data class BuddyOpenRequest(
+    val memory: String? = null,
+    val recent: List<BuddyAgentMessageDto> = emptyList(),
+    val state: String = "",
+)
+
+@Serializable
+data class BuddyOpenActionDto(
+    val label: String,
+    val question: String,
+)
+
+@Serializable
+data class BuddyOpenResponse(
+    val memory: String,
+    val greeting: String,
+    val action: BuddyOpenActionDto? = null,
+)
+
 @Serializable
 data class BuddyAgentResponse(
     // True when [text] is the answer; false when [pendingToolCalls] must be run first.
