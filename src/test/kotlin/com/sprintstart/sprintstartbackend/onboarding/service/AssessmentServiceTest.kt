@@ -3,15 +3,19 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.SkillAssessmentSessionStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentResultSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.GithubHistoryPrior
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.SkillAssessmentSession
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.SkillAssessmentTurn
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
+import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyModuleRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.SkillAssessmentSessionRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
@@ -40,6 +44,7 @@ class AssessmentServiceTest {
     private val onboardingAiClient: OnboardingAiClient = mockk()
     private val skillAssessmentSessionRepository: SkillAssessmentSessionRepository = mockk()
     private val competencyRepository: CompetencyRepository = mockk()
+    private val competencyModuleRepository: CompetencyModuleRepository = mockk()
     private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
     private val userApi: UserApi = mockk()
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
@@ -49,6 +54,7 @@ class AssessmentServiceTest {
             onboardingAiClient,
             skillAssessmentSessionRepository,
             competencyRepository,
+            competencyModuleRepository,
             userCompetencyStateRepository,
             userApi,
             githubHistoryPriorService,
@@ -56,6 +62,7 @@ class AssessmentServiceTest {
         )
 
     private val userId = UUID.randomUUID()
+    private val projectId = UUID.randomUUID()
     private val authId = "auth|test-user"
     private val kotlinCompetency = Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL)
 
@@ -66,32 +73,58 @@ class AssessmentServiceTest {
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
     }
 
+    /** Wires the project to have a live module for each competency, so it is a valid candidate. */
+    private fun setUpCandidates(vararg competencies: Competency) {
+        val keys = competencies.map { it.key }.toSet()
+        every {
+            competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE)
+        } returns keys.map {
+            CompetencyModule(
+                competencyKey = it,
+                projectId = projectId,
+                version = 1,
+                status = ModuleStatus.ACTIVE,
+                title = it,
+            )
+        }
+        every { competencyRepository.findAllByKeyIn(keys) } returns competencies.toList()
+    }
+
+    /** Wires the project to have no live modules at all -- nothing to assess. */
+    private fun setUpNoCandidates() {
+        every {
+            competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE)
+        } returns emptyList()
+    }
+
     @Nested
     inner class HasCompletedAssessment {
         @Test
-        fun `returns true when the user has a completed session`() {
+        fun `returns true when the user has a completed session for this project`() {
             setUpUser()
             every {
-                skillAssessmentSessionRepository.existsByUserIdAndStatus(
+                skillAssessmentSessionRepository.existsByUserIdAndProjectIdAndStatus(
                     userId,
+                    projectId,
                     SkillAssessmentSessionStatus.COMPLETED,
                 )
             } returns true
 
-            assertTrue(service.hasCompletedAssessment(authId))
+            assertTrue(service.hasCompletedAssessment(authId, projectId))
         }
 
         @Test
-        fun `returns false when the user has never completed a session`() {
+        fun `returns false when the user has never completed a session for this project`() {
             setUpUser()
             every {
-                skillAssessmentSessionRepository.existsByUserIdAndStatus(
+                skillAssessmentSessionRepository.existsByUserIdAndProjectIdAndStatus(
                     userId,
+                    projectId,
                     SkillAssessmentSessionStatus.COMPLETED,
                 )
             } returns false
 
-            assertEquals(false, service.hasCompletedAssessment(authId))
+            assertEquals(false, service.hasCompletedAssessment(authId, projectId))
         }
     }
 
@@ -101,12 +134,13 @@ class AssessmentServiceTest {
         fun `creates a new session and first turn when none is in progress`() = runTest {
             setUpUser()
             every {
-                skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
                     userId,
+                    projectId,
                     SkillAssessmentSessionStatus.IN_PROGRESS,
                 )
             } returns null
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             coEvery { onboardingAiClient.assessTurn(any()) } returns
                 AssessmentTurnResponse(done = false, question = "Walk me through a Kotlin null-safety pitfall.")
             val savedSlot = slot<SkillAssessmentSession>()
@@ -114,10 +148,12 @@ class AssessmentServiceTest {
             // The session is reserved first, then re-read to write its first turn onto.
             every { skillAssessmentSessionRepository.findById(any()) } answers { Optional.of(savedSlot.captured) }
 
-            val result = service.startAssessment(authId)
+            val result = service.startAssessment(authId, projectId)
 
             assertEquals("Walk me through a Kotlin null-safety pitfall.", result.question)
+            assertEquals(false, result.done)
             assertEquals(savedSlot.captured.id, result.sessionId)
+            assertEquals(projectId, savedSlot.captured.projectId)
             assertEquals(1, savedSlot.captured.turns.size)
             assertEquals(0, savedSlot.captured.turns[0].turnIndex)
             assertNull(savedSlot.captured.turns[0].answer)
@@ -126,19 +162,20 @@ class AssessmentServiceTest {
         @Test
         fun `reuses the in-progress session instead of creating a second one`() = runTest {
             setUpUser()
-            val reserved = SkillAssessmentSession(userId = userId)
+            val reserved = SkillAssessmentSession(userId = userId, projectId = projectId)
             every {
-                skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
                     userId,
+                    projectId,
                     SkillAssessmentSessionStatus.IN_PROGRESS,
                 )
             } returns reserved
             every { skillAssessmentSessionRepository.findById(reserved.id) } returns Optional.of(reserved)
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             coEvery { onboardingAiClient.assessTurn(any()) } returns
                 AssessmentTurnResponse(done = false, question = "q")
 
-            val result = service.startAssessment(authId)
+            val result = service.startAssessment(authId, projectId)
 
             // The session is reserved before the AI call, so a start racing another one joins it
             // rather than creating the stranded duplicates this replaced.
@@ -149,18 +186,19 @@ class AssessmentServiceTest {
         @Test
         fun `keeps the question a racing start already wrote`() = runTest {
             setUpUser()
-            val reserved = SkillAssessmentSession(userId = userId)
+            val reserved = SkillAssessmentSession(userId = userId, projectId = projectId)
             reserved.turns.add(
                 SkillAssessmentTurn(session = reserved, turnIndex = 0, question = "the first question"),
             )
             every {
-                skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
                     userId,
+                    projectId,
                     SkillAssessmentSessionStatus.IN_PROGRESS,
                 )
             } returns reserved
 
-            val result = service.startAssessment(authId)
+            val result = service.startAssessment(authId, projectId)
 
             assertEquals("the first question", result.question)
             coVerify(exactly = 0) { onboardingAiClient.assessTurn(any()) }
@@ -175,12 +213,13 @@ class AssessmentServiceTest {
             )
             every { githubHistoryPriorService.getPrior(userId) } returns prior
             every {
-                skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
                     userId,
+                    projectId,
                     SkillAssessmentSessionStatus.IN_PROGRESS,
                 )
             } returns null
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             val request = slot<AssessmentTurnRequest>()
             coEvery { onboardingAiClient.assessTurn(capture(request)) } returns
                 AssessmentTurnResponse(done = false, question = "q")
@@ -189,7 +228,7 @@ class AssessmentServiceTest {
             // The session is reserved first, then re-read to write its first turn onto.
             every { skillAssessmentSessionRepository.findById(any()) } answers { Optional.of(savedSlot.captured) }
 
-            service.startAssessment(authId)
+            service.startAssessment(authId, projectId)
 
             assertEquals(9, request.captured.candidateSignal.signals["repo:owner/api"])
         }
@@ -198,12 +237,13 @@ class AssessmentServiceTest {
         fun `sends an empty prior when the user has not consented`() = runTest {
             setUpUser()
             every {
-                skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
                     userId,
+                    projectId,
                     SkillAssessmentSessionStatus.IN_PROGRESS,
                 )
             } returns null
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             val request = slot<AssessmentTurnRequest>()
             coEvery { onboardingAiClient.assessTurn(capture(request)) } returns
                 AssessmentTurnResponse(done = false, question = "q")
@@ -212,7 +252,7 @@ class AssessmentServiceTest {
             // The session is reserved first, then re-read to write its first turn onto.
             every { skillAssessmentSessionRepository.findById(any()) } answers { Optional.of(savedSlot.captured) }
 
-            service.startAssessment(authId)
+            service.startAssessment(authId, projectId)
 
             // Not consenting must be indistinguishable from having no history, never an error.
             val signals = request.captured.candidateSignal.signals
@@ -222,16 +262,17 @@ class AssessmentServiceTest {
         @Test
         fun `resumes an existing in-progress session instead of creating a duplicate`() = runTest {
             setUpUser()
-            val existing = SkillAssessmentSession(userId = userId)
+            val existing = SkillAssessmentSession(userId = userId, projectId = projectId)
             existing.turns.add(SkillAssessmentTurn(session = existing, turnIndex = 0, question = "First question?"))
             every {
-                skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
                     userId,
+                    projectId,
                     SkillAssessmentSessionStatus.IN_PROGRESS,
                 )
             } returns existing
 
-            val result = service.startAssessment(authId)
+            val result = service.startAssessment(authId, projectId)
 
             assertEquals(existing.id, result.sessionId)
             assertEquals("First question?", result.question)
@@ -243,12 +284,13 @@ class AssessmentServiceTest {
         fun `records what the first question probed`() = runTest {
             setUpUser()
             every {
-                skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+                skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
                     userId,
+                    projectId,
                     SkillAssessmentSessionStatus.IN_PROGRESS,
                 )
             } returns null
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             coEvery { onboardingAiClient.assessTurn(any()) } returns AssessmentTurnResponse(
                 done = false,
                 question = "q",
@@ -258,9 +300,53 @@ class AssessmentServiceTest {
             every { skillAssessmentSessionRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
             every { skillAssessmentSessionRepository.findById(any()) } answers { Optional.of(savedSlot.captured) }
 
-            service.startAssessment(authId)
+            service.startAssessment(authId, projectId)
 
             assertEquals(listOf("kotlin", "jpa-persistence"), savedSlot.captured.turns[0].targets)
+        }
+
+        @Test
+        fun `surfaces an unavailable AI service as a retryable 503, not a raw failure`() = runTest {
+            setUpUser()
+            every {
+                skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
+                    userId,
+                    projectId,
+                    SkillAssessmentSessionStatus.IN_PROGRESS,
+                )
+            } returns null
+            setUpCandidates(kotlinCompetency)
+            val savedSlot = slot<SkillAssessmentSession>()
+            every { skillAssessmentSessionRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
+            coEvery { onboardingAiClient.assessTurn(any()) } throws
+                OnboardingAiException(503, "", "Failed to run assessment turn (HTTP 503): ")
+
+            val exception = assertThrows<ResponseStatusException> { service.startAssessment(authId, projectId) }
+
+            assertEquals(HttpStatus.SERVICE_UNAVAILABLE, exception.statusCode)
+        }
+
+        @Test
+        fun `finishes immediately with no question when the project has no live module yet`() = runTest {
+            setUpUser()
+            every {
+                skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
+                    userId,
+                    projectId,
+                    SkillAssessmentSessionStatus.IN_PROGRESS,
+                )
+            } returns null
+            setUpNoCandidates()
+            val savedSlot = slot<SkillAssessmentSession>()
+            every { skillAssessmentSessionRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
+            every { skillAssessmentSessionRepository.findById(any()) } answers { Optional.of(savedSlot.captured) }
+
+            val result = service.startAssessment(authId, projectId)
+
+            assertTrue(result.done)
+            assertNull(result.question)
+            assertEquals(SkillAssessmentSessionStatus.COMPLETED, savedSlot.captured.status)
+            coVerify(exactly = 0) { onboardingAiClient.assessTurn(any()) }
         }
     }
 
@@ -269,7 +355,7 @@ class AssessmentServiceTest {
         @Test
         fun `sends every past question's targets so the interviewer can be held to covering them`() = runTest {
             setUpUser()
-            val session = SkillAssessmentSession(userId = userId)
+            val session = SkillAssessmentSession(userId = userId, projectId = projectId)
             session.turns.add(
                 SkillAssessmentTurn(
                     session = session,
@@ -288,7 +374,7 @@ class AssessmentServiceTest {
                 ),
             )
             every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             val request = slot<AssessmentTurnRequest>()
             coEvery { onboardingAiClient.assessTurn(capture(request)) } returns
                 AssessmentTurnResponse(done = false, question = "Q2", targets = listOf("testing"))
@@ -305,7 +391,7 @@ class AssessmentServiceTest {
             setUpUser()
             // A session started before targets were recorded: absent is the honest reading, and it
             // makes the interviewer cover more rather than less.
-            val session = SkillAssessmentSession(userId = userId)
+            val session = SkillAssessmentSession(userId = userId, projectId = projectId)
             session.turns.add(
                 SkillAssessmentTurn(session = session, turnIndex = 0, question = "Q0", answer = "a0"),
             )
@@ -318,7 +404,7 @@ class AssessmentServiceTest {
                 ),
             )
             every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             val request = slot<AssessmentTurnRequest>()
             coEvery { onboardingAiClient.assessTurn(capture(request)) } returns
                 AssessmentTurnResponse(done = false, question = "Q2")
@@ -331,10 +417,10 @@ class AssessmentServiceTest {
         @Test
         fun `records what each following question probed`() = runTest {
             setUpUser()
-            val session = SkillAssessmentSession(userId = userId)
+            val session = SkillAssessmentSession(userId = userId, projectId = projectId)
             session.turns.add(SkillAssessmentTurn(session = session, turnIndex = 0, question = "Q0"))
             every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             coEvery { onboardingAiClient.assessTurn(any()) } returns
                 AssessmentTurnResponse(done = false, question = "Q1", targets = listOf("testing"))
 
@@ -347,7 +433,7 @@ class AssessmentServiceTest {
     @Nested
     inner class AnswerAssessment {
         private fun sessionWithOpenTurn(turnIndex: Int = 0, question: String = "Q$turnIndex"): SkillAssessmentSession {
-            val session = SkillAssessmentSession(userId = userId)
+            val session = SkillAssessmentSession(userId = userId, projectId = projectId)
             session.turns.add(SkillAssessmentTurn(session = session, turnIndex = turnIndex, question = question))
             return session
         }
@@ -357,7 +443,7 @@ class AssessmentServiceTest {
             setUpUser()
             val session = sessionWithOpenTurn()
             every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             coEvery { onboardingAiClient.assessTurn(any()) } returns
                 AssessmentTurnResponse(done = false, question = "Second question?")
 
@@ -376,7 +462,7 @@ class AssessmentServiceTest {
             setUpUser()
             val session = sessionWithOpenTurn()
             every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             coEvery { onboardingAiClient.assessTurn(any()) } returns
                 AssessmentTurnResponse(
                     done = true,
@@ -408,7 +494,7 @@ class AssessmentServiceTest {
             setUpUser()
             val session = sessionWithOpenTurn()
             every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             coEvery { onboardingAiClient.assessTurn(any()) } returns
                 AssessmentTurnResponse(
                     done = true,
@@ -443,7 +529,7 @@ class AssessmentServiceTest {
                 source = CompetencySource.VERIFIED,
             )
             every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             coEvery { onboardingAiClient.assessTurn(any()) } returns
                 AssessmentTurnResponse(
                     done = true,
@@ -471,7 +557,7 @@ class AssessmentServiceTest {
                 source = CompetencySource.ASSESSED,
             )
             every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             coEvery { onboardingAiClient.assessTurn(any()) } returns
                 AssessmentTurnResponse(
                     done = true,
@@ -492,7 +578,7 @@ class AssessmentServiceTest {
             setUpUser()
             val session = sessionWithOpenTurn()
             every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             coEvery { onboardingAiClient.assessTurn(any()) } returns
                 AssessmentTurnResponse(
                     done = true,
@@ -514,7 +600,7 @@ class AssessmentServiceTest {
             setUpUser()
             // MAX_TURNS = 6 (indices 0..5); turns 0..3 answered, turn 4 open -> nextTurnIndex = 5,
             // the last allowed index, so must_finish should flip to true.
-            val session = SkillAssessmentSession(userId = userId)
+            val session = SkillAssessmentSession(userId = userId, projectId = projectId)
             repeat(4) { i ->
                 session.turns.add(
                     SkillAssessmentTurn(session = session, turnIndex = i, question = "Q$i", answer = "A$i"),
@@ -522,7 +608,7 @@ class AssessmentServiceTest {
             }
             session.turns.add(SkillAssessmentTurn(session = session, turnIndex = 4, question = "Q4"))
             every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
-            every { competencyRepository.findAllByKind(CompetencyKind.SKILL) } returns listOf(kotlinCompetency)
+            setUpCandidates(kotlinCompetency)
             val requestSlot = slot<AssessmentTurnRequest>()
             coEvery { onboardingAiClient.assessTurn(capture(requestSlot)) } returns
                 AssessmentTurnResponse(done = true, assessments = emptyList())
@@ -550,7 +636,7 @@ class AssessmentServiceTest {
         @Test
         fun `throws 404 for a session owned by a different user`() {
             setUpUser()
-            val otherUsersSession = SkillAssessmentSession(userId = UUID.randomUUID())
+            val otherUsersSession = SkillAssessmentSession(userId = UUID.randomUUID(), projectId = projectId)
             otherUsersSession.turns.add(
                 SkillAssessmentTurn(session = otherUsersSession, turnIndex = 0, question = "Q0"),
             )
@@ -567,7 +653,7 @@ class AssessmentServiceTest {
         @Test
         fun `throws 409 when the session has no open turn`() {
             setUpUser()
-            val session = SkillAssessmentSession(userId = userId)
+            val session = SkillAssessmentSession(userId = userId, projectId = projectId)
             session.turns.add(
                 SkillAssessmentTurn(session = session, turnIndex = 0, question = "Q0", answer = "already answered"),
             )

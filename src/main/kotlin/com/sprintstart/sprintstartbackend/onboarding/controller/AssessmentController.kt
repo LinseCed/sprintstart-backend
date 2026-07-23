@@ -19,8 +19,10 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import java.util.UUID
 
 /**
  * Exposes the turn-based adaptive skill-assessment interview (Seam 2) for the authenticated user.
@@ -38,15 +40,16 @@ class AssessmentController(
     private val assessmentService: AssessmentService,
 ) {
     /**
-     * Returns whether the authenticated user has ever completed a skill assessment.
+     * Returns whether the authenticated user has ever completed a skill assessment for one project.
      *
      * @param jwt Authenticated JWT used to resolve the current user.
-     * @return Whether a completed assessment session exists for the user.
+     * @param projectId The project to check completion for. Assessment is per-project.
+     * @return Whether a completed assessment session exists for the user on this project.
      */
     @Operation(
-        summary = "Get the current user's skill-assessment status",
-        description = "Returns whether the user has ever completed the adaptive interview. " +
-            "Drives the client-side 'needs assessment' gate.",
+        summary = "Get the current user's skill-assessment status for one project",
+        description = "Returns whether the user has ever completed the adaptive interview for " +
+            "this project. Drives the client-side 'needs assessment' gate.",
     )
     @ApiResponses(
         value = [
@@ -62,20 +65,26 @@ class AssessmentController(
     fun getAssessmentStatusForMe(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
+        @RequestParam projectId: UUID,
     ): GetAssessmentStatusResponse {
-        return GetAssessmentStatusResponse(completed = assessmentService.hasCompletedAssessment(jwt.subject))
+        return GetAssessmentStatusResponse(
+            completed = assessmentService.hasCompletedAssessment(jwt.subject, projectId),
+        )
     }
 
     /**
-     * Starts (or resumes) the authenticated user's skill-assessment interview.
+     * Starts (or resumes) the authenticated user's skill-assessment interview for one project.
      *
      * @param jwt Authenticated JWT used to resolve the current user.
-     * @return The session id and the question to show next.
+     * @param projectId The project to run the interview for. Assessment is per-project.
+     * @return The session id and the question to show next, or `done=true` with no question if the
+     * project has nothing configured to assess yet.
      */
     @Operation(
-        summary = "Start or resume the current user's skill assessment",
-        description = "Starts a new adaptive interview, or resumes the user's existing " +
-            "in-progress session instead of starting a duplicate.",
+        summary = "Start or resume the current user's skill assessment for one project",
+        description = "Starts a new adaptive interview scoped to this project's live competency " +
+            "modules, or resumes the user's existing in-progress session for it instead of " +
+            "starting a duplicate.",
     )
     @ApiResponses(
         value = [
@@ -84,6 +93,7 @@ class AssessmentController(
             ApiResponse(responseCode = "403", description = "Insufficient role to start an assessment"),
             ApiResponse(responseCode = "404", description = "No user found for the authenticated user"),
             ApiResponse(responseCode = "502", description = "The AI service returned no question"),
+            ApiResponse(responseCode = "503", description = "The AI service is temporarily unavailable"),
         ],
     )
     @ResponseStatus(HttpStatus.OK)
@@ -92,8 +102,9 @@ class AssessmentController(
     suspend fun startAssessmentForMe(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
+        @RequestParam projectId: UUID,
     ): StartAssessmentResponse {
-        return assessmentService.startAssessment(jwt.subject)
+        return assessmentService.startAssessment(jwt.subject, projectId)
     }
 
     /**
@@ -120,6 +131,7 @@ class AssessmentController(
             ),
             ApiResponse(responseCode = "409", description = "The session has no open turn to answer"),
             ApiResponse(responseCode = "502", description = "The AI service returned no question"),
+            ApiResponse(responseCode = "503", description = "The AI service is temporarily unavailable"),
         ],
     )
     @ResponseStatus(HttpStatus.OK)
