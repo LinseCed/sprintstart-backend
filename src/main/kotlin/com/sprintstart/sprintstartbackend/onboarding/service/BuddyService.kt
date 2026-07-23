@@ -6,12 +6,16 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMe
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCitationDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
+import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyOpeningActionResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyOpeningResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -48,13 +52,72 @@ class BuddyService(
         buddySessionRepository.findByUserId(userId)
             ?: buddySessionRepository.save(BuddySession(userId = userId))
 
-    /** Returns the authenticated user's buddy conversation so far, oldest first. */
+    /**
+     * Returns the current visit's buddy messages, oldest first.
+     *
+     * Only the window after [BuddySession.summarizedCount] — everything older has been folded into
+     * the mentor's memory and is intentionally not replayed. A visit opens fresh with a greeting
+     * ([openForMe]); the durable memory, not a transcript, is what carries continuity across visits.
+     */
     fun getMessagesForMe(authId: String): List<BuddyMessageResponse> {
         val userId = resolveUserId(authId)
         val session = buddySessionRepository.findByUserId(userId) ?: return emptyList()
         return buddyMessageRepository
             .findAllBySessionIdOrderByCreatedAtAsc(session.id)
+            .drop(session.summarizedCount)
             .map { it.toResponse() }
+    }
+
+    /**
+     * Opens a visit: folds the previous visit into the mentor's memory and returns a proactive,
+     * mentor-written greeting grounded in the hire's current state — no transcript replay.
+     *
+     * The prior active window (everything after the memory cursor) is what the AI folds into the
+     * durable memory; on success the memory is replaced, the cursor advances past that window, and
+     * the greeting is persisted as the visit's opening message (so the rest of the visit has it as
+     * context). The AI already degrades to the prior memory and a plain welcome on its own failures;
+     * a transport-level failure here is caught too, leaving memory and cursor untouched so nothing
+     * the buddy has not yet remembered is ever dropped.
+     *
+     * @throws ResponseStatusException 404 if the authenticated user doesn't exist.
+     */
+    suspend fun openForMe(authId: String): BuddyOpeningResponse {
+        val userId = resolveUserId(authId)
+        val session = getOrCreateSession(userId)
+
+        val all = buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
+        val recent = all
+            .drop(session.summarizedCount)
+            .map { BuddyAgentMessageDto(role = it.role.toHistoryRole(), content = it.content) }
+        val state = buddyToolExecutor.stateSnapshot(userId)
+
+        val opening = try {
+            onboardingAiClient.buddyOpen(
+                BuddyOpenRequest(memory = session.summary, recent = recent, state = state),
+            )
+        } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
+            // Opening the buddy must never fail the page. Leave memory and cursor as they are so the
+            // unremembered window is folded on a later, successful open.
+            null
+        }
+
+        if (opening == null) {
+            return BuddyOpeningResponse(greeting = FALLBACK_OPENING)
+        }
+
+        // Advance the cursor past everything folded *before* persisting the greeting, so the greeting
+        // lands in the fresh active window and the just-folded window drops out of it.
+        session.summary = opening.memory
+        session.summarizedCount = all.size
+        buddySessionRepository.save(session)
+        buddyMessageRepository.save(
+            BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = opening.greeting),
+        )
+
+        return BuddyOpeningResponse(
+            greeting = opening.greeting,
+            action = opening.action?.let { BuddyOpeningActionResponse(it.label, it.question) },
+        )
     }
 
     /**
@@ -232,6 +295,11 @@ class BuddyService(
 
         const val FALLBACK_REPLY =
             "I wasn't able to finish answering that one — could you rephrase or add a little detail?"
+
+        // Shown when opening a visit can't reach the AI: a plain, warm welcome so the page still
+        // works and the hire can start talking.
+        const val FALLBACK_OPENING =
+            "Welcome back! How can I help with your onboarding today?"
 
         // Split after each space, keeping the space on the preceding chunk, so concatenating every
         // emitted token reproduces the answer exactly (newlines and punctuation preserved).

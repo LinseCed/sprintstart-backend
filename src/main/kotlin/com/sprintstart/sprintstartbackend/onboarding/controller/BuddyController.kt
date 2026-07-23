@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyAc
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.SendBuddyMessageRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyOpeningResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyService
 import io.swagger.v3.oas.annotations.Operation
@@ -57,6 +58,27 @@ class BuddyController(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
     ): List<BuddyMessageResponse> = buddyService.getMessagesForMe(jwt.subject)
+
+    @Operation(
+        summary = "Open a buddy visit",
+        description = "Opens the buddy: folds the previous visit into the mentor's durable memory and returns a " +
+            "proactive, mentor-written greeting grounded in the hire's current state, plus an optional suggested " +
+            "next step. The past transcript is not replayed — a visit starts fresh with this greeting.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Greeting returned successfully"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role to access this conversation"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/open")
+    @PreAuthorize("hasRole('USER')")
+    suspend fun openForMe(
+        @Parameter(hidden = true)
+        @AuthenticationPrincipal jwt: Jwt,
+    ): BuddyOpeningResponse = buddyService.openForMe(jwt.subject)
 
     @Operation(
         summary = "Send a message to the buddy",
