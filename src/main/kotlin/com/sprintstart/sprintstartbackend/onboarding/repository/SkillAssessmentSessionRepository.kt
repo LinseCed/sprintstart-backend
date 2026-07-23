@@ -6,10 +6,15 @@ import org.springframework.data.jpa.repository.JpaRepository
 import java.util.UUID
 
 interface SkillAssessmentSessionRepository : JpaRepository<SkillAssessmentSession, UUID> {
-    fun findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+    fun findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
         userId: UUID,
+        projectId: UUID,
         status: SkillAssessmentSessionStatus,
     ): SkillAssessmentSession?
 
-    fun existsByUserIdAndStatus(userId: UUID, status: SkillAssessmentSessionStatus): Boolean
+    fun existsByUserIdAndProjectIdAndStatus(
+        userId: UUID,
+        projectId: UUID,
+        status: SkillAssessmentSessionStatus,
+    ): Boolean
 }

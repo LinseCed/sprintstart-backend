@@ -52,6 +52,7 @@ class AssessmentControllerTest(
 
     private val authId = "test-auth-id"
     private val sessionId = UUID.randomUUID()
+    private val projectId = UUID.randomUUID()
 
     private fun jwtWithSubject(subject: String, vararg roles: String): JwtRequestPostProcessor {
         return jwt()
@@ -69,18 +70,21 @@ class AssessmentControllerTest(
     // Non-suspend handler, so no async dispatch is involved here.
     @Test
     fun `getAssessmentStatusForMe should return 200 with the completion flag`() {
-        every { assessmentService.hasCompletedAssessment(authId) } returns true
+        every { assessmentService.hasCompletedAssessment(authId, projectId) } returns true
 
         mockMvc
-            .perform(get("/api/v1/onboarding/me/assessment/status").with(userJwt))
-            .andExpect(status().isOk)
+            .perform(
+                get("/api/v1/onboarding/me/assessment/status")
+                    .queryParam("projectId", projectId.toString())
+                    .with(userJwt),
+            ).andExpect(status().isOk)
             .andExpect(jsonPath("$.completed").value(true))
     }
 
     @Test
     fun `getAssessmentStatusForMe should return 401 when not authenticated`() {
         mockMvc
-            .perform(get("/api/v1/onboarding/me/assessment/status"))
+            .perform(get("/api/v1/onboarding/me/assessment/status").queryParam("projectId", projectId.toString()))
             .andExpect(status().isUnauthorized)
     }
 
@@ -88,12 +92,15 @@ class AssessmentControllerTest(
 
     @Test
     fun `startAssessmentForMe should return 200 and the first question`() {
-        coEvery { assessmentService.startAssessment(authId) } returns
+        coEvery { assessmentService.startAssessment(authId, projectId) } returns
             StartAssessmentResponse(sessionId = sessionId, question = "Walk me through your last PR.")
 
         val mvcResult = mockMvc
-            .perform(post("/api/v1/onboarding/me/assessment/start").with(userJwt))
-            .andExpect(request().asyncStarted())
+            .perform(
+                post("/api/v1/onboarding/me/assessment/start")
+                    .queryParam("projectId", projectId.toString())
+                    .with(userJwt),
+            ).andExpect(request().asyncStarted())
             .andReturn()
 
         mockMvc
@@ -103,21 +110,24 @@ class AssessmentControllerTest(
             .andExpect(jsonPath("$.sessionId").value(sessionId.toString()))
             .andExpect(jsonPath("$.question").value("Walk me through your last PR."))
 
-        coVerify(exactly = 1) { assessmentService.startAssessment(authId) }
+        coVerify(exactly = 1) { assessmentService.startAssessment(authId, projectId) }
     }
 
     @Test
     fun `startAssessmentForMe should return 401 when not authenticated`() {
         mockMvc
-            .perform(post("/api/v1/onboarding/me/assessment/start"))
+            .perform(post("/api/v1/onboarding/me/assessment/start").queryParam("projectId", projectId.toString()))
             .andExpect(status().isUnauthorized)
     }
 
     @Test
     fun `startAssessmentForMe should return 403 when authenticated with wrong role`() {
         val mvcResult = mockMvc
-            .perform(post("/api/v1/onboarding/me/assessment/start").with(noUserRoleJwt))
-            .andExpect(request().asyncStarted())
+            .perform(
+                post("/api/v1/onboarding/me/assessment/start")
+                    .queryParam("projectId", projectId.toString())
+                    .with(noUserRoleJwt),
+            ).andExpect(request().asyncStarted())
             .andReturn()
 
         mockMvc

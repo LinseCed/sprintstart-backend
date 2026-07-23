@@ -3,23 +3,28 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.SkillAssessmentSessionStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentHistoryEntrySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTargetsSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.CandidateCompetencySchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.CandidateSignalSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.SkillAssessmentSession
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.SkillAssessmentTurn
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
+import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.model.response.assessment.AnswerAssessmentResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.assessment.StartAssessmentResponse
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyModuleRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.SkillAssessmentSessionRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.slf4j.LoggerFactory
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -34,11 +39,14 @@ import java.util.UUID
  * turn to the AI interviewer (Seam 1), and writes the final placement to the durable ledger
  * ([UserCompetencyState]).
  *
- * Candidate competencies are today's [CompetencyKind.SKILL] nodes with a flat `role_weight = 1.0`
- * — weighting by blueprint requirement or graph centrality needs Phase 2's traversal and a
- * blueprint-step-to-competency-key bridge that doesn't exist yet. `repo_signal` is always the
- * empty placeholder for the same reason: nothing in `ingestion` aggregates languages/frameworks
- * today. Both are flagged follow-ups, not oversights.
+ * Per-project: a hire runs this interview once per project they are on, not once ever. Candidate
+ * competencies are the [CompetencyKind.SKILL] nodes that project actually teaches -- the keys of
+ * its live [com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule]s, the same
+ * association the project's path already points modules through -- not the whole global catalog, so
+ * a hire on the frontend project is never interviewed on a backend-only project's competencies. The
+ * placement it writes still lands on the global ledger: "earn once, transfers across projects" is
+ * unchanged, only the interview itself is scoped. `repo_signal` stays the empty placeholder, since
+ * nothing in `ingestion` aggregates languages/frameworks yet.
  */
 @Suppress("TooManyFunctions")
 @Service
@@ -46,11 +54,14 @@ class AssessmentService(
     private val onboardingAiClient: OnboardingAiClient,
     private val skillAssessmentSessionRepository: SkillAssessmentSessionRepository,
     private val competencyRepository: CompetencyRepository,
+    private val competencyModuleRepository: CompetencyModuleRepository,
     private val userCompetencyStateRepository: UserCompetencyStateRepository,
     private val userApi: UserApi,
     private val githubHistoryPriorService: GithubHistoryPriorService,
     transactionManager: PlatformTransactionManager,
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
+
     // Mirrors BlueprintService: the AI call is a long-running suspend operation and must not run
     // inside a transaction, so DB reads/writes bracket it in their own explicit transactions.
     private val txTemplate = TransactionTemplate(transactionManager)
@@ -58,29 +69,36 @@ class AssessmentService(
         TransactionTemplate(transactionManager).apply { isReadOnly = true }
 
     /**
-     * Whether the authenticated user has ever completed an assessment session.
+     * Whether the authenticated user has ever completed an assessment session for this project.
      *
      * The frontend's "needs assessment" gate checks this -- a COMPLETED session is the thing the
-     * assessment flow actually produces.
+     * assessment flow actually produces. Scoped per project: completing it for one project says
+     * nothing about another, since the questions asked (and the project's live modules they were
+     * scoped to) differ.
      *
      * @param authId The authenticated user's auth (JWT subject) id.
+     * @param projectId The project to check completion for.
      * @throws ResponseStatusException 404 if no user exists for [authId].
      */
-    fun hasCompletedAssessment(authId: String): Boolean {
+    fun hasCompletedAssessment(authId: String, projectId: UUID): Boolean {
         val userId = resolveUserId(authId)
-        return skillAssessmentSessionRepository.existsByUserIdAndStatus(
+        return skillAssessmentSessionRepository.existsByUserIdAndProjectIdAndStatus(
             userId,
+            projectId,
             SkillAssessmentSessionStatus.COMPLETED,
         )
     }
 
     /**
-     * Starts a new assessment for the authenticated user, or resumes their in-progress one.
+     * Starts a new assessment for the authenticated user on [projectId], or resumes their
+     * in-progress one for it.
      *
      * @param authId The authenticated user's auth (JWT subject) id.
-     * @return The session id and the question to show next.
+     * @param projectId The project to run the interview for.
+     * @return The session id and the question to show next, or `done=true` with no question if the
+     * project has nothing configured to assess yet.
      */
-    suspend fun startAssessment(authId: String): StartAssessmentResponse {
+    suspend fun startAssessment(authId: String, projectId: UUID): StartAssessmentResponse {
         val userId = resolveUserId(authId)
 
         // Reserve the session *before* the slow AI call. Resuming used to be checked against state
@@ -88,17 +106,26 @@ class AssessmentService(
         // saw nothing to resume and created its own -- four sessions for one assessment, three of
         // them stranded IN_PROGRESS with a question nobody ever saw.
         val reserved = withContext(Dispatchers.IO) {
-            txTemplate.execute { reserveSession(userId) }!!
+            txTemplate.execute { reserveSession(userId, projectId) }!!
         }
         reserved.openQuestion?.let {
             return StartAssessmentResponse(sessionId = reserved.sessionId, question = it)
         }
 
         val candidates = withContext(Dispatchers.IO) {
-            readTxTemplate.execute { loadCandidateCompetencies() }.orEmpty()
+            readTxTemplate.execute { loadCandidateCompetencies(projectId) }.orEmpty()
+        }
+        if (candidates.isEmpty()) {
+            // Nothing this project teaches yet to place the hire against -- an honest empty
+            // result, the same way GET /me/path treats "nothing set up yet" as a real state
+            // rather than an error. Finishing without ever calling the AI also avoids handing it
+            // an empty candidate list, which it cannot legitimately finish over either.
+            return withContext(Dispatchers.IO) {
+                txTemplate.execute { completeWithNothingToAssess(reserved.sessionId) }!!
+            }
         }
         val candidateSignal = withContext(Dispatchers.IO) { loadCandidateSignal(userId) }
-        val aiResponse = onboardingAiClient.assessTurn(
+        val aiResponse = runAssessTurn(
             AssessmentTurnRequest(
                 candidateCompetencies = candidates,
                 candidateSignal = candidateSignal,
@@ -122,23 +149,39 @@ class AssessmentService(
     )
 
     /**
-     * Returns the user's single in-progress session, creating an empty one if they have none.
+     * Returns the user's single in-progress session for [projectId], creating an empty one if they
+     * have none.
      *
      * Runs in its own short write transaction so it is the serialization point for concurrent
      * starts: whoever gets there first creates the row, everyone else finds it. A session reserved
      * this way has no turn yet -- [openFirstTurn] fills that in once the interviewer answers.
      */
-    private fun reserveSession(userId: UUID): ReservedSession {
-        val existing = skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
+    private fun reserveSession(userId: UUID, projectId: UUID): ReservedSession {
+        val existing = skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
             userId,
+            projectId,
             SkillAssessmentSessionStatus.IN_PROGRESS,
         )
         if (existing != null) {
             return ReservedSession(existing.id, existing.turns.lastOrNull { it.answer == null }?.question)
         }
 
-        val session = skillAssessmentSessionRepository.save(SkillAssessmentSession(userId = userId))
+        val session = skillAssessmentSessionRepository.save(
+            SkillAssessmentSession(userId = userId, projectId = projectId),
+        )
         return ReservedSession(session.id, null)
+    }
+
+    /**
+     * Finishes a reserved session immediately with no question and nothing assessed, because its
+     * project has no live competency module to interview against yet.
+     */
+    private fun completeWithNothingToAssess(sessionId: UUID): StartAssessmentResponse {
+        val session = skillAssessmentSessionRepository.findByIdOrNull(sessionId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Assessment session no longer exists")
+        session.status = SkillAssessmentSessionStatus.COMPLETED
+        session.updatedAt = Instant.now()
+        return StartAssessmentResponse(sessionId = session.id, question = null, done = true)
     }
 
     /**
@@ -196,13 +239,13 @@ class AssessmentService(
                     history = buildHistory(session, openTurn, answer),
                     targets = buildTargets(session),
                     nextTurnIndex = openTurn.turnIndex + 1,
-                    candidates = loadCandidateCompetencies(),
+                    candidates = loadCandidateCompetencies(session.projectId),
                 )
             }!!
         }
 
         val mustFinish = turnState.nextTurnIndex >= MAX_TURNS - 1
-        val aiResponse = onboardingAiClient.assessTurn(
+        val aiResponse = runAssessTurn(
             AssessmentTurnRequest(
                 candidateCompetencies = turnState.candidates,
                 candidateSignal = withContext(Dispatchers.IO) { loadCandidateSignal(userId) },
@@ -265,16 +308,6 @@ class AssessmentService(
             .filter { it.targets.isNotEmpty() }
             .map { AssessmentTargetsSchema(turn = it.turnIndex, keys = it.targets.toList()) }
 
-    /** Returns the resumable question for an existing in-progress session, or `null`. */
-    private fun findResumableSession(userId: UUID): StartAssessmentResponse? {
-        val session = skillAssessmentSessionRepository.findFirstByUserIdAndStatusOrderByCreatedAtDesc(
-            userId,
-            SkillAssessmentSessionStatus.IN_PROGRESS,
-        ) ?: return null
-        val openTurn = session.turns.lastOrNull { it.answer == null } ?: return null
-        return StartAssessmentResponse(sessionId = session.id, question = openTurn.question)
-    }
-
     /**
      * The candidate's consented involvement prior, or an empty signal.
      *
@@ -288,10 +321,25 @@ class AssessmentService(
         return CandidateSignalSchema(signals = prior.signals.toMap())
     }
 
-    private fun loadCandidateCompetencies(): List<CandidateCompetencySchema> =
-        competencyRepository.findAllByKind(CompetencyKind.SKILL).map {
-            CandidateCompetencySchema(key = it.key, label = it.label, description = it.description.orEmpty())
-        }
+    /**
+     * The [CompetencyKind.SKILL] competencies [projectId] actually teaches: the keys of its live
+     * [com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule]s, the same
+     * per-`(competencyKey, projectId)` association the path already points modules through. A
+     * project with no live modules yet returns an empty list -- callers must treat that as nothing
+     * to assess, not as a request to send an empty candidate set to the AI.
+     */
+    private fun loadCandidateCompetencies(projectId: UUID): List<CandidateCompetencySchema> {
+        val taughtKeys = competencyModuleRepository
+            .findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE)
+            .map { it.competencyKey }
+            .toSet()
+        if (taughtKeys.isEmpty()) return emptyList()
+
+        return competencyRepository
+            .findAllByKeyIn(taughtKeys)
+            .filter { it.kind == CompetencyKind.SKILL }
+            .map { CandidateCompetencySchema(key = it.key, label = it.label, description = it.description.orEmpty()) }
+    }
 
     private fun loadOwnedSession(userId: UUID, sessionId: UUID): SkillAssessmentSession {
         val session = skillAssessmentSessionRepository
@@ -365,6 +413,27 @@ class AssessmentService(
         }
         return LEVEL_RANKS[level.trim().lowercase()] ?: 0
     }
+
+    /**
+     * Runs one AI interviewer turn, translating a transport-level AI failure into a retryable
+     * 503 instead of letting [OnboardingAiException] surface as an opaque 500.
+     *
+     * The AI service itself now refuses to fabricate a placement when it is still too early to
+     * legitimately finish (a model that won't stop trying to finish early, or an unparseable
+     * response at that point) -- it answers with its own 503 rather than a hollow `done=true`.
+     * This is that failure reaching the caller as what it is: a "please retry", not a finished
+     * assessment nothing backed.
+     */
+    private suspend fun runAssessTurn(request: AssessmentTurnRequest): AssessmentTurnResponse =
+        try {
+            onboardingAiClient.assessTurn(request)
+        } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
+            logger.warn("Assessment turn unavailable: {}", e.message)
+            throw ResponseStatusException(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Assessment is temporarily unavailable, please try again",
+            )
+        }
 
     private fun resolveUserId(authId: String): UUID =
         userApi
