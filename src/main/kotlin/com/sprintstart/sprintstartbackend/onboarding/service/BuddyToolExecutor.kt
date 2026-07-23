@@ -100,12 +100,13 @@ class BuddyToolExecutor(
     }.trim()
 
     /**
-     * The hire's open (not-yet-merged) pull requests, named — so the buddy can say *which* pull
-     * request is stuck, not just how many. [getMyMetrics] reports the count and the longest wait;
-     * this fills the gap it leaves: the numbers, titles and links.
+     * The hire's still-open pull requests, named — so the buddy can say *which* pull request is
+     * stuck, not just how many. [getMyMetrics] reports the count and the longest wait; this fills
+     * the gap it leaves: the numbers, titles and links.
      *
-     * "Open" matches the metric exactly (`mergedAt == null`), so the list the buddy shows always
-     * has the same length as the "open pull requests" count it reports.
+     * "Open" means genuinely open — [AuthoredPullRequest.isOpen], not merely unmerged — so a pull
+     * request closed without merging is excluded, and the list matches the "open pull requests"
+     * count [getMyMetrics] reports.
      */
     private fun getMyOpenPullRequests(userId: UUID): String {
         val login = userApi.getGithubLoginByUserId(userId)
@@ -125,7 +126,8 @@ class BuddyToolExecutor(
         val sections = projects.mapNotNull { project ->
             val open = artifactIngestionApi
                 .getAuthoredPullRequests(project.projectId, login)
-                .filter { it.mergedAt == null }
+                // Still open, not merely unmerged — a pull request closed without merging is not open.
+                .filter { it.isOpen }
                 // Longest-waiting first: the one most likely to be the stall leads the list.
                 .sortedByDescending { waitHours(it.openedAt, now) ?: -1 }
             if (open.isEmpty()) {
@@ -263,8 +265,9 @@ class BuddyToolExecutor(
 
         val GET_MY_OPEN_PULL_REQUESTS_SPEC = BuddyToolSpecDto(
             name = GET_MY_OPEN_PULL_REQUESTS,
-            description = "The hire's own open (not yet merged) pull requests, each with its " +
-                "number, title, link, and how long it has been waiting for a first review. Use " +
+            description = "The hire's own still-open pull requests (not merged and not closed), " +
+                "each with its number, title, link, and how long it has been waiting for a first " +
+                "review. Use " +
                 "this whenever the hire asks which pull requests they have open, or to name the " +
                 "specific pull request that is stuck — `get_my_metrics` only gives the count and " +
                 "the longest wait, not the identifiers. Takes no arguments — it always reads the " +

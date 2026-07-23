@@ -56,12 +56,13 @@ class BuddyToolExecutorTest {
         openedHoursAgo: Long?,
         firstResponseAt: Instant? = null,
         sourceUrl: String? = null,
+        state: String = "OPEN",
     ) = AuthoredPullRequest(
         artifactId = UUID.randomUUID(),
         openedAt = openedHoursAgo?.let { Instant.now().minusSeconds(it * 3600) },
         firstResponseAt = firstResponseAt,
         mergedAt = null,
-        state = "OPEN",
+        state = state,
         number = number,
         title = title,
         sourceUrl = sourceUrl,
@@ -182,6 +183,21 @@ class BuddyToolExecutorTest {
         assertThat(result).contains("waiting 1514 hours for a first review")
         // Longest-waiting (the 1514h one) is listed before the 10h one.
         assertThat(result.indexOf("#141")).isLessThan(result.indexOf("#128"))
+    }
+
+    @Test
+    fun `does not list a pull request closed without merging as open`() {
+        every { userApi.getGithubLoginByUserId(userId) } returns "sam"
+        every { userApi.getUsersByIds(listOf(userId)) } returns
+            listOf(userWith(ProjectDto(projectId, "Checkout", null)))
+        every { artifactIngestionApi.getAuthoredPullRequests(projectId, "sam") } returns listOf(
+            openPullRequest(number = 128, title = "Abandoned attempt", openedHoursAgo = 100, state = "CLOSED"),
+        )
+
+        val result = executor.execute(openPullRequestsCall, userId)
+
+        assertThat(result).contains("no open pull requests")
+        assertThat(result).doesNotContain("#128")
     }
 
     @Test
