@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.ConnectRepositoryRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.DiscoverRepositoriesRequest
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.requests.UpdateRepositoryRequest
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.AddRepositoryToProjectResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.ConnectRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.ConnectRepositoryResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoverRepositoriesResponse
@@ -11,6 +12,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubRepositoryConnectionOrchestrator
+import com.sprintstart.sprintstartbackend.connectors.github.service.GithubRepositoryProjectService
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubUpdatesService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -32,6 +34,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import java.util.UUID
 
 @Tag(
     name = "Github Connector",
@@ -44,6 +47,7 @@ internal class GithubConnectorController(
     private val githubConnectorService: GithubConnectorService,
     private val githubUpdateService: GithubUpdatesService,
     private val connectionOrchestrator: GithubRepositoryConnectionOrchestrator,
+    private val githubRepositoryProjectService: GithubRepositoryProjectService,
 ) {
     /**
      * Discovers the GitHub repositories of a specified organization.
@@ -290,5 +294,43 @@ internal class GithubConnectorController(
     ): ResponseEntity<UpdateRepositoryResponse> {
         val response = githubUpdateService.updateRepository(request, true)
         return ResponseEntity.accepted().body(response)
+    }
+
+    /**
+     * Links an already-connected repository to an additional project.
+     *
+     * This reuses the existing connection and only adds the project id to its set of linked
+     * projects. It performs no fetching or re-ingestion, and is idempotent when the project is
+     * already linked.
+     *
+     * @param jwt The authentication principal used to authorize access to the target project.
+     * @param repositoryId The connected repository to link.
+     * @param projectId The project to add to the repository's linked projects.
+     * @return The repository connection with its resulting set of linked project ids.
+     */
+    @Operation(
+        summary = "Link a connected repository to another project",
+        description =
+            "Adds a project to an already-connected repository without fetching or re-ingesting " +
+                "anything. Idempotent when the project is already linked.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Repository linked to the project"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Caller has no access to the target project"),
+            ApiResponse(responseCode = "404", description = "Repository connection not found"),
+        ],
+    )
+    @PostMapping("/connections/{repositoryId}/projects/{projectId}")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('PM', 'ADMIN')")
+    fun addRepositoryToProject(
+        @Parameter(hidden = true) @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable repositoryId: UUID,
+        @PathVariable projectId: UUID,
+    ): ResponseEntity<AddRepositoryToProjectResponse> {
+        val projectIds = githubRepositoryProjectService.addProjectToRepository(jwt.subject, repositoryId, projectId)
+        return ResponseEntity.ok(AddRepositoryToProjectResponse(repositoryId, projectIds))
     }
 }

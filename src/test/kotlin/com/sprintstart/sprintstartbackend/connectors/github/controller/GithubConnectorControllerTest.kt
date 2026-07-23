@@ -20,6 +20,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.Re
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubRepositoryConnectionOrchestrator
+import com.sprintstart.sprintstartbackend.connectors.github.service.GithubRepositoryProjectService
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubUpdatesService
 import io.mockk.coEvery
 import io.mockk.every
@@ -65,6 +66,9 @@ class GithubConnectorControllerTest {
 
     @MockkBean
     private lateinit var githubUserRepository: GithubUserRepository
+
+    @MockkBean
+    private lateinit var githubRepositoryProjectService: GithubRepositoryProjectService
 
     private val objectMapper = jacksonObjectMapper()
 
