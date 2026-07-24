@@ -59,7 +59,7 @@ class IngestionSourceStatusService(
             owner = owner,
             name = name,
             sourceUrl = "https://github.com/$component",
-            status = toSourceStatus(),
+            connectionStatus = toSourceStatus(),
             enabled = sourceEnabled,
             lastRunTime = lastRun?.startedAt,
             ingestedCount = lastRun?.ingestedCount ?: 0,

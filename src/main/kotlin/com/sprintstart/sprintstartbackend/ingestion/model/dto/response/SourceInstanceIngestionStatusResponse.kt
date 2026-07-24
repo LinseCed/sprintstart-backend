@@ -28,9 +28,9 @@ data class SourceInstanceIngestionStatusResponse(
     @field:Schema(
         description =
             "Current connection status of the source instance: CONNECTED, UPDATING, OUT_OF_DATE, " +
-                "FAILED or DISABLED.",
+                "FAILED or DISABLED. Distinct from a run's status, which uses its own vocabulary.",
     )
-    val status: String,
+    val connectionStatus: String,
     @field:Schema(description = "Whether ingestion is currently enabled for this source instance.")
     val enabled: Boolean,
     @field:Schema(description = "Start time of the latest run for this instance. Null if it has never run.")

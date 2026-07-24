@@ -68,7 +68,7 @@ class IngestionSourceStatusServiceTest {
         assertThat(response.owner).isEqualTo("SprintStartProject")
         assertThat(response.name).isEqualTo("sprintstart-frontend")
         assertThat(response.sourceUrl).isEqualTo("https://github.com/SprintStartProject/sprintstart-frontend")
-        assertThat(response.status).isEqualTo("CONNECTED")
+        assertThat(response.connectionStatus).isEqualTo("CONNECTED")
         assertThat(response.enabled).isTrue()
         assertThat(response.lastRunTime).isEqualTo(run.startedAt)
         assertThat(response.ingestedCount).isEqualTo(42)
@@ -98,7 +98,7 @@ class IngestionSourceStatusServiceTest {
 
         val response = service.getStatusPerSourceInstance().single()
 
-        assertThat(response.status).isEqualTo("DISABLED")
+        assertThat(response.connectionStatus).isEqualTo("DISABLED")
         assertThat(response.enabled).isFalse()
         assertThat(response.lastRunTime).isNull()
         assertThat(response.ingestedCount).isZero()
@@ -128,7 +128,7 @@ class IngestionSourceStatusServiceTest {
         val response = service.getStatusPerSourceInstance(projectId).single()
 
         assertThat(response.repositoryId).isEqualTo(repositoryId)
-        assertThat(response.status).isEqualTo("OUT_OF_DATE")
+        assertThat(response.connectionStatus).isEqualTo("OUT_OF_DATE")
         assertThat(response.artifactCount).isEqualTo(5)
     }
 
