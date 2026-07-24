@@ -19,17 +19,30 @@ class JiraClient(
 ) {
     private val defaultMaxResults = 100
     private val defaultFields = listOf(
-        "summary",
-        "status",
-        "description",
         "issuetype",
-        "priority",
-        "assignee",
-        "reporter",
         "project",
+        "parent",
+        "resolution",
+        "resolutiondate",
         "created",
+        "priority",
+        "labels",
+        "versions",
+        "assignee",
         "updated",
+        "status",
+        "components",
+        "issuekey",
+        "description",
+        "timetracking",
+        "summary",
+        "creator",
+        "subtasks",
+        "reporter",
+        "duedate",
         "comment",
+        "environment",
+        "issuelinks"
     )
     private val defaultExpand = listOf("changelog")
 
