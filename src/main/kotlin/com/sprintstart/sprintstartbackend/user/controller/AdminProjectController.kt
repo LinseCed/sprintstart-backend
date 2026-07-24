@@ -32,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
+import io.swagger.v3.oas.annotations.parameters.RequestBody as SwaggerRequestBody
 
 /**
  * REST API for administrative project management.
@@ -125,7 +126,7 @@ class AdminProjectController(
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
     fun createProject(
-        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+        @SwaggerRequestBody(
             description = "Project metadata to create.",
             required = true,
             content = [Content(schema = Schema(implementation = CreateAdminProjectRequest::class))],
@@ -165,7 +166,7 @@ class AdminProjectController(
     fun patchProject(
         @Parameter(description = "UUID of the project to patch")
         @PathVariable projectId: UUID,
-        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+        @SwaggerRequestBody(
             description = "Project fields to update.",
             required = true,
             content = [Content(schema = Schema(implementation = PatchAdminProjectRequest::class))],
@@ -263,7 +264,7 @@ class AdminProjectController(
     fun assignUsers(
         @Parameter(description = "UUID of the project receiving users")
         @PathVariable projectId: UUID,
-        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+        @SwaggerRequestBody(
             description = "User IDs to assign to the project.",
             required = true,
             content = [Content(schema = Schema(implementation = AssignProjectUsersRequest::class))],
@@ -336,7 +337,7 @@ class AdminProjectController(
     fun setManager(
         @Parameter(description = "UUID of the project")
         @PathVariable projectId: UUID,
-        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+        @SwaggerRequestBody(
             description = "Identifier of the user to assign as project manager.",
             required = true,
             content = [Content(schema = Schema(implementation = SetProjectManagerRequest::class))],

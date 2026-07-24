@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.util.UUID
+import io.swagger.v3.oas.annotations.parameters.RequestBody as SwaggerRequestBody
 
 /**
  * REST API for project-manager-scoped project management.
@@ -165,7 +166,7 @@ class ProjectController(
     fun assignUsers(
         @Parameter(description = "UUID of the project receiving users")
         @PathVariable projectId: UUID,
-        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+        @SwaggerRequestBody(
             description = "User IDs to assign to the project.",
             required = true,
             content = [Content(schema = Schema(implementation = AssignProjectUsersRequest::class))],
