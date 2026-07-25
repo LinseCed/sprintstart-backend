@@ -164,6 +164,26 @@ class UserApiService(
         }
 
     /**
+     * Marks the given user's onboarding as completed.
+     *
+     * Idempotent: when the user is already flagged nothing is written. The change is
+     * flushed by the surrounding transaction on the managed entity.
+     *
+     * @param userId Internal SprintStart user identifier.
+     * @throws NoSuchElementException if no user is found with the provided identifier.
+     */
+    @Transactional
+    @Tracked("Marking user onboarding as completed")
+    override fun markOnboardingCompleted(userId: UUID) {
+        val user = userRepository.findById(userId).orElseThrow {
+            NoSuchElementException("User with id $userId not found")
+        }
+        if (!user.hasCompletedOnboarding) {
+            user.hasCompletedOnboarding = true
+        }
+    }
+
+    /**
      * Determines whether a user with the given authentication identifier has access to the specified project.
      *
      * @param authId The external authentication identifier of the user.
