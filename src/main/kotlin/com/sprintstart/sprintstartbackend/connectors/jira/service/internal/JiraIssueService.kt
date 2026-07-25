@@ -1,22 +1,68 @@
 package com.sprintstart.sprintstartbackend.connectors.jira.service.internal
 
 import com.sprintstart.sprintstartbackend.connectors.jira.JiraClient
+import com.sprintstart.sprintstartbackend.connectors.jira.external.events.JiraIssueFetchedEvent
+import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraIssueResponse
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentials
+import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstance
+import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraIssue
+import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraIssueRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
+import java.util.UUID
 
 @Service
 class JiraIssueService(
+    private val issueRepository: JiraIssueRepository,
     private val jiraClient: JiraClient,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
-    suspend fun searchAndIngestAllIssuesOfProjects(uri: String, credentials: JiraCredentials, projectId: List<String>) {
+    @Tracked("Fetching & ingesting all jira instance's issues of a list of projects")
+    suspend fun searchAndIngestAllIssuesOfProjects(
+        instance: JiraInstance,
+        credentials: JiraCredentials,
+        projectId: List<String>,
+    ): UUID {
+        val transactionId = UUID.randomUUID()
+
         projectId.forEach {
-            searchAndIngestAllIssuesOfProject(uri, credentials, it)
+            searchAndIngestAllIssuesOfProject(instance, credentials, it, transactionId)
         }
+
+        return transactionId
     }
 
-    suspend fun searchAndIngestAllIssuesOfProject(uri: String, credentials: JiraCredentials, projectId: String) {
-        val issues = jiraClient.searchIssues(uri, credentials, "project=$projectId")
-        // TODO: Process issues (store least amount of metadata possible)
-        // TODO: Ingest issues
+    @Tracked("Fetching & ingesting all jira instance's issues of a single project")
+    suspend fun searchAndIngestAllIssuesOfProject(
+        instance: JiraInstance,
+        credentials: JiraCredentials,
+        projectId: String,
+        transactionId: UUID,
+    ) {
+        val issues = jiraClient.searchIssues(instance.instanceUrl, credentials, "project=$projectId")
+        if (issues.isEmpty()) return
+
+        processAndIngestIssues(instance, issues, transactionId)
+    }
+
+    private suspend fun processAndIngestIssues(
+        instance: JiraInstance,
+        issues: List<JiraIssueResponse>,
+        transactionId: UUID,
+    ) {
+        issues
+            .map { JiraIssue(it.id, instance) }
+            .forEach { issueRepository.save(it) }
+
+        issues.forEach { ingestIssue(it, transactionId) }
+    }
+
+    private suspend fun ingestIssue(issue: JiraIssueResponse, transactionId: UUID) {
+        val event = JiraIssueFetchedEvent(
+            transactionId,
+            issue,
+        )
+        eventPublisher.publishEvent(event)
     }
 }

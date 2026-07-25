@@ -17,7 +17,7 @@ class JiraController(
 ) {
     @PostMapping("/connect")
     suspend fun connectInstance(@Valid request: ConnectJiraInstanceRequest): ResponseEntity<Unit> {
-        service.connectInstanceIfExists(request)
+        service.connectInstanceIfNeeded(request)
         return ResponseEntity.accepted().build()
     }
 }

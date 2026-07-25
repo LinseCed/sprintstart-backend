@@ -1,12 +1,9 @@
 package com.sprintstart.sprintstartbackend.connectors.jira
 
-import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.GetIssuesOfProjectRequest
-import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.GetProjectsOfInstanceResponse
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraIssueResponse
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraProjectResponse
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraServerCapabilitiesResponse
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentials
-import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraIssue
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraAuthException
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraResourceNotFoundException
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
@@ -44,7 +41,7 @@ class JiraClient(
         "duedate",
         "comment",
         "environment",
-        "issuelinks"
+        "issuelinks",
     )
     private val defaultExpand = listOf("changelog")
 
@@ -84,21 +81,21 @@ class JiraClient(
      */
     suspend fun searchProjects(
         baseUrl: String,
-        credentials: JiraCredentials
+        credentials: JiraCredentials,
     ): List<JiraProjectResponse> {
         return doFetchAll("$baseUrl/rest/api/3/project/search", credentials, null, null, null)
     }
 
     /**
-    * Checks remote Jira instance server capabilities, including a failsafe for if the given url does not point to a Jira
-    * instance.
-    *
-    * Right now the only validated capability is the server title, but depending on how strict we want to be we could also
-    * validate server versions, deployment types, etc...
-    *
-    * @param url The url to check capabilities of.
-    * @return true, if a valid Jira instance is available under the given url, otherwise false.
-    */
+     * Checks remote Jira instance server capabilities, including a failsafe for if the given url does not point to a Jira
+     * instance.
+     *
+     * Right now the only validated capability is the server title, but depending on how strict we want to be we could also
+     * validate server versions, deployment types, etc...
+     *
+     * @param url The url to check capabilities of.
+     * @return true, if a valid Jira instance is available under the given url, otherwise false.
+     */
     suspend fun checkInstanceCapabilities(url: String): Boolean {
         val serverInfo = try {
             webClient
@@ -228,6 +225,7 @@ class JiraClient(
 
 interface PageableResponse<T> {
     fun getValues(): List<T>
+
     fun isLast(): Boolean
 }
 

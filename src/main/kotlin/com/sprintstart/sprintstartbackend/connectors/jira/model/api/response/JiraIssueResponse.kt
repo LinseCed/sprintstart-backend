@@ -9,6 +9,7 @@ import java.time.OffsetDateTime
 
 @Serializable
 data class JiraIssueResponse(
+    val id: String,
     val key: String,
     val changelog: JiraIssueChangelog,
     val fields: JiraIssueFields,

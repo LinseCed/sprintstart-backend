@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.connectors.jira.model.api.request
 
 import jakarta.validation.constraints.NotBlank
+import java.util.UUID
 
 data class ConnectJiraInstanceRequest(
     @NotBlank
@@ -10,5 +11,5 @@ data class ConnectJiraInstanceRequest(
     @NotBlank
     val userEmail: String,
     @NotBlank
-    val projectId: String,
+    val projectId: UUID,
 )
