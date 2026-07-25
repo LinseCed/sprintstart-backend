@@ -41,7 +41,7 @@ class AdminProjectServiceTest {
 
     @Test
     fun `getAllProjects returns empty list when no projects exist`() {
-        every { projectRepository.findAll() } returns emptyList()
+        every { projectRepository.findAllWithManager() } returns emptyList()
 
         val result = service.getAllProjects()
 
@@ -59,7 +59,7 @@ class AdminProjectServiceTest {
         val frontendAssignment = ProjectUserAssignment(user = frontendUser, project = frontendProject)
         val backendAssignment = ProjectUserAssignment(user = backendUser, project = backendProject)
 
-        every { projectRepository.findAll() } returns listOf(frontendProject, backendProject)
+        every { projectRepository.findAllWithManager() } returns listOf(frontendProject, backendProject)
         every {
             assignmentRepository.findAllByProjectIdIn(listOf(frontendProject.id, backendProject.id))
         } returns listOf(frontendAssignment, backendAssignment)
@@ -445,6 +445,20 @@ class AdminProjectServiceTest {
         verify(exactly = 0) { assignmentRepository.findAllByProjectId(any()) }
         verify(exactly = 0) { assignmentRepository.deleteAll(any<Iterable<ProjectUserAssignment>>()) }
         verify(exactly = 0) { projectRepository.delete(any()) }
+    }
+
+    @Test
+    fun `removeUser rejects removing the assigned manager`() {
+        val manager = user(username = "erika").apply { roles.add(Role.PM) }
+        val project = project().apply { this.manager = manager }
+        every { projectRepository.findById(project.id) } returns Optional.of(project)
+
+        val ex = assertThrows<ResponseStatusException> {
+            service.removeUser(project.id, manager.id)
+        }
+
+        assertThat(ex.statusCode).isEqualTo(HttpStatus.CONFLICT)
+        verify(exactly = 0) { assignmentRepository.delete(any()) }
     }
 
     private fun projectSource(

@@ -45,7 +45,7 @@ class AdminProjectService(
     @Transactional(readOnly = true)
     @Tracked("Retrieving all projects")
     fun getAllProjects(): List<AdminProjectListResponse> {
-        val projects = projectRepository.findAll()
+        val projects = projectRepository.findAllWithManager()
         if (projects.isEmpty()) {
             return emptyList()
         }
@@ -219,7 +219,14 @@ class AdminProjectService(
     @Transactional
     @Tracked("Removing project user")
     fun removeUser(projectId: UUID, userId: UUID) {
-        findProject(projectId)
+        val project = findProject(projectId)
+        if (project.manager?.id == userId) {
+            throw ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "User with id $userId manages project with id $projectId. Clear the project manager first.",
+            )
+        }
+
         val assignment = assignmentRepository.findByProjectIdAndUserId(projectId, userId)
             ?: throw ResponseStatusException(
                 HttpStatus.NOT_FOUND,
