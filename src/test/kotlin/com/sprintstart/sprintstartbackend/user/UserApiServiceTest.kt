@@ -12,6 +12,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.util.Optional
 import java.util.UUID
 
@@ -165,6 +166,40 @@ class UserApiServiceTest {
         val result = userApi.userHasAccessToProject("missing-auth", UUID.randomUUID())
 
         assertThat(result).isFalse()
+    }
+
+    @Test
+    fun `markOnboardingCompleted sets the flag on a user that has not completed onboarding`() {
+        val userId = UUID.randomUUID()
+        val user = user(project = null)
+        assertThat(user.hasCompletedOnboarding).isFalse()
+
+        every { userRepository.findById(userId) } returns Optional.of(user)
+
+        userApi.markOnboardingCompleted(userId)
+
+        // The managed entity is mutated; the surrounding transaction flushes the change.
+        assertThat(user.hasCompletedOnboarding).isTrue()
+    }
+
+    @Test
+    fun `markOnboardingCompleted is idempotent when already completed`() {
+        val userId = UUID.randomUUID()
+        val user = user(project = null).apply { hasCompletedOnboarding = true }
+
+        every { userRepository.findById(userId) } returns Optional.of(user)
+
+        userApi.markOnboardingCompleted(userId)
+
+        assertThat(user.hasCompletedOnboarding).isTrue()
+    }
+
+    @Test
+    fun `markOnboardingCompleted throws when the user does not exist`() {
+        val userId = UUID.randomUUID()
+        every { userRepository.findById(userId) } returns Optional.empty()
+
+        assertThrows<NoSuchElementException> { userApi.markOnboardingCompleted(userId) }
     }
 
     private fun user(project: Project?) = User(
