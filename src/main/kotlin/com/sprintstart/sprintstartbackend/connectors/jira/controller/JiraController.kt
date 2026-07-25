@@ -16,8 +16,8 @@ class JiraController(
     private val service: JiraService,
 ) {
     @PostMapping("/connect")
-    fun connectInstance(@Valid request: ConnectJiraInstanceRequest): ResponseEntity<Unit> {
-        val response = service.connectInstance(request)
+    suspend fun connectInstance(@Valid request: ConnectJiraInstanceRequest): ResponseEntity<Unit> {
+        service.connectInstanceIfExists(request)
         return ResponseEntity.accepted().build()
     }
 }

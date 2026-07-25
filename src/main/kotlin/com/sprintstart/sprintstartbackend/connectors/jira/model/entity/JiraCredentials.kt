@@ -12,8 +12,7 @@ import java.util.UUID
 @Table(name = "jira_credentials")
 class JiraCredentials(
     @Id
-    var id: UUID = UUID.randomUUID(),
-    @Column(name = "user_email", nullable = false, unique = true)
+    @Column(name = "user_email")
     var userEmail: String,
     @Convert(converter = SymmetricEncryptedStringConverter::class)
     @Column(name = "api_key", nullable = false, unique = true)

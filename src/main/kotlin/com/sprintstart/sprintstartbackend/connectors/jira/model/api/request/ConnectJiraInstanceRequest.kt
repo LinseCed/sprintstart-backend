@@ -4,11 +4,11 @@ import jakarta.validation.constraints.NotBlank
 
 data class ConnectJiraInstanceRequest(
     @NotBlank
-    val name: String,
+    val displayName: String,
     @NotBlank
     val url: String,
     @NotBlank
-    val tokenName: String,
+    val userEmail: String,
     @NotBlank
     val projectId: String,
 )

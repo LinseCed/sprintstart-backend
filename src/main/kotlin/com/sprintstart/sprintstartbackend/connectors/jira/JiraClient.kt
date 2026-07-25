@@ -3,6 +3,8 @@ package com.sprintstart.sprintstartbackend.connectors.jira
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.GetIssuesOfProjectRequest
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.GetProjectsOfInstanceResponse
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraIssueResponse
+import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraProjectResponse
+import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraServerCapabilitiesResponse
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentials
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraIssue
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraAuthException
@@ -46,6 +48,18 @@ class JiraClient(
     )
     private val defaultExpand = listOf("changelog")
 
+    /**
+     * Searches a given Jira Cloud instance's issues and retrieves all issues from all projects the user has access to,
+     * along with a number of metadata on the issue, and allows filtering issues via JQL.
+     *
+     * @param baseUrl The base url of the Jira Instance to fetch issues from.
+     * @param credentials The Jira Cloud user credentials used for auth.
+     * @param jql The jql filter for the issues.
+     * @param fields A list of extra fields to fetch per issue.
+     * @param expand A list of properties to also include with each issue, as an extension.
+     * @param extraFields Additional fields to fetch.
+     * @return A list of Jira Cloud issue responses.
+     */
     suspend fun searchIssues(
         baseUrl: String,
         credentials: JiraCredentials,
@@ -57,28 +71,80 @@ class JiraClient(
         val requestFields = (fields + extraFields).joinToString(",")
         val requestExpand = expand.joinToString(",")
 
-        return doFetchAll(baseUrl, jql, requestFields, requestExpand, credentials)
+        return doFetchAll("$baseUrl/rest/api/3/search/jql", credentials, jql, requestFields, requestExpand)
     }
 
-    private suspend inline fun <reified T> doFetchAll(
+    /**
+     * Searches a given Jira Cloud instance for projects and returns a list of [JiraProjectResponse], including all
+     * projects the fetching user has access to using the given credentials.
+     *
+     * @param baseUrl The base url of the Jira Instance to fetch issues from.
+     * @param credentials description
+     * @return description
+     */
+    suspend fun searchProjects(
         baseUrl: String,
-        jql: String,
-        fields: String,
-        expand: String,
+        credentials: JiraCredentials
+    ): List<JiraProjectResponse> {
+        return doFetchAll("$baseUrl/rest/api/3/project/search", credentials, null, null, null)
+    }
+
+    /**
+    * Checks remote Jira instance server capabilities, including a failsafe for if the given url does not point to a Jira
+    * instance.
+    *
+    * Right now the only validated capability is the server title, but depending on how strict we want to be we could also
+    * validate server versions, deployment types, etc...
+    *
+    * @param url The url to check capabilities of.
+    * @return true, if a valid Jira instance is available under the given url, otherwise false.
+    */
+    suspend fun checkInstanceCapabilities(url: String): Boolean {
+        val serverInfo = try {
+            webClient
+                .get()
+                .uri(url)
+                .sync()
+                .perform<JiraServerCapabilitiesResponse>()
+        } catch (e: Exception) {
+            return false
+        }
+        return serverInfo.serverTitle == "Jira"
+    }
+
+    /**
+     * Fetches paginated resources from a Jira Cloud instance via the REST api and deserializes into [T].
+     *
+     * By default, Jira Cloud's REST api only allows paginated results. Therefore to fetch all resources, instead of a
+     * hardcoded maximum, we loop and retrieve the max amount of issues until we have it all, using the provided
+     * `nextPageToken`.
+     *
+     * @param url The base url of the Jira Instance to fetch issues from.
+     * @param jql The jql filter for the issues.
+     * @param fields A list of extra fields to fetch per issue.
+     * @param expand A list of properties to also include with each issue, as an extension.
+     * @param credentials The Jira Cloud user credentials used for auth.
+     * @return A list of deserialized [T], fetched from the Jira Cloud instance.
+     */
+    private suspend inline fun <reified T> doFetchAll(
+        url: String,
         credentials: JiraCredentials,
+        jql: String?,
+        fields: String?,
+        expand: String?,
     ): List<T> {
         val results = mutableListOf<T>()
         var startAt = 0
 
         while (true) {
-            val query = mapOf(
-                "jql" to jql,
-                "startAt" to startAt.toString(),
-                "maxResults" to defaultMaxResults.toString(),
-                "fields" to fields,
-                "expand" to expand,
-            )
-            val uri = buildUri(baseUrl, "/rest/api/3/search", query)
+            val query = buildMap {
+                jql?.let { put("jql", jql) }
+                put("startAt", startAt.toString())
+                put("maxResult", defaultMaxResults.toString())
+                fields?.let { put("fields", fields) }
+                expand?.let { put("expand", expand) }
+            }
+            val uri = buildUri(url, "", query)
 
             val page: PageableResponse<T> = performGet(uri, credentials)
 
@@ -173,6 +239,20 @@ data class PaginatedIssuesSearchResponse(
 ) : PageableResponse<JiraIssueResponse> {
     override fun getValues(): List<JiraIssueResponse> {
         return this.issues
+    }
+
+    override fun isLast(): Boolean {
+        return this.isLast
+    }
+}
+
+@Serializable
+data class PaginatedProjectsSearchResponse(
+    val isLast: Boolean,
+    val values: List<JiraProjectResponse>,
+) : PageableResponse<JiraProjectResponse> {
+    override fun getValues(): List<JiraProjectResponse> {
+        return this.values
     }
 
     override fun isLast(): Boolean {
