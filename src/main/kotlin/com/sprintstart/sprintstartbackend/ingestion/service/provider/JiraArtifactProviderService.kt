@@ -4,14 +4,17 @@ import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.JiraArtifa
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMetadataJsonMapper
+import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
+import jakarta.transaction.Transactional
 import org.springframework.stereotype.Service
 
 @Service
 class JiraArtifactProviderService(
     private val ingestionRunRepository: IngestionRunRepository,
-    private val artifactMetadataJsonMapper: ArtifactMetadataJsonMapper,
+    private val artifactRepository: ArtifactRepository,
 ) {
+    @Transactional
     fun persistArtifact(command: JiraArtifactCommand) {
         val runId = command.ingestionRunId
 
@@ -32,7 +35,8 @@ class JiraArtifactProviderService(
             createdAtSource = command.createdAt,
             updatedAtSource = command.updatedAt,
             hash = null,
-            metadata = artifactMetadataJsonMapper.toJson(command.comments),
         )
+        artifactRepository.save(artifact)
+        ingestionRun.ingestedCount++
     }
 }

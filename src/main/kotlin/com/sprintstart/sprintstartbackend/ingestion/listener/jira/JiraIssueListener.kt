@@ -6,8 +6,10 @@ import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues
 import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues.JiraResourceFetchingStartedEvent
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
+import com.sprintstart.sprintstartbackend.ingestion.model.mapper.JiraArtifactMapper
 import com.sprintstart.sprintstartbackend.ingestion.service.IngestionRunLifeCycleService
 import com.sprintstart.sprintstartbackend.ingestion.service.IngestionRunService
+import com.sprintstart.sprintstartbackend.ingestion.service.provider.JiraArtifactProviderService
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
 
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Component
 internal class JiraIssueListener(
     private val ingestionRunLifeCycleService: IngestionRunLifeCycleService,
     private val ingestionRunService: IngestionRunService,
+    private val jiraArtifactProviderService: JiraArtifactProviderService,
+    private val mapper: JiraArtifactMapper,
 ) {
     @EventListener
     fun on(event: JiraResourceFetchingStartedEvent) {
@@ -26,7 +30,7 @@ internal class JiraIssueListener(
 
     @EventListener
     fun on(event: JiraIssueFetchedEvent) {
-
+        jiraArtifactProviderService.persistArtifact(mapper.toCommand(event))
     }
 
     @EventListener
