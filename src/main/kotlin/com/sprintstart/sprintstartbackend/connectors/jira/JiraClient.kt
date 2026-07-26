@@ -3,7 +3,7 @@ package com.sprintstart.sprintstartbackend.connectors.jira
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraIssueResponse
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraProjectResponse
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraServerCapabilitiesResponse
-import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentials
+import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredential
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraAuthException
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraResourceNotFoundException
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
@@ -60,7 +60,7 @@ internal class JiraClient(
      */
     suspend fun searchIssues(
         baseUrl: String,
-        credentials: JiraCredentials,
+        credentials: JiraCredential,
         jql: String,
         fields: List<String> = defaultFields,
         expand: List<String> = defaultExpand,
@@ -82,7 +82,7 @@ internal class JiraClient(
      */
     suspend fun searchProjects(
         baseUrl: String,
-        credentials: JiraCredentials,
+        credentials: JiraCredential,
     ): List<JiraProjectResponse> {
         return doFetchAll("$baseUrl/rest/api/3/project/search", credentials, null, null, null)
     }
@@ -101,7 +101,7 @@ internal class JiraClient(
         val serverInfo = try {
             webClient
                 .get()
-                .uri(url)
+                .uri("$url/rest/api/3/serverInfo")
                 .sync()
                 .perform<JiraServerCapabilitiesResponse>()
         } catch (e: Exception) {
@@ -126,7 +126,7 @@ internal class JiraClient(
      */
     private suspend inline fun <reified T> doFetchAll(
         url: String,
-        credentials: JiraCredentials,
+        credentials: JiraCredential,
         jql: String?,
         fields: String?,
         expand: String?,
@@ -168,7 +168,7 @@ internal class JiraClient(
      */
     private suspend inline fun <reified T> performGet(
         uri: String,
-        credentials: JiraCredentials,
+        credentials: JiraCredential,
     ): T {
         return try {
             webClient
@@ -204,12 +204,12 @@ internal class JiraClient(
     }
 
     /**
-     * Extends [JiraCredentials] by formatting the credential values as a valid credential authorization header in Jira
+     * Extends [JiraCredential] by formatting the credential values as a valid credential authorization header in Jira
      * Cloud requests.
      *
      * @return The formatted credential values.
      */
-    private fun JiraCredentials.authorizationHeader(): String = "${this.id.userEmail}:${this.authToken}"
+    private fun JiraCredential.authorizationHeader(): String = "${this.id.userEmail}:${this.authToken}"
 
     /**
      * Encodes a given string into a valid path string.

@@ -9,7 +9,7 @@ import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.ConnectJiraInstanceRequest
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraInstanceDto
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.toDto
-import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentials
+import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredential
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentialsId
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstance
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraCredentialNotFoundException
@@ -122,7 +122,7 @@ internal class JiraService(
     @Tracked("Starting Jira instance connection process")
     private suspend fun connectInstance(
         request: ConnectJiraInstanceRequest,
-        credentials: JiraCredentials,
+        credentials: JiraCredential,
         transactionId: UUID,
     ) {
         eventPublisher.publishEvent(JiraResourceFetchingStartedEvent(transactionId))

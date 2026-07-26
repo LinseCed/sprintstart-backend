@@ -10,7 +10,7 @@ import jakarta.persistence.Table
 
 @Entity
 @Table(name = "jira_credentials")
-internal class JiraCredentials(
+internal class JiraCredential(
     @Id
     var id: JiraCredentialsId,
     @Convert(converter = SymmetricEncryptedStringConverter::class)

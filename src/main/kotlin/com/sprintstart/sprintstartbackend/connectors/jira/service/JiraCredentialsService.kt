@@ -1,10 +1,12 @@
 package com.sprintstart.sprintstartbackend.connectors.jira.service
 
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.credentials.AddCredentialRequest
+import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.credentials.ChangeJiraCredentialNameRequest
+import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.credentials.ChangeJiraCredentialTokenRequest
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.credentials.DeleteJiraCredentialRequest
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.credentials.JiraCredentialsDto
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.credentials.toDto
-import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentials
+import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredential
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentialsId
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraCredentialAlreadyExistsException
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraCredentialNotFoundException
@@ -23,7 +25,7 @@ internal class JiraCredentialsService(
             throw JiraCredentialAlreadyExistsException(request.userEmail, request.tokenName)
         }
 
-        val credentials = JiraCredentials(JiraCredentialsId(request.userEmail, request.tokenName), request.authToken)
+        val credentials = JiraCredential(JiraCredentialsId(request.userEmail, request.tokenName), request.authToken)
         credentialsRepository.save(credentials)
     }
 
@@ -39,5 +41,31 @@ internal class JiraCredentialsService(
         }
 
         credentialsRepository.deleteById(JiraCredentialsId(request.userEmail, request.tokenName))
+    }
+
+    @Tracked("Changing Jira credential name")
+    fun changeCredentialName(request: ChangeJiraCredentialNameRequest): JiraCredentialsDto {
+        val credential = credentialsRepository
+            .findById(JiraCredentialsId(request.userEmail, request.oldName))
+            .orElseThrow {
+                throw JiraCredentialNotFoundException(request.userEmail, request.oldName)
+            }
+
+        credential.id.name = request.newName
+        credentialsRepository.save(credential)
+        return credential.toDto()
+    }
+
+    @Tracked("Changing Jira credential name")
+    fun changeCredentialToken(request: ChangeJiraCredentialTokenRequest): JiraCredentialsDto {
+        val credential = credentialsRepository
+            .findById(JiraCredentialsId(request.userEmail, request.tokenName))
+            .orElseThrow {
+                throw JiraCredentialNotFoundException(request.userEmail, request.tokenName)
+            }
+
+        credential.authToken = request.newToken
+        credentialsRepository.save(credential)
+        return credential.toDto()
     }
 }

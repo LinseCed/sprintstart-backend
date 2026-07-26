@@ -5,7 +5,7 @@ import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues
 import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues.JiraResourceFetchingCompleteEvent
 import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues.JiraResourceFetchingFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraIssueResponse
-import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentials
+import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredential
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstance
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraIssue
 import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraIssueRepository
@@ -23,7 +23,7 @@ internal class JiraIssueService(
     @Tracked("Fetching & ingesting all jira instance's issues of a list of projects")
     suspend fun searchAndIngestAllIssuesOfProjects(
         instance: JiraInstance,
-        credentials: JiraCredentials,
+        credentials: JiraCredential,
         projectId: List<String>,
         transactionId: UUID,
     ) {
@@ -35,7 +35,7 @@ internal class JiraIssueService(
     @Tracked("Fetching & ingesting all jira instance's issues of a single project")
     suspend fun searchAndIngestAllIssuesOfProject(
         instance: JiraInstance,
-        credentials: JiraCredentials,
+        credentials: JiraCredential,
         projectId: String,
         transactionId: UUID,
     ) {

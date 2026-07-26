@@ -3,9 +3,11 @@ package com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.cre
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
 
-data class DeleteJiraCredentialRequest(
+data class ChangeJiraCredentialNameRequest(
     @Pattern(regexp = "^[\\w\\-.]+@([\\w-]+\\.)+[\\w-]{2,}$")
     val userEmail: String,
     @NotBlank
-    val tokenName: String,
+    val oldName: String,
+    @NotBlank
+    val newName: String,
 )
