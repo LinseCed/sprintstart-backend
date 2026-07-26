@@ -9,7 +9,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "jira_instances")
-class JiraInstance(
+internal class JiraInstance(
     @Id
     @Column(name = "instance_url", unique = true, nullable = false)
     var instanceUrl: String,
@@ -19,4 +19,6 @@ class JiraInstance(
     var lastUpdate: Instant = Instant.now(),
     @Column(name = "project_id", nullable = false)
     var projectIds: MutableSet<UUID> = mutableSetOf(),
+    @Column(name = "source_enabled", nullable = false)
+    var sourceEnabled: Boolean = false,
 )

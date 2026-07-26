@@ -9,11 +9,12 @@ import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraR
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
 import kotlinx.serialization.Serializable
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import java.net.URLEncoder
 
 @Component
-class JiraClient(
+internal class JiraClient(
     private val webClient: WebClient,
 ) {
     private val defaultMaxResults = 100
@@ -179,7 +180,8 @@ class JiraClient(
                 .perform<T>()
         } catch (e: WebClientException) {
             when (e.statusCode) {
-                401, 403 -> throw JiraAuthException(e.body)
+                401 -> throw JiraAuthException(HttpStatus.UNAUTHORIZED, e.body)
+                403 -> throw JiraAuthException(HttpStatus.FORBIDDEN, e.body)
                 404 -> throw JiraResourceNotFoundException("Jira resource not found at $uri: ${e.body}")
                 else -> throw e
             }

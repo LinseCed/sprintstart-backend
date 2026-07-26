@@ -9,7 +9,7 @@ import jakarta.persistence.Table
 
 @Entity
 @Table(name = "jira_issues")
-class JiraIssue(
+internal class JiraIssue(
     @Id
     var id: String,
     @ManyToOne(fetch = FetchType.LAZY)

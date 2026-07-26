@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository
 import java.util.UUID
 
 @Repository
-interface JiraCredentialsRepository : JpaRepository<JiraCredentials, UUID> {
+internal interface JiraCredentialsRepository : JpaRepository<JiraCredentials, UUID> {
     @Query(
         """
         select c from jira_credentials c where c.user_email = :email;

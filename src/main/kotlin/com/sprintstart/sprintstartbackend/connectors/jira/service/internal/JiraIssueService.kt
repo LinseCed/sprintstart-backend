@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service
 import java.util.UUID
 
 @Service
-class JiraIssueService(
+internal class JiraIssueService(
     private val issueRepository: JiraIssueRepository,
     private val jiraClient: JiraClient,
     private val eventPublisher: ApplicationEventPublisher,
@@ -64,14 +64,16 @@ class JiraIssueService(
             .map { JiraIssue(it.id, instance) }
             .forEach { issueRepository.save(it) }
 
-        issues.forEach { ingestIssue(it, transactionId) }
+        issues.forEach { ingestIssue(it, instance, transactionId) }
 
         eventPublisher.publishEvent(JiraResourceFetchingCompleteEvent(transactionId))
     }
 
-    private suspend fun ingestIssue(issue: JiraIssueResponse, transactionId: UUID) {
+    private suspend fun ingestIssue(issue: JiraIssueResponse, instance: JiraInstance, transactionId: UUID) {
         val event = JiraIssueFetchedEvent(
             transactionId,
+            instance.instanceUrl,
+            instance.instanceUrl,
             issue,
         )
         eventPublisher.publishEvent(event)

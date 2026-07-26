@@ -10,7 +10,7 @@ import java.util.UUID
 
 @Entity
 @Table(name = "jira_credentials")
-class JiraCredentials(
+internal class JiraCredentials(
     @Id
     @Column(name = "user_email")
     var userEmail: String,

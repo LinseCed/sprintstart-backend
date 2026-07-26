@@ -1,5 +1,8 @@
 package com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions
 
-data class JiraAuthException(
+import org.springframework.http.HttpStatus
+
+internal data class JiraAuthException(
+    val code: HttpStatus,
     val msg: String,
-) : RuntimeException(msg)
+) : RuntimeException("Request to jira instance returned $code: $msg")

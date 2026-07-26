@@ -7,9 +7,12 @@ import com.sprintstart.sprintstartbackend.connectors.jira.external.events.initia
 import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues.JiraResourceFetchingFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues.JiraResourceFetchingStartedEvent
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.ConnectJiraInstanceRequest
+import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraInstanceDto
+import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.toDto
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentials
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstance
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraCredentialNotFoundException
+import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraInstanceNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraInstanceUnavailableException
 import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraCredentialsRepository
 import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraInstanceRepository
@@ -22,11 +25,12 @@ import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
-import java.util.*
+import java.util.UUID
 
 @Service
-class JiraService(
+internal class JiraService(
     private val credentialsRepository: JiraCredentialsRepository,
     private val instanceRepository: JiraInstanceRepository,
     private val jiraClient: JiraClient,
@@ -35,6 +39,25 @@ class JiraService(
     private val eventPublisher: ApplicationEventPublisher,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
+
+    @Transactional(readOnly = true)
+    @Tracked("Retrieving all connected Jira instances")
+    fun getInstances(): List<JiraInstanceDto> =
+        instanceRepository.findAll().map { it.toDto() }
+
+    @Transactional(readOnly = true)
+    @Tracked("Retrieving connected Jira instances for project")
+    fun getInstances(projectId: UUID): List<JiraInstanceDto> =
+        instanceRepository.findByProjectId(projectId).map { it.toDto() }
+
+    @Tracked("Patching Jira instance status")
+    fun patchInstance(instanceId: String, newStatus: Boolean) {
+        val instance = instanceRepository.findById(instanceId).orElseThrow {
+            throw JiraInstanceNotConnectedException(instanceId)
+        }
+        instance.sourceEnabled = newStatus
+        instanceRepository.save(instance)
+    }
 
     @Tracked("Connecting Jira Cloud instance if not already connected")
     suspend fun connectInstanceIfNeeded(request: ConnectJiraInstanceRequest): UUID = withContext(Dispatchers.IO) {
