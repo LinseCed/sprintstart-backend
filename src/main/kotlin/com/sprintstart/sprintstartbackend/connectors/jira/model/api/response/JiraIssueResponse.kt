@@ -17,9 +17,6 @@ data class JiraIssueResponse(
 
 @Serializable
 data class JiraIssueChangelog(
-    val startAt: Int,
-    val maxResults: Int,
-    val total: Int,
     val histories: List<JiraIssueChangelogHistory>,
 )
 
@@ -59,7 +56,7 @@ data class JiraIssueFields(
     // TODO: val duedate
     // TODO: val resolutiondate
     val comment: JiraIssueCommentField,
-    val assignee: JiraAuthor,
+    val assignee: JiraAuthor?,
     @Serializable(with = CustomOffsetDateTimeSerializer::class)
     val updated: OffsetDateTime,
     val status: JiraIssueStatus,

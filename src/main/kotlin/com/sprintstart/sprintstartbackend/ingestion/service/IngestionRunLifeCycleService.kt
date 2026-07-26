@@ -41,7 +41,7 @@ class IngestionRunLifeCycleService(
      */
     @Transactional
     @Tracked("Starting ingestion run")
-    fun startRun(
+    fun startOrUpdateRun(
         transactionId: UUID,
         sourceSystem: SourceSystem,
         status: IngestionRunStatus,

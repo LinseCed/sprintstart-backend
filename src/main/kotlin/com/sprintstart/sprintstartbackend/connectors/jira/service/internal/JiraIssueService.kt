@@ -1,7 +1,9 @@
 package com.sprintstart.sprintstartbackend.connectors.jira.service.internal
 
 import com.sprintstart.sprintstartbackend.connectors.jira.JiraClient
-import com.sprintstart.sprintstartbackend.connectors.jira.external.events.JiraIssueFetchedEvent
+import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues.JiraIssueFetchedEvent
+import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues.JiraResourceFetchingCompleteEvent
+import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues.JiraResourceFetchingFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraIssueResponse
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentials
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstance
@@ -23,14 +25,11 @@ class JiraIssueService(
         instance: JiraInstance,
         credentials: JiraCredentials,
         projectId: List<String>,
-    ): UUID {
-        val transactionId = UUID.randomUUID()
-
+        transactionId: UUID,
+    ) {
         projectId.forEach {
             searchAndIngestAllIssuesOfProject(instance, credentials, it, transactionId)
         }
-
-        return transactionId
     }
 
     @Tracked("Fetching & ingesting all jira instance's issues of a single project")
@@ -40,7 +39,17 @@ class JiraIssueService(
         projectId: String,
         transactionId: UUID,
     ) {
-        val issues = jiraClient.searchIssues(instance.instanceUrl, credentials, "project=$projectId")
+        val issues = runCatching {
+            jiraClient.searchIssues(
+                instance.instanceUrl,
+                credentials,
+                "project=$projectId",
+            )
+        }.onFailure {
+            eventPublisher.publishEvent(JiraResourceFetchingFailedEvent(transactionId, it.message ?: "Unknown error"))
+            throw it
+        }.getOrNull() ?: return
+
         if (issues.isEmpty()) return
 
         processAndIngestIssues(instance, issues, transactionId)
@@ -56,6 +65,8 @@ class JiraIssueService(
             .forEach { issueRepository.save(it) }
 
         issues.forEach { ingestIssue(it, transactionId) }
+
+        eventPublisher.publishEvent(JiraResourceFetchingCompleteEvent(transactionId))
     }
 
     private suspend fun ingestIssue(issue: JiraIssueResponse, transactionId: UUID) {

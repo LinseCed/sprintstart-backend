@@ -1,11 +1,14 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.IngestionRunResponse
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import org.springframework.data.domain.PageRequest
+import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 /**
  * Reads recent ingestion runs for API consumers.
@@ -47,4 +50,9 @@ class IngestionRunService(
                     aiSyncFailureReason = it.aiSyncFailureReason,
                 )
             }
+
+    @Transactional(readOnly = true)
+    @Tracked("Retrieving ingestion run")
+    fun findRunByTransactionId(transactionId: UUID): IngestionRun? =
+        ingestionRunRepository.findByIdOrNull(transactionId)
 }

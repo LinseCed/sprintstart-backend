@@ -17,7 +17,7 @@ internal class GithubRepositoryUpdateListener(
         event: GithubRepositoryUpdateStartedEvent,
     ) {
         ingestionRunLifeCycleService
-            .startRun(
+            .startOrUpdateRun(
                 transactionId = event.transactionId,
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.CONNECTED,
@@ -29,7 +29,7 @@ internal class GithubRepositoryUpdateListener(
         event: GithubRepositoryUpdateFailedEvent,
     ) {
         ingestionRunLifeCycleService
-            .startRun(
+            .startOrUpdateRun(
                 transactionId = event.transactionId,
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.FAILED,

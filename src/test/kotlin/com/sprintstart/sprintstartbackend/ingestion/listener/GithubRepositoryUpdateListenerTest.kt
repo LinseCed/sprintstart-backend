@@ -21,7 +21,7 @@ class GithubRepositoryUpdateListenerTest {
     @Test
     fun `update started event starts connected github run`() {
         val runId = UUID.randomUUID()
-        every { ingestionRunLifeCycleService.startRun(any(), any(), any(), any()) } just runs
+        every { ingestionRunLifeCycleService.startOrUpdateRun(any(), any(), any(), any()) } just runs
 
         listener.on(
             GithubRepositoryUpdateStartedEvent(
@@ -32,7 +32,7 @@ class GithubRepositoryUpdateListenerTest {
         )
 
         verify(exactly = 1) {
-            ingestionRunLifeCycleService.startRun(
+            ingestionRunLifeCycleService.startOrUpdateRun(
                 transactionId = runId,
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.CONNECTED,
@@ -44,7 +44,7 @@ class GithubRepositoryUpdateListenerTest {
     @Test
     fun `update failed event starts failed github run with failure reason`() {
         val runId = UUID.randomUUID()
-        every { ingestionRunLifeCycleService.startRun(any(), any(), any(), any()) } just runs
+        every { ingestionRunLifeCycleService.startOrUpdateRun(any(), any(), any(), any()) } just runs
 
         listener.on(
             GithubRepositoryUpdateFailedEvent(
@@ -56,7 +56,7 @@ class GithubRepositoryUpdateListenerTest {
         )
 
         verify(exactly = 1) {
-            ingestionRunLifeCycleService.startRun(
+            ingestionRunLifeCycleService.startOrUpdateRun(
                 transactionId = runId,
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.FAILED,

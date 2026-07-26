@@ -21,7 +21,7 @@ class GithubRepositoryConnectionListenerTest {
     @Test
     fun `initiated event starts connected github run`() {
         val runId = UUID.randomUUID()
-        every { ingestionRunLifeCycleService.startRun(any(), any(), any(), any()) } just runs
+        every { ingestionRunLifeCycleService.startOrUpdateRun(any(), any(), any(), any()) } just runs
 
         listener.on(
             GithubRepositoryConnectionInitiatedEvent(
@@ -32,7 +32,7 @@ class GithubRepositoryConnectionListenerTest {
         )
 
         verify(exactly = 1) {
-            ingestionRunLifeCycleService.startRun(
+            ingestionRunLifeCycleService.startOrUpdateRun(
                 transactionId = runId,
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.CONNECTED,
@@ -44,7 +44,7 @@ class GithubRepositoryConnectionListenerTest {
     @Test
     fun `failed initiation event starts failed github run`() {
         val runId = UUID.randomUUID()
-        every { ingestionRunLifeCycleService.startRun(any(), any(), any(), any()) } just runs
+        every { ingestionRunLifeCycleService.startOrUpdateRun(any(), any(), any(), any()) } just runs
 
         listener.on(
             GithubRepositoryConnectionInitiationFailedEvent(
@@ -56,7 +56,7 @@ class GithubRepositoryConnectionListenerTest {
         )
 
         verify(exactly = 1) {
-            ingestionRunLifeCycleService.startRun(
+            ingestionRunLifeCycleService.startOrUpdateRun(
                 transactionId = runId,
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.FAILED,
