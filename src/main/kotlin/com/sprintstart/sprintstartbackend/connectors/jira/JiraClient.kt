@@ -142,7 +142,7 @@ internal class JiraClient(
                 fields?.let { put("fields", fields) }
                 expand?.let { put("expand", expand) }
             }
-            val uri = buildUri(url, "", query)
+            val uri = buildUri(url, query)
 
             val page: PageableResponse<T> = performGet(uri, credentials)
 
@@ -193,15 +193,14 @@ internal class JiraClient(
      * number of request filters.
      *
      * @param baseUrl The base uri to the Jira Cloud instance (`https://my-app.atlassian.net ...`)
-     * @param path The endpoint path (`... /rest/api/3/search/jql ...`)
      * @param query The query to append to the path (`... ?key1=value1&key2=value2& ...`)
      * @return The formatted request uri (`baseUrl/path/query`)
      */
-    private fun buildUri(baseUrl: String, path: String, query: Map<String, String>): String {
+    private fun buildUri(baseUrl: String, query: Map<String, String>): String {
         val queryString = query.entries.joinToString("&") { (key, value) ->
             "${key.encodePath()}=${value.encodePath()}"
         }
-        return "$baseUrl$path?$queryString"
+        return "$baseUrl?$queryString"
     }
 
     /**
@@ -210,7 +209,7 @@ internal class JiraClient(
      *
      * @return The formatted credential values.
      */
-    private fun JiraCredentials.authorizationHeader(): String = "${this.userEmail}:${this.apiKey}"
+    private fun JiraCredentials.authorizationHeader(): String = "${this.id.userEmail}:${this.authToken}"
 
     /**
      * Encodes a given string into a valid path string.

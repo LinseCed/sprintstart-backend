@@ -10,6 +10,7 @@ import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.Conn
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraInstanceDto
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.toDto
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentials
+import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentialsId
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstance
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraCredentialNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraInstanceNotConnectedException
@@ -27,7 +28,7 @@ import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 
 @Service
 internal class JiraService(
@@ -86,15 +87,23 @@ internal class JiraService(
 
     @Tracked("Connecting new Jira Cloud instance")
     suspend fun connectInstanceIfExists(request: ConnectJiraInstanceRequest, transactionId: UUID) {
-        val credentials = withContext(Dispatchers.IO) { credentialsRepository.findByUserEmail(request.userEmail) }
-        if (credentials == null) {
+        val credentials = withContext(Dispatchers.IO) {
+            credentialsRepository.findById(
+                JiraCredentialsId(
+                    request.userEmail,
+                    request.tokenName,
+                ),
+            )
+        }
+
+        if (credentials.isEmpty) {
             eventPublisher.publishEvent(
                 JiraInstanceConnectionInitiationFailedEvent(
                     transactionId,
                     "Invalid credentials",
                 ),
             )
-            throw JiraCredentialNotFoundException(request.userEmail)
+            throw JiraCredentialNotFoundException(request.userEmail, request.tokenName)
         }
 
         if (!jiraClient.checkInstanceCapabilities(request.url)) {
@@ -107,7 +116,7 @@ internal class JiraService(
             throw JiraInstanceUnavailableException(request.url)
         }
 
-        return connectInstance(request, credentials, transactionId)
+        return connectInstance(request, credentials.get(), transactionId)
     }
 
     @Tracked("Starting Jira instance connection process")

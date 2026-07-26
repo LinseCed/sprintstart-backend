@@ -11,5 +11,7 @@ data class ConnectJiraInstanceRequest(
     @NotBlank
     val userEmail: String,
     @NotBlank
+    val tokenName: String,
+    @NotBlank
     val projectId: UUID,
 )

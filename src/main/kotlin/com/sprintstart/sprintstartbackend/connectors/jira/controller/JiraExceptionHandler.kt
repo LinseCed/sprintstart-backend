@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.connectors.jira.controller
 
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraAuthException
+import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraCredentialAlreadyExistsException
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraCredentialNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraInstanceNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraInstanceUnavailableException
@@ -86,6 +87,21 @@ internal class JiraExceptionHandler {
     fun handleResourceNotFound(ex: JiraResourceNotFoundException): ResponseEntity<ErrorResponse> =
         ResponseEntity
             .status(HttpStatus.NOT_FOUND)
+            .body(ErrorResponse(ex.message))
+
+    /**
+     * Handles exceptions of type `JiraCredentialAlreadyExistsException` by returning a response
+     * with HTTP status `400 Bad Request` and an error body containing the exception message.
+     *
+     * @param ex The `JiraCredentialAlreadyExistsException` instance containing details about
+     * the duplicate Jira credential that caused the exception.
+     * @return A `ResponseEntity` object with status `400 Bad Request` and an `ErrorResponse` body
+     * containing the exception message.
+     */
+    @ExceptionHandler(JiraCredentialAlreadyExistsException::class)
+    fun handleCredentialAlreadyExists(ex: JiraCredentialAlreadyExistsException): ResponseEntity<ErrorResponse> =
+        ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
             .body(ErrorResponse(ex.message))
 }
 
