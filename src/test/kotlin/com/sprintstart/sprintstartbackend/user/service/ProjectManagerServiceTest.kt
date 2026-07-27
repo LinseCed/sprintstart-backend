@@ -127,8 +127,8 @@ class ProjectManagerServiceTest {
     fun `getManagerCandidates returns only users holding a management role`() {
         val projectManager = user(username = "erika").apply { roles.add(Role.PM) }
         val admin = user(username = "adam").apply { roles.add(Role.ADMIN) }
-        val member = user(username = "max").apply { roles.add(Role.USER) }
-        every { userRepository.findAll() } returns listOf(projectManager, admin, member)
+        every { userRepository.findAllByRoleIn(listOf(Role.PM, Role.ADMIN)) } returns
+            listOf(admin, projectManager)
 
         val result = service.getManagerCandidates()
 

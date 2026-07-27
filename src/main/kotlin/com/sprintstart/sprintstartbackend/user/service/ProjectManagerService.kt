@@ -100,9 +100,7 @@ class ProjectManagerService(
     @Tracked("Retrieving project manager candidates")
     fun getManagerCandidates(): List<ProjectManagerResponse> {
         return userRepository
-            .findAll()
-            .filter { Role.PM in it.roles || Role.ADMIN in it.roles }
-            .sortedBy { it.username.lowercase() }
+            .findAllByRoleIn(listOf(Role.PM, Role.ADMIN))
             .map { it.toManagerResponse() }
     }
 

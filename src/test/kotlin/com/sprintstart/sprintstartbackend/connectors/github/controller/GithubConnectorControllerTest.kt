@@ -14,12 +14,14 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNotFoundException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.ProjectAccessDeniedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubUserRepository
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubRepositoryConnectionOrchestrator
+import com.sprintstart.sprintstartbackend.connectors.github.service.GithubRepositoryProjectService
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubUpdatesService
 import io.mockk.coEvery
 import io.mockk.every
@@ -37,6 +39,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -65,6 +68,9 @@ class GithubConnectorControllerTest {
 
     @MockkBean
     private lateinit var githubUserRepository: GithubUserRepository
+
+    @MockkBean
+    private lateinit var githubRepositoryProjectService: GithubRepositoryProjectService
 
     private val objectMapper = jacksonObjectMapper()
 
@@ -517,6 +523,54 @@ class GithubConnectorControllerTest {
                         .content(objectMapper.writeValueAsString(request))
                         .with(pmJwt),
                 ).andExpect(status().isBadRequest)
+        }
+    }
+
+    @Nested
+    inner class RemoveRepositoryFromProject {
+        @Test
+        fun `should return 200 with the resulting project ids`() {
+            val repositoryId = UUID.randomUUID()
+            val remainingProjectId = UUID.randomUUID()
+            every {
+                githubRepositoryProjectService.removeProjectFromRepository("mockId", repositoryId, projectId)
+            } returns setOf(remainingProjectId)
+
+            mockMvc
+                .perform(
+                    delete("/api/v1/github/connections/$repositoryId/projects/$projectId")
+                        .with(pmJwt),
+                ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.repositoryId").value(repositoryId.toString()))
+                .andExpect(jsonPath("$.projectIds[0]").value(remainingProjectId.toString()))
+        }
+
+        @Test
+        fun `should return 403 when the caller has no access to the target project`() {
+            val repositoryId = UUID.randomUUID()
+            every {
+                githubRepositoryProjectService.removeProjectFromRepository("mockId", repositoryId, projectId)
+            } throws ProjectAccessDeniedException(projectId)
+
+            mockMvc
+                .perform(
+                    delete("/api/v1/github/connections/$repositoryId/projects/$projectId")
+                        .with(pmJwt),
+                ).andExpect(status().isForbidden)
+        }
+
+        @Test
+        fun `should return 404 when the repository connection does not exist`() {
+            val repositoryId = UUID.randomUUID()
+            every {
+                githubRepositoryProjectService.removeProjectFromRepository("mockId", repositoryId, projectId)
+            } throws RepositoryNotFoundException("", "", "Repository connection with id $repositoryId not found")
+
+            mockMvc
+                .perform(
+                    delete("/api/v1/github/connections/$repositoryId/projects/$projectId")
+                        .with(pmJwt),
+                ).andExpect(status().isNotFound)
         }
     }
 }
