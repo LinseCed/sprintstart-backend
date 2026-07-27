@@ -98,12 +98,14 @@ class IngestionRunService(
             Specification<IngestionRun> { root, _, cb ->
                 val predicates = mutableListOf<Predicate>()
                 sourceSystem?.let { predicates.add(cb.equal(root.get<SourceSystem>("sourceSystem"), it)) }
-                repositoryId?.let { predicates.add(cb.equal(root.get<UUID>("repositoryId"), it)) }
+                repositoryId?.let { predicates.add(cb.equal(root.get<UUID>("sourceInstanceId"), it)) }
                 status?.let { predicates.add(cb.equal(root.get<IngestionRunStatus>("status"), it)) }
                 since?.let { predicates.add(cb.greaterThanOrEqualTo(root.get<Instant>("startedAt"), it)) }
                 projectRepositoryIds?.let { ids ->
                     // An empty set means the project has no connected repositories, so no run matches.
-                    predicates.add(if (ids.isEmpty()) cb.disjunction() else root.get<UUID>("repositoryId").`in`(ids))
+                    predicates.add(
+                        if (ids.isEmpty()) cb.disjunction() else root.get<UUID>("sourceInstanceId").`in`(ids),
+                    )
                 }
                 if (predicates.isEmpty()) null else cb.and(*predicates.toTypedArray())
             }
@@ -129,17 +131,22 @@ class IngestionRunService(
 }
 
 /**
- * Maps an ingestion run entity to its API representation, deriving the stable `sourceId`
- * ("owner/name") from the persisted source-instance metadata when both parts are present.
+ * Maps an ingestion run entity to its API representation.
+ *
+ * The persisted source-instance reference is connector-neutral, so the GitHub-specific response
+ * fields (`owner`, `name`, `repositoryId`) are derived here for GITHUB runs by splitting the
+ * denormalized `sourceInstanceRef` ("owner/name"). This keeps the API response shape stable for the
+ * frontend while the entity stays abstract across connectors.
  */
-internal fun IngestionRun.toResponse(): IngestionRunResponse =
-    IngestionRunResponse(
+internal fun IngestionRun.toResponse(): IngestionRunResponse {
+    val isGithub = sourceSystem == SourceSystem.GITHUB && sourceInstanceRef != null
+    return IngestionRunResponse(
         runId = id,
         sourceSystem = sourceSystem,
-        sourceId = if (owner != null && name != null) "$owner/$name" else null,
-        owner = owner,
-        name = name,
-        repositoryId = repositoryId,
+        sourceId = sourceInstanceRef,
+        owner = if (isGithub) sourceInstanceRef!!.substringBefore("/") else null,
+        name = if (isGithub) sourceInstanceRef!!.substringAfter("/") else null,
+        repositoryId = sourceInstanceId,
         startedAt = startedAt,
         finishedAt = finishedAt,
         ingestedCount = ingestedCount,
@@ -152,3 +159,4 @@ internal fun IngestionRun.toResponse(): IngestionRunResponse =
         aiSyncStatus = aiSyncStatus,
         aiSyncFailureReason = aiSyncFailureReason,
     )
+}

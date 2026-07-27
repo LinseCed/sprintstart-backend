@@ -24,9 +24,8 @@ internal class GithubRepositoryUpdateListener(
                 transactionId = event.transactionId,
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.CONNECTED,
-                owner = event.owner,
-                name = event.name,
-                repositoryId = resolveRepositoryId(event.owner, event.name),
+                sourceInstanceId = resolveRepositoryId(event.owner, event.name),
+                sourceInstanceRef = "${event.owner}/${event.name}",
             )
     }
 
@@ -40,9 +39,8 @@ internal class GithubRepositoryUpdateListener(
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.FAILED,
                 failureReason = event.reason,
-                owner = event.owner,
-                name = event.name,
-                repositoryId = resolveRepositoryId(event.owner, event.name),
+                sourceInstanceId = resolveRepositoryId(event.owner, event.name),
+                sourceInstanceRef = "${event.owner}/${event.name}",
             )
     }
 

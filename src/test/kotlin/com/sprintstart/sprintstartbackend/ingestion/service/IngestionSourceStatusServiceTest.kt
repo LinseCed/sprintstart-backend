@@ -41,9 +41,8 @@ class IngestionSourceStatusServiceTest {
         val run = IngestionRun(
             id = UUID.randomUUID(),
             sourceSystem = SourceSystem.GITHUB,
-            repositoryId = repositoryId,
-            owner = "SprintStartProject",
-            name = "sprintstart-frontend",
+            sourceInstanceId = repositoryId,
+            sourceInstanceRef = "SprintStartProject/sprintstart-frontend",
             startedAt = Instant.parse("2026-07-06T12:30:00Z"),
             ingestedCount = 42,
             updatedCount = 3,
@@ -53,7 +52,7 @@ class IngestionSourceStatusServiceTest {
             aiSyncStatus = AiSyncStatus.SUCCEEDED,
         )
         every { githubRepositoryApi.getSourceInstances(null) } returns listOf(instance)
-        every { ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(repositoryId) } returns run
+        every { ingestionRunRepository.findFirstBySourceInstanceIdOrderByStartedAtDesc(repositoryId) } returns run
         every { artifactRepository.countByComponent("SprintStartProject/sprintstart-frontend") } returns 128
 
         val response = service.getStatusPerSourceInstance().single()
@@ -91,7 +90,7 @@ class IngestionSourceStatusServiceTest {
             lastPullRequestsSyncAt = null,
         )
         every { githubRepositoryApi.getSourceInstances(null) } returns listOf(instance)
-        every { ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(repositoryId) } returns null
+        every { ingestionRunRepository.findFirstBySourceInstanceIdOrderByStartedAtDesc(repositoryId) } returns null
         every { artifactRepository.countByComponent("owner/repo") } returns 0
 
         val response = service.getStatusPerSourceInstance().single()
@@ -122,7 +121,7 @@ class IngestionSourceStatusServiceTest {
             lastPullRequestsSyncAt = null,
         )
         every { githubRepositoryApi.getSourceInstances(projectId) } returns listOf(instance)
-        every { ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(repositoryId) } returns null
+        every { ingestionRunRepository.findFirstBySourceInstanceIdOrderByStartedAtDesc(repositoryId) } returns null
         every { artifactRepository.countByComponent("owner/repo") } returns 5
 
         val response = service.getStatusPerSourceInstance(projectId).single()

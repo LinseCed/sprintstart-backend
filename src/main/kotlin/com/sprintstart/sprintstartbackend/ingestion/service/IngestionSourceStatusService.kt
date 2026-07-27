@@ -39,7 +39,7 @@ class IngestionSourceStatusService(
 
     private fun GithubSourceInstanceDto.toStatusResponse(): SourceInstanceIngestionStatusResponse {
         val component = "$owner/$name"
-        val lastRun = ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(repositoryId)
+        val lastRun = ingestionRunRepository.findFirstBySourceInstanceIdOrderByStartedAtDesc(repositoryId)
         return SourceInstanceIngestionStatusResponse(
             sourceSystem = SourceSystem.GITHUB,
             sourceId = component,

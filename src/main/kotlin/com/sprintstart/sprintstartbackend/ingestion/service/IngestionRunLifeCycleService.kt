@@ -38,9 +38,10 @@ class IngestionRunLifeCycleService(
      * @param sourceSystem The external system that owns the run.
      * @param status The initial or replacement lifecycle status.
      * @param failureReason Optional run-level failure reason for startup failures.
-     * @param owner Optional repository owner for source-instance-aware runs.
-     * @param name Optional repository name for source-instance-aware runs.
-     * @param repositoryId Optional id of the connected repository this run belongs to.
+     * @param sourceInstanceId Optional connector-neutral id of the source instance this run belongs
+     * to (for GitHub the connected repository id).
+     * @param sourceInstanceRef Optional denormalized label of the source instance (for GitHub
+     * "owner/name").
      */
     @Transactional
     @Tracked("Starting ingestion run")
@@ -49,9 +50,8 @@ class IngestionRunLifeCycleService(
         sourceSystem: SourceSystem,
         status: IngestionRunStatus,
         failureReason: String? = null,
-        owner: String? = null,
-        name: String? = null,
-        repositoryId: UUID? = null,
+        sourceInstanceId: UUID? = null,
+        sourceInstanceRef: String? = null,
     ) {
         val ingestionRun = ingestionRunRepository.findByIdOrNull(transactionId)
         if (ingestionRun == null) {
@@ -60,9 +60,8 @@ class IngestionRunLifeCycleService(
             val ingestionRun = IngestionRun(
                 id = transactionId,
                 sourceSystem = sourceSystem,
-                repositoryId = repositoryId,
-                owner = owner,
-                name = name,
+                sourceInstanceId = sourceInstanceId,
+                sourceInstanceRef = sourceInstanceRef,
                 status = status,
                 failureReason = failureReason,
                 finishedAt = if (status == IngestionRunStatus.FAILED) Instant.now() else null,
@@ -77,9 +76,8 @@ class IngestionRunLifeCycleService(
                 ingestionRun.aiSyncStatus = AiSyncStatus.NOT_APPLICABLE
             }
             // Backfill source-instance metadata if a later lifecycle call resolved it.
-            if (ingestionRun.repositoryId == null) ingestionRun.repositoryId = repositoryId
-            if (ingestionRun.owner == null) ingestionRun.owner = owner
-            if (ingestionRun.name == null) ingestionRun.name = name
+            if (ingestionRun.sourceInstanceId == null) ingestionRun.sourceInstanceId = sourceInstanceId
+            if (ingestionRun.sourceInstanceRef == null) ingestionRun.sourceInstanceRef = sourceInstanceRef
         }
     }
 

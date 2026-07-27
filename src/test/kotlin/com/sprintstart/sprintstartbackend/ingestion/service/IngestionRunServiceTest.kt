@@ -54,9 +54,8 @@ class IngestionRunServiceTest {
         val run = IngestionRun(
             id = UUID.randomUUID(),
             sourceSystem = SourceSystem.GITHUB,
-            repositoryId = repositoryId,
-            owner = "SprintStartProject",
-            name = "sprintstart-frontend",
+            sourceInstanceId = repositoryId,
+            sourceInstanceRef = "SprintStartProject/sprintstart-frontend",
             startedAt = Instant.parse("2024-01-01T00:00:00Z"),
             finishedAt = Instant.parse("2024-01-01T00:01:00Z"),
             ingestedCount = 3,
@@ -118,9 +117,8 @@ class IngestionRunServiceTest {
         val run = IngestionRun(
             id = UUID.randomUUID(),
             sourceSystem = SourceSystem.GITHUB,
-            repositoryId = repositoryId,
-            owner = "SprintStartProject",
-            name = "sprintstart-frontend",
+            sourceInstanceId = repositoryId,
+            sourceInstanceRef = "SprintStartProject/sprintstart-frontend",
             startedAt = Instant.parse("2024-01-01T00:00:00Z"),
             status = IngestionRunStatus.COMPLETED,
             aiSyncStatus = AiSyncStatus.SUCCEEDED,

@@ -25,7 +25,7 @@ class GithubRepositoryUpdateListenerTest {
     fun `update started event starts connected github run with resolved repository metadata`() {
         val runId = UUID.randomUUID()
         val repositoryId = UUID.randomUUID()
-        every { ingestionRunLifeCycleService.startRun(any(), any(), any(), any(), any(), any(), any()) } just runs
+        every { ingestionRunLifeCycleService.startRun(any(), any(), any(), any(), any(), any()) } just runs
         every { githubRepositoryApi.getRepositoryIdByOwnerAndName("owner", "repo") } returns repositoryId
 
         listener.on(
@@ -41,9 +41,8 @@ class GithubRepositoryUpdateListenerTest {
                 transactionId = runId,
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.CONNECTED,
-                owner = "owner",
-                name = "repo",
-                repositoryId = repositoryId,
+                sourceInstanceId = repositoryId,
+                sourceInstanceRef = "owner/repo",
             )
         }
     }
@@ -52,7 +51,7 @@ class GithubRepositoryUpdateListenerTest {
     fun `update failed event starts failed github run with failure reason and repository metadata`() {
         val runId = UUID.randomUUID()
         val repositoryId = UUID.randomUUID()
-        every { ingestionRunLifeCycleService.startRun(any(), any(), any(), any(), any(), any(), any()) } just runs
+        every { ingestionRunLifeCycleService.startRun(any(), any(), any(), any(), any(), any()) } just runs
         every { githubRepositoryApi.getRepositoryIdByOwnerAndName("owner", "repo") } returns repositoryId
 
         listener.on(
@@ -70,9 +69,8 @@ class GithubRepositoryUpdateListenerTest {
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.FAILED,
                 failureReason = "Snapshot missing",
-                owner = "owner",
-                name = "repo",
-                repositoryId = repositoryId,
+                sourceInstanceId = repositoryId,
+                sourceInstanceRef = "owner/repo",
             )
         }
     }
