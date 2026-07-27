@@ -18,6 +18,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.board.NoteCar
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.NoteContent
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every
@@ -51,6 +52,8 @@ class BoardAuthoringTest {
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
     private val currentTaskReader: CurrentTaskReader = mockk()
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService = mockk()
+    private val myCompetencyService: MyCompetencyService = mockk()
+    private val buddySessionRepository: BuddySessionRepository = mockk()
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -66,6 +69,8 @@ class BoardAuthoringTest {
         OpenPullRequestReader(artifactIngestionApi),
         currentTaskReader,
         starterWorkTaskProposalService,
+        myCompetencyService,
+        buddySessionRepository,
     )
 
     @BeforeEach
@@ -95,6 +100,8 @@ class BoardAuthoringTest {
         every { currentTaskReader.currentTaskFor(hireId, projectId) } returns null
         every { currentTaskReader.isClaimedGoal(hireId, projectId) } returns false
         every { starterWorkTaskProposalService.matchForUserId(hireId, projectId) } returns emptyList()
+        every { myCompetencyService.getCompetenciesForUser(hireId) } returns emptyList()
+        every { buddySessionRepository.findByUserId(hireId) } returns null
     }
 
     private fun existingBoard(): Board {

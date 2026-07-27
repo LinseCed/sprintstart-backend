@@ -5,24 +5,31 @@ import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardState
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Board
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCard
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTrack
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardMomentKey
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardMomentResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.CompetencyProgressContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.CurrentTaskContent
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.MemoryRecapContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.OpenPullRequestsContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathToFirstContributionContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.SuggestedTasksContent
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every
@@ -52,6 +59,8 @@ class BoardServiceTest {
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
     private val currentTaskReader: CurrentTaskReader = mockk()
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService = mockk()
+    private val myCompetencyService: MyCompetencyService = mockk()
+    private val buddySessionRepository: BuddySessionRepository = mockk()
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -68,6 +77,8 @@ class BoardServiceTest {
         OpenPullRequestReader(artifactIngestionApi, Clock.fixed(now, ZoneOffset.UTC)),
         currentTaskReader,
         starterWorkTaskProposalService,
+        myCompetencyService,
+        buddySessionRepository,
     )
 
     private val engineering = OnboardingTrack(
@@ -101,6 +112,8 @@ class BoardServiceTest {
         every { currentTaskReader.currentTaskFor(hireId, projectId) } returns null
         every { currentTaskReader.isClaimedGoal(hireId, projectId) } returns false
         every { starterWorkTaskProposalService.matchForUserId(hireId, projectId) } returns emptyList()
+        every { myCompetencyService.getCompetenciesForUser(hireId) } returns emptyList()
+        every { buddySessionRepository.findByUserId(hireId) } returns null
     }
 
     private fun member(
@@ -557,6 +570,96 @@ class BoardServiceTest {
 
         assertEquals(listOf("You have worked in this repository before"), tasks.first().reasons)
     }
+
+    // ---- what the mentor's other cards say (slice 3) ----
+
+    @Test
+    fun `the competency card splits at the bar rather than summing to a percentage`() {
+        val board = existingBoard()
+        every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(
+            card(board, BoardCardKind.COMPETENCY_PROGRESS),
+        )
+        every { myCompetencyService.getCompetenciesForUser(hireId) } returns listOf(
+            competency("Kotlin", level = 3, targetLevel = 2),
+            competency("Testing", level = 1, targetLevel = 2),
+        )
+
+        val content = service.competencyCard()
+
+        assertEquals(listOf("Kotlin"), content.held.map { it.label })
+        assertEquals(listOf("Testing"), content.inProgress.map { it.label })
+    }
+
+    @Test
+    fun `a level-0 placement is not a competency and is left out`() {
+        val board = existingBoard()
+        every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(
+            card(board, BoardCardKind.COMPETENCY_PROGRESS),
+        )
+        every { myCompetencyService.getCompetenciesForUser(hireId) } returns listOf(
+            competency("Kubernetes", level = 0, targetLevel = 2),
+        )
+
+        val content = service.competencyCard()
+
+        // Level 0 means "asked, saw no evidence". Reporting it would claim a skill nobody showed.
+        assertTrue(content.held.isEmpty())
+        assertTrue(content.inProgress.isEmpty())
+    }
+
+    @Test
+    fun `the memory card shows what the mentor remembers, and how much it covers`() {
+        val board = existingBoard()
+        every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(
+            card(board, BoardCardKind.MEMORY_RECAP),
+        )
+        every { buddySessionRepository.findByUserId(hireId) } returns BuddySession(
+            userId = hireId,
+            summary = "Ada is working through the login refactor and asked about our test setup.",
+            summarizedCount = 12,
+        )
+
+        val content = service.memoryCard()
+
+        assertEquals(12, content.messagesRemembered)
+        assertTrue(content.memory!!.contains("login refactor"))
+    }
+
+    @Test
+    fun `a hire who has never opened the buddy has no memory, and reading the card starts none`() {
+        val board = existingBoard()
+        every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(
+            card(board, BoardCardKind.MEMORY_RECAP),
+        )
+
+        val content = service.memoryCard()
+
+        // Hydrating a card must not be what starts somebody's buddy session.
+        assertNull(content.memory)
+        assertEquals(0, content.messagesRemembered)
+    }
+
+    private fun competency(label: String, level: Int, targetLevel: Int) = MyCompetencyResponse(
+        competencyKey = label.lowercase(),
+        label = label,
+        kind = CompetencyKind.SKILL,
+        level = level,
+        targetLevel = targetLevel,
+        source = CompetencySource.VERIFIED,
+        updatedAt = Instant.EPOCH,
+    )
+
+    private fun BoardService.competencyCard(): CompetencyProgressContent =
+        getBoard(hireId, projectId)!!
+            .cards
+            .first { it.kind == BoardCardKind.COMPETENCY_PROGRESS }
+            .content as CompetencyProgressContent
+
+    private fun BoardService.memoryCard(): MemoryRecapContent =
+        getBoard(hireId, projectId)!!
+            .cards
+            .first { it.kind == BoardCardKind.MEMORY_RECAP }
+            .content as MemoryRecapContent
 
     private fun card(
         board: Board,
