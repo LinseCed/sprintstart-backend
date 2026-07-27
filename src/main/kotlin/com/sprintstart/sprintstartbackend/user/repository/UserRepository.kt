@@ -27,7 +27,7 @@ interface UserRepository :
     fun existsByAuthId(authId: String): Boolean
 
     @Query(
-        "select distinct u from User u join u.roles r where r in :roles order by lower(u.username)",
+        "select distinct u from User u join u.roles r where r in :roles order by u.username",
     )
     fun findAllByRoleIn(roles: Collection<Role>): List<User>
 
