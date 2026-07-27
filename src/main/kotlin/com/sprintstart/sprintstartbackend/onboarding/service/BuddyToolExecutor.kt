@@ -25,9 +25,11 @@ import java.util.UUID
  * the hire's *own* onboarding, which only the backend can see. Each tool is executed strictly on
  * behalf of the resolved caller — the agent never supplies whose data to read, so one hire can
  * never read another's metrics through the buddy.
+ *
+ * One function per buddy tool (plus the shared state snapshot the opener grounds itself in); the
+ * count tracks how much the buddy can read about the hire, not a class doing unrelated things,
+ * hence the suppression.
  */
-// One function per buddy tool (plus the shared state snapshot the opener grounds itself in); the
-// count tracks how much the buddy can read about the hire, not a class doing unrelated things.
 @Suppress("TooManyFunctions")
 @Component
 class BuddyToolExecutor(

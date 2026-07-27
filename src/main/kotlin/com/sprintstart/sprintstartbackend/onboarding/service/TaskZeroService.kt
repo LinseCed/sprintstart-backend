@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskZeroAssignment
@@ -39,7 +38,7 @@ class TaskZeroService(
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val taskZeroAssignmentRepository: TaskZeroAssignmentRepository,
     private val projectMembershipApi: ProjectMembershipApi,
-    private val artifactIngestionApi: ArtifactIngestionApi,
+    private val contributionService: ContributionService,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     /**
@@ -75,7 +74,7 @@ class TaskZeroService(
     @Transactional
     fun getForHire(hireId: UUID, projectId: UUID): MyTaskZeroResponse {
         val member = requireMember(hireId, projectId)
-        val loopProven = hasMergedPullRequest(member, projectId)
+        val loopProven = hasAcceptedContribution(member, projectId)
 
         taskZeroAssignmentRepository.findByHireIdAndProjectId(hireId, projectId)?.let { existing ->
             return existing.toResponse(loopProven)
@@ -127,10 +126,16 @@ class TaskZeroService(
             .minByOrNull { it.createdAt }
     }
 
-    private fun hasMergedPullRequest(member: ProjectMember, projectId: UUID): Boolean {
-        val login = member.githubLogin
-        if (login.isNullOrBlank()) return false
-        return artifactIngestionApi.getAuthoredPullRequests(projectId, login).any { it.mergedAt != null }
+    /**
+     * Whether anything this hire produced has been accepted here yet.
+     *
+     * This is the same question the ramp asks to decide somebody has left stage zero, so it reads
+     * the same contribution stream rather than re-deriving it from pull requests -- two answers to
+     * "have they completed anything" that could disagree is exactly the kind of drift that put
+     * "writes code" into the definition of progress in the first place.
+     */
+    private fun hasAcceptedContribution(member: ProjectMember, projectId: UUID): Boolean {
+        return contributionService.forHire(member, projectId).any { it.isAccepted }
     }
 
     private fun requireMember(hireId: UUID, projectId: UUID): ProjectMember =

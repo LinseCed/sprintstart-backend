@@ -66,7 +66,10 @@ class RampServiceTest {
         autonomyMilestoneRepository,
         knowledgeRequestRepository,
         projectMembershipApi,
-        artifactIngestionApi,
+        // A real ContributionService over the same mocked ingestion API, not a mock: these
+        // tests assert the numbers this service reports, and the point of the refactor is
+        // that swapping pull requests for contributions did not move any of them.
+        ContributionService(artifactIngestionApi),
         Clock.fixed(now, ZoneOffset.UTC),
     )
 
