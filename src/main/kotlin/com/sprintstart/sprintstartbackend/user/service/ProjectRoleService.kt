@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingTrackApi
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.mapper.toGetResponse
 import com.sprintstart.sprintstartbackend.user.model.mapper.toUpdateRoleSkillsResponse
@@ -21,6 +22,7 @@ class ProjectRoleService(
     private val projectRoleRepository: ProjectRoleRepository,
     private val userRepository: UserRepository,
     private val skillRepository: SkillRepository,
+    private val onboardingTrackApi: OnboardingTrackApi,
 ) {
     @Transactional(readOnly = true)
     fun getAllRoles(): List<ProjectRole> {
@@ -33,6 +35,34 @@ class ProjectRoleService(
             name = request.name,
             description = request.description,
         )
+        return projectRoleRepository.save(role)
+    }
+
+    /**
+     * Points a role at an onboarding track, or clears it.
+     *
+     * The key is validated against the live tracks rather than stored as free text: an unknown key
+     * silently resolves to the default track everywhere it is read, so a typo would look exactly
+     * like a working configuration and would only surface as a hire reading the wrong words.
+     *
+     * A null or blank key clears the track. That is not a failure state -- it resolves to the
+     * default, which is what every role did before tracks existed.
+     *
+     * @throws ResponseStatusException 404 if the role does not exist, 400 if the key is not a
+     * known track.
+     */
+    @Transactional
+    fun setOnboardingTrack(roleId: UUID, trackKey: String?): ProjectRole {
+        val role = projectRoleRepository
+            .findById(roleId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Project role with id $roleId not found") }
+
+        val normalized = trackKey?.trim()?.takeIf { it.isNotBlank() }
+        if (normalized != null && normalized !in onboardingTrackApi.trackKeys()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown onboarding track '$normalized'")
+        }
+
+        role.onboardingTrackKey = normalized
         return projectRoleRepository.save(role)
     }
 
