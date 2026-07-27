@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.Contribution
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
@@ -42,6 +43,7 @@ class BuddyToolExecutor(
     private val buddyPlanTools: BuddyPlanTools,
     private val artifactIngestionApi: ArtifactIngestionApi,
     private val trackService: TrackService,
+    private val projectMembershipApi: ProjectMembershipApi,
 ) {
     /**
      * The backend tools the AI reasoner is told it may call, for this hire.
@@ -65,6 +67,11 @@ class BuddyToolExecutor(
         }
         add(GET_SUGGESTED_TASKS_SPEC)
         add(SEARCH_CANONICAL_ANSWERS_SPEC)
+        // Mounted with attestation rather than universally: naming teammates is only useful when
+        // the hire can actually ask one of them to confirm something.
+        if (trackService.admitsAnywhere(userId, ContributionEvidenceKind.ATTESTATION)) {
+            add(GET_TEAMMATES_SPEC)
+        }
         addAll(buddyPlanTools.toolSpecs())
     }
 
@@ -97,9 +104,39 @@ class BuddyToolExecutor(
                 GET_MY_OPEN_PULL_REQUESTS -> getMyOpenPullRequests(userId)
                 GET_SUGGESTED_TASKS -> getSuggestedTasks(userId)
                 SEARCH_CANONICAL_ANSWERS -> searchCanonicalAnswers(userId, call.stringArg("query"))
+                GET_TEAMMATES -> getTeammates(userId)
                 else -> "Unknown tool: ${call.name}."
             }
         }
+
+    /**
+     * Who else is on the hire's projects, by id and name.
+     *
+     * Exists so the buddy can offer to ask a *real, named* person to confirm the hire's work rather
+     * than guessing at one. The hire themselves is excluded from the list on purpose: an
+     * attestation confirmed by the person who did the work is not evidence, and the surest way to
+     * stop the buddy proposing that is to never show it the option.
+     */
+    private fun getTeammates(userId: UUID): String {
+        val projects = userApi
+            .getUsersByIds(listOf(userId))
+            .firstOrNull()
+            ?.projects
+            .orEmpty()
+        if (projects.isEmpty()) {
+            return "You are not a member of any project yet, so there are no teammates to name."
+        }
+        val sections = projects.map { project ->
+            val others = projectMembershipApi
+                .getProjectMembers(project.projectId)
+                .filter { it.userId != userId }
+            val lines = others
+                .map { "- ${it.displayName} (id: ${it.userId})" }
+                .ifEmpty { listOf("- nobody else is on this project yet") }
+            (listOf("Project: ${project.name}") + lines).joinToString("\n")
+        }
+        return sections.joinToString("\n\n")
+    }
 
     private fun getMyMetrics(userId: UUID): String {
         val projects = userApi
@@ -275,6 +312,7 @@ class BuddyToolExecutor(
         const val GET_MY_OPEN_PULL_REQUESTS = "get_my_open_pull_requests"
         const val GET_SUGGESTED_TASKS = "get_suggested_tasks"
         const val SEARCH_CANONICAL_ANSWERS = "search_canonical_answers"
+        const val GET_TEAMMATES = "get_teammates"
         const val MAX_SUGGESTED_TASKS = 3
 
         // No-argument JSON schema shared by every caller-scoped tool: the agent never says whose
@@ -323,6 +361,15 @@ class BuddyToolExecutor(
                 "questions like 'what should I work on?' or 'what's a good first task for me?'. " +
                 "Present the reasons, never a score. When the hire picks one, offer to claim it " +
                 "as their goal with claim_goal. Takes no arguments — it always ranks for the caller.",
+            parameters = noArgs(),
+        )
+
+        val GET_TEAMMATES_SPEC = BuddyToolSpecDto(
+            name = GET_TEAMMATES,
+            description = "The other people on the hire's projects, with their ids. Read this " +
+                "before offering request_attestation, so the hire can pick who should confirm " +
+                "their work and you pass that person's real id. The hire is never in this list — " +
+                "work confirmed by the person who did it is not evidence.",
             parameters = noArgs(),
         )
 

@@ -35,6 +35,7 @@ class BuddyActionServiceTest {
     private val userGoalService: UserGoalService = mockk()
     private val verificationService: VerificationService = mockk()
     private val userApi: UserApi = mockk()
+    private val attestationService: AttestationService = mockk()
     private val service = BuddyActionService(
         taskZeroService,
         taskOrientationService,
@@ -42,6 +43,7 @@ class BuddyActionServiceTest {
         userGoalService,
         verificationService,
         userApi,
+        attestationService,
     )
 
     private val userId = UUID.randomUUID()
@@ -111,13 +113,14 @@ class BuddyActionServiceTest {
     // -- specs / dispatch -------------------------------------------------------------------------
 
     @Test
-    fun `exposes exactly the five action tools`() {
+    fun `exposes exactly the six action tools`() {
         assertThat(service.actionSpecs().map { it.name }).containsExactlyInAnyOrder(
             "flag_to_pm",
             "claim_task_zero",
             "open_orientation",
             "claim_goal",
             "submit_verification",
+            "request_attestation",
         )
     }
 

@@ -37,7 +37,7 @@ import java.util.UUID
  * project the buddy did not scope it to, nor act as another hire.
  */
 @Service
-@Suppress("TooManyFunctions") // Five wrapped actions, each with a propose + a perform helper.
+@Suppress("TooManyFunctions") // Six wrapped actions, each with a propose + a perform helper.
 class BuddyActionService(
     private val taskZeroService: TaskZeroService,
     private val taskOrientationService: TaskOrientationService,
@@ -45,6 +45,7 @@ class BuddyActionService(
     private val userGoalService: UserGoalService,
     private val verificationService: VerificationService,
     private val userApi: UserApi,
+    private val attestationService: AttestationService,
 ) {
     /** The action tools the AI reasoner is told it may propose, alongside the read-only tools. */
     fun actionSpecs(): List<BuddyToolSpecDto> =
@@ -53,6 +54,7 @@ class BuddyActionService(
             CLAIM_TASK_ZERO_SPEC,
             OPEN_ORIENTATION_SPEC,
             CLAIM_GOAL_SPEC,
+            REQUEST_ATTESTATION_SPEC,
             SUBMIT_VERIFICATION_SPEC,
         )
 
@@ -110,25 +112,55 @@ class BuddyActionService(
                     proposed(type, project.name, question = null, taskId = taskId)
                 }
             }
-            BuddyActionType.SUBMIT_VERIFICATION -> {
-                val moduleId = call.uuidArg("module_id")
-                val answer = call.stringArg("answer").trim()
-                when {
-                    moduleId == null ->
-                        ProposeOutcome(
-                            "No module_id was provided. Read the module and submit against its id.",
-                            null,
-                        )
-                    answer.isBlank() ->
-                        ProposeOutcome(
-                            "No answer was provided. Ask the hire for their answer (a pull " +
-                                "request number for an artifact check) before offering to submit.",
-                            null,
-                        )
-                    else -> proposed(type, project.name, question = null, moduleId = moduleId, answer = answer)
-                }
-            }
+            BuddyActionType.SUBMIT_VERIFICATION -> proposeVerification(call, type, project.name)
+            BuddyActionType.REQUEST_ATTESTATION -> proposeAttestation(call, type, project.name)
             else -> proposed(type, project.name, question = null)
+        }
+    }
+
+    /** Same shape as [proposeAttestation]: neither half of a submission may be missing. */
+    private fun proposeVerification(
+        call: BuddyToolCallDto,
+        type: BuddyActionType,
+        projectName: String,
+    ): ProposeOutcome {
+        val moduleId = call.uuidArg("module_id")
+        val answer = call.stringArg("answer").trim()
+        return when {
+            moduleId == null ->
+                ProposeOutcome("No module_id was provided. Read the module and submit against its id.", null)
+            answer.isBlank() ->
+                ProposeOutcome(
+                    "No answer was provided. Ask the hire for their answer (a pull request number " +
+                        "for an artifact check) before offering to submit.",
+                    null,
+                )
+            else -> proposed(type, projectName, question = null, moduleId = moduleId, answer = answer)
+        }
+    }
+
+    /**
+     * Both halves of an attestation proposal must be real before the hire sees a button: what work,
+     * and which teammate. A missing one comes back as guidance the buddy can act on rather than a
+     * proposal it cannot honour.
+     */
+    private fun proposeAttestation(
+        call: BuddyToolCallDto,
+        type: BuddyActionType,
+        projectName: String,
+    ): ProposeOutcome {
+        val title = call.stringArg("title").trim()
+        val attesterId = call.uuidArg("attester_id")
+        return when {
+            title.isBlank() ->
+                ProposeOutcome("No title was provided. Ask the hire what work they want confirmed.", null)
+            attesterId == null ->
+                ProposeOutcome(
+                    "No attester_id was provided. Read get_teammates and ask the hire which of " +
+                        "them should confirm it, then pass that person's id.",
+                    null,
+                )
+            else -> proposed(type, projectName, question = null, title = title, attesterId = attesterId)
         }
     }
 
@@ -183,6 +215,8 @@ class BuddyActionService(
                     BuddyActionType.CLAIM_TASK_ZERO -> claimTaskZero(resolved.userId, resolved.projectId)
                     BuddyActionType.FLAG_TO_PM -> flagToPm(authId, resolved.projectId, request.question)
                     BuddyActionType.CLAIM_GOAL -> claimGoal(authId, resolved.projectId, request.taskId)
+                    BuddyActionType.REQUEST_ATTESTATION ->
+                        requestAttestation(resolved, request.title, request.attesterId)
                     BuddyActionType.OPEN_ORIENTATION,
                     BuddyActionType.SUBMIT_VERIFICATION,
                     -> error("handled above")
@@ -264,6 +298,41 @@ class BuddyActionService(
         }
     }
 
+    /**
+     * Asks a named colleague to confirm a piece of the hire's work.
+     *
+     * The buddy relays; it never confirms. Every rule that makes an attestation worth anything —
+     * not the hire, on this project — is enforced by [AttestationService], so a buddy that got the
+     * person wrong produces a legible refusal rather than weak evidence.
+     */
+    private fun requestAttestation(
+        resolved: CallerContext.Resolved,
+        title: String?,
+        attesterId: UUID?,
+    ): BuddyActionResponse {
+        if (title.isNullOrBlank() || attesterId == null) {
+            return BuddyActionResponse(ok = false, message = "I need to know what work to confirm and who to ask.")
+        }
+        return try {
+            val attestation = attestationService.request(
+                hireId = resolved.userId,
+                projectId = resolved.projectId,
+                title = title,
+                evidenceUrl = null,
+                attesterId = attesterId,
+            )
+            BuddyActionResponse(
+                ok = true,
+                message = "Asked them to confirm “${attestation.title}”. " +
+                    "It counts once they do — you will see it on your ramp.",
+            )
+        } catch (e: ResponseStatusException) {
+            // A handled precondition ("not on this project", "that is you") is a sentence the buddy
+            // can relay, not a stack trace.
+            BuddyActionResponse(ok = false, message = e.reason ?: "That request could not be filed.")
+        }
+    }
+
     private fun flagToPm(authId: String, projectId: UUID, question: String?): BuddyActionResponse {
         val trimmed = question?.trim().orEmpty()
         if (trimmed.isBlank()) {
@@ -283,6 +352,8 @@ class BuddyActionService(
         taskId: UUID? = null,
         moduleId: UUID? = null,
         answer: String? = null,
+        title: String? = null,
+        attesterId: UUID? = null,
     ): ProposeOutcome =
         ProposeOutcome(
             toolResult = "Proposed to the hire on $projectName: “${type.label}”. They will see a confirm " +
@@ -294,6 +365,8 @@ class BuddyActionService(
                 taskId = taskId,
                 moduleId = moduleId,
                 answer = answer,
+                title = title,
+                attesterId = attesterId?.toString(),
             ),
         )
 
@@ -340,6 +413,7 @@ class BuddyActionService(
             BuddyActionType.CLAIM_TASK_ZERO -> "start Task 0"
             BuddyActionType.OPEN_ORIENTATION -> "open a task packet"
             BuddyActionType.CLAIM_GOAL -> "claim a goal"
+            BuddyActionType.REQUEST_ATTESTATION -> "ask somebody to confirm your work"
             BuddyActionType.SUBMIT_VERIFICATION -> "submit an answer"
         }
 
@@ -360,6 +434,8 @@ class BuddyActionService(
         val taskId: UUID? = null,
         val moduleId: UUID? = null,
         val answer: String? = null,
+        val title: String? = null,
+        val attesterId: String? = null,
     )
 
     private sealed interface ProjectResolution {
@@ -442,6 +518,33 @@ class BuddyActionService(
                     }
                 }
                 putJsonArray("required") { add("task_id") }
+            },
+        )
+
+        val REQUEST_ATTESTATION_SPEC = BuddyToolSpecDto(
+            name = BuddyActionType.REQUEST_ATTESTATION.toolName,
+            description = "Offer to ask a named colleague to confirm a piece of work the hire has " +
+                "done — a facilitated ceremony, a published plan, anything no system can see. " +
+                "This does NOT confirm anything by itself; it shows the hire a confirm button and " +
+                "runs only if they click, and the colleague still has to agree. Use for work that " +
+                "leaves no trace a tool can read. Read get_teammates first and ask the hire who " +
+                "should confirm it — never guess, and never name the hire themselves.",
+            parameters = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("title") {
+                        put("type", "string")
+                        put("description", "What the hire did, in their words.")
+                    }
+                    putJsonObject("attester_id") {
+                        put("type", "string")
+                        put("description", "The user id of the teammate the hire picked to confirm it.")
+                    }
+                }
+                putJsonArray("required") {
+                    add("title")
+                    add("attester_id")
+                }
             },
         )
 
