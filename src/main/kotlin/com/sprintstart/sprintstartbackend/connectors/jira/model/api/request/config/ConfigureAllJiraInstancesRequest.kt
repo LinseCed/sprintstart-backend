@@ -1,9 +1,9 @@
-package com.sprintstart.sprintstartbackend.connectors.github.models.api.requests
+package com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.config
 
 import com.sprintstart.sprintstartbackend.shared.scheduler.ScheduleSpec
 import jakarta.validation.Valid
 
-data class ConfigureRepositoryRequest(
+data class ConfigureAllJiraInstancesRequest(
     @Valid val schedule: ScheduleSpec,
     val autoUpdate: Boolean,
 )

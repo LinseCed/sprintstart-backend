@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.connectors.github.models
+package com.sprintstart.sprintstartbackend.connectors.jira.model.entity
 
 import com.sprintstart.sprintstartbackend.shared.scheduler.ScheduleSpec
 import com.sprintstart.sprintstartbackend.shared.scheduler.ScheduleSpecJpaConverter
@@ -13,17 +13,16 @@ import jakarta.persistence.OneToOne
 import jakarta.persistence.Table
 import java.time.Instant
 import java.time.LocalTime
-import java.util.UUID
 
 @Entity
-@Table(name = "gh_repository_configs")
-class GithubRepositoryConfig(
+@Table(name = "jira_instance_configs")
+internal class JiraInstanceConfig(
     @Id
-    var id: UUID? = null,
+    var id: String? = null,
     @OneToOne(fetch = FetchType.LAZY)
     @MapsId
-    @JoinColumn(name = "repository_id")
-    var repository: GithubRepositoryConnection,
+    @JoinColumn(name = "instance_id")
+    var instance: JiraInstance,
     @Column(name = "auto_update", nullable = false)
     var autoUpdate: Boolean = false,
     @Column(nullable = false)
