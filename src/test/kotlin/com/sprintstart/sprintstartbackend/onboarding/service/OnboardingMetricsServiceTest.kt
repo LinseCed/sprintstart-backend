@@ -2,6 +2,8 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTrack
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGoal
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalRepository
 import com.sprintstart.sprintstartbackend.onboarding.service.evidence.PullRequestEvidenceProvider
@@ -9,6 +11,7 @@ import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.time.Clock
@@ -39,8 +42,31 @@ class OnboardingMetricsServiceTest {
     // never write -- a PM opening the dashboard cannot be what grants somebody autonomy.
     private val rampService: RampService = mockk(relaxed = true)
 
+    // Engineering unless a test says otherwise: these assert numbers, and the track only decides
+    // the words around them -- except in the stall tests, where it decides whether a hire whose
+    // work nothing observes can be seen at all.
+    private val trackService: TrackService = mockk()
+
     private val now: Instant = Instant.parse("2026-07-20T12:00:00Z")
     private val projectId: UUID = UUID.randomUUID()
+
+    private val engineering = OnboardingTrack(
+        key = OnboardingTrack.DEFAULT_KEY,
+        label = "Engineering",
+        contributionNoun = "change",
+        contributionNounPlural = "changes",
+        contributionVerbPast = "merged",
+        evidenceKinds = mutableSetOf(ContributionEvidenceKind.PULL_REQUEST),
+    )
+
+    private val scrumMaster = OnboardingTrack(
+        key = "scrum-master",
+        label = "Scrum Master",
+        contributionNoun = "ceremony",
+        contributionNounPlural = "ceremonies",
+        contributionVerbPast = "facilitated",
+        evidenceKinds = mutableSetOf(ContributionEvidenceKind.ATTESTATION),
+    )
 
     private val service = OnboardingMetricsService(
         projectMembershipApi,
@@ -51,8 +77,14 @@ class OnboardingMetricsServiceTest {
         userGoalRepository,
         taskZeroService,
         rampService,
+        trackService,
         Clock.fixed(now, ZoneOffset.UTC),
     )
+
+    @BeforeEach
+    fun setUp() {
+        every { trackService.forMember(any()) } returns engineering
+    }
 
     private fun daysAgo(days: Long): Instant = now.minus(Duration.ofDays(days))
 
@@ -146,10 +178,13 @@ class OnboardingMetricsServiceTest {
     @Nested
     inner class Attribution {
         @Test
-        fun `a member with no GitHub login is counted as unattributable, but not stalled`() {
+        fun `a member whose work nothing could observe is unattributable, not stalled`() {
             // A missing GitHub username is an optional setup item, not a stall — onboarding is not
             // blocked on it. It is still surfaced separately via unattributableMemberCount so a PM
             // can see whose work cannot be measured, without calling the hire stuck.
+            //
+            // This holds only while the hire's track has no other way to be seen; the test below
+            // is the case that used to be swept in here with it.
             every { projectMembershipApi.getProjectMembers(projectId) } returns listOf(member(login = null))
             every { userGoalRepository.findByUserIdAndProjectId(any(), projectId) } returns null
 
@@ -158,6 +193,20 @@ class OnboardingMetricsServiceTest {
             assertEquals(1, metrics.unattributableMemberCount)
             assertFalse(metrics.hires.single().stalled)
             assertNull(metrics.hires.single().stalledReason)
+        }
+
+        @Test
+        fun `a hire on an attested track is judged with no GitHub login at all`() {
+            // The invisible-hire bug in one test. Attested evidence is attributed by identity, not
+            // by a git handle, so an empty contribution list is a real answer for this hire rather
+            // than a blind spot -- and silence has to reach the PM. Before, they read as calm.
+            every { trackService.forMember(any()) } returns scrumMaster
+            stage(listOf(member(login = null, joinedDaysAgo = 20)), emptyList())
+
+            val hire = service.getProjectMetrics(projectId).hires.single()
+
+            assertTrue(hire.stalled)
+            assertTrue(hire.stalledReason!!.contains("No ceremony started"))
         }
     }
 
@@ -171,6 +220,37 @@ class OnboardingMetricsServiceTest {
 
             assertTrue(hire.stalled)
             assertTrue(hire.stalledReason!!.contains("4 days"))
+        }
+
+        @Test
+        fun `the stall is worded in the hire's own track, never in pull requests`() {
+            // A Scrum Master told their pull request is late learns nothing except that the tool
+            // was not built for them.
+            every { trackService.forMember(any()) } returns scrumMaster
+            stage(listOf(member()), listOf(pullRequest(openedDaysAgo = 4)))
+
+            val reason = service
+                .getProjectMetrics(projectId)
+                .hires
+                .single()
+                .stalledReason
+
+            assertTrue(reason!!.contains("A ceremony has been waiting"))
+        }
+
+        @Test
+        fun `the timeline carries the words to say its numbers in`() {
+            every { trackService.forMember(any()) } returns scrumMaster
+            stage(listOf(member()), emptyList())
+
+            val vocabulary = service
+                .getProjectMetrics(projectId)
+                .hires
+                .single()
+                .vocabulary
+
+            assertEquals("ceremonies", vocabulary.contributionNounPlural)
+            assertEquals("facilitated", vocabulary.contributionVerbPast)
         }
 
         @Test
@@ -206,7 +286,7 @@ class OnboardingMetricsServiceTest {
             val hire = service.getProjectMetrics(projectId).hires.single()
 
             assertTrue(hire.stalled)
-            assertTrue(hire.stalledReason!!.contains("No pull request opened"))
+            assertTrue(hire.stalledReason!!.contains("No change started"))
         }
 
         @Test

@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionSeverity
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireVocabularyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectOnboardingMetricsResponse
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
@@ -53,6 +54,12 @@ class ProjectAttentionServiceTest {
         stalled = stalled,
         stalledReason = stalledReason,
         autonomyReachedAt = null,
+        vocabulary = HireVocabularyResponse(
+            trackLabel = "Engineering",
+            contributionNoun = "change",
+            contributionNounPlural = "changes",
+            contributionVerbPast = "merged",
+        ),
         reworkedPullRequestCount = 0,
     )
 

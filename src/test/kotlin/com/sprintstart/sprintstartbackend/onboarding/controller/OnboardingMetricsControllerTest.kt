@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.onboarding.controller
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireVocabularyResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingMetricsService
 import com.sprintstart.sprintstartbackend.onboarding.service.ProjectAttentionService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -78,6 +79,12 @@ class OnboardingMetricsControllerTest(
             stalled = true,
             stalledReason = "Waiting on a review for 3 days",
             autonomyReachedAt = null,
+            vocabulary = HireVocabularyResponse(
+                trackLabel = "Engineering",
+                contributionNoun = "change",
+                contributionNounPlural = "changes",
+                contributionVerbPast = "merged",
+            ),
             reworkedPullRequestCount = 0,
         )
 

@@ -59,6 +59,35 @@ data class HireTimelineResponse(
      * before.
      */
     val reworkedPullRequestCount: Int,
+    /**
+     * How this hire's work is named, from their track.
+     *
+     * Every field above still says "pull request", because the numbers behind them are composed
+     * from contributions of any kind and renaming a wire contract is a separate, breaking job. This
+     * is what lets a PM surface *say* the right word anyway: "2 ceremonies facilitated" over the
+     * same number that would read "2 changes merged" for an engineer.
+     *
+     * Structured nouns rather than prose, for the reason the board gives: a track fills fixed slots
+     * in a sentence the app owns, it never gets to write the sentence.
+     */
+    val vocabulary: HireVocabularyResponse,
+)
+
+/**
+ * The words for one hire's work, taken from their track.
+ *
+ * Deliberately a copy of the shape the board sends rather than a shared type imported across
+ * feature boundaries: these are four strings, and coupling a PM metrics contract to a hire board
+ * contract so that neither can change without the other would cost more than the duplication.
+ */
+data class HireVocabularyResponse(
+    /** The track's own name, e.g. "Engineering". */
+    val trackLabel: String,
+    /** One unit of accepted work, bare: "change", "ceremony". */
+    val contributionNoun: String,
+    val contributionNounPlural: String,
+    /** The hire's own act in the past tense: "merged", "facilitated". */
+    val contributionVerbPast: String,
 )
 
 /**
