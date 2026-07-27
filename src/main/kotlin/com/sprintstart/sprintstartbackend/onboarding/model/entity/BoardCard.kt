@@ -77,6 +77,19 @@ class BoardCard(
      */
     @Column(columnDefinition = "TEXT")
     var payload: String? = null,
+    /**
+     * What a [BoardCardKind.DIAGRAM] card is a diagram *of*; null for every other kind.
+     *
+     * The question, never the answer — which is the whole reason a live card is allowed to store
+     * this at all. The picture is re-derived from the corpus on every read, so a diagram cannot
+     * describe code that has since moved; only the thing somebody asked about is durable.
+     *
+     * It is also this card's identity: two subjects are two diagrams, so uniqueness for the kind is
+     * per `(board, subject)` rather than per board. Compared case-insensitively, or the same
+     * question asked twice with different capitals becomes two cards.
+     */
+    @Column(columnDefinition = "TEXT")
+    var subject: String? = null,
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false)

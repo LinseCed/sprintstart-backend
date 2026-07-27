@@ -4,6 +4,8 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.board.Authore
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.ReorderBoardRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCardResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.DiagramContent
+import com.sprintstart.sprintstartbackend.onboarding.service.BoardDiagramService
 import com.sprintstart.sprintstartbackend.onboarding.service.BoardService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.swagger.v3.oas.annotations.Operation
@@ -45,6 +47,7 @@ import java.util.UUID
 )
 class BoardController(
     private val boardService: BoardService,
+    private val boardDiagramService: BoardDiagramService,
     private val userApi: UserApi,
 ) {
     @Operation(
@@ -74,6 +77,32 @@ class BoardController(
                 HttpStatus.NOT_FOUND,
                 "You are not a member of that project",
             )
+
+    @Operation(
+        summary = "Redraw a diagram card if the project has changed",
+        description = "Checks this diagram against the project's material as it is *now*. An " +
+            "unchanged project returns the same picture without redrawing anything, so calling " +
+            "this on every board load is cheap; a project that has moved is redrawn, and one that " +
+            "no longer supports the subject returns no picture and says so.\n\n" +
+            "Separate from the board read on purpose: assembling a diagram costs a generation, and " +
+            "a page that waits on one to open is a page nobody opens. The board serves the last " +
+            "picture drawn, dated; this is what makes sure it is still true.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "The current picture, redrawn if it needed to be"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "404", description = "No such diagram card on a board of yours"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/me/board/cards/{cardId}/diagram")
+    @PreAuthorize("hasAnyRole('USER', 'PM', 'HR', 'ADMIN')")
+    suspend fun refreshDiagram(
+        @Parameter(hidden = true)
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable cardId: UUID,
+    ): DiagramContent = boardDiagramService.refresh(resolveUserId(jwt), cardId)
 
     @Operation(
         summary = "Put a card of my own on my board",

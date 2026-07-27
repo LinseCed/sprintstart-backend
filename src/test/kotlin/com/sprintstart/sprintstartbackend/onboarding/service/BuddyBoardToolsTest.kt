@@ -9,6 +9,9 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
@@ -41,11 +44,51 @@ class BuddyBoardToolsTest {
         projectRoles = emptyList(),
     )
 
-    private fun placeCall(kind: String) = BuddyToolCallDto(
+    private fun placeCall(kind: String, subject: String? = null) = BuddyToolCallDto(
         id = "c0",
         name = "place_card",
-        arguments = buildJsonObject { put("kind", kind) },
+        arguments = buildJsonObject {
+            put("kind", kind)
+            subject?.let { put("subject", it) }
+        },
     )
+
+    @Test
+    fun `a diagram carries the question the mentor chose`() {
+        every { boardService.place(userId, projectId, BoardCardKind.DIAGRAM, "how auth flows here") } returns
+            BoardService.PlacementOutcome.PLACED
+
+        val result = tools.execute(placeCall("DIAGRAM", "how auth flows here"), userId)
+
+        // The one argument any kind takes beyond its kind: the model chooses the question, and the
+        // picture is still derived from the project's own material.
+        assertThat(result).contains("Placed")
+        verify { boardService.place(userId, projectId, BoardCardKind.DIAGRAM, "how auth flows here") }
+    }
+
+    @Test
+    fun `a diagram with no subject comes back as a sentence, not silence`() {
+        every { boardService.place(userId, projectId, BoardCardKind.DIAGRAM, null) } returns
+            BoardService.PlacementOutcome.NEEDS_A_SUBJECT
+
+        val result = tools.execute(placeCall("DIAGRAM"), userId)
+
+        // A tool that fails quietly is a tool the model reports as having worked.
+        assertThat(result).contains("diagram of something")
+        assertThat(result).contains("how a request reaches the database")
+    }
+
+    @Test
+    fun `the tool advertises subject as belonging to diagrams only`() {
+        val spec = tools.toolSpecs().single()
+
+        val subject = spec.parameters["properties"]!!.jsonObject["subject"]!!.jsonObject
+        assertThat(subject["description"]!!.jsonPrimitive.content).contains("DIAGRAM only")
+        // Not required at the schema level: every other kind takes no subject at all, and a schema
+        // demanding one would make them all invalid.
+        assertThat(spec.parameters["required"]!!.jsonArray.map { it.jsonPrimitive.content })
+            .containsExactly("kind")
+    }
 
     @Test
     fun `places a card and tells the mentor it will stay there`() {

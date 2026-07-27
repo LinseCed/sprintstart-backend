@@ -13,6 +13,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardR
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardVocabularyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.NoteContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathToFirstContributionContent
+import com.sprintstart.sprintstartbackend.onboarding.service.BoardDiagramService
 import com.sprintstart.sprintstartbackend.onboarding.service.BoardService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
@@ -50,6 +51,9 @@ class BoardControllerTest(
 ) {
     @MockkBean
     private lateinit var boardService: BoardService
+
+    @MockkBean
+    private lateinit var boardDiagramService: BoardDiagramService
 
     @MockkBean
     private lateinit var userApi: UserApi

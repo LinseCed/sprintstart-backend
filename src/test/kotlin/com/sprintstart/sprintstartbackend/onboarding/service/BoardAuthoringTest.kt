@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
+import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardState
@@ -17,6 +18,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.board.LinkCar
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.NoteCardRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.NoteContent
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.BoardDiagramRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
@@ -29,6 +31,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.http.HttpStatus
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 import java.util.Optional
@@ -54,6 +57,9 @@ class BoardAuthoringTest {
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService = mockk()
     private val myCompetencyService: MyCompetencyService = mockk()
     private val buddySessionRepository: BuddySessionRepository = mockk()
+    private val boardDiagramRepository: BoardDiagramRepository = mockk(relaxed = true)
+    private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -71,6 +77,14 @@ class BoardAuthoringTest {
         starterWorkTaskProposalService,
         myCompetencyService,
         buddySessionRepository,
+        boardDiagramRepository,
+        BoardDiagramService(
+            boardRepository,
+            boardCardRepository,
+            boardDiagramRepository,
+            onboardingAiClient,
+            transactionManager,
+        ),
     )
 
     @BeforeEach
