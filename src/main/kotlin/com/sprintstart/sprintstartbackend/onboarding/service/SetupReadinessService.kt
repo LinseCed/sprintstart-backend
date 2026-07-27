@@ -1,12 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.RungState
 import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.SetupReadinessResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.SetupRungResponse
-import com.sprintstart.sprintstartbackend.onboarding.repository.BlueprintRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
@@ -16,23 +14,26 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * "Is this project ready to onboard someone?" answered as a ladder of the three setup stages the
- * onboarding module owns: an approved skill map, a chosen baseline, and a stocked pool of starter
- * tasks. (The corpus stage lives in the ingestion module; see [SetupReadinessResponse]. The
- * fourth stage this used to check — a buddy for every hire — went away with the human-buddy loop:
- * the AI buddy needs no assignment.)
+ * "Is this project ready to onboard someone?" answered as a ladder of the two setup stages the
+ * onboarding module owns: an approved skill map, and a stocked pool of starter tasks. (The corpus
+ * stage lives in the ingestion module; see [SetupReadinessResponse].)
+ *
+ * Two rungs have gone since it was written, both because the work behind them stopped existing. A
+ * buddy for every hire went with the human-buddy loop — the AI buddy needs no assignment. A chosen
+ * baseline went when the path started deriving its targets from the hire's claimed goal: the rung
+ * was asking a PM to make a selection nothing read, which is a worse failure than a missing rung
+ * because it looks like progress.
  *
  * Every number is composed on read from the same rows each stage's own page reads, so this can never
  * disagree with those pages -- and the bug that motivated it (proposals generated but never approved,
- * so the baseline page read "empty") shows up here as an explicit "waiting for your review" instead
- * of a silent contradiction between two surfaces.
+ * so a page read "empty") shows up here as an explicit "waiting for your review" instead of a silent
+ * contradiction between two surfaces.
  */
 @Service
 class SetupReadinessService(
     private val competencyGraphAuthoringService: CompetencyGraphAuthoringService,
     private val competencyProposalRepository: CompetencyProposalRepository,
     private val competencyEdgeProposalRepository: CompetencyEdgeProposalRepository,
-    private val blueprintRepository: BlueprintRepository,
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val projectMembershipApi: ProjectMembershipApi,
     private val trackService: TrackService,
@@ -42,7 +43,6 @@ class SetupReadinessService(
         val approvedCompetencies = competencyGraphAuthoringService.getGraph().competencies.size
         val rungs = listOf(
             skillMapRung(approvedCompetencies),
-            baselineRung(projectId, approvedCompetencies),
             starterTasksRung(),
         )
         return SetupReadinessResponse(
@@ -75,37 +75,6 @@ class SetupReadinessService(
                 RungState.OK,
                 approvedCompetencies,
                 "$approvedCompetencies ${competencyWord(approvedCompetencies)} approved.",
-            )
-        }
-    }
-
-    private fun baselineRung(projectId: UUID, approvedCompetencies: Int): SetupRungResponse {
-        // A baseline is a selection *from* the approved competencies, so it cannot be chosen before
-        // any exist -- that is the one genuine ordering constraint in the ladder.
-        if (approvedCompetencies == 0) {
-            return rung(
-                BASELINE,
-                RungState.BLOCKED,
-                0,
-                "Approve competencies first, then mark which ones matter on this project.",
-            )
-        }
-        val baselineCount = blueprintRepository
-            .findAllByStatus(BlueprintStatus.ACTIVE)
-            .filter { it.projectId == projectId }
-            .sumOf { blueprint -> blueprint.competencies.count { it.status == ProposalStatus.APPROVED } }
-        return when (baselineCount) {
-            0 -> rung(
-                BASELINE,
-                RungState.WARN,
-                0,
-                "No baseline yet. Choose the competencies expected of a hire on this project.",
-            )
-            else -> rung(
-                BASELINE,
-                RungState.OK,
-                baselineCount,
-                "$baselineCount ${competencyWord(baselineCount)} expected on this project.",
             )
         }
     }
@@ -182,7 +151,6 @@ class SetupReadinessService(
 
     private companion object {
         const val SKILL_MAP = "skill-map"
-        const val BASELINE = "baseline"
         const val STARTER_TASKS = "starter-tasks"
     }
 }

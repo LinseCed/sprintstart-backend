@@ -116,7 +116,6 @@ class CompetencyPathService(
             competencies = effectiveGraph.competencies,
             edges = effectiveGraph.edges,
             targetKeys = targetKeys,
-            targetLevelOverrides = emptyMap(),
             ledger = ledger,
             graphVersion = pin.pinnedVersion,
             moduleIdByCompetencyKey = liveModules.mapValues { it.value.id },

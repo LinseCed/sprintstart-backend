@@ -125,7 +125,9 @@ class BuddyPlanToolsTest {
         val result = tools.execute(planCall, userId)
 
         assertThat(result).contains("Learning plan on Checkout")
-        assertThat(result).contains("the team's baseline")
+        // No goal claimed, so the plan says so and points at the move that fills it in --
+        // which is the hire's, not a PM approving a baseline nothing reads any more.
+        assertThat(result).contains("nothing claimed yet — offer to claim a goal")
         assertThat(result).contains("React (level 0/2) — usually comes after Kotlin. Module: “React basics”")
         assertThat(result).contains("Testing (level 1/3) — usually comes after React. No published module yet")
         assertThat(result).contains("After that:")
