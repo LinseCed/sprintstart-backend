@@ -69,6 +69,36 @@ class TrackService(
     }
 
     /**
+     * The one track whose words describe this hire, across every project they are on.
+     *
+     * The buddy is not scoped to a project, so its persona needs a single vocabulary while
+     * [forMember] needs a per-project one. Where [admitsAnywhere] is deliberately **permissive** —
+     * a capability is offered if any project could use it — this is deliberately **strict**: a
+     * sentence can only be written in one set of words, so two projects putting the hire on
+     * different tracks resolves to the default rather than picking a winner. Same rule the user
+     * module applies when two roles disagree, for the same reason: the wrong vocabulary in front of
+     * somebody is worse than the neutral one.
+     *
+     * @param userId The hire.
+     * @return Their track when every project agrees, otherwise the default.
+     */
+    @Transactional(readOnly = true)
+    fun forUser(userId: UUID): OnboardingTrack {
+        val projects = userApi
+            .getUsersByIds(listOf(userId))
+            .firstOrNull()
+            ?.projects
+            .orEmpty()
+        val memberships = projects.mapNotNull { project ->
+            projectMembershipApi
+                .getProjectMembers(project.projectId)
+                .firstOrNull { it.userId == userId }
+        }
+        val tracks = memberships.map { forMember(it) }.distinctBy { it.key }
+        return tracks.singleOrNull() ?: default()
+    }
+
+    /**
      * The fallback track.
      *
      * Falls back again to an in-memory engineering track when the seeded row is absent. That is not

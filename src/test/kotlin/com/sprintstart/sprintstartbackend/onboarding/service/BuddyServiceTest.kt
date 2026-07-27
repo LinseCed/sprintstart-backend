@@ -9,6 +9,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamE
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTrack
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
@@ -36,6 +37,19 @@ class BuddyServiceTest {
     private val buddyToolExecutor: BuddyToolExecutor = mockk()
     private val buddyActionService: BuddyActionService = mockk()
     private val userApi: UserApi = mockk()
+
+    // Every hire here is on the engineering track, so these tests describe the buddy every
+    // existing hire meets; the vocabulary swap is exercised in TrackServiceTest.
+    private val trackService: TrackService = mockk {
+        every { forUser(any()) } returns OnboardingTrack(
+            key = OnboardingTrack.DEFAULT_KEY,
+            label = "Engineering",
+            contributionNoun = "change",
+            contributionNounPlural = "changes",
+            contributionVerbPast = "merged",
+        )
+    }
+
     private val service = BuddyService(
         buddySessionRepository,
         buddyMessageRepository,
@@ -43,6 +57,7 @@ class BuddyServiceTest {
         buddyToolExecutor,
         buddyActionService,
         userApi,
+        trackService,
     )
 
     private val userId = UUID.randomUUID()
@@ -254,6 +269,44 @@ class BuddyServiceTest {
                 BuddyAgentMessageDto(role = "assistant", content = "Hello!"),
                 BuddyAgentMessageDto(role = "user", content = "Can you say more?"),
             )
+        }
+
+        @Test
+        fun `sends the hire's own track vocabulary on every hop, not just the first`() = runTest {
+            val session = BuddySession(userId = userId)
+            every { trackService.forUser(userId) } returns OnboardingTrack(
+                key = "delivery",
+                label = "Agile delivery",
+                contributionNoun = "ceremony",
+                contributionNounPlural = "ceremonies",
+                contributionVerbPast = "facilitated",
+            )
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
+            every { buddyActionService.isAction(any()) } returns false
+            val requests = mutableListOf<BuddyAgentRequest>()
+            coEvery { onboardingAiClient.buddyAgentTurn(capture(requests)) } returnsMany listOf(
+                BuddyAgentResponse(
+                    final = false,
+                    text = "",
+                    pendingToolCalls = listOf(BuddyToolCallDto(id = "c0", name = "get_my_metrics")),
+                ),
+                finalReply("Nice work on that retro."),
+            )
+            every { buddyToolExecutor.execute(any(), userId) } returns "no metrics"
+
+            service.sendMessageForMe(authId, "how am I doing?").toList()
+
+            // Every hop, unlike the summary: the persona is rebuilt whenever the running
+            // conversation carries no system message, so a resumed turn that omitted the
+            // vocabulary would silently fall back to the engineering wording mid-conversation.
+            assertThat(requests).hasSize(2)
+            assertThat(requests.map { it.vocabulary.contributionNounPlural })
+                .containsExactly("ceremonies", "ceremonies")
+            assertThat(requests.first().vocabulary.contributionVerbPast).isEqualTo("facilitated")
         }
 
         @Test
