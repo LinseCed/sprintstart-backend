@@ -53,6 +53,29 @@ data class BuddyAgentRequest(
      * transcript: the window stays small, and the summary accretes what slides out of it.
      */
     @SerialName("summarize_upto") val summarizeUpto: Int? = null,
+    /**
+     * What one unit of this hire's accepted work is called, for the mentor's persona.
+     *
+     * Three structured fields rather than persona prose: the AI renders them into a fixed sentence
+     * skeleton, so however many tracks exist the mentor stays one voice. Defaults to the
+     * engineering wording on both sides, so an older AI service — or a hire on no track — reads
+     * exactly as it did before tracks existed.
+     */
+    @SerialName("vocabulary") val vocabulary: BuddyVocabularyDto = BuddyVocabularyDto(),
+)
+
+/**
+ * The nouns and verb one track's accepted work is described with.
+ *
+ * [contributionNoun] is bare ("change", "ceremony") because it is always rendered next to
+ * [contributionVerbPast]; baking the verb into the noun produces "merged merged change" the moment
+ * a sentence needs both.
+ */
+@Serializable
+data class BuddyVocabularyDto(
+    @SerialName("contribution_noun") val contributionNoun: String = "change",
+    @SerialName("contribution_noun_plural") val contributionNounPlural: String = "changes",
+    @SerialName("contribution_verb_past") val contributionVerbPast: String = "merged",
 )
 
 @Serializable

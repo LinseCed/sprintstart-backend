@@ -9,6 +9,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenReq
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyVocabularyDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
@@ -46,6 +47,7 @@ class BuddyService(
     private val buddyToolExecutor: BuddyToolExecutor,
     private val buddyActionService: BuddyActionService,
     private val userApi: UserApi,
+    private val trackService: TrackService,
 ) {
     /** Finds or creates a user's one ongoing buddy session. */
     fun getOrCreateSession(userId: UUID): BuddySession =
@@ -154,6 +156,11 @@ class BuddyService(
         // tool call never mutates here — it produces a proposal the hire must confirm out-of-band.
         val tools = buddyToolExecutor.toolSpecs(userId) + buddyActionService.actionSpecs()
 
+        // The words the mentor describes this hire's work in. Resolved once per turn rather than
+        // per hop: it cannot change mid-conversation, and re-reading it would cost a membership
+        // lookup on every step of the agent loop.
+        val vocabulary = vocabularyFor(userId)
+
         // Fold the oldest part of the window into the summary once it outgrows the window. The
         // cursor arithmetic never reaches the just-sent user message (summarizeUpto <= the window's
         // persisted prefix), so nothing is summarized before it is durably stored.
@@ -169,7 +176,7 @@ class BuddyService(
             while (answer == null && step < MAX_AGENT_STEPS) {
                 step++
                 val response = onboardingAiClient.buddyAgentTurn(
-                    agentRequest(messages, tools, step, session, summarizeUpto),
+                    agentRequest(messages, tools, step, session, summarizeUpto, vocabulary),
                 )
                 citations = response.citations
                 response.updatedSummary?.let { updatedSummary = it }
@@ -222,6 +229,16 @@ class BuddyService(
         }
     }
 
+    /** This hire's track vocabulary, in the shape the AI service's persona skeleton expects. */
+    private fun vocabularyFor(userId: UUID): BuddyVocabularyDto {
+        val track = trackService.forUser(userId)
+        return BuddyVocabularyDto(
+            contributionNoun = track.contributionNoun,
+            contributionNounPlural = track.contributionNounPlural,
+            contributionVerbPast = track.contributionVerbPast,
+        )
+    }
+
     /**
      * Builds one agent request. Summary fields go on the first hop only: after that the AI has
      * folded them into the running conversation it returns, and re-sending would double-fold
@@ -233,12 +250,17 @@ class BuddyService(
         step: Int,
         session: BuddySession,
         summarizeUpto: Int?,
+        vocabulary: BuddyVocabularyDto,
     ): BuddyAgentRequest =
         BuddyAgentRequest(
             messages = messages,
             backendTools = tools,
             priorSummary = if (step == 1) session.summary else null,
             summarizeUpto = if (step == 1) summarizeUpto else null,
+            // Sent on every hop, unlike the summary: the persona is rebuilt from scratch whenever
+            // the running conversation has no system message yet, so withholding it after the
+            // first hop would let a resumed turn fall back to the engineering wording.
+            vocabulary = vocabulary,
         )
 
     /**

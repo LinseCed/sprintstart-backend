@@ -118,6 +118,39 @@ class TrackServiceTest {
     }
 
     @Test
+    fun `a hire's vocabulary is their track when every project agrees`() {
+        noSeededTracks()
+        every { onboardingTrackRepository.findByKey("delivery") } returns delivery
+        onProjects(ProjectDto(projectId, "Delivery", null))
+        every { projectMembershipApi.getProjectMembers(projectId) } returns listOf(member("delivery"))
+
+        assertEquals("ceremony", service.forUser(userId).contributionNoun)
+    }
+
+    @Test
+    fun `a hire on two different tracks falls back to the default vocabulary`() {
+        noSeededTracks()
+        every { onboardingTrackRepository.findByKey("delivery") } returns delivery
+        val codeProjectId = UUID.randomUUID()
+        onProjects(ProjectDto(projectId, "Delivery", null), ProjectDto(codeProjectId, "Checkout", null))
+        every { projectMembershipApi.getProjectMembers(projectId) } returns listOf(member("delivery"))
+        every { projectMembershipApi.getProjectMembers(codeProjectId) } returns listOf(member(null))
+
+        // Strict where `admitsAnywhere` is permissive, and deliberately so: a capability can be
+        // offered on the chance it is useful, but a sentence can only be written in one set of
+        // words, and the wrong ones are worse than the neutral ones.
+        assertEquals(OnboardingTrack.DEFAULT_KEY, service.forUser(userId).key)
+    }
+
+    @Test
+    fun `a hire on no project yet gets the default vocabulary`() {
+        noSeededTracks()
+        onProjects()
+
+        assertEquals(OnboardingTrack.DEFAULT_KEY, service.forUser(userId).key)
+    }
+
+    @Test
     fun `a hire on two tracks admits evidence either of them admits`() {
         noSeededTracks()
         every { onboardingTrackRepository.findByKey("delivery") } returns delivery
