@@ -90,19 +90,22 @@ class BuddyBoardTools(
     /** Reads the `kind` argument, or null when it is missing or not a kind the buddy may place. */
     private fun BuddyToolCallDto.kindArg(): BoardCardKind? {
         val raw = (arguments["kind"] as? JsonPrimitive)?.contentOrNull.orEmpty()
-        return BoardCardKind.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) && !it.baseline }
+        return PLACEABLE.firstOrNull { it.name.equals(raw, ignoreCase = true) }
     }
 
     private companion object {
         const val PLACE_CARD = "place_card"
 
         /**
-         * The kinds the mentor may place: everything the board does not already keep by itself.
+         * The kinds the mentor may place, and only those.
          *
-         * A baseline card is on the board already, so offering it here would only let the model
-         * claim credit for something that was there anyway.
+         * A baseline card is on the board already, so offering it would only let the model claim
+         * credit for something that was there anyway. A card the *hire* wrote is theirs — the
+         * mentor cannot create one, and the surest way to keep it that way is that no tool exists
+         * which could.
          */
-        private val PLACEABLE = BoardCardKind.entries.filterNot { it.baseline }
+        private val PLACEABLE =
+            BoardCardKind.entries.filter { it.placement == BoardCardKind.Placement.MENTOR }
 
         private fun placeableKindNames() = PLACEABLE.joinToString(", ") { it.name }
 

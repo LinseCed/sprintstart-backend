@@ -4,20 +4,26 @@ import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
+import com.sprintstart.sprintstartbackend.onboarding.model.request.board.AuthoredCardRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.board.NoteCardRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCardResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardMomentKey
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardMomentResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardVocabularyResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.NoteContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathToFirstContributionContent
 import com.sprintstart.sprintstartbackend.onboarding.service.BoardService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
+import io.mockk.slot
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor
@@ -25,10 +31,16 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.web.server.ResponseStatusException
 import java.util.Optional
 import java.util.UUID
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @WebMvcTest(BoardController::class)
 @Import(SecurityConfig::class)
@@ -82,6 +94,15 @@ class BoardControllerTest(
                 ),
             ),
         ),
+    )
+
+    private fun noteCard() = BoardCardResponse(
+        id = UUID.randomUUID(),
+        kind = BoardCardKind.NOTE,
+        owner = BoardCardOwner.HIRE,
+        position = 2,
+        placedAt = null,
+        content = NoteContent(text = "deploys are on Thursdays"),
     )
 
     @Test
@@ -138,6 +159,90 @@ class BoardControllerTest(
         mockMvc
             .perform(delete("/api/v1/onboarding/me/board/cards/${UUID.randomUUID()}"))
             .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `addCard takes a note and answers with the card`() {
+        val request = slot<AuthoredCardRequest>()
+        every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+        every { boardService.addAuthoredCard(eq(userId), eq(projectId), capture(request)) } returns
+            noteCard()
+
+        mockMvc
+            .perform(
+                post("/api/v1/onboarding/me/board/cards")
+                    .param("projectId", projectId.toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"kind":"NOTE","text":"deploys are on Thursdays"}""")
+                    .with(userJwt),
+            ).andExpect(status().isCreated)
+            .andExpect(jsonPath("$.owner").value("HIRE"))
+            .andExpect(jsonPath("$.content.text").value("deploys are on Thursdays"))
+
+        // The wire kind has to pick the right request shape, or a note could arrive as a link.
+        assertTrue(request.captured is NoteCardRequest)
+    }
+
+    @Test
+    fun `addCard relays a refusal to keep a card that would say nothing`() {
+        every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+        every { boardService.addAuthoredCard(any(), any(), any()) } throws
+            ResponseStatusException(HttpStatus.BAD_REQUEST, "A note needs some text")
+
+        mockMvc
+            .perform(
+                post("/api/v1/onboarding/me/board/cards")
+                    .param("projectId", projectId.toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"kind":"NOTE","text":"   "}""")
+                    .with(userJwt),
+            ).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `editCard replaces what one of the caller's cards says`() {
+        val cardId = UUID.randomUUID()
+        every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+        every { boardService.editAuthoredCard(eq(userId), eq(cardId), any()) } returns noteCard()
+
+        mockMvc
+            .perform(
+                patch("/api/v1/onboarding/me/board/cards/$cardId")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"kind":"NOTE","text":"deploys are on Thursdays"}""")
+                    .with(userJwt),
+            ).andExpect(status().isOk)
+    }
+
+    @Test
+    fun `reorder sends the whole order`() {
+        val request = slot<List<UUID>>()
+        val first = UUID.randomUUID()
+        val second = UUID.randomUUID()
+        every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+        every { boardService.reorder(eq(userId), eq(projectId), capture(request)) } returns Unit
+
+        mockMvc
+            .perform(
+                put("/api/v1/onboarding/me/board/order")
+                    .param("projectId", projectId.toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"cardIds":["$first","$second"]}""")
+                    .with(userJwt),
+            ).andExpect(status().isNoContent)
+
+        assertEquals(listOf(first, second), request.captured)
+    }
+
+    @Test
+    fun `authoring requires authentication`() {
+        mockMvc
+            .perform(
+                post("/api/v1/onboarding/me/board/cards")
+                    .param("projectId", projectId.toString())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"kind":"NOTE","text":"hello"}"""),
+            ).andExpect(status().isUnauthorized)
     }
 
     @Test
