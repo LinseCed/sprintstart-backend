@@ -1,7 +1,5 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
-import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectOnboardingMetricsResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalRepository
@@ -40,7 +38,7 @@ import java.util.UUID
 @Service
 class OnboardingMetricsService(
     private val projectMembershipApi: ProjectMembershipApi,
-    private val artifactIngestionApi: ArtifactIngestionApi,
+    private val contributionService: ContributionService,
     private val userGoalRepository: UserGoalRepository,
     private val taskZeroService: TaskZeroService,
     private val rampService: RampService,
@@ -90,31 +88,27 @@ class OnboardingMetricsService(
         val now = clock.instant()
         val login = member.githubLogin
 
-        // No declared login means no attribution is possible. Reporting that as "opened no pull
-        // requests" would be a lie about the person rather than about the data.
-        val pullRequests = if (login.isNullOrBlank()) {
-            emptyList()
-        } else {
-            artifactIngestionApi.getAuthoredPullRequests(projectId, login)
-        }
+        // No attributable identity means no contributions can be found. Reporting that as "did
+        // nothing" would be a lie about the person rather than about the data.
+        val contributions = contributionService.forHire(member, projectId)
 
-        val opened = pullRequests.mapNotNull { it.openedAt }.minOrNull()
-        val merged = pullRequests.mapNotNull { it.mergedAt }.minOrNull()
-        val firstPullRequest = pullRequests
+        val opened = contributions.mapNotNull { it.openedAt }.minOrNull()
+        val accepted = contributions.mapNotNull { it.acceptedAt }.minOrNull()
+        val firstContribution = contributions
             .filter { it.openedAt != null }
             .minByOrNull { it.openedAt as Instant }
 
         val goalClaimedAt = userGoalRepository.findByUserIdAndProjectId(member.userId, projectId)?.claimedAt
 
-        val longestOpenWait = pullRequests
-            // Only a still-open pull request is "waiting on a review": a closed one is done, not
-            // stuck, even though it never merged.
-            .filter { it.firstResponseAt == null && it.isOpen && it.openedAt != null }
+        val longestOpenWait = contributions
+            // Only a contribution still in flight is "waiting on somebody": an abandoned one is
+            // done, not stuck, even though it was never accepted.
+            .filter { it.firstResponseAt == null && it.isInFlight && it.openedAt != null }
             .mapNotNull { it.openedAt }
             .minOrNull()
             ?.let { hoursBetween(it, now) }
 
-        val stalledReason = stalledReason(member, pullRequests, goalClaimedAt, merged, now)
+        val stalledReason = stalledReason(member, contributions, goalClaimedAt, accepted, now)
 
         return HireTimelineResponse(
             userId = member.userId,
@@ -124,14 +118,14 @@ class OnboardingMetricsService(
             taskZeroAssignedAt = taskZeroService.assignedAtFor(member.userId, projectId),
             firstTaskClaimedAt = goalClaimedAt,
             firstPullRequestOpenedAt = opened,
-            firstResponseAt = firstPullRequest?.firstResponseAt,
-            firstPullRequestMergedAt = merged,
-            hoursToFirstMergedPullRequest = hoursBetween(member.joinedAt, merged),
-            hoursToFirstResponse = hoursBetween(firstPullRequest?.openedAt, firstPullRequest?.firstResponseAt),
-            mergedPullRequestCount = pullRequests.count { it.mergedAt != null },
-            // Open = still open, not merely unmerged: a pull request closed without merging is
-            // neither open nor merged and must not inflate the open count.
-            openPullRequestCount = pullRequests.count { it.isOpen },
+            firstResponseAt = firstContribution?.firstResponseAt,
+            firstPullRequestMergedAt = accepted,
+            hoursToFirstMergedPullRequest = hoursBetween(member.joinedAt, accepted),
+            hoursToFirstResponse = hoursBetween(firstContribution?.openedAt, firstContribution?.firstResponseAt),
+            mergedPullRequestCount = contributions.count { it.isAccepted },
+            // In flight, not merely unaccepted: a contribution closed without acceptance is neither
+            // in flight nor accepted and must not inflate the open count.
+            openPullRequestCount = contributions.count { it.isInFlight },
             longestOpenWaitHours = longestOpenWait,
             stalled = stalledReason != null,
             stalledReason = stalledReason,
@@ -140,35 +134,39 @@ class OnboardingMetricsService(
             autonomyReachedAt = rampService.autonomyReachedAtFor(member.userId, projectId),
             // R7's own measure, on our data: whether a suggested task was claimed, and whether it
             // came back sent-for-rework. Both derived, so history is covered without a backfill.
-            reworkedPullRequestCount = pullRequests.count { it.changesRequestedCount > 0 },
+            reworkedPullRequestCount = contributions.count { it.returnedCount > 0 },
         )
     }
 
     /**
      * Why this hire is stuck, in the words a PM would use — or null if they are not.
      *
-     * The reasons are ordered by what a PM should do about them, not by severity. A pull request
-     * waiting on a review is somebody else's action and is named first; a hire who has not opened
-     * anything is a conversation.
+     * The reasons are ordered by what a PM should do about them, not by severity. Work waiting on a
+     * response is somebody else's action and is named first; a hire who has produced nothing is a
+     * conversation.
      */
     private fun stalledReason(
         member: ProjectMember,
-        pullRequests: List<AuthoredPullRequest>,
+        contributions: List<Contribution>,
         goalClaimedAt: Instant?,
-        firstMergedAt: Instant?,
+        firstAcceptedAt: Instant?,
         now: Instant,
     ): String? {
         // A missing GitHub username is an optional setup item, not a stall: onboarding must not be
-        // blocked on it. It also means we cannot attribute this hire's pull requests at all, so we
-        // have no basis to judge progress — the "no pull request opened" check below would fire
-        // falsely on work we simply cannot see. Treat it as "unknown, not stalled".
+        // blocked on it. It also means we cannot attribute this hire's work at all, so we have no
+        // basis to judge progress — the "nothing opened" check below would fire falsely on work we
+        // simply cannot see. Treat it as "unknown, not stalled".
+        //
+        // This is also where a role with no observable evidence source currently lands, which is
+        // why they read as calm rather than stalled. Naming that honestly needs per-track
+        // evidence, not a change here.
         if (member.githubLogin.isNullOrBlank()) {
             return null
         }
 
-        val waitingSince = pullRequests
-            // A closed-unmerged pull request is not waiting on anyone, so it cannot be the stall.
-            .filter { it.firstResponseAt == null && it.isOpen }
+        val waitingSince = contributions
+            // An abandoned contribution is not waiting on anyone, so it cannot be the stall.
+            .filter { it.firstResponseAt == null && it.isInFlight }
             .mapNotNull { it.openedAt }
             .minOrNull()
         if (waitingSince != null && hoursBetween(waitingSince, now)!! >= RESPONSE_SLA_HOURS) {
@@ -176,14 +174,14 @@ class OnboardingMetricsService(
             return "A pull request has been waiting $days days for a first response"
         }
 
-        // Merged something already: onboarding is moving, whatever else is open.
-        if (firstMergedAt != null) {
+        // Something accepted already: onboarding is moving, whatever else is open.
+        if (firstAcceptedAt != null) {
             return null
         }
 
         val since = listOfNotNull(goalClaimedAt, member.joinedAt).maxOrNull() ?: return null
         val quietHours = hoursBetween(since, now) ?: return null
-        if (pullRequests.isEmpty() && quietHours >= NO_ACTIVITY_STALL_HOURS) {
+        if (contributions.isEmpty() && quietHours >= NO_ACTIVITY_STALL_HOURS) {
             val days = quietHours / HOURS_PER_DAY
             return "No pull request opened in $days days since joining"
         }

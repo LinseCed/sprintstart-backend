@@ -1,7 +1,5 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
-import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.RampStage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.AutonomyMilestone
@@ -31,11 +29,13 @@ import java.util.UUID
  *
  * Three decisions shape this service.
  *
- * **The ledger is written by merged pull requests, not by chat.** A merged change credits the
+ * **The ledger is written by accepted work, not by chat.** An accepted [Contribution] credits the
  * competencies of the task it was claimed against, at that competency's own target level, with
- * [CompetencySource.VERIFIED] and the same monotonic rule as every other ledger writer — a merge
- * never lowers what somebody already showed. Chat placement stays a weak prior that a merge
- * outranks, never the other way round.
+ * [CompetencySource.VERIFIED] and the same monotonic rule as every other ledger writer — it
+ * never lowers what somebody already showed. Chat placement stays a weak prior that accepted work
+ * outranks, never the other way round. What counts as accepted work is [ContributionService]'s
+ * question, not this service's: today every contribution is a merged pull request, and this
+ * service reads none of that detail.
  *
  * **Task 0 credits nothing, by construction rather than by convention.** Credit is derived from the
  * *claimed goal*, and Task 0 is an assignment, not a goal — so there is no code path that could
@@ -43,7 +43,7 @@ import java.util.UUID
  * "opened a pull request once" would be a lie about competence.
  *
  * **Autonomy is an event, not a state.** The exit condition is a task completed with no help from
- * a person (an escalation to the PM, the surviving human channel) and no review rework, which is
+ * a person (an escalation to the PM, the surviving human channel) and no rework, which is
  * the honest operational definition of "can be left alone here" — not "all nodes mastered". The
  * moment is recorded once ([AutonomyMilestone]) so it can be announced and dated; recomputing it
  * would only ever yield a boolean, and a boolean cannot be announced.
@@ -58,7 +58,7 @@ class RampService(
     private val autonomyMilestoneRepository: AutonomyMilestoneRepository,
     private val knowledgeRequestRepository: KnowledgeRequestRepository,
     private val projectMembershipApi: ProjectMembershipApi,
-    private val artifactIngestionApi: ArtifactIngestionApi,
+    private val contributionService: ContributionService,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     /**
@@ -73,18 +73,17 @@ class RampService(
     @Transactional
     fun getForHire(hireId: UUID, projectId: UUID): MyRampResponse {
         val member = requireMember(hireId, projectId)
-        val pullRequests = authoredPullRequests(member, projectId)
-        val merged = pullRequests.filter { it.mergedAt != null }
+        val accepted = contributionService.forHire(member, projectId).filter { it.isAccepted }
 
-        val credited = creditMergedWork(hireId, projectId, merged)
-        val autonomy = evaluateAutonomy(hireId, projectId, merged)
+        val credited = creditAcceptedWork(hireId, projectId, accepted)
+        val autonomy = evaluateAutonomy(hireId, projectId, accepted)
         val currentTask = currentTask(hireId, projectId)
 
         return MyRampResponse(
-            stage = stageOf(merged.size, autonomy.reached),
+            stage = stageOf(accepted.size, autonomy.reached),
             currentTask = currentTask?.toResponse(),
-            unlockedBy = unlockedBy(merged.size, autonomy.reached),
-            mergedCount = merged.size,
+            unlockedBy = unlockedBy(accepted.size, autonomy.reached),
+            mergedCount = accepted.size,
             creditedCompetencyKeys = credited,
             autonomy = autonomy,
         )
@@ -98,47 +97,50 @@ class RampService(
     /**
      * The stage a hire is on.
      *
-     * Counted in *merged changes*, because that is the only unit of progress the ramp recognises.
-     * Task 0 is where somebody sits before they have merged anything — including a hire who has one
-     * open pull request, since an unmerged change has not proven the loop.
+     * Counted in *accepted contributions*, because that is the only unit of progress the ramp
+     * recognises. Task 0 is where somebody sits before anything of theirs has been accepted —
+     * including a hire with one contribution still in flight, since work nobody has taken has not
+     * proven the loop.
      */
-    private fun stageOf(mergedCount: Int, autonomous: Boolean): RampStage = when {
+    private fun stageOf(acceptedCount: Int, autonomous: Boolean): RampStage = when {
         autonomous -> RampStage.AUTONOMOUS
-        mergedCount == 0 -> RampStage.TASK_ZERO
-        mergedCount == 1 -> RampStage.TASK_ONE
+        acceptedCount == 0 -> RampStage.TASK_ZERO
+        acceptedCount == 1 -> RampStage.TASK_ONE
         else -> RampStage.TASK_TWO_PLUS
     }
 
-    private fun unlockedBy(mergedCount: Int, autonomous: Boolean): String = when {
+    // The wording still says "merged" because every contribution is a merged pull request today.
+    // Per-track vocabulary is a later slice; inventing neutral copy now would make this read worse
+    // for the only hires who currently see it.
+    private fun unlockedBy(acceptedCount: Int, autonomous: Boolean): String = when {
         autonomous -> "You shipped a change with no help and no rework"
-        mergedCount == 0 -> "You haven't merged anything here yet — that's the whole first step"
-        mergedCount == 1 -> "You merged your first change here"
-        else -> "You've merged $mergedCount changes here"
+        acceptedCount == 0 -> "You haven't merged anything here yet — that's the whole first step"
+        acceptedCount == 1 -> "You merged your first change here"
+        else -> "You've merged $acceptedCount changes here"
     }
 
     /**
-     * Writes ledger credit for competencies proven by merged work.
+     * Writes ledger credit for competencies proven by accepted work.
      *
-     * **What a merge is attributed to.** Ingestion records who authored a pull request but not
-     * which task it was for, so a merge is attributed to the goal the hire had *claimed at the
-     * time* — a pull request that merged after the claim. That is an approximation and worth
-     * naming: without a task↔PR link there is no exact answer, and the claimed goal is the best
-     * evidence available. It cannot over-credit an unrelated person's work, because authorship is
-     * already enforced (the pull requests come from the hire's own declared GitHub login).
+     * **What acceptance is attributed to.** Nothing links a contribution to the task it was for, so
+     * it is attributed to the goal the hire had *claimed at the time* — work accepted after the
+     * claim. That is an approximation and worth naming: without a task↔contribution link there is
+     * no exact answer, and the claimed goal is the best evidence available. It cannot over-credit
+     * an unrelated person's work, because attribution is enforced where contributions are built.
      *
      * @return The competency keys credited, for the hire to see what their work counted for.
      */
-    private fun creditMergedWork(
+    private fun creditAcceptedWork(
         hireId: UUID,
         projectId: UUID,
-        merged: List<AuthoredPullRequest>,
+        accepted: List<Contribution>,
     ): List<String> {
         val goal = userGoalRepository.findByUserIdAndProjectId(hireId, projectId) ?: return emptyList()
         val proposal = goal.sourceProposalId
             ?.let { starterWorkTaskProposalRepository.findById(it).orElse(null) }
             ?: return emptyList()
 
-        val qualifying = merged.any { pr -> pr.mergedAt?.isAfter(goal.claimedAt) == true }
+        val qualifying = accepted.any { it.acceptedAt?.isAfter(goal.claimedAt) == true }
         if (!qualifying) return emptyList()
 
         val competencies = competencyRepository.findAllByKeyIn(proposal.competencyKeys).associateBy { it.key }
@@ -152,13 +154,13 @@ class RampService(
     /**
      * Monotonic find-or-create, mirroring `VerificationService`'s ledger write.
      *
-     * Credit lands at the competency's **own target level**: a merge is evidence of meeting the
-     * bar the project set for that competency, not of some level the merge itself implies.
+     * Credit lands at the competency's **own target level**: accepted work is evidence of meeting
+     * the bar the project set for that competency, not of some level the work itself implies.
      */
     private fun creditCompetency(hireId: UUID, competency: Competency) {
         val existing = userCompetencyStateRepository.findByUserIdAndCompetencyKey(hireId, competency.key)
         if (existing != null) {
-            // Never un-earns: a merge cannot lower a level already shown, only raise it and
+            // Never un-earns: accepted work cannot lower a level already shown, only raise it and
             // upgrade the source to VERIFIED.
             existing.level = maxOf(existing.level, competency.targetLevel)
             existing.source = CompetencySource.VERIFIED
@@ -178,14 +180,14 @@ class RampService(
     /**
      * Whether a hire has shown they can work here unsupervised, and what is missing if not.
      *
-     * The condition is evaluated against the **most recent merged pull request**, because autonomy
-     * is a claim about how somebody works now. Both halves must hold on that one task: no review
-     * asked for changes, and no person was pulled in between opening it and merging it.
+     * The condition is evaluated against the **most recently accepted contribution**, because
+     * autonomy is a claim about how somebody works now. Both halves must hold on that one task: it
+     * was not sent back, and no person was pulled in between submitting it and its acceptance.
      */
     private fun evaluateAutonomy(
         hireId: UUID,
         projectId: UUID,
-        merged: List<AuthoredPullRequest>,
+        accepted: List<Contribution>,
     ): AutonomyResponse {
         autonomyMilestoneRepository.findByHireIdAndProjectId(hireId, projectId)?.let {
             return AutonomyResponse(
@@ -196,7 +198,8 @@ class RampService(
             )
         }
 
-        val latest = merged.maxByOrNull { it.mergedAt!! }
+        // Safe by the Contribution invariant: an ACCEPTED contribution always carries an acceptedAt.
+        val latest = accepted.maxByOrNull { it.acceptedAt!! }
             ?: return AutonomyResponse(
                 reached = false,
                 reachedAt = null,
@@ -205,7 +208,7 @@ class RampService(
             )
 
         val blockers = mutableListOf<String>()
-        if (latest.changesRequestedCount > 0) {
+        if (latest.returnedCount > 0) {
             blockers += "Your last merged change was sent back for rework"
         }
         if (neededHelp(hireId, projectId, latest)) {
@@ -220,14 +223,14 @@ class RampService(
             )
         }
 
-        // Recorded at the merge itself, not at the moment we noticed -- the date has to be the
+        // Recorded at the acceptance itself, not at the moment we noticed -- the date has to be the
         // one that actually happened, or the announcement is about our polling.
         val milestone = autonomyMilestoneRepository.save(
             AutonomyMilestone(
                 hireId = hireId,
                 projectId = projectId,
-                reachedAt = latest.mergedAt!!,
-                provenByArtifactId = latest.artifactId,
+                reachedAt = latest.acceptedAt!!,
+                provenByArtifactId = latest.evidenceRef,
             ),
         )
         return AutonomyResponse(
@@ -239,20 +242,20 @@ class RampService(
     }
 
     /**
-     * Whether the hire needed a person while this change was open.
+     * Whether the hire needed a person while this contribution was in flight.
      *
-     * Scoped to the change's own window rather than "ever": a hire who needed help in week one and
-     * shipped week four's change alone has demonstrated exactly what the exit condition asks about.
-     * "Help" is what the surviving human channel records: the assigned-buddy loop is retired, so
-     * this is now an escalation to the PM (flag-to-PM) during the window — the only reaching out
-     * a hire can still do.
+     * Scoped to the contribution's own window rather than "ever": a hire who needed help in week
+     * one and delivered week four's work alone has demonstrated exactly what the exit condition
+     * asks about. "Help" is what the surviving human channel records: the assigned-buddy loop is
+     * retired, so this is now an escalation to the PM (flag-to-PM) during the window — the only
+     * reaching out a hire can still do.
      */
-    private fun neededHelp(hireId: UUID, projectId: UUID, pullRequest: AuthoredPullRequest): Boolean {
-        val opened = pullRequest.openedAt ?: return false
-        val merged = pullRequest.mergedAt ?: return false
+    private fun neededHelp(hireId: UUID, projectId: UUID, contribution: Contribution): Boolean {
+        val opened = contribution.openedAt ?: return false
+        val accepted = contribution.acceptedAt ?: return false
         return knowledgeRequestRepository
             .findAllByHireIdAndProjectId(hireId, projectId)
-            .any { !it.createdAt.isBefore(opened) && !it.createdAt.isAfter(merged) }
+            .any { !it.createdAt.isBefore(opened) && !it.createdAt.isAfter(accepted) }
     }
 
     /**
@@ -269,12 +272,6 @@ class RampService(
             ?: taskZeroAssignmentRepository
                 .findByHireIdAndProjectId(hireId, projectId)
                 ?.let { starterWorkTaskProposalRepository.findById(it.proposalId).orElse(null) }
-
-    private fun authoredPullRequests(member: ProjectMember, projectId: UUID): List<AuthoredPullRequest> {
-        val login = member.githubLogin
-        if (login.isNullOrBlank()) return emptyList()
-        return artifactIngestionApi.getAuthoredPullRequests(projectId, login)
-    }
 
     private fun requireMember(hireId: UUID, projectId: UUID): ProjectMember =
         projectMembershipApi.getProjectMembers(projectId).firstOrNull { it.userId == hireId }
