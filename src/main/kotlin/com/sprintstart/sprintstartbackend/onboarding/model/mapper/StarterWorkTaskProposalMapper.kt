@@ -14,4 +14,5 @@ fun StarterWorkTaskProposal.toResponse(): StarterWorkTaskProposalResponse =
         competencyKeys = competencyKeys.toList(),
         status = status,
         taskZeroEligible = taskZeroEligible,
+        onboardingTrackKey = onboardingTrackKey,
     )

@@ -21,6 +21,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRe
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
+import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -61,6 +62,8 @@ class StarterWorkTaskProposalService(
     private val githubHistoryPriorService: GithubHistoryPriorService,
     private val artifactIngestionApi: ArtifactIngestionApi,
     private val userApi: UserApi,
+    private val projectMembershipApi: ProjectMembershipApi,
+    private val trackService: TrackService,
     private val json: Json,
     transactionManager: PlatformTransactionManager,
 ) {
@@ -263,6 +266,7 @@ class StarterWorkTaskProposalService(
                 competencyKeys = request.competencyKeys.toMutableList(),
                 status = ProposalStatus.APPROVED,
                 decidedAt = Instant.now(),
+                onboardingTrackKey = request.onboardingTrackKey?.trim()?.takeIf { it.isNotBlank() },
             ),
         )
         materialiseContributionNode(proposal)
@@ -359,7 +363,7 @@ class StarterWorkTaskProposalService(
      */
     @Transactional(readOnly = true)
     fun matchForUserId(userId: UUID, projectId: UUID): List<RankedStarterWorkTaskResponse> {
-        val pool = starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED)
+        val pool = suggestablePool(userId, projectId)
         if (pool.isEmpty()) return emptyList()
 
         val profile = buildProfile(userId)
@@ -385,6 +389,25 @@ class StarterWorkTaskProposalService(
             // Ties broken by the oldest task first, so the ranking is stable across calls rather
             // than reshuffling equally-good suggestions every time the hire reloads.
             .sortedWith(compareByDescending<RankedStarterWorkTaskResponse> { it.score }.thenBy { it.task.title })
+    }
+
+    /**
+     * The approved tasks worth suggesting to this hire: their own track's, plus every unscoped one.
+     *
+     * Filtering here rather than scoring it as a signal is deliberate. A task for another role is
+     * not a *worse* suggestion, it is the wrong job — offering a Scrum Master "fix the null pointer
+     * in checkout", however far down the list, is noise that costs trust in everything above it.
+     *
+     * An **unscoped** task stays in every hire's pool. Null means "any track", which is how every
+     * task behaved before tracks existed and the only honest reading of a mined issue: mining
+     * cannot know which role an issue suits, so it must not pretend to.
+     */
+    private fun suggestablePool(userId: UUID, projectId: UUID): List<StarterWorkTaskProposal> {
+        val member = projectMembershipApi.getProjectMembers(projectId).firstOrNull { it.userId == userId }
+        val trackKey = member?.let { trackService.forMember(it).key }
+        return starterWorkTaskProposalRepository
+            .findAllByStatus(ProposalStatus.APPROVED)
+            .filter { it.onboardingTrackKey == null || it.onboardingTrackKey == trackKey }
     }
 
     /**

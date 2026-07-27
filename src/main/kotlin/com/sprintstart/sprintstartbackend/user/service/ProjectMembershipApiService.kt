@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.user.service
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectUserAssignment
+import com.sprintstart.sprintstartbackend.user.repository.ProjectRoleRepository
 import com.sprintstart.sprintstartbackend.user.repository.ProjectUserAssignmentRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -18,7 +19,13 @@ import java.util.UUID
 @Service
 internal class ProjectMembershipApiService(
     private val projectUserAssignmentRepository: ProjectUserAssignmentRepository,
+    private val projectRoleRepository: ProjectRoleRepository,
 ) : ProjectMembershipApi {
+    @Transactional(readOnly = true)
+    override fun onboardingTrackKeysInUse(): Set<String> {
+        return projectRoleRepository.findAll().mapNotNull { it.onboardingTrackKey }.toSet()
+    }
+
     @Transactional(readOnly = true)
     override fun getProjectMembers(projectId: UUID): List<ProjectMember> {
         return projectUserAssignmentRepository.findAllByProjectId(projectId).map { assignment ->

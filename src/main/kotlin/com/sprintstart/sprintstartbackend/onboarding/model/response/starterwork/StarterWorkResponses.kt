@@ -15,6 +15,8 @@ data class StarterWorkTaskProposalResponse(
     val status: ProposalStatus,
     /** True when a PM has flagged this approved task as suitable for Task 0. */
     val taskZeroEligible: Boolean,
+    /** Which track this work is for, or null when it suits any role. */
+    val onboardingTrackKey: String? = null,
 )
 
 /**

@@ -62,6 +62,16 @@ class StarterWorkTaskProposal(
      */
     @Column(name = "task_zero_eligible", nullable = false)
     var taskZeroEligible: Boolean = false,
+    /**
+     * Which onboarding track this task is work *for*, or null when it suits anybody.
+     *
+     * Without it a Scrum Master's suggested first tasks were mined GitHub issues -- correct work,
+     * for somebody else's job. Null is the deliberate default and means "any track": a task nobody
+     * has scoped is offered to everybody, which is exactly how every task behaved before tracks
+     * existed, and mining cannot know which role an issue suits.
+     */
+    @Column(name = "onboarding_track_key", nullable = true)
+    var onboardingTrackKey: String? = null,
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now(),
     @Column(name = "decided_at", nullable = true)
