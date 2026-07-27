@@ -80,6 +80,65 @@ class GithubRepositoryProjectServiceTest {
             .isEqualTo(HttpStatus.NOT_FOUND)
     }
 
+    @Test
+    fun `removes the project from an existing connection`() {
+        val repositoryId = UUID.randomUUID()
+        val keptProjectId = UUID.randomUUID()
+        val removedProjectId = UUID.randomUUID()
+        val connection = connection(mutableSetOf(keptProjectId, removedProjectId))
+        every { userApi.userHasAccessToProject(authId, removedProjectId) } returns true
+        every { githubRepositoryConnectionRepository.findById(repositoryId) } returns Optional.of(connection)
+        val saved = slot<GithubRepositoryConnection>()
+        every { githubRepositoryConnectionRepository.save(capture(saved)) } answers { firstArg() }
+
+        val result = service.removeProjectFromRepository(authId, repositoryId, removedProjectId)
+
+        assertThat(result).containsExactly(keptProjectId)
+        assertThat(saved.captured.projectIds).containsExactly(keptProjectId)
+    }
+
+    @Test
+    fun `remove is idempotent when the project is not linked`() {
+        val repositoryId = UUID.randomUUID()
+        val existingProjectId = UUID.randomUUID()
+        val notLinkedProjectId = UUID.randomUUID()
+        val connection = connection(mutableSetOf(existingProjectId))
+        every { userApi.userHasAccessToProject(authId, notLinkedProjectId) } returns true
+        every { githubRepositoryConnectionRepository.findById(repositoryId) } returns Optional.of(connection)
+        every { githubRepositoryConnectionRepository.save(any()) } answers { firstArg() }
+
+        val result = service.removeProjectFromRepository(authId, repositoryId, notLinkedProjectId)
+
+        assertThat(result).containsExactly(existingProjectId)
+    }
+
+    @Test
+    fun `remove rejects with forbidden when the caller has no access to the target project`() {
+        val repositoryId = UUID.randomUUID()
+        val projectId = UUID.randomUUID()
+        every { userApi.userHasAccessToProject(authId, projectId) } returns false
+
+        assertThatThrownBy { service.removeProjectFromRepository(authId, repositoryId, projectId) }
+            .isInstanceOf(ResponseStatusException::class.java)
+            .extracting { (it as ResponseStatusException).statusCode }
+            .isEqualTo(HttpStatus.FORBIDDEN)
+
+        verify(exactly = 0) { githubRepositoryConnectionRepository.save(any()) }
+    }
+
+    @Test
+    fun `remove returns not found when the repository connection does not exist`() {
+        val repositoryId = UUID.randomUUID()
+        val projectId = UUID.randomUUID()
+        every { userApi.userHasAccessToProject(authId, projectId) } returns true
+        every { githubRepositoryConnectionRepository.findById(repositoryId) } returns Optional.empty()
+
+        assertThatThrownBy { service.removeProjectFromRepository(authId, repositoryId, projectId) }
+            .isInstanceOf(ResponseStatusException::class.java)
+            .extracting { (it as ResponseStatusException).statusCode }
+            .isEqualTo(HttpStatus.NOT_FOUND)
+    }
+
     private fun connection(
         projectIds: MutableSet<UUID>,
     ): GithubRepositoryConnection =

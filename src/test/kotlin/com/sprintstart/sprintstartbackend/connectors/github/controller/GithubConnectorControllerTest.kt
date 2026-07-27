@@ -33,16 +33,19 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.request
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.web.server.ResponseStatusException
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.util.Optional
 import java.util.UUID
@@ -521,6 +524,57 @@ class GithubConnectorControllerTest {
                         .content(objectMapper.writeValueAsString(request))
                         .with(pmJwt),
                 ).andExpect(status().isBadRequest)
+        }
+    }
+
+    @Nested
+    inner class RemoveRepositoryFromProject {
+        @Test
+        fun `should return 200 with the resulting project ids`() {
+            val repositoryId = UUID.randomUUID()
+            val remainingProjectId = UUID.randomUUID()
+            every {
+                githubRepositoryProjectService.removeProjectFromRepository("mockId", repositoryId, projectId)
+            } returns setOf(remainingProjectId)
+
+            mockMvc
+                .perform(
+                    delete("/api/v1/github/connections/$repositoryId/projects/$projectId")
+                        .with(pmJwt),
+                ).andExpect(status().isOk)
+                .andExpect(jsonPath("$.repositoryId").value(repositoryId.toString()))
+                .andExpect(jsonPath("$.projectIds[0]").value(remainingProjectId.toString()))
+        }
+
+        @Test
+        fun `should return 403 when the caller has no access to the target project`() {
+            val repositoryId = UUID.randomUUID()
+            every {
+                githubRepositoryProjectService.removeProjectFromRepository("mockId", repositoryId, projectId)
+            } throws ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project with id $projectId")
+
+            mockMvc
+                .perform(
+                    delete("/api/v1/github/connections/$repositoryId/projects/$projectId")
+                        .with(pmJwt),
+                ).andExpect(status().isForbidden)
+        }
+
+        @Test
+        fun `should return 404 when the repository connection does not exist`() {
+            val repositoryId = UUID.randomUUID()
+            every {
+                githubRepositoryProjectService.removeProjectFromRepository("mockId", repositoryId, projectId)
+            } throws ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "Repository connection with id $repositoryId not found",
+            )
+
+            mockMvc
+                .perform(
+                    delete("/api/v1/github/connections/$repositoryId/projects/$projectId")
+                        .with(pmJwt),
+                ).andExpect(status().isNotFound)
         }
     }
 }

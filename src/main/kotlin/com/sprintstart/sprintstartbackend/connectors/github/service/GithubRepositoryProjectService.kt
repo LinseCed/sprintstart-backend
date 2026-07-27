@@ -50,4 +50,34 @@ class GithubRepositoryProjectService(
         githubRepositoryConnectionRepository.save(connection)
         return connection.projectIds
     }
+
+    /**
+     * Removes a project from an already-connected repository, completing the link lifecycle.
+     *
+     * The operation is idempotent: unlinking a project that is not linked leaves the set of
+     * projects unchanged. The repository connection and its artifacts are kept; only the project
+     * association is dropped.
+     *
+     * @param authId The authenticated caller subject, used to authorize access to the target project.
+     * @param repositoryId The connected repository to unlink.
+     * @param projectId The project to remove from the repository's linked projects.
+     * @return The resulting set of project ids linked to the repository.
+     * @throws ResponseStatusException `403` when the caller has no access to the target project,
+     * `404` when no repository connection exists for the given id.
+     */
+    @Transactional
+    @Tracked("Unlinking GitHub repository from a project")
+    fun removeProjectFromRepository(authId: String, repositoryId: UUID, projectId: UUID): Set<UUID> {
+        if (!userApi.userHasAccessToProject(authId, projectId)) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project with id $projectId")
+        }
+
+        val connection = githubRepositoryConnectionRepository.findById(repositoryId).orElseThrow {
+            ResponseStatusException(HttpStatus.NOT_FOUND, "Repository connection with id $repositoryId not found")
+        }
+
+        connection.projectIdsInternal.remove(projectId)
+        githubRepositoryConnectionRepository.save(connection)
+        return connection.projectIds
+    }
 }

@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.ConnectRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.ConnectRepositoryResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoverRepositoriesResponse
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.RemoveRepositoryFromProjectResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
 import com.sprintstart.sprintstartbackend.connectors.github.service.GithubConnectorService
@@ -26,6 +27,7 @@ import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.validation.annotation.Validated
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -332,5 +334,43 @@ internal class GithubConnectorController(
     ): ResponseEntity<AddRepositoryToProjectResponse> {
         val projectIds = githubRepositoryProjectService.addProjectToRepository(jwt.subject, repositoryId, projectId)
         return ResponseEntity.ok(AddRepositoryToProjectResponse(repositoryId, projectIds))
+    }
+
+    /**
+     * Unlinks a connected repository from a project.
+     *
+     * This only removes the project id from the connection's set of linked projects; the repository
+     * connection and its artifacts are kept. It is idempotent when the project is not linked.
+     *
+     * @param jwt The authentication principal used to authorize access to the target project.
+     * @param repositoryId The connected repository to unlink.
+     * @param projectId The project to remove from the repository's linked projects.
+     * @return The repository connection with its resulting set of linked project ids.
+     */
+    @Operation(
+        summary = "Unlink a connected repository from a project",
+        description =
+            "Removes a project from an already-connected repository, keeping the connection and its " +
+                "artifacts. Idempotent when the project is not linked.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Repository unlinked from the project"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Caller has no access to the target project"),
+            ApiResponse(responseCode = "404", description = "Repository connection not found"),
+        ],
+    )
+    @DeleteMapping("/connections/{repositoryId}/projects/{projectId}")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('PM', 'ADMIN')")
+    fun removeRepositoryFromProject(
+        @Parameter(hidden = true) @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable repositoryId: UUID,
+        @PathVariable projectId: UUID,
+    ): ResponseEntity<RemoveRepositoryFromProjectResponse> {
+        val projectIds =
+            githubRepositoryProjectService.removeProjectFromRepository(jwt.subject, repositoryId, projectId)
+        return ResponseEntity.ok(RemoveRepositoryFromProjectResponse(repositoryId, projectIds))
     }
 }
