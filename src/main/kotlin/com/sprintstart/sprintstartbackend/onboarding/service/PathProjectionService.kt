@@ -30,10 +30,6 @@ class PathProjectionService(
      * @param ledger The hire's durable progress: competency key -> assessed/verified level (0..4).
      * @param graphVersion The competency graph version being projected against; echoed onto the
      * returned [PathView] as-is (this function stays pure -- the caller looks the version up).
-     * @param targetLevelOverrides Per-competency bars this project's baseline sets, overriding
-     * [Competency.targetLevel]. The bar is partly a property of the team's expectations, not only
-     * of the competency: the same node can be a passing acquaintance in one project and a core
-     * skill in another. Keys absent here use the competency's own bar.
      * @param moduleIdByCompetencyKey The live
      * [com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule] that teaches
      * each competency key, if one has been approved. Echoed onto each [PathNode] as-is so a client
@@ -50,7 +46,6 @@ class PathProjectionService(
         targetKeys: Set<String>,
         ledger: Map<String, Int>,
         graphVersion: Int,
-        targetLevelOverrides: Map<String, Int> = emptyMap(),
         moduleIdByCompetencyKey: Map<String, UUID> = emptyMap(),
         verificationTypeByCompetencyKey: Map<String, VerificationType> = emptyMap(),
     ): PathView {
@@ -71,8 +66,7 @@ class PathProjectionService(
             // A node is met or it isn't, and the bar is the competency's own target level. Treating
             // any non-zero level as mastery meant an assessment that placed somebody at `beginner`
             // -- including one where they said they knew nothing -- marked the node done for good.
-            val targetLevel = targetLevelOverrides[key]
-                ?: competenciesByKey[key]?.targetLevel
+            val targetLevel = competenciesByKey[key]?.targetLevel
                 ?: Competency.DEFAULT_TARGET_LEVEL
             // A prerequisite edge no longer *locks* a node -- it ranks the work a hire is nudged
             // toward, it never tells them "not yet". Nothing in the evidence supports gating a
@@ -90,9 +84,7 @@ class PathProjectionService(
                 kind = competency.kind,
                 state = states.getValue(key),
                 level = ledger[key],
-                targetLevel = targetLevelOverrides[key]
-                    ?: competency.targetLevel
-                    ?: Competency.DEFAULT_TARGET_LEVEL,
+                targetLevel = competency.targetLevel ?: Competency.DEFAULT_TARGET_LEVEL,
                 moduleId = moduleIdByCompetencyKey[key],
                 verificationType = verificationTypeByCompetencyKey[key],
             )

@@ -9,14 +9,11 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.AssembleDiag
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssembleOrientationRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BaselineSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.DiagramOutcome
-import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateCompetencyGraphRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeArtifactRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeKnowledgeRequest
@@ -44,41 +41,6 @@ class OnboardingAiClient(
     private val applicationConfig: ApplicationConfig,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-
-    /**
-     * Runs the AI service's batch blueprint generation job over the ingested corpus.
-     *
-     * The AI service is stateless: [active] (the backend's current active baselines)
-     * drives version numbering and lets the job skip an unchanged corpus. A non-2xx
-     * response is wrapped in an [OnboardingAiException] carrying the upstream status/body.
-     *
-     * @param scopes The scopes to (re)generate, or `null` to refresh all known scopes.
-     * @param active The backend's currently-active baselines for the requested scopes.
-     * @param activeCompetencies The backend's live competency graph -- the set the AI selects the
-     *   baseline from.
-     * @return The per-scope generation outcomes returned by the AI service.
-     */
-    suspend fun generateBlueprints(
-        scopes: List<String>?,
-        active: List<BaselineSchema> = emptyList(),
-        activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
-    ): GenerateBlueprintsResponse =
-        try {
-            webClient
-                .post()
-                .uri(uri("/api/v1/onboarding/blueprints/generate"))
-                .body(
-                    GenerateBlueprintsRequest(
-                        scopes = scopes,
-                        active = active,
-                        activeCompetencies = activeCompetencies,
-                    ),
-                ).sync()
-                .perform<GenerateBlueprintsResponse>()
-        } catch (@Suppress("SwallowedException") e: WebClientException) {
-            val msg = "Failed to generate blueprints (HTTP ${e.statusCode}): ${e.body}"
-            throw OnboardingAiException(e.statusCode, e.body, msg)
-        }
 
     /**
      * Runs one turn of the stateless adaptive skill-assessment interview.

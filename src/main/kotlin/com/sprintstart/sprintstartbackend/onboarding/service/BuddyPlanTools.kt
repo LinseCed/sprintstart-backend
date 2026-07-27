@@ -26,8 +26,9 @@ import java.util.UUID
  * it from.
  *
  * The competency graph stopped being a hire-facing UI and became the buddy's working memory:
- * [GET_LEARNING_PLAN] reads the same projection `GET /me/path` serves (baseline ∪ goal, ordered
- * by prerequisite edges, state derived from the ledger) and reads it *to* the hire with reasons —
+ * [GET_LEARNING_PLAN] reads the same projection `GET /me/path` serves (the claimed goal and
+ * everything it needs, ordered by prerequisite edges, state derived from the ledger) and reads it
+ * *to* the hire with reasons —
  * never scores. [GET_MODULE] hands the buddy a published competency module's pages, with their
  * citations, so teaching stays grounded in the PM-approved material rather than improvised. Both
  * are executed strictly on behalf of the resolved caller, like every buddy tool.
@@ -78,9 +79,12 @@ class BuddyPlanTools(
         moduleTitleById: Map<UUID, String>,
     ): String {
         if (path.nodes.isEmpty()) {
-            return "On $projectName there is no learning plan yet — the project's baseline hasn't " +
-                "been approved and no goal has been claimed. That is a PM's task, not something " +
-                "the hire failed to do."
+            // The plan is the claimed goal and what it needs, so an empty one means no goal --
+            // and claiming one is the hire's own move, through claim_goal. The old copy sent them
+            // to wait on a PM approving a baseline, which stopped being a thing the path reads.
+            return "On $projectName there is no learning plan yet, because no goal has been " +
+                "claimed. Ask what they would like to work toward and offer to claim it — that " +
+                "is what fills the plan in."
         }
 
         val labelByKey = path.nodes.associate { it.key to it.label }
@@ -100,7 +104,7 @@ class BuddyPlanTools(
                         },
                 )
             } else {
-                appendLine("- Working toward: the team's baseline (no personal goal claimed yet).")
+                appendLine("- Working toward: nothing claimed yet — offer to claim a goal.")
             }
 
             appendLine("Next up (in the order the graph suggests):")
@@ -225,7 +229,7 @@ class BuddyPlanTools(
         val GET_LEARNING_PLAN_SPEC = BuddyToolSpecDto(
             name = GET_LEARNING_PLAN,
             description = "The hire's learning plan on their project(s): what they are working " +
-                "toward (their claimed goal or the team's baseline), which competencies are next " +
+                "toward (the goal they claimed), which competencies are next " +
                 "in the order the graph suggests, how far along each is against its target level, " +
                 "and whether a module teaches it. Consult this BEFORE recommending what to learn " +
                 "or work on — the plan determines sequence, never your own intuition. State the " +
