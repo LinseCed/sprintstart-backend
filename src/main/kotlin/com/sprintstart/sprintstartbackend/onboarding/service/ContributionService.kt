@@ -1,10 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
-import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.onboarding.service.evidence.EvidenceProvider
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import org.springframework.stereotype.Service
 import java.time.Instant
@@ -26,87 +25,45 @@ import java.util.UUID
  * possibly sent back, eventually accepted or not. Those four moments are the whole measurement
  * surface, and none of them are specific to git.
  *
- * ### Derived, not stored
+ * ### Derived where it can be
  *
- * Nothing here is persisted. Every contribution is composed on read from artifacts ingestion
- * already holds, following the same rule [OnboardingMetricsService] documents: a second log of
- * facts that already live somewhere durable would drift from the first and would need a backfill
- * for everything predating it. Deriving means this covers history from the day it ships.
+ * Pull-request contributions are composed on read from artifacts ingestion already holds, following
+ * the rule [OnboardingMetricsService] documents: a second log of facts that already live somewhere
+ * durable would drift and would need a backfill. Attestations are the exception that proves it —
+ * nobody records that a retro was well run until somebody is asked, so that one has a table.
  *
- * The first genuinely non-derivable evidence — a person attesting that work happened — is exactly
- * when a table becomes the honest choice, and it will get one then, for the same reason
- * `BuddyContact` did.
+ * ### One stream, many sources
  *
- * ### Where the second source goes
- *
- * There is deliberately **no provider interface yet**. One source exists, and an abstraction shaped
- * around a single example is reliably the wrong abstraction — the second one is what reveals what
- * actually varies. [forHire] is the seam: a second source is another private mapper composed into
- * that list, and the interface gets extracted once there are two implementations to extract it
- * from.
+ * P0 shipped this with a single hardcoded source and no abstraction, because an interface shaped
+ * around one example is reliably the wrong interface. With attestations there are two, so the shape
+ * could be taken from what actually differs: see [EvidenceProvider]. This service is now only the
+ * composition rule — every provider runs, and their contributions become one time-ordered stream
+ * that the ramp and the metrics read.
  */
 @Service
 class ContributionService(
-    private val artifactIngestionApi: ArtifactIngestionApi,
+    private val evidenceProviders: List<EvidenceProvider>,
 ) {
     /**
-     * Everything [member] has contributed to this project, newest last.
+     * Everything [member] has contributed to this project, from every source.
      *
      * Takes the resolved [ProjectMember] rather than a user id because callers have already
-     * resolved it and because identity is what a source needs: today the declared GitHub login,
-     * tomorrow the user id an attestation is filed against.
+     * resolved it and because identity is what a source needs: the declared GitHub login for pull
+     * requests, the user id for attestations.
+     *
+     * **Every provider runs.** The stream is not filtered by the hire's track: a track's admitted
+     * evidence kinds govern which buddy tools mount and what a PM is warned about, never what
+     * counts. Filtering here would take a PM's pull requests off their own ramp.
      *
      * @param member The hire, already resolved against the project.
      * @param projectId The project to look in.
-     * @return Their contributions, empty when there is nothing to attribute.
+     * @return Their contributions, oldest submission first, empty when there is nothing to
+     * attribute.
      */
     fun forHire(member: ProjectMember, projectId: UUID): List<Contribution> {
-        return pullRequestContributions(member, projectId)
-    }
-
-    /**
-     * Pull requests the hire authored, as contributions.
-     *
-     * A blank GitHub login yields nothing rather than an error: no declared identity means no
-     * attribution is possible, which callers already distinguish from "did no work".
-     */
-    private fun pullRequestContributions(member: ProjectMember, projectId: UUID): List<Contribution> {
-        val login = member.githubLogin
-        if (login.isNullOrBlank()) {
-            return emptyList()
-        }
-        return artifactIngestionApi
-            .getAuthoredPullRequests(projectId, login)
-            .map { it.toContribution() }
-    }
-
-    private fun AuthoredPullRequest.toContribution(): Contribution {
-        return Contribution(
-            evidenceRef = artifactId,
-            kind = ContributionEvidenceKind.PULL_REQUEST,
-            rigor = Rigor.OBSERVED,
-            state = stateOf(this),
-            openedAt = openedAt,
-            firstResponseAt = firstResponseAt,
-            acceptedAt = mergedAt,
-            returnedCount = changesRequestedCount,
-        )
-    }
-
-    /**
-     * A merged pull request is accepted; a genuinely open one is in flight; anything else was
-     * closed without merging.
-     *
-     * Leans on [AuthoredPullRequest.isOpen] rather than re-deriving openness, so "open" keeps
-     * meaning what it means everywhere else — merge state alone would count a closed-unmerged pull
-     * request as still waiting.
-     */
-    private fun stateOf(pullRequest: AuthoredPullRequest): ContributionState {
-        return when {
-            pullRequest.mergedAt != null -> ContributionState.ACCEPTED
-            pullRequest.isOpen -> ContributionState.IN_FLIGHT
-            else -> ContributionState.ABANDONED
-        }
+        return evidenceProviders
+            .flatMap { it.contributionsFor(member, projectId) }
+            .sortedBy { it.openedAt ?: Instant.EPOCH }
     }
 }
 

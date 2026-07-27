@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.onboarding.service.evidence.PullRequestEvidenceProvider
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import io.mockk.every
 import io.mockk.mockk
@@ -27,7 +28,7 @@ import kotlin.test.assertTrue
  */
 class ContributionServiceTest {
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
-    private val service = ContributionService(artifactIngestionApi)
+    private val service = ContributionService(listOf(PullRequestEvidenceProvider(artifactIngestionApi)))
 
     private val now: Instant = Instant.parse("2026-07-27T12:00:00Z")
     private val projectId: UUID = UUID.randomUUID()
