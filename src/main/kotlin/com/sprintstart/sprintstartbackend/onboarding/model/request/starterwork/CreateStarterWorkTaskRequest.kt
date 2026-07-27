@@ -19,4 +19,6 @@ data class CreateStarterWorkTaskRequest(
     val summary: String? = null,
     val sourceUrl: String? = null,
     val competencyKeys: List<String> = emptyList(),
+    /** Which track this work is for. Null means it suits any role. */
+    val onboardingTrackKey: String? = null,
 )

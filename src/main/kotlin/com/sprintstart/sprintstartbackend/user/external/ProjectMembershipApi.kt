@@ -20,6 +20,18 @@ interface ProjectMembershipApi {
      * @return One entry per assigned member; empty when the project has none or does not exist.
      */
     fun getProjectMembers(projectId: UUID): List<ProjectMember>
+
+    /**
+     * Every onboarding track key some project role actually points at.
+     *
+     * Lives here rather than on [UserApi] because it is a fact about the project roles people hold,
+     * not about any one user. It lets onboarding distinguish "a track a PM could choose" from "a
+     * track somebody is on", which is what keeps readiness warnings about real gaps rather than
+     * about unused configuration.
+     *
+     * @return The declared track keys; empty when no role declares one.
+     */
+    fun onboardingTrackKeysInUse(): Set<String>
 }
 
 /**

@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BlueprintStatus
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.RungState
 import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.SetupReadinessResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.SetupRungResponse
@@ -34,6 +35,7 @@ class SetupReadinessService(
     private val blueprintRepository: BlueprintRepository,
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val projectMembershipApi: ProjectMembershipApi,
+    private val trackService: TrackService,
 ) {
     @Transactional(readOnly = true)
     fun getReadiness(projectId: UUID): SetupReadinessResponse {
@@ -108,10 +110,29 @@ class SetupReadinessService(
         }
     }
 
+    /**
+     * Whether there is starter work to claim — and whether it covers every track in use.
+     *
+     * A count alone hid a real failure: a project can have plenty of approved tasks and still have
+     * none a delivery lead could do, because every one of them was a mined GitHub issue. A hire in
+     * that position sees an empty suggestion list on a project the ladder called ready.
+     *
+     * Unscoped tasks count toward every track: null means "suits any role", so they are coverage
+     * for everybody rather than for nobody.
+     */
     private fun starterTasksRung(): SetupRungResponse {
-        val approved = starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED).size
+        val approvedTasks = starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED)
+        val approved = approvedTasks.size
         val pending = starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.PROPOSED).size
+        val uncovered = uncoveredTracks(approvedTasks)
         return when {
+            approved > 0 && uncovered.isNotEmpty() -> rung(
+                STARTER_TASKS,
+                RungState.WARN,
+                approved,
+                "$approved starter ${taskWord(approved)} ready to claim, but nothing a hire on " +
+                    "${uncovered.joinToString(" or ")} could pick up.",
+            )
             approved > 0 -> rung(
                 STARTER_TASKS,
                 RungState.OK,
@@ -131,6 +152,23 @@ class SetupReadinessService(
                 "No starter tasks yet. Mine well-scoped first tasks from the corpus.",
             )
         }
+    }
+
+    /**
+     * Tracks that some role points at but no claimable task serves.
+     *
+     * Read from the tracks roles actually use rather than every track that exists: warning about a
+     * track nobody is on is noise a PM cannot act on.
+     */
+    private fun uncoveredTracks(approvedTasks: List<StarterWorkTaskProposal>): List<String> {
+        if (approvedTasks.any { it.onboardingTrackKey == null }) {
+            return emptyList()
+        }
+        val covered = approvedTasks.mapNotNull { it.onboardingTrackKey }.toSet()
+        return trackService
+            .tracksInUse()
+            .filter { it.key !in covered }
+            .map { it.label }
     }
 
     private fun rung(key: String, state: RungState, count: Int, detail: String) =

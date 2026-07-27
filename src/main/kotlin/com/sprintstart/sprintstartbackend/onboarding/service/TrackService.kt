@@ -112,6 +112,21 @@ class TrackService(
     }
 
     /**
+     * The tracks some project role actually points at.
+     *
+     * Distinct from [listTracks], which is every track a PM *could* choose. Readiness checks and
+     * warnings use this one: telling a PM that a track nobody is on has no starter work is noise
+     * they cannot act on, and noise on a readiness ladder is how the ladder stops being read.
+     *
+     * The default track is always in use — every role that declares nothing resolves to it.
+     */
+    @Transactional(readOnly = true)
+    fun tracksInUse(): List<OnboardingTrack> {
+        val declared = projectMembershipApi.onboardingTrackKeysInUse()
+        return listTracks().filter { it.key in declared || it.key == OnboardingTrack.DEFAULT_KEY }
+    }
+
+    /**
      * The fallback track.
      *
      * Falls back again to an in-memory engineering track when the seeded row is absent. That is not
