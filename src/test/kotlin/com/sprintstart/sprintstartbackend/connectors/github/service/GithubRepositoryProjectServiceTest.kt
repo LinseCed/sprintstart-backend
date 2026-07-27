@@ -1,6 +1,8 @@
 package com.sprintstart.sprintstartbackend.connectors.github.service
 
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.ProjectAccessDeniedException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
@@ -10,8 +12,6 @@ import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
-import org.springframework.http.HttpStatus
-import org.springframework.web.server.ResponseStatusException
 import java.util.Optional
 import java.util.UUID
 
@@ -60,9 +60,7 @@ class GithubRepositoryProjectServiceTest {
         every { userApi.userHasAccessToProject(authId, projectId) } returns false
 
         assertThatThrownBy { service.addProjectToRepository(authId, repositoryId, projectId) }
-            .isInstanceOf(ResponseStatusException::class.java)
-            .extracting { (it as ResponseStatusException).statusCode }
-            .isEqualTo(HttpStatus.FORBIDDEN)
+            .isInstanceOf(ProjectAccessDeniedException::class.java)
 
         verify(exactly = 0) { githubRepositoryConnectionRepository.save(any()) }
     }
@@ -75,9 +73,7 @@ class GithubRepositoryProjectServiceTest {
         every { githubRepositoryConnectionRepository.findById(repositoryId) } returns Optional.empty()
 
         assertThatThrownBy { service.addProjectToRepository(authId, repositoryId, projectId) }
-            .isInstanceOf(ResponseStatusException::class.java)
-            .extracting { (it as ResponseStatusException).statusCode }
-            .isEqualTo(HttpStatus.NOT_FOUND)
+            .isInstanceOf(RepositoryNotFoundException::class.java)
     }
 
     @Test
@@ -119,9 +115,7 @@ class GithubRepositoryProjectServiceTest {
         every { userApi.userHasAccessToProject(authId, projectId) } returns false
 
         assertThatThrownBy { service.removeProjectFromRepository(authId, repositoryId, projectId) }
-            .isInstanceOf(ResponseStatusException::class.java)
-            .extracting { (it as ResponseStatusException).statusCode }
-            .isEqualTo(HttpStatus.FORBIDDEN)
+            .isInstanceOf(ProjectAccessDeniedException::class.java)
 
         verify(exactly = 0) { githubRepositoryConnectionRepository.save(any()) }
     }
@@ -134,9 +128,7 @@ class GithubRepositoryProjectServiceTest {
         every { githubRepositoryConnectionRepository.findById(repositoryId) } returns Optional.empty()
 
         assertThatThrownBy { service.removeProjectFromRepository(authId, repositoryId, projectId) }
-            .isInstanceOf(ResponseStatusException::class.java)
-            .extracting { (it as ResponseStatusException).statusCode }
-            .isEqualTo(HttpStatus.NOT_FOUND)
+            .isInstanceOf(RepositoryNotFoundException::class.java)
     }
 
     private fun connection(

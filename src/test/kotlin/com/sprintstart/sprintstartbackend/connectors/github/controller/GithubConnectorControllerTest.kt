@@ -14,6 +14,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateAllRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.UpdateRepositoryResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNotFoundException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.ProjectAccessDeniedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotInitializedException
@@ -33,7 +34,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.context.annotation.Import
-import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
@@ -45,7 +45,6 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.request
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import org.springframework.web.server.ResponseStatusException
 import tools.jackson.module.kotlin.jacksonObjectMapper
 import java.util.Optional
 import java.util.UUID
@@ -551,7 +550,7 @@ class GithubConnectorControllerTest {
             val repositoryId = UUID.randomUUID()
             every {
                 githubRepositoryProjectService.removeProjectFromRepository("mockId", repositoryId, projectId)
-            } throws ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project with id $projectId")
+            } throws ProjectAccessDeniedException(projectId)
 
             mockMvc
                 .perform(
@@ -565,10 +564,7 @@ class GithubConnectorControllerTest {
             val repositoryId = UUID.randomUUID()
             every {
                 githubRepositoryProjectService.removeProjectFromRepository("mockId", repositoryId, projectId)
-            } throws ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "Repository connection with id $repositoryId not found",
-            )
+            } throws RepositoryNotFoundException("", "", "Repository connection with id $repositoryId not found")
 
             mockMvc
                 .perform(

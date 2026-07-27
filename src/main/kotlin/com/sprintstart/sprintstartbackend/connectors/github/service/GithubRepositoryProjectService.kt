@@ -1,12 +1,12 @@
 package com.sprintstart.sprintstartbackend.connectors.github.service
 
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.ProjectAccessDeniedException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.UserApi
-import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 /**
@@ -32,18 +32,18 @@ class GithubRepositoryProjectService(
      * @param repositoryId The connected repository to link.
      * @param projectId The project to add to the repository's linked projects.
      * @return The resulting set of project ids linked to the repository.
-     * @throws ResponseStatusException `403` when the caller has no access to the target project,
-     * `404` when no repository connection exists for the given id.
+     * @throws ProjectAccessDeniedException when the caller has no access to the target project.
+     * @throws RepositoryNotFoundException when no repository connection exists for the given id.
      */
     @Transactional
     @Tracked("Linking GitHub repository to an additional project")
     fun addProjectToRepository(authId: String, repositoryId: UUID, projectId: UUID): Set<UUID> {
         if (!userApi.userHasAccessToProject(authId, projectId)) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project with id $projectId")
+            throw ProjectAccessDeniedException(projectId)
         }
 
         val connection = githubRepositoryConnectionRepository.findById(repositoryId).orElseThrow {
-            ResponseStatusException(HttpStatus.NOT_FOUND, "Repository connection with id $repositoryId not found")
+            RepositoryNotFoundException("", "", "Repository connection with id $repositoryId not found")
         }
 
         connection.projectIdsInternal.add(projectId)
@@ -62,18 +62,18 @@ class GithubRepositoryProjectService(
      * @param repositoryId The connected repository to unlink.
      * @param projectId The project to remove from the repository's linked projects.
      * @return The resulting set of project ids linked to the repository.
-     * @throws ResponseStatusException `403` when the caller has no access to the target project,
-     * `404` when no repository connection exists for the given id.
+     * @throws ProjectAccessDeniedException when the caller has no access to the target project.
+     * @throws RepositoryNotFoundException when no repository connection exists for the given id.
      */
     @Transactional
     @Tracked("Unlinking GitHub repository from a project")
     fun removeProjectFromRepository(authId: String, repositoryId: UUID, projectId: UUID): Set<UUID> {
         if (!userApi.userHasAccessToProject(authId, projectId)) {
-            throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project with id $projectId")
+            throw ProjectAccessDeniedException(projectId)
         }
 
         val connection = githubRepositoryConnectionRepository.findById(repositoryId).orElseThrow {
-            ResponseStatusException(HttpStatus.NOT_FOUND, "Repository connection with id $repositoryId not found")
+            RepositoryNotFoundException("", "", "Repository connection with id $repositoryId not found")
         }
 
         connection.projectIdsInternal.remove(projectId)

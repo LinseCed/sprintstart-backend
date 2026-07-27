@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.connectors.github.controller
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNameAlreadyExistsException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.GithubUserPatStillInUseException
+import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.ProjectAccessDeniedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryConfigNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.github.models.exceptions.RepositoryNotFoundException
@@ -131,6 +132,20 @@ class GithubExceptionHandler {
     fun handleSourceNotFound(ex: SourceNotFoundException) =
         ResponseEntity
             .status(HttpStatus.NOT_FOUND)
+            .body(ErrorResponse(ex.message))
+
+    /**
+     * Handles exceptions of type [ProjectAccessDeniedException] and maps them to a standardized
+     * error response with a 403 FORBIDDEN HTTP status code.
+     *
+     * @param ex The exception containing the project the caller has no access to.
+     * @return A [ResponseEntity] containing the [ErrorResponse] with the exception's message
+     *         and an HTTP status of 403 (FORBIDDEN).
+     */
+    @ExceptionHandler(ProjectAccessDeniedException::class)
+    fun handleProjectAccessDenied(ex: ProjectAccessDeniedException) =
+        ResponseEntity
+            .status(HttpStatus.FORBIDDEN)
             .body(ErrorResponse(ex.message))
 }
 
