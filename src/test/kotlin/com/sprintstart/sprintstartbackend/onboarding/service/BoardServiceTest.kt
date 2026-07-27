@@ -29,6 +29,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Clock
@@ -51,6 +52,8 @@ class BoardServiceTest {
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
     private val currentTaskReader: CurrentTaskReader = mockk()
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService = mockk()
+
+    private val json = Json { ignoreUnknownKeys = true }
 
     private val now: Instant = Instant.parse("2026-07-27T12:00:00Z")
     private val hireId: UUID = UUID.randomUUID()
@@ -558,12 +561,13 @@ class BoardServiceTest {
     private fun card(
         board: Board,
         kind: BoardCardKind,
+        owner: BoardCardOwner = BoardCardOwner.AI,
         state: BoardCardState = BoardCardState.ACTIVE,
         position: Int = 0,
     ) = BoardCard(
         boardId = board.id,
         kind = kind,
-        owner = BoardCardOwner.AI,
+        owner = owner,
         state = state,
         position = position,
     )

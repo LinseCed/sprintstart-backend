@@ -9,7 +9,6 @@ import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
 import jakarta.persistence.Id
 import jakarta.persistence.Table
-import jakarta.persistence.UniqueConstraint
 import java.time.Instant
 import java.util.UUID
 
@@ -24,24 +23,19 @@ import java.util.UUID
  * to disagree. Storing a copy would be a second record of facts that already live somewhere
  * durable, and this codebase has repeatedly found that the copy is the one that goes stale.
  *
- * Authored cards — a note, a drawn diagram — genuinely have content of their own and will bring a
- * payload column with them in the slice that adds them. A nullable column nothing writes yet would
- * just be dead wiring.
+ * Authored cards — a note, a link, a checklist — genuinely have content of their own, and it lives
+ * in [payload] because there is nowhere else for it to be.
  *
- * ### One row per kind, for now
+ * ### One row per kind, except for the ones the hire writes
  *
- * Every kind in this slice is a single live read, so a second copy would be the same card twice —
- * hence the unique constraint, which also makes "ensure this card exists" idempotent. Authored
- * cards break that (several notes are several notes), and the slice that adds them is the slice
- * that relaxes it.
+ * A live card is a single read, so a second copy would be the same card twice — and uniqueness is
+ * also what makes "ensure this card exists" idempotent. Authored cards are the exception: several
+ * notes are several notes. The database enforces it with a partial unique index covering only the
+ * non-authored kinds; Hibernate cannot express a partial index, so the constraint is absent from
+ * this mapping and [BoardService] enforces the same rule in code.
  */
 @Entity
-@Table(
-    name = "board_cards",
-    uniqueConstraints = [
-        UniqueConstraint(name = "uq_board_cards_board_kind", columnNames = ["board_id", "kind"]),
-    ],
-)
+@Table(name = "board_cards")
 class BoardCard(
     @Id
     val id: UUID = UUID.randomUUID(),
@@ -75,6 +69,14 @@ class BoardCard(
      */
     @Column(name = "placed_at")
     var placedAt: Instant? = null,
+    /**
+     * The content of a card the hire wrote, as JSON; null for every live card.
+     *
+     * Stored as text and decoded on read rather than mapped into columns, because these are small,
+     * are read and written whole, and nothing ever queries inside them.
+     */
+    @Column(columnDefinition = "TEXT")
+    var payload: String? = null,
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false)

@@ -84,6 +84,9 @@ data class BoardCardResponse(
     JsonSubTypes.Type(value = OpenPullRequestsContent::class, name = "OPEN_PULL_REQUESTS"),
     JsonSubTypes.Type(value = CurrentTaskContent::class, name = "CURRENT_TASK"),
     JsonSubTypes.Type(value = SuggestedTasksContent::class, name = "SUGGESTED_TASKS"),
+    JsonSubTypes.Type(value = NoteContent::class, name = "NOTE"),
+    JsonSubTypes.Type(value = LinkContent::class, name = "LINK"),
+    JsonSubTypes.Type(value = ChecklistContent::class, name = "CHECKLIST"),
 )
 sealed interface BoardCardContent {
     val kind: BoardCardKind
@@ -202,4 +205,36 @@ data class BoardSuggestedTaskResponse(
     val title: String,
     val url: String?,
     val reasons: List<String>,
+)
+
+/**
+ * Something the hire wrote down.
+ *
+ * The one card whose text the board did not read from anywhere: it is theirs, and it is rendered as
+ * theirs rather than quoted back as a fact about the project.
+ */
+data class NoteContent(
+    override val kind: BoardCardKind = BoardCardKind.NOTE,
+    val text: String,
+) : BoardCardContent
+
+/** A link the hire kept. A null [label] means show the URL — worse to read, but always true. */
+data class LinkContent(
+    override val kind: BoardCardKind = BoardCardKind.LINK,
+    val url: String,
+    val label: String?,
+) : BoardCardContent
+
+/** A list the hire ticks off — the only card whose content changes by being used. */
+data class ChecklistContent(
+    override val kind: BoardCardKind = BoardCardKind.CHECKLIST,
+    val title: String?,
+    val items: List<ChecklistItemResponse>,
+) : BoardCardContent
+
+/** One checklist item, identified so that ticking it is an edit to the line and not to a position. */
+data class ChecklistItemResponse(
+    val id: UUID,
+    val text: String,
+    val done: Boolean,
 )

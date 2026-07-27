@@ -12,15 +12,19 @@ package com.sprintstart.sprintstartbackend.onboarding.external.enums
  * rule every other buddy surface holds to: the mentor decides what to show, the backend decides
  * what it says.
  *
+ * Cards the *hire* writes are the exception that proves it: their content is prose, and it is
+ * theirs. Nothing reads it back to them as fact, and the mentor cannot touch it.
+ *
  * ### Live vs authored
  *
  * A **live** card stores nothing but its own existence: the content is re-read on every board load
  * from the same services the buddy's tools use, so a card and the tool of the same name can never
- * disagree. An **authored** card (a note, a diagram) is frozen at placement and does have stored
- * content — those arrive in a later slice, which is also when this table stops being one row per
- * kind.
+ * disagree. An **authored** card is frozen at the moment it was written and stores its content in
+ * the row, because there is nowhere else for it to live.
  */
-enum class BoardCardKind {
+enum class BoardCardKind(
+    val placement: Placement,
+) {
     /**
      * The moments between joining and a first accepted piece of work, and which have happened.
      *
@@ -28,7 +32,7 @@ enum class BoardCardKind {
      * pull requests, so it says something true for a Scrum Master as well as a developer. The words
      * come from the hire's track, which is why the board carries its vocabulary.
      */
-    PATH_TO_FIRST_CONTRIBUTION,
+    PATH_TO_FIRST_CONTRIBUTION(Placement.BASELINE),
 
     /**
      * The hire's still-open pull requests, named, with how long each has waited.
@@ -40,16 +44,16 @@ enum class BoardCardKind {
      * and is simply absent otherwise. An empty "your open pull requests" card in front of somebody
      * who will never have one is the invisible-hire problem in card form.
      */
-    OPEN_PULL_REQUESTS,
+    OPEN_PULL_REQUESTS(Placement.BASELINE),
 
     /**
      * The task the hire is on, and where it came from.
      *
      * Not part of the baseline, because it is only true some of the time — somebody with no claimed
-     * goal and no Task 0 is not "between tasks", they simply have no task, and a card saying so is
-     * a card about nothing. The mentor places it, and confirming `claim_goal` places it too.
+     * goal and no Task 0 is not "between tasks", they simply have no task, and a card about nothing
+     * is worse than no card. The mentor places it, and confirming `claim_goal` places it too.
      */
-    CURRENT_TASK,
+    CURRENT_TASK(Placement.MENTOR),
 
     /**
      * Good next tasks for the hire, ranked, each with the plain reason it was suggested.
@@ -58,17 +62,50 @@ enum class BoardCardKind {
      * they already have some. Which of those is true is exactly the kind of thing the mentor knows
      * from the conversation and the board does not.
      */
-    SUGGESTED_TASKS,
+    SUGGESTED_TASKS(Placement.MENTOR),
+
+    /** Something the hire wrote down. Markdown, theirs, and nothing reads it back as fact. */
+    NOTE(Placement.AUTHORED),
+
+    /** A link the hire wants to keep. The smallest possible card, and probably the most used. */
+    LINK(Placement.AUTHORED),
+
+    /** A list the hire ticks off. The only card whose content changes by being *used*. */
+    CHECKLIST(Placement.AUTHORED),
     ;
 
     /**
-     * Whether the board keeps this card without being asked.
+     * How a card of this kind gets onto a board.
      *
-     * The split is between *what a hire always needs* and *what the mentor decided was worth
-     * keeping*. A baseline card is placed deterministically on every board read, so nobody depends
-     * on the model noticing their pull request has been waiting a week. Everything else is placed
-     * deliberately — that is what makes the board curated rather than generated.
+     * The distinction is between *what a hire always needs*, *what the mentor decided was worth
+     * keeping*, and *what the hire put there themselves* — and it decides everything downstream:
+     * which kinds are ensured automatically, which the buddy may place, which may appear more than
+     * once, and who may edit one.
      */
-    val baseline: Boolean
-        get() = this == PATH_TO_FIRST_CONTRIBUTION || this == OPEN_PULL_REQUESTS
+    enum class Placement {
+        /**
+         * Ensured on every board read, without anybody deciding.
+         *
+         * Deterministic on purpose: nobody should depend on a language model noticing that their
+         * pull request has been waiting a week.
+         */
+        BASELINE,
+
+        /**
+         * Placed by the mentor, in conversation.
+         *
+         * The mentor chooses *that* the card belongs there; its content is still a live read, so it
+         * never chooses what the card says.
+         */
+        MENTOR,
+
+        /**
+         * Written by the hire.
+         *
+         * The only cards that carry stored content, the only ones a board may hold several of, and
+         * the only ones the mentor must never touch. A board the mentor can tidy is a board the
+         * hire cannot trust to keep what they put on it.
+         */
+        AUTHORED,
+    }
 }
