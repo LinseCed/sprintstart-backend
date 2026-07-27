@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.Contribution
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Board
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCardPayload
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardDiagram
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ChecklistItemPayload
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ChecklistPayload
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.LinkPayload
@@ -38,6 +39,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.Sugges
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.BoardDiagramRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
@@ -84,6 +86,8 @@ class BoardService(
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val myCompetencyService: MyCompetencyService,
     private val buddySessionRepository: BuddySessionRepository,
+    private val boardDiagramRepository: BoardDiagramRepository,
+    private val boardDiagramService: BoardDiagramService,
 ) {
     /**
      * This hire's board on this project, cards hydrated.
@@ -102,6 +106,12 @@ class BoardService(
         val track = trackService.forMember(member)
         val cards = ensureRelevantCards(board, track)
         val timeline = onboardingMetricsService.getHireTimeline(userId, projectId)
+        // One query for every diagram on the board rather than one per card -- and the *kept*
+        // picture, never a fresh one: assembling costs a generation, and a page that waits on a
+        // model to open is a page nobody opens. The client revalidates afterwards.
+        val diagrams = boardDiagramRepository
+            .findAllByCardIdIn(cards.filter { it.kind == BoardCardKind.DIAGRAM }.map { it.id })
+            .associateBy { it.cardId }
 
         return BoardResponse(
             boardId = board.id,
@@ -115,7 +125,7 @@ class BoardService(
             cards = cards
                 .filter { it.state == BoardCardState.ACTIVE }
                 .sortedBy { it.position }
-                .map { it.toResponse(member, projectId, timeline) },
+                .map { it.toResponse(member, projectId, timeline, diagrams[it.id]) },
         )
     }
 
@@ -128,29 +138,45 @@ class BoardService(
      * Gating it behind a button would make the mentor ask permission to point at something, which
      * is not how anybody helps.
      *
-     * What it will not do is the interesting part, and all three refusals come back as sentences
-     * the mentor can relay rather than as silence:
+     * What it will not do is the interesting part, and every refusal comes back as a sentence the
+     * mentor can relay rather than as silence:
      * - **A kind this hire's track cannot support** is refused outright. See [supports].
      * - **A card the hire dismissed is never put back.** Sticky removal is the whole reason a
      *   dismissed card keeps its row, and it has to bind the mentor as well as the baseline.
      * - **A card already there is left alone**, position included. Re-placing would let the mentor
      *   rearrange a board the hire has arranged.
+     * - **A diagram with no subject is refused.** A diagram is *of* something, and one without a
+     *   question is a blank frame the hire cannot make sense of or fix.
      *
      * @param userId The hire whose board it is.
      * @param projectId The project the board belongs to.
      * @param kind The card to place.
+     * @param subject What a [BoardCardKind.DIAGRAM] is a diagram of — the mentor's question, never
+     *   its answer. Required for that kind and meaningless for every other, which is exactly as
+     *   narrow as this rule is meant to be.
      * @return What happened, in a form the caller can turn into a line for the model.
      */
     @Transactional
-    fun place(userId: UUID, projectId: UUID, kind: BoardCardKind): PlacementOutcome {
+    fun place(
+        userId: UUID,
+        projectId: UUID,
+        kind: BoardCardKind,
+        subject: String? = null,
+    ): PlacementOutcome {
         val member = memberOrNull(userId, projectId) ?: return PlacementOutcome.NOT_A_MEMBER
         if (!supports(trackService.forMember(member), kind)) return PlacementOutcome.UNSUPPORTED
+
+        val cleanSubject = subject?.let { normaliseSubject(it) }?.takeIf { it.isNotBlank() }
+        if (kind == BoardCardKind.DIAGRAM && cleanSubject == null) return PlacementOutcome.NEEDS_A_SUBJECT
 
         val board = boardRepository.findByUserIdAndProjectId(userId, projectId)
             ?: boardRepository.save(Board(userId = userId, projectId = projectId))
         val existing = boardCardRepository.findAllByBoardId(board.id)
 
-        existing.firstOrNull { it.kind == kind }?.let { card ->
+        // For every kind but a diagram, one row per kind is the whole identity. A diagram is
+        // identified by its *question* as well: two subjects are two different pictures, and
+        // repurposing an existing card into a new subject would take away something the hire kept.
+        existing.firstOrNull { it.kind == kind && it.matchesSubject(cleanSubject) }?.let { card ->
             return if (card.state == BoardCardState.DISMISSED) {
                 PlacementOutcome.DISMISSED_BY_HIRE
             } else {
@@ -167,10 +193,25 @@ class BoardService(
                 // Dated, because the board says "your buddy put this here" only about cards it
                 // actually did.
                 placedAt = Instant.now(),
+                subject = cleanSubject.takeIf { kind == BoardCardKind.DIAGRAM },
             ),
         )
         return PlacementOutcome.PLACED
     }
+
+    /**
+     * Whether this row is the same card as one of [kind] with [subject].
+     *
+     * Case- and whitespace-insensitive, because "How auth works" asked twice with different capitals
+     * is one question — and because a dismissal has to stick against the way somebody phrases it the
+     * second time.
+     */
+    private fun BoardCard.matchesSubject(subject: String?): Boolean =
+        kind != BoardCardKind.DIAGRAM ||
+            this.subject?.let { normaliseSubject(it).equals(subject, ignoreCase = true) } == true
+
+    private fun normaliseSubject(subject: String): String =
+        subject.trim().replace(WHITESPACE, " ").take(MAX_SUBJECT_LENGTH)
 
     /**
      * Takes a card off the hire's board, for good.
@@ -350,19 +391,22 @@ class BoardService(
             track.admits(ContributionEvidenceKind.PULL_REQUEST)
 
     private fun hydrate(
-        kind: BoardCardKind,
+        card: BoardCard,
         member: ProjectMember,
         projectId: UUID,
         timeline: HireTimelineResponse?,
-        payload: String?,
-    ): BoardCardContent = when (kind) {
+        diagram: BoardDiagram?,
+    ): BoardCardContent = when (card.kind) {
         BoardCardKind.PATH_TO_FIRST_CONTRIBUTION -> pathContent(member, timeline)
         BoardCardKind.OPEN_PULL_REQUESTS -> openPullRequestsContent(member, projectId)
         BoardCardKind.CURRENT_TASK -> currentTaskContent(member.userId, projectId)
         BoardCardKind.SUGGESTED_TASKS -> suggestedTasksContent(member.userId, projectId)
         BoardCardKind.COMPETENCY_PROGRESS -> competencyProgressContent(member.userId)
         BoardCardKind.MEMORY_RECAP -> memoryRecapContent(member.userId)
-        BoardCardKind.NOTE, BoardCardKind.LINK, BoardCardKind.CHECKLIST -> authoredContent(payload)
+        // The one live card served from a cache, because the one live card whose content costs a
+        // generation. [BoardDiagramService] owns whether that cache is still true.
+        BoardCardKind.DIAGRAM -> boardDiagramService.contentFor(card.subject.orEmpty(), diagram)
+        BoardCardKind.NOTE, BoardCardKind.LINK, BoardCardKind.CHECKLIST -> authoredContent(card.payload)
     }
 
     /**
@@ -533,13 +577,14 @@ class BoardService(
         member: ProjectMember,
         projectId: UUID,
         timeline: HireTimelineResponse?,
+        diagram: BoardDiagram? = null,
     ) = BoardCardResponse(
         id = id,
         kind = kind,
         owner = owner,
         position = position,
         placedAt = placedAt,
-        content = hydrate(kind, member, projectId, timeline, payload),
+        content = hydrate(this, member, projectId, timeline, diagram),
     )
 
     /**
@@ -624,11 +669,22 @@ class BoardService(
         /** This hire's track can never give the card anything true to say. */
         UNSUPPORTED,
         NOT_A_MEMBER,
+
+        /** A diagram was asked for without saying what it should be a diagram of. */
+        NEEDS_A_SUBJECT,
     }
 
     private companion object {
         /** Matches the buddy tool's cap, so the card and the conversation list the same tasks. */
         const val MAX_SUGGESTED_TASKS = 3
+
+        /**
+         * Long enough for any real question, short enough that a rambling one cannot become a card
+         * title nobody can read. Matches the cap the AI service applies to the same string.
+         */
+        const val MAX_SUBJECT_LENGTH = 200
+
+        val WHITESPACE = Regex("\\s+")
 
         /** Lenient on unknown keys so a payload written by a newer version still reads back. */
         val json = Json { ignoreUnknownKeys = true }

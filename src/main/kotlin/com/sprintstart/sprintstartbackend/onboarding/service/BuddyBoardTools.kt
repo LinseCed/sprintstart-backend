@@ -31,6 +31,19 @@ import java.util.UUID
  * or a caption. Whatever the card ends up saying is read server-side from the same services the
  * buddy's read tools use — so the mentor decides *that* something is worth keeping, never *what it
  * says*. That is the constraint the whole board rests on.
+ *
+ * ### The one extension, and the direction it goes in
+ *
+ * `DIAGRAM` needs a **subject**, because a diagram is *of* something and only the conversation knows
+ * whether the mentor has just been explaining authentication or the ingestion pipeline. That is a
+ * real extension of the rule above, so it is named rather than left implied:
+ *
+ * > The model may choose the question. It never writes the answer.
+ *
+ * The subject aims retrieval and is asserted nowhere. Every box in the resulting picture comes back
+ * derived from the project's corpus with the citation proving it, and a box that cannot be grounded
+ * is dropped — so a subject the model invented cannot become a claim the model invented. It is the
+ * only argument any card kind takes beyond its kind, and it is not a foothold for a second one.
  */
 @Component
 class BuddyBoardTools(
@@ -69,7 +82,7 @@ class BuddyBoardTools(
                     "putting anything on their board."
         }
 
-        return when (boardService.place(userId, project.projectId, kind)) {
+        return when (boardService.place(userId, project.projectId, kind, call.subjectArg())) {
             BoardService.PlacementOutcome.PLACED ->
                 "Placed the $kind card on the hire's board for ${project.name}. Tell them it is " +
                     "there and will stay there — they can dismiss it if they do not want it."
@@ -84,6 +97,10 @@ class BuddyBoardTools(
                     "placed. Do not mention it."
             BoardService.PlacementOutcome.NOT_A_MEMBER ->
                 "The hire is not a member of that project, so there is no board to put a card on."
+            BoardService.PlacementOutcome.NEEDS_A_SUBJECT ->
+                "A diagram has to be a diagram of something, and no subject was given, so nothing " +
+                    "was placed. Try again with the question it should answer — for example " +
+                    "\"how a request reaches the database\"."
         }
     }
 
@@ -92,6 +109,16 @@ class BuddyBoardTools(
         val raw = (arguments["kind"] as? JsonPrimitive)?.contentOrNull.orEmpty()
         return PLACEABLE.firstOrNull { it.name.equals(raw, ignoreCase = true) }
     }
+
+    /**
+     * Reads the `subject` argument — the question a diagram answers, and only ever that.
+     *
+     * Passed straight through to [BoardService.place], which ignores it for every kind but
+     * `DIAGRAM`. A subject sent alongside `CURRENT_TASK` is not an error worth a sentence; it is a
+     * model being verbose, and the card is unaffected either way.
+     */
+    private fun BuddyToolCallDto.subjectArg(): String? =
+        (arguments["subject"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
     private companion object {
         const val PLACE_CARD = "place_card"
@@ -115,7 +142,8 @@ class BuddyBoardTools(
                 "conversations, since this chat starts fresh every visit. Use it when something " +
                 "you have just discussed is worth them still having tomorrow: after they pick a " +
                 "task to work on (CURRENT_TASK), or when they are looking for work and you have " +
-                "shown them suggestions (SUGGESTED_TASKS). This applies straight away — no " +
+                "shown them suggestions (SUGGESTED_TASKS), or after explaining how some part of " +
+                "the system fits together (DIAGRAM). This applies straight away — no " +
                 "confirmation — and the card is clearly marked as yours and easy for them to " +
                 "dismiss. You choose *that* a card belongs there; you never choose what it says, " +
                 "because its contents are read live from the same place your other tools read. " +
@@ -128,6 +156,20 @@ class BuddyBoardTools(
                         put("type", "string")
                         putJsonArray("enum") { PLACEABLE.forEach { add(it.name) } }
                         put("description", "Which card to put on the board.")
+                    }
+                    putJsonObject("subject") {
+                        put("type", "string")
+                        put(
+                            "description",
+                            "DIAGRAM only, and required for it: what the diagram should be a " +
+                                "diagram of, phrased as the question it answers — \"how a request " +
+                                "reaches the database\", \"what the ingestion pipeline is made " +
+                                "of\". You are choosing the question, not the answer: the picture " +
+                                "is drawn from this project's own material, every box carries the " +
+                                "source it came from, and anything the material does not support " +
+                                "is left out. So ask about something this project actually has, " +
+                                "and use the names it uses. Ignored for other kinds.",
+                        )
                     }
                 }
                 putJsonArray("required") { add("kind") }

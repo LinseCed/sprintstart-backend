@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardState
@@ -28,6 +29,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.Hire
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.BoardDiagramRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
@@ -39,6 +41,7 @@ import io.mockk.verify
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.springframework.transaction.PlatformTransactionManager
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -61,8 +64,19 @@ class BoardServiceTest {
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService = mockk()
     private val myCompetencyService: MyCompetencyService = mockk()
     private val buddySessionRepository: BuddySessionRepository = mockk()
+    private val boardDiagramRepository: BoardDiagramRepository = mockk()
+    private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    private val boardDiagramService = BoardDiagramService(
+        boardRepository,
+        boardCardRepository,
+        boardDiagramRepository,
+        onboardingAiClient,
+        transactionManager,
+    )
 
     private val now: Instant = Instant.parse("2026-07-27T12:00:00Z")
     private val hireId: UUID = UUID.randomUUID()
@@ -79,6 +93,8 @@ class BoardServiceTest {
         starterWorkTaskProposalService,
         myCompetencyService,
         buddySessionRepository,
+        boardDiagramRepository,
+        boardDiagramService,
     )
 
     private val engineering = OnboardingTrack(
@@ -114,6 +130,7 @@ class BoardServiceTest {
         every { starterWorkTaskProposalService.matchForUserId(hireId, projectId) } returns emptyList()
         every { myCompetencyService.getCompetenciesForUser(hireId) } returns emptyList()
         every { buddySessionRepository.findByUserId(hireId) } returns null
+        every { boardDiagramRepository.findAllByCardIdIn(any()) } returns emptyList()
     }
 
     private fun member(

@@ -84,6 +84,27 @@ enum class BoardCardKind(
      */
     MEMORY_RECAP(Placement.MENTOR),
 
+    /**
+     * A picture of how some part of this project fits together, drawn from the project's material.
+     *
+     * The one card that needs the mentor to supply something beyond its kind: a diagram is *of*
+     * something, and only the conversation knows whether the mentor just explained authentication or
+     * the ingestion pipeline. So `place_card` carries a **subject** for this kind — and the rule it
+     * bends is bent in exactly one direction, worth naming rather than leaving implied:
+     *
+     * > The model may choose the question. It never writes the answer.
+     *
+     * The subject aims retrieval and is asserted nowhere. Every node comes back derived from the
+     * corpus with the citation proving it, and a node that cannot be grounded is dropped — so a
+     * subject the model invented cannot become a claim the model invented. Live, not authored: the
+     * row stores the question, never the picture, so a diagram cannot describe code that has moved.
+     *
+     * The only non-authored kind a board may hold several of, because two subjects are two different
+     * diagrams — and re-placing an existing one would let the mentor repurpose a picture the hire
+     * chose to keep.
+     */
+    DIAGRAM(Placement.MENTOR),
+
     /** Something the hire wrote down. Markdown, theirs, and nothing reads it back as fact. */
     NOTE(Placement.AUTHORED),
 
@@ -115,7 +136,8 @@ enum class BoardCardKind(
          * Placed by the mentor, in conversation.
          *
          * The mentor chooses *that* the card belongs there; its content is still a live read, so it
-         * never chooses what the card says.
+         * never chooses what the card says. [DIAGRAM] is the one kind that also takes a **subject**
+         * — the question, never the answer — for the reason given on it.
          */
         MENTOR,
 

@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompet
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveEdgeSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ArtifactEvidenceDto
+import com.sprintstart.sprintstartbackend.onboarding.external.model.AssembleDiagramRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssembleOrientationRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
@@ -13,6 +14,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRe
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenResponse
+import com.sprintstart.sprintstartbackend.onboarding.external.model.DiagramOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateBlueprintsResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateCompetencyGraphRequest
@@ -174,6 +176,44 @@ class OnboardingAiClient(
                 .perform<ModuleProposalOutcome>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
             val msg = "Failed to propose module (HTTP ${e.statusCode}): ${e.body}"
+            throw OnboardingAiException(e.statusCode, e.body, msg)
+        }
+
+    /**
+     * Draws one subject from the project's own material: typed nodes, typed edges, a citation each.
+     *
+     * The rule this sits under is worth restating where it is called: **the model may choose the
+     * question, it never writes the answer.** [subject] is the only part of a diagram a model chose,
+     * and it aims retrieval rather than being asserted — every node comes back derived from a
+     * retrieved chunk and cited, and an ungrounded one is dropped along with the arrows that reached
+     * it.
+     *
+     * On a hire's request path in the most literal way of anything here: a board card hydrates on
+     * every page load, which is exactly why [lastFingerprint] must be sent. An unchanged corpus
+     * answers `unchanged` with no retrieval and no generation, so revalidating a diagram costs a
+     * hash rather than a model.
+     *
+     * `skipped` with no diagram is a real answer — an empty corpus, nothing retrieved, or too few
+     * grounded and connected parts to be a picture rather than a word. It must reach the hire as an
+     * honest empty state.
+     *
+     * @param subject The question the diagram answers.
+     * @param lastFingerprint The corpus fingerprint the cached picture was drawn from, if any.
+     * @return The assembly outcome returned by the AI service.
+     */
+    suspend fun assembleDiagram(
+        subject: String,
+        lastFingerprint: String? = null,
+    ): DiagramOutcome =
+        try {
+            webClient
+                .post()
+                .uri(uri("/api/v1/onboarding/diagram"))
+                .body(AssembleDiagramRequest(subject = subject, lastFingerprint = lastFingerprint))
+                .sync()
+                .perform<DiagramOutcome>()
+        } catch (@Suppress("SwallowedException") e: WebClientException) {
+            val msg = "Failed to assemble diagram (HTTP ${e.statusCode}): ${e.body}"
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 

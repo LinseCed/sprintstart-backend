@@ -86,6 +86,7 @@ data class BoardCardResponse(
     JsonSubTypes.Type(value = SuggestedTasksContent::class, name = "SUGGESTED_TASKS"),
     JsonSubTypes.Type(value = CompetencyProgressContent::class, name = "COMPETENCY_PROGRESS"),
     JsonSubTypes.Type(value = MemoryRecapContent::class, name = "MEMORY_RECAP"),
+    JsonSubTypes.Type(value = DiagramContent::class, name = "DIAGRAM"),
     JsonSubTypes.Type(value = NoteContent::class, name = "NOTE"),
     JsonSubTypes.Type(value = LinkContent::class, name = "LINK"),
     JsonSubTypes.Type(value = ChecklistContent::class, name = "CHECKLIST"),
@@ -265,6 +266,76 @@ data class BoardCompetencyResponse(
     val label: String,
     val level: Int,
     val targetLevel: Int,
+)
+
+/**
+ * A picture of how some part of this project fits together.
+ *
+ * The card that carries the one extension the board's rules ever got: **the model may choose the
+ * question, it never writes the answer.** [subject] is the mentor's — only the conversation knows
+ * what was just being explained — and everything else here is derived from the project's own
+ * material, one citation per box, ungrounded boxes dropped before they were ever returned.
+ *
+ * A board read serves the **last picture drawn**, never a fresh one: assembling costs a generation
+ * and this card hydrates on every page load. The client revalidates it afterwards through the
+ * diagram endpoint, which is where the cache is checked against the current corpus. So [assembledAt]
+ * is not decoration — a diagram is a claim about code as it was at a moment, and the reader is
+ * entitled to know which moment.
+ *
+ * [nodes] empty with a [reason] is an ordinary state: the corpus may have nothing to say about this
+ * subject, or too little to make a picture rather than a word. An empty diagram is never dressed up
+ * as an explanation.
+ */
+data class DiagramContent(
+    override val kind: BoardCardKind = BoardCardKind.DIAGRAM,
+    /** The question this diagram answers, as the mentor asked it. */
+    val subject: String,
+    val summary: String?,
+    val nodes: List<BoardDiagramNodeResponse>,
+    val edges: List<BoardDiagramEdgeResponse>,
+    /** The material the picture drew on, so "this is wrong" has somewhere to point. */
+    val sources: List<BoardDiagramSourceResponse>,
+    /** When this picture was drawn; null when it never has been. */
+    val assembledAt: Instant?,
+    /** Why there is no picture, when there is none. Null whenever [nodes] is non-empty. */
+    val reason: String?,
+) : BoardCardContent
+
+/**
+ * One box.
+ *
+ * [citations] is what separates a diagram from a drawing: every box asserts this project contains
+ * this part, and the citation is how a reader checks it. Never empty — an ungrounded node is dropped
+ * upstream rather than shown unsourced.
+ */
+data class BoardDiagramNodeResponse(
+    val id: String,
+    val label: String,
+    /** What this is — COMPONENT, FILE, SERVICE, DATA, STEP, EXTERNAL, or OTHER when unsettled. */
+    val kind: String,
+    val summary: String?,
+    val citations: List<BoardDiagramCitationResponse>,
+)
+
+/** One arrow. Both ends name a box in the same diagram. */
+data class BoardDiagramEdgeResponse(
+    val fromId: String,
+    val toId: String,
+    /** FLOWS_TO, DEPENDS_ON, CONTAINS, or RELATES_TO when the evidence does not settle it. */
+    val kind: String,
+    val label: String?,
+)
+
+/** Where a box came from. A source with no URL is still named — unopenable beats unattributed. */
+data class BoardDiagramCitationResponse(
+    val filename: String,
+    val sourceUrl: String?,
+)
+
+data class BoardDiagramSourceResponse(
+    val filename: String,
+    val sourceUrl: String?,
+    val artifactType: String?,
 )
 
 /**
