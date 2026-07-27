@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionAp
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
@@ -33,6 +34,13 @@ class BuddyToolExecutorTest {
     private val userApi: UserApi = mockk()
     private val buddyPlanTools: BuddyPlanTools = mockk(relaxed = true)
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
+
+    // Defaults to the engineering track, so these tests describe the behaviour every existing hire
+    // gets; the track-specific mounting is exercised in TrackServiceTest and its own cases below.
+    private val trackService: TrackService = mockk {
+        every { admitsAnywhere(any(), any()) } returns true
+    }
+
     private val executor = BuddyToolExecutor(
         onboardingMetricsService,
         myCompetencyService,
@@ -41,6 +49,7 @@ class BuddyToolExecutorTest {
         userApi,
         buddyPlanTools,
         artifactIngestionApi,
+        trackService,
     )
 
     private val userId = UUID.randomUUID()
@@ -151,10 +160,25 @@ class BuddyToolExecutorTest {
     fun `exposes the caller-scoped hire-state tools`() {
         every { buddyPlanTools.toolSpecs() } returns emptyList()
 
-        assertThat(executor.toolSpecs().map { it.name }).containsExactly(
+        assertThat(executor.toolSpecs(userId).map { it.name }).containsExactly(
             "get_my_metrics",
             "get_my_competencies",
             "get_my_open_pull_requests",
+            "get_suggested_tasks",
+            "search_canonical_answers",
+        )
+    }
+
+    @Test
+    fun `a hire whose track cannot have pull requests is not offered the pull-request tool`() {
+        every { buddyPlanTools.toolSpecs() } returns emptyList()
+        every { trackService.admitsAnywhere(userId, ContributionEvidenceKind.PULL_REQUEST) } returns false
+
+        // Absent, not present-and-empty: a mentor offered a tool for evidence this role can never
+        // produce will open the conversation by asking about it.
+        assertThat(executor.toolSpecs(userId).map { it.name }).containsExactly(
+            "get_my_metrics",
+            "get_my_competencies",
             "get_suggested_tasks",
             "search_canonical_answers",
         )
@@ -253,7 +277,7 @@ class BuddyToolExecutorTest {
         every { buddyPlanTools.handles("get_learning_plan") } returns true
         every { buddyPlanTools.execute(planCall, userId) } returns "the plan"
 
-        assertThat(executor.toolSpecs().map { it.name }).contains("get_learning_plan")
+        assertThat(executor.toolSpecs(userId).map { it.name }).contains("get_learning_plan")
         assertThat(executor.execute(planCall, userId)).isEqualTo("the plan")
     }
 

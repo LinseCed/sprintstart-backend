@@ -152,7 +152,7 @@ class BuddyService(
 
         // The AI reasoner sees the read-only tools *and* the action tools it may propose. An action
         // tool call never mutates here — it produces a proposal the hire must confirm out-of-band.
-        val tools = buddyToolExecutor.toolSpecs() + buddyActionService.actionSpecs()
+        val tools = buddyToolExecutor.toolSpecs(userId) + buddyActionService.actionSpecs()
 
         // Fold the oldest part of the window into the summary once it outgrows the window. The
         // cursor arithmetic never reaches the just-sent user message (summarizeUpto <= the window's

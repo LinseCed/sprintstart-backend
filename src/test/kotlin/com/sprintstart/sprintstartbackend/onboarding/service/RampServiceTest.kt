@@ -4,11 +4,13 @@ import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionAp
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.RampStage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.AutonomyMilestone
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.KnowledgeRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTrack
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskZeroAssignment
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
@@ -70,6 +72,9 @@ class RampServiceTest {
         // tests assert the numbers this service reports, and the point of the refactor is
         // that swapping pull requests for contributions did not move any of them.
         ContributionService(artifactIngestionApi),
+        // The default engineering track, so every copy assertion below is the copy an engineer
+        // reads today -- the vocabulary swap must not have moved it.
+        mockk<TrackService> { every { forMember(any()) } returns engineeringTrack() },
         Clock.fixed(now, ZoneOffset.UTC),
     )
 
@@ -80,6 +85,15 @@ class RampServiceTest {
     }
 
     private fun daysAgo(days: Long): Instant = now.minus(Duration.ofDays(days))
+
+    private fun engineeringTrack() = OnboardingTrack(
+        key = OnboardingTrack.DEFAULT_KEY,
+        label = "Engineering",
+        contributionNoun = "change",
+        contributionNounPlural = "changes",
+        contributionVerbPast = "merged",
+        evidenceKinds = mutableSetOf(ContributionEvidenceKind.PULL_REQUEST),
+    )
 
     private fun isMember(login: String? = "hire") {
         every { projectMembershipApi.getProjectMembers(projectId) } returns

@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
@@ -40,16 +41,35 @@ class BuddyToolExecutor(
     private val userApi: UserApi,
     private val buddyPlanTools: BuddyPlanTools,
     private val artifactIngestionApi: ArtifactIngestionApi,
+    private val trackService: TrackService,
 ) {
-    /** The backend tools the AI reasoner is told it may call. */
-    fun toolSpecs(): List<BuddyToolSpecDto> =
-        listOf(
-            GET_MY_METRICS_SPEC,
-            GET_MY_COMPETENCIES_SPEC,
-            GET_MY_OPEN_PULL_REQUESTS_SPEC,
-            GET_SUGGESTED_TASKS_SPEC,
-            SEARCH_CANONICAL_ANSWERS_SPEC,
-        ) + buddyPlanTools.toolSpecs()
+    /**
+     * The backend tools the AI reasoner is told it may call, for this hire.
+     *
+     * Mounted per hire rather than globally, because a tool the hire's role can never have evidence
+     * for is worse than absent: offering `get_my_open_pull_requests` to a Scrum Master invites the
+     * mentor to open their first conversation by discussing pull requests they will never have. The
+     * gate is the track's evidence kinds, so a new evidence source mounts its own tools by
+     * declaring itself rather than by editing this list.
+     *
+     * It also keeps the reasoner's tool count down, which is the practical limit on how reliably it
+     * picks the right one.
+     */
+    fun toolSpecs(userId: UUID): List<BuddyToolSpecDto> = buildList {
+        add(GET_MY_METRICS_SPEC)
+        add(GET_MY_COMPETENCIES_SPEC)
+        // Inserted in place rather than appended, so a hire whose track admits pull requests is
+        // offered exactly the list -- and the order -- they were offered before tracks existed.
+        if (admitsPullRequests(userId)) {
+            add(GET_MY_OPEN_PULL_REQUESTS_SPEC)
+        }
+        add(GET_SUGGESTED_TASKS_SPEC)
+        add(SEARCH_CANONICAL_ANSWERS_SPEC)
+        addAll(buddyPlanTools.toolSpecs())
+    }
+
+    private fun admitsPullRequests(userId: UUID): Boolean =
+        trackService.admitsAnywhere(userId, ContributionEvidenceKind.PULL_REQUEST)
 
     /**
      * A plain-text snapshot of the hire's own onboarding, for the buddy's opening greeting to
@@ -57,9 +77,12 @@ class BuddyToolExecutor(
      * the tools can never describe different states.
      */
     fun stateSnapshot(userId: UUID): String =
-        listOf(
+        listOfNotNull(
             "Progress:\n" + getMyMetrics(userId),
-            "Open pull requests:\n" + getMyOpenPullRequests(userId),
+            // Omitted entirely for a track that cannot have pull requests, rather than included as
+            // an empty section: a greeting grounded in "Open pull requests: none" will bring them
+            // up, which is exactly the opening a Scrum Master should never get.
+            ("Open pull requests:\n" + getMyOpenPullRequests(userId)).takeIf { admitsPullRequests(userId) },
             "Suggested tasks:\n" + getSuggestedTasks(userId),
             "Competencies:\n" + getMyCompetencies(userId),
         ).joinToString("\n\n")
