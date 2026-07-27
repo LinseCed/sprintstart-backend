@@ -22,6 +22,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskP
 import com.sprintstart.sprintstartbackend.onboarding.repository.TaskZeroAssignmentRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalRepository
+import com.sprintstart.sprintstartbackend.onboarding.service.evidence.PullRequestEvidenceProvider
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every
@@ -71,7 +72,7 @@ class RampServiceTest {
         // A real ContributionService over the same mocked ingestion API, not a mock: these
         // tests assert the numbers this service reports, and the point of the refactor is
         // that swapping pull requests for contributions did not move any of them.
-        ContributionService(artifactIngestionApi),
+        ContributionService(listOf(PullRequestEvidenceProvider(artifactIngestionApi))),
         // The default engineering track, so every copy assertion below is the copy an engineer
         // reads today -- the vocabulary swap must not have moved it.
         mockk<TrackService> { every { forMember(any()) } returns engineeringTrack() },

@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTas
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskZeroAssignment
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.TaskZeroAssignmentRepository
+import com.sprintstart.sprintstartbackend.onboarding.service.evidence.PullRequestEvidenceProvider
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every
@@ -44,7 +45,7 @@ class TaskZeroServiceTest {
         // A real ContributionService over the same mocked ingestion API, not a mock: these
         // tests assert the numbers this service reports, and the point of the refactor is
         // that swapping pull requests for contributions did not move any of them.
-        ContributionService(artifactIngestionApi),
+        ContributionService(listOf(PullRequestEvidenceProvider(artifactIngestionApi))),
         Clock.fixed(now, ZoneOffset.UTC),
     )
 

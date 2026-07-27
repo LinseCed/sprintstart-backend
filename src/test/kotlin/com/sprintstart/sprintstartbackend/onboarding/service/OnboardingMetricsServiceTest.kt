@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionAp
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGoal
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalRepository
+import com.sprintstart.sprintstartbackend.onboarding.service.evidence.PullRequestEvidenceProvider
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every
@@ -46,7 +47,7 @@ class OnboardingMetricsServiceTest {
         // A real ContributionService over the same mocked ingestion API, not a mock: these
         // tests assert the numbers this service reports, and the point of the refactor is
         // that swapping pull requests for contributions did not move any of them.
-        ContributionService(artifactIngestionApi),
+        ContributionService(listOf(PullRequestEvidenceProvider(artifactIngestionApi))),
         userGoalRepository,
         taskZeroService,
         rampService,
