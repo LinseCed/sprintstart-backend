@@ -10,6 +10,9 @@ internal data class JiraInstanceDto(
     var lastUpdate: Instant,
     var projectIds: MutableSet<UUID>,
     var sourceEnabled: Boolean,
+    var status: String,
+    var updateCredentialName: String,
+    var updateCredentialUserEmail: String,
 )
 
 internal fun JiraInstance.toDto() = JiraInstanceDto(
@@ -18,4 +21,7 @@ internal fun JiraInstance.toDto() = JiraInstanceDto(
     lastUpdate = this.lastUpdate,
     projectIds = this.projectIds,
     sourceEnabled = this.sourceEnabled,
+    status = this.status.name,
+    updateCredentialName = this.updateCredentialName,
+    updateCredentialUserEmail = this.updateCredentialUserEmail,
 )

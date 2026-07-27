@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.connectors.jira.model.entity
 
+import com.sprintstart.sprintstartbackend.connectors.ConnectionState
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
@@ -21,4 +22,10 @@ internal class JiraInstance(
     var projectIds: MutableSet<UUID> = mutableSetOf(),
     @Column(name = "source_enabled", nullable = false)
     var sourceEnabled: Boolean = false,
+    @Column(name = "status", nullable = false)
+    var status: ConnectionState = ConnectionState.UP_TO_DATE,
+    @Column(name = "update_credential_name", nullable = false)
+    var updateCredentialName: String,
+    @Column(name = "update_credential_user_email", nullable = false)
+    var updateCredentialUserEmail: String,
 )

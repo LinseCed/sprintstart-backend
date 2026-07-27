@@ -1,6 +1,8 @@
 package com.sprintstart.sprintstartbackend.connectors.jira
 
 import com.sprintstart.sprintstartbackend.connectors.jira.service.JiraInstanceConfigService
+import com.sprintstart.sprintstartbackend.connectors.jira.service.JiraService
+import com.sprintstart.sprintstartbackend.connectors.jira.service.JiraUpdateService
 import com.sprintstart.sprintstartbackend.shared.scheduler.ScheduledExecutor
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -13,6 +15,7 @@ import java.time.Instant
 internal class JiraScheduledExecutor(
     private val scheduledExecutor: ScheduledExecutor,
     private val configService: JiraInstanceConfigService,
+    private val updateService: JiraUpdateService,
 ) {
     @Scheduled(fixedRate = 60_000)
     fun tick() {
@@ -21,7 +24,7 @@ internal class JiraScheduledExecutor(
 
         instancesDueForSync.forEach { config ->
             scheduledExecutor.launch("Updating Jira instance '${config.id}' (auto-update: ${config.autoUpdate})") {
-                // TODO: Update
+                updateService.updateJiraInstance(config.instance.instanceUrl, config.autoUpdate)
             }
 
             config.nextSyncAt = configService.calculateNextSyncAt(config.schedule)

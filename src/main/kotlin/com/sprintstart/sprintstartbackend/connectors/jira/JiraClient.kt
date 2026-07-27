@@ -69,7 +69,13 @@ internal class JiraClient(
         val requestFields = (fields + extraFields).joinToString(",")
         val requestExpand = expand.joinToString(",")
 
-        return doFetchAll("$baseUrl/rest/api/3/search/jql", credentials, jql, requestFields, requestExpand)
+        return doFetchAll<PaginatedIssuesSearchResponse>(
+            "$baseUrl/rest/api/3/search/jql",
+            credentials,
+            jql,
+            requestFields,
+            requestExpand,
+        ).flatMap { it.issues }
     }
 
     /**
@@ -84,7 +90,13 @@ internal class JiraClient(
         baseUrl: String,
         credentials: JiraCredential,
     ): List<JiraProjectResponse> {
-        return doFetchAll("$baseUrl/rest/api/3/project/search", credentials, null, null, null)
+        return doFetchAll<PaginatedProjectsSearchResponse>(
+            "$baseUrl/rest/api/3/project/search",
+            credentials,
+            null,
+            null,
+            null,
+        ).flatMap { it.values }
     }
 
     /**
@@ -230,6 +242,16 @@ interface PageableResponse<T> {
     fun isLast(): Boolean
 }
 
+/**
+ * Represents a paginated response for a search query returning Jira issues.
+ *
+ * This class wraps [JiraIssueResponse] objects in a paginated format, providing information about the current page
+ * and whether it's the last one.
+ *
+ * @property issues The list of `JiraIssueResponse` objects representing the Jira issues in the current page.
+ * @property isLast A boolean flag indicating whether this is the last page of results.
+ * @property nextPageToken An optional token used to fetch the next page of results, or `null` if no further pages exist.
+ */
 @Serializable
 data class PaginatedIssuesSearchResponse(
     val issues: List<JiraIssueResponse>,
@@ -245,6 +267,15 @@ data class PaginatedIssuesSearchResponse(
     }
 }
 
+/**
+ * Represents the response of a paginated search for Jira projects.
+ *
+ * This class wraps [JiraProjectResponse] objects in a paginated format, providing information about the current page
+ * and whether it's the last one.
+ *
+ * @property isLast Indicates whether the current page is the last page in the paginated result set.
+ * @property values A list of Jira project responses representing the projects in the current page.
+ */
 @Serializable
 data class PaginatedProjectsSearchResponse(
     val isLast: Boolean,

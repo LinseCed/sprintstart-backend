@@ -27,6 +27,7 @@ internal class JiraInstanceConfigService(
      * @param schedule A string representing the cron expression that defines the schedule of synchronization.
      * @return The next synchronization time as an [Instant], or null if the calculation fails.
      */
+    @Tracked("Calculating next sync time")
     fun calculateNextSyncAt(schedule: String): Instant? =
         runCatching {
             val cron = CronExpression.parse(schedule)

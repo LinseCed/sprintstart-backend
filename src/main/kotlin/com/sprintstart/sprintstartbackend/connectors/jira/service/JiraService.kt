@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.connectors.jira.service
 
+import com.sprintstart.sprintstartbackend.connectors.ConnectionState
 import com.sprintstart.sprintstartbackend.connectors.jira.JiraClient
 import com.sprintstart.sprintstartbackend.connectors.jira.external.events.initial.JiraInstanceConnectionCompletedEvent
 import com.sprintstart.sprintstartbackend.connectors.jira.external.events.initial.JiraInstanceConnectionInitiatedEvent
@@ -94,21 +95,19 @@ internal class JiraService(
         eventPublisher.publishEvent(JiraInstanceConnectionInitiatedEvent(transactionId, request.displayName))
 
         val instance = instanceRepository.findById(request.url)
+
         if (instance.isPresent) {
             logger.info("Jira instance already connected: ${request.url}")
 
             eventPublisher.publishEvent(JiraInstanceConnectionCompletedEvent(transactionId))
 
-            return@withContext if (instance.get().projectIds.contains(request.projectId)) {
-                transactionId
-            } else {
+            if (!instance.get().projectIds.contains(request.projectId)) {
                 instance.get().projectIds.add(request.projectId)
                 instanceRepository.save(instance.get())
-                transactionId
             }
+        } else {
+            connectInstanceIfExists(request, transactionId)
         }
-
-        connectInstanceIfExists(request, transactionId)
 
         return@withContext transactionId
     }
@@ -163,7 +162,6 @@ internal class JiraService(
      * @param credentials The credentials required to authenticate with the Jira instance.
      * @param transactionId A unique identifier for tracking the connection and resource-fetching process.
      */
-    @Tracked("Starting Jira instance connection process")
     private suspend fun connectInstance(
         request: ConnectJiraInstanceRequest,
         credentials: JiraCredential,
@@ -184,6 +182,9 @@ internal class JiraService(
             displayName = request.displayName,
             lastUpdate = Instant.now(),
             projectIds = mutableSetOf(request.projectId),
+            status = ConnectionState.UP_TO_DATE,
+            updateCredentialName = credentials.id.name,
+            updateCredentialUserEmail = credentials.id.userEmail,
         )
         val config = JiraInstanceConfig(
             instance = instance,
