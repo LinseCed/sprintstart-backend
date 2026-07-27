@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
@@ -16,8 +15,6 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.springframework.stereotype.Component
-import java.time.Duration
-import java.time.Instant
 import java.util.UUID
 
 /**
@@ -41,7 +38,7 @@ class BuddyToolExecutor(
     private val knowledgeBaseService: KnowledgeBaseService,
     private val userApi: UserApi,
     private val buddyPlanTools: BuddyPlanTools,
-    private val artifactIngestionApi: ArtifactIngestionApi,
+    private val openPullRequestReader: OpenPullRequestReader,
     private val trackService: TrackService,
     private val projectMembershipApi: ProjectMembershipApi,
 ) {
@@ -200,20 +197,16 @@ class BuddyToolExecutor(
         if (projects.isEmpty()) {
             return "You are not a member of any project yet, so there are no pull requests to show."
         }
-        val now = Instant.now()
         val sections = projects.mapNotNull { project ->
-            val open = artifactIngestionApi
-                .getAuthoredPullRequests(project.projectId, login)
-                // Still open, not merely unmerged — a pull request closed without merging is not open.
-                .filter { it.isOpen }
-                // Longest-waiting first: the one most likely to be the stall leads the list.
-                .sortedByDescending { waitHours(it.openedAt, now) ?: -1 }
+            // Which pull requests count as open, and which leads, are decided in one place — the
+            // board shows the same list as cards, and the two must not be able to disagree.
+            val open = openPullRequestReader.openFor(project.projectId, login)
             if (open.isEmpty()) {
                 null
             } else {
                 buildString {
                     appendLine("On ${project.name}, your open pull requests:")
-                    open.forEach { pr -> appendPullRequest(pr, now) }
+                    open.forEach { pr -> appendPullRequest(pr) }
                 }.trim()
             }
         }
@@ -222,20 +215,13 @@ class BuddyToolExecutor(
             .joinToString("\n\n")
     }
 
-    private fun StringBuilder.appendPullRequest(pr: AuthoredPullRequest, now: Instant) {
+    private fun StringBuilder.appendPullRequest(pr: AuthoredPullRequest) {
         val id = pr.number?.let { "#$it" } ?: "(number unknown)"
         appendLine("- $id ${pr.title ?: "(untitled)"}")
-        // Only an unanswered pull request is "waiting" — once someone has responded the clock the
-        // hire cares about (time to a first review) has stopped.
-        if (pr.firstResponseAt == null) {
-            waitHours(pr.openedAt, now)?.let { appendLine("    · waiting $it hours for a first review") }
+        openPullRequestReader.waitingHours(pr)?.let {
+            appendLine("    · waiting $it hours for a first review")
         }
         pr.sourceUrl?.let { appendLine("    ($it)") }
-    }
-
-    private fun waitHours(from: Instant?, to: Instant): Long? {
-        if (from == null || to.isBefore(from)) return null
-        return Duration.between(from, to).toHours()
     }
 
     private fun getMyCompetencies(userId: UUID): String {

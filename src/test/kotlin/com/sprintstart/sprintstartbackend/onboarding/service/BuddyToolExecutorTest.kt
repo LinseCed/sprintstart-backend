@@ -50,7 +50,9 @@ class BuddyToolExecutorTest {
         knowledgeBaseService,
         userApi,
         buddyPlanTools,
-        artifactIngestionApi,
+        // The real reader, not a mock: which pull requests count as open and which one leads are
+        // its judgements now, and these tests are about the buddy still reporting them.
+        OpenPullRequestReader(artifactIngestionApi),
         trackService,
         projectMembershipApi,
     )
