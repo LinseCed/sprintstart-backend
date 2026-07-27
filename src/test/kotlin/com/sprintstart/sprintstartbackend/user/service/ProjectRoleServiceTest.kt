@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingTrackApi
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.entity.Skill
 import com.sprintstart.sprintstartbackend.user.model.entity.User
@@ -26,7 +27,59 @@ class ProjectRoleServiceTest {
     private val projectRoleRepository: ProjectRoleRepository = mockk()
     private val userRepository: UserRepository = mockk()
     private val skillRepository: SkillRepository = mockk()
-    private val service = ProjectRoleService(projectRoleRepository, userRepository, skillRepository)
+    private val onboardingTrackApi: OnboardingTrackApi = mockk {
+        every { trackKeys() } returns setOf("engineering", "delivery")
+    }
+    private val service = ProjectRoleService(
+        projectRoleRepository,
+        userRepository,
+        skillRepository,
+        onboardingTrackApi,
+    )
+
+    @Test
+    fun `setOnboardingTrack points a role at a known track`() {
+        val role = ProjectRole(id = UUID.randomUUID(), name = "Scrum Master", description = "Runs delivery")
+        every { projectRoleRepository.findById(role.id) } returns Optional.of(role)
+        every { projectRoleRepository.save(any()) } answers { firstArg() }
+
+        val result = service.setOnboardingTrack(role.id, "delivery")
+
+        assertEquals("delivery", result.onboardingTrackKey)
+    }
+
+    @Test
+    fun `setOnboardingTrack rejects a key that is not a live track`() {
+        val role = ProjectRole(id = UUID.randomUUID(), name = "Dev", description = "Builds")
+        every { projectRoleRepository.findById(role.id) } returns Optional.of(role)
+
+        // An unknown key silently resolves to the default wherever it is read, so a typo would
+        // look exactly like a working configuration until a hire read the wrong words.
+        val error = assertThrows<ResponseStatusException> {
+            service.setOnboardingTrack(role.id, "delivry")
+        }
+
+        assertEquals(400, error.statusCode.value())
+        assertEquals(null, role.onboardingTrackKey)
+    }
+
+    @Test
+    fun `setOnboardingTrack clears the track when given blank`() {
+        val role = ProjectRole(
+            id = UUID.randomUUID(),
+            name = "Dev",
+            description = "Builds",
+            onboardingTrackKey = "delivery",
+        )
+        every { projectRoleRepository.findById(role.id) } returns Optional.of(role)
+        every { projectRoleRepository.save(any()) } answers { firstArg() }
+
+        // "Not decided" is a real answer: it resolves to the default track, which is what every
+        // role did before tracks existed.
+        val result = service.setOnboardingTrack(role.id, "   ")
+
+        assertEquals(null, result.onboardingTrackKey)
+    }
 
     @Test
     fun `getAllRoles returns list of roles`() {

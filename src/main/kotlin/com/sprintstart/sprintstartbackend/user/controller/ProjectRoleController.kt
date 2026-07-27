@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.user.controller
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.request.AssignProjectRoleRequest
 import com.sprintstart.sprintstartbackend.user.model.request.CreateProjectRoleRequest
+import com.sprintstart.sprintstartbackend.user.model.request.SetProjectRoleTrackRequest
 import com.sprintstart.sprintstartbackend.user.model.request.UpdateRoleSkillsRequest
 import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillResponse
 import com.sprintstart.sprintstartbackend.user.model.response.skill.UpdateRoleSkillsResponse
@@ -75,6 +76,39 @@ class ProjectRoleController(
         @RequestBody request: CreateProjectRoleRequest,
     ): ProjectRole {
         return projectRoleService.createRole(request)
+    }
+
+    /**
+     * Points a project role at an onboarding track, deciding what onboarding means for its people.
+     *
+     * @param roleId The role to configure.
+     * @param request The track key, or null/blank to clear it.
+     * @return The updated project role.
+     */
+    @Operation(
+        summary = "Set a project role's onboarding track",
+        description =
+            "Decides what onboarding means for people in this role: what counts as their work " +
+                "and what it is called. A null or blank key clears it, resolving to the default " +
+                "track. Track keys come from GET /api/v1/onboarding/tracks.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Onboarding track updated"),
+            ApiResponse(responseCode = "400", description = "Unknown onboarding track"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "Project role not found"),
+        ],
+    )
+    @PutMapping("/projectRoles/{roleId}/onboarding-track")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun setOnboardingTrack(
+        @PathVariable roleId: UUID,
+        @RequestBody request: SetProjectRoleTrackRequest,
+    ): ProjectRole {
+        return projectRoleService.setOnboardingTrack(roleId, request.onboardingTrackKey)
     }
 
     /**

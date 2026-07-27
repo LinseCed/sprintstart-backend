@@ -99,6 +99,19 @@ class TrackService(
     }
 
     /**
+     * Every track a PM may point a role at, stable order.
+     *
+     * Falls back to the single in-memory default when nothing is seeded, so the chooser is never
+     * an empty list -- an empty list would read as "tracks are broken" when it means "nobody has
+     * added any beyond the default yet".
+     */
+    @Transactional(readOnly = true)
+    fun listTracks(): List<OnboardingTrack> {
+        val tracks = onboardingTrackRepository.findAll().sortedBy { it.label }
+        return tracks.ifEmpty { listOf(default()) }
+    }
+
+    /**
      * The fallback track.
      *
      * Falls back again to an in-memory engineering track when the seeded row is absent. That is not
