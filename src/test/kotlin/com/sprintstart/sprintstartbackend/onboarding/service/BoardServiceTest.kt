@@ -26,6 +26,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathTo
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.SuggestedTasksContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireVocabularyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
@@ -170,6 +171,12 @@ class BoardServiceTest {
         stalled = stalledReason != null,
         stalledReason = stalledReason,
         autonomyReachedAt = autonomyReachedAt,
+        vocabulary = HireVocabularyResponse(
+            trackLabel = "Engineering",
+            contributionNoun = "change",
+            contributionNounPlural = "changes",
+            contributionVerbPast = "merged",
+        ),
         reworkedPullRequestCount = 0,
     )
 

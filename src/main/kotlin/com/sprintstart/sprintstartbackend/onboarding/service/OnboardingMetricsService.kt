@@ -1,6 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTrack
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireVocabularyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectOnboardingMetricsResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalRepository
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
@@ -42,6 +45,7 @@ class OnboardingMetricsService(
     private val userGoalRepository: UserGoalRepository,
     private val taskZeroService: TaskZeroService,
     private val rampService: RampService,
+    private val trackService: TrackService,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     /**
@@ -108,7 +112,8 @@ class OnboardingMetricsService(
             .minOrNull()
             ?.let { hoursBetween(it, now) }
 
-        val stalledReason = stalledReason(member, contributions, goalClaimedAt, accepted, now)
+        val track = trackService.forMember(member)
+        val stalledReason = stalledReason(member, track, contributions, goalClaimedAt, accepted, now)
 
         return HireTimelineResponse(
             userId = member.userId,
@@ -134,6 +139,12 @@ class OnboardingMetricsService(
             autonomyReachedAt = rampService.autonomyReachedAtFor(member.userId, projectId),
             // R7's own measure, on our data: whether a suggested task was claimed, and whether it
             // came back sent-for-rework. Both derived, so history is covered without a backfill.
+            vocabulary = HireVocabularyResponse(
+                trackLabel = track.label,
+                contributionNoun = track.contributionNoun,
+                contributionNounPlural = track.contributionNounPlural,
+                contributionVerbPast = track.contributionVerbPast,
+            ),
             reworkedPullRequestCount = contributions.count { it.returnedCount > 0 },
         )
     }
@@ -147,20 +158,24 @@ class OnboardingMetricsService(
      */
     private fun stalledReason(
         member: ProjectMember,
+        track: OnboardingTrack,
         contributions: List<Contribution>,
         goalClaimedAt: Instant?,
         firstAcceptedAt: Instant?,
         now: Instant,
     ): String? {
-        // A missing GitHub username is an optional setup item, not a stall: onboarding must not be
-        // blocked on it. It also means we cannot attribute this hire's work at all, so we have no
-        // basis to judge progress — the "nothing opened" check below would fire falsely on work we
-        // simply cannot see. Treat it as "unknown, not stalled".
+        // Can this hire's work be seen at all? A missing GitHub username used to end the question
+        // here, which is how a non-engineering hire became *invisible*: nothing could be attributed
+        // to them, so they were never stalled, so nobody was ever told. They were not calm, they
+        // were unobserved, and those read identically to a PM.
         //
-        // This is also where a role with no observable evidence source currently lands, which is
-        // why they read as calm rather than stalled. Naming that honestly needs per-track
-        // evidence, not a change here.
-        if (member.githubLogin.isNullOrBlank()) {
+        // Attested evidence is attributed by identity rather than by a git handle, so a track that
+        // admits it can be judged with no GitHub login at all — and for that hire an empty
+        // contribution list is a real answer rather than a blind spot. The gate is now what it
+        // always meant: skip only when there is genuinely no way to see.
+        if (member.githubLogin.isNullOrBlank() &&
+            !track.admits(ContributionEvidenceKind.ATTESTATION)
+        ) {
             return null
         }
 
@@ -171,7 +186,7 @@ class OnboardingMetricsService(
             .minOrNull()
         if (waitingSince != null && hoursBetween(waitingSince, now)!! >= RESPONSE_SLA_HOURS) {
             val days = hoursBetween(waitingSince, now)!! / HOURS_PER_DAY
-            return "A pull request has been waiting $days days for a first response"
+            return "A ${track.contributionNoun} has been waiting $days days for a first response"
         }
 
         // Something accepted already: onboarding is moving, whatever else is open.
@@ -183,7 +198,7 @@ class OnboardingMetricsService(
         val quietHours = hoursBetween(since, now) ?: return null
         if (contributions.isEmpty() && quietHours >= NO_ACTIVITY_STALL_HOURS) {
             val days = quietHours / HOURS_PER_DAY
-            return "No pull request opened in $days days since joining"
+            return "No ${track.contributionNoun} started in $days days since joining"
         }
 
         return null
@@ -212,7 +227,7 @@ class OnboardingMetricsService(
         const val P90 = 0.9
         const val HOURS_PER_DAY = 24
 
-        /** How long a pull request may wait for any response before it is somebody's problem. */
+        /** How long a contribution may wait for any response before it is somebody's problem. */
         const val RESPONSE_SLA_HOURS = 48
 
         /** How long a hire may be quiet after joining or claiming a task before it is flagged. */
