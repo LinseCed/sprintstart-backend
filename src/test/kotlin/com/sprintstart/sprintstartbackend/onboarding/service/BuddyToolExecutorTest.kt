@@ -14,6 +14,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.M
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
+import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
@@ -34,6 +35,7 @@ class BuddyToolExecutorTest {
     private val userApi: UserApi = mockk()
     private val buddyPlanTools: BuddyPlanTools = mockk(relaxed = true)
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
+    private val projectMembershipApi: ProjectMembershipApi = mockk()
 
     // Defaults to the engineering track, so these tests describe the behaviour every existing hire
     // gets; the track-specific mounting is exercised in TrackServiceTest and its own cases below.
@@ -50,6 +52,7 @@ class BuddyToolExecutorTest {
         buddyPlanTools,
         artifactIngestionApi,
         trackService,
+        projectMembershipApi,
     )
 
     private val userId = UUID.randomUUID()
@@ -166,6 +169,7 @@ class BuddyToolExecutorTest {
             "get_my_open_pull_requests",
             "get_suggested_tasks",
             "search_canonical_answers",
+            "get_teammates",
         )
     }
 
@@ -181,7 +185,17 @@ class BuddyToolExecutorTest {
             "get_my_competencies",
             "get_suggested_tasks",
             "search_canonical_answers",
+            "get_teammates",
         )
+    }
+
+    @Test
+    fun `a hire whose track cannot have attested work is not offered the teammates tool`() {
+        every { buddyPlanTools.toolSpecs() } returns emptyList()
+        every { trackService.admitsAnywhere(userId, ContributionEvidenceKind.ATTESTATION) } returns false
+
+        // Naming teammates is only useful to a hire who can ask one of them to confirm something.
+        assertThat(executor.toolSpecs(userId).map { it.name }).doesNotContain("get_teammates")
     }
 
     @Test

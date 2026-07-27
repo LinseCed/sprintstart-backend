@@ -36,4 +36,7 @@ data class BuddyStreamEvent(
     @SerialName("task_id") val taskId: String? = null,
     @SerialName("module_id") val moduleId: String? = null,
     val answer: String? = null,
+    /** Attestation confirm payload: what work, and who the hire is asking to confirm it. */
+    val title: String? = null,
+    @SerialName("attester_id") val attesterId: String? = null,
 )

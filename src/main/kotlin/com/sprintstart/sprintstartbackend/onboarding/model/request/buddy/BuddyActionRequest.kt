@@ -19,4 +19,6 @@ data class BuddyActionRequest(
     val taskId: UUID? = null,
     val moduleId: UUID? = null,
     val answer: String? = null,
+    val title: String? = null,
+    val attesterId: UUID? = null,
 )

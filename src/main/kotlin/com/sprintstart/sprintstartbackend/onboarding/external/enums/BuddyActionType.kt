@@ -17,6 +17,7 @@ enum class BuddyActionType(
     OPEN_ORIENTATION("open_orientation", "Open the task packet"),
     CLAIM_GOAL("claim_goal", "Work toward this task"),
     SUBMIT_VERIFICATION("submit_verification", "Submit this answer"),
+    REQUEST_ATTESTATION("request_attestation", "Ask them to confirm this"),
     ;
 
     companion object {
