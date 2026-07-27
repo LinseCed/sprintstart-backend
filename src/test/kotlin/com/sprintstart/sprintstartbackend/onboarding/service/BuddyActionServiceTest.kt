@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
@@ -36,6 +37,10 @@ class BuddyActionServiceTest {
     private val verificationService: VerificationService = mockk()
     private val userApi: UserApi = mockk()
     private val attestationService: AttestationService = mockk()
+
+    // Relaxed: claiming a goal also pins the task to the board, which is a side effect these tests
+    // are not about -- the case that asserts it says so explicitly.
+    private val boardService: BoardService = mockk(relaxed = true)
     private val service = BuddyActionService(
         taskZeroService,
         taskOrientationService,
@@ -44,6 +49,7 @@ class BuddyActionServiceTest {
         verificationService,
         userApi,
         attestationService,
+        boardService,
     )
 
     private val userId = UUID.randomUUID()
@@ -354,6 +360,24 @@ class BuddyActionServiceTest {
 
         assertThat(result.ok).isTrue()
         assertThat(result.message).contains("Fix the login redirect")
+    }
+
+    @Test
+    fun `claiming a goal pins it to the board, so the next visit still knows about it`() = runTest {
+        asHire()
+        onOneProject()
+        val taskId = UUID.randomUUID()
+        every { userGoalService.claimForMe(authId, projectId, taskId) } returns GoalView(
+            competencyKey = "contrib-fix-login",
+            label = "Fix the login redirect",
+        )
+
+        val result = service.perform(BuddyActionRequest(action = "claim_goal", taskId = taskId), jwt)
+
+        // This conversation is gone by the next visit; the one instant we know for certain the
+        // task is theirs is now, so the card is placed then rather than when the mentor thinks of it.
+        verify { boardService.place(userId, projectId, BoardCardKind.CURRENT_TASK) }
+        assertThat(result.message).contains("board")
     }
 
     @Test

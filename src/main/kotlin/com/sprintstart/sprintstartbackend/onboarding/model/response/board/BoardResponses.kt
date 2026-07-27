@@ -52,6 +52,14 @@ data class BoardCardResponse(
     val kind: BoardCardKind,
     val owner: BoardCardOwner,
     val position: Int,
+    /**
+     * When the mentor put this card here; null when the board keeps it as part of the baseline.
+     *
+     * The client says "your buddy added this" only for a card that has one. Attribution the hire
+     * cannot check is attribution they cannot trust, so the board never claims a placement it did
+     * not make.
+     */
+    val placedAt: Instant?,
     val content: BoardCardContent,
 )
 
@@ -74,6 +82,8 @@ data class BoardCardResponse(
         name = "PATH_TO_FIRST_CONTRIBUTION",
     ),
     JsonSubTypes.Type(value = OpenPullRequestsContent::class, name = "OPEN_PULL_REQUESTS"),
+    JsonSubTypes.Type(value = CurrentTaskContent::class, name = "CURRENT_TASK"),
+    JsonSubTypes.Type(value = SuggestedTasksContent::class, name = "SUGGESTED_TASKS"),
 )
 sealed interface BoardCardContent {
     val kind: BoardCardKind
@@ -152,4 +162,44 @@ data class BoardPullRequestResponse(
     val title: String?,
     val url: String?,
     val waitingHours: Long?,
+)
+
+/**
+ * The task the hire is on, or the fact that they are on none.
+ *
+ * Present-but-empty rather than absent when there is no task: a card that vanishes when a goal is
+ * cleared reads as the board losing something, and "you have no task right now" is a state worth
+ * being told about — it is usually the thing to fix.
+ */
+data class CurrentTaskContent(
+    override val kind: BoardCardKind = BoardCardKind.CURRENT_TASK,
+    val taskId: UUID?,
+    val title: String?,
+    val summary: String?,
+    val url: String?,
+    /**
+     * True when the hire claimed this as their goal, false when it is the Task 0 they were handed.
+     *
+     * Worth distinguishing because only one of the two is theirs to change their mind about.
+     */
+    val chosen: Boolean,
+) : BoardCardContent
+
+/**
+ * Good next tasks, ranked by fit.
+ *
+ * Carries [BoardSuggestedTaskResponse.reasons] and deliberately no score. The ranker was built to
+ * explain itself in one line per signal, and a number is not a reason anybody can act on.
+ */
+data class SuggestedTasksContent(
+    override val kind: BoardCardKind = BoardCardKind.SUGGESTED_TASKS,
+    val tasks: List<BoardSuggestedTaskResponse>,
+) : BoardCardContent
+
+/** One suggested task, with the plain reasons it was suggested and the id to claim it by. */
+data class BoardSuggestedTaskResponse(
+    val taskId: UUID,
+    val title: String,
+    val url: String?,
+    val reasons: List<String>,
 )

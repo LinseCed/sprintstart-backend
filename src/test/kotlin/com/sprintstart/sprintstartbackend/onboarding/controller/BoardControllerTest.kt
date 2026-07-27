@@ -23,6 +23,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.JwtRequestPostProcessor
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -72,6 +73,7 @@ class BoardControllerTest(
                 kind = BoardCardKind.PATH_TO_FIRST_CONTRIBUTION,
                 owner = BoardCardOwner.AI,
                 position = 0,
+                placedAt = null,
                 content = PathToFirstContributionContent(
                     moments = listOf(BoardMomentResponse(BoardMomentKey.JOINED, null)),
                     acceptedCount = 0,
@@ -106,6 +108,36 @@ class BoardControllerTest(
         mockMvc
             .perform(get("/api/v1/onboarding/me/board").param("projectId", projectId.toString()).with(userJwt))
             .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `dismissCard removes a card from the caller's own board`() {
+        val cardId = UUID.randomUUID()
+        every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+        every { boardService.dismiss(userId, cardId) } returns true
+
+        mockMvc
+            .perform(delete("/api/v1/onboarding/me/board/cards/$cardId").with(userJwt))
+            .andExpect(status().isNoContent)
+    }
+
+    @Test
+    fun `dismissCard is 404 for a card that is not on a board of theirs`() {
+        val cardId = UUID.randomUUID()
+        every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+        every { boardService.dismiss(userId, cardId) } returns false
+
+        // Same answer as a card that does not exist: a 403 would confirm the id is somebody's card.
+        mockMvc
+            .perform(delete("/api/v1/onboarding/me/board/cards/$cardId").with(userJwt))
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `dismissCard requires authentication`() {
+        mockMvc
+            .perform(delete("/api/v1/onboarding/me/board/cards/${UUID.randomUUID()}"))
+            .andExpect(status().isUnauthorized)
     }
 
     @Test

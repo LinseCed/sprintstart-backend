@@ -38,6 +38,7 @@ class BuddyToolExecutor(
     private val knowledgeBaseService: KnowledgeBaseService,
     private val userApi: UserApi,
     private val buddyPlanTools: BuddyPlanTools,
+    private val buddyBoardTools: BuddyBoardTools,
     private val openPullRequestReader: OpenPullRequestReader,
     private val trackService: TrackService,
     private val projectMembershipApi: ProjectMembershipApi,
@@ -70,6 +71,7 @@ class BuddyToolExecutor(
             add(GET_TEAMMATES_SPEC)
         }
         addAll(buddyPlanTools.toolSpecs())
+        addAll(buddyBoardTools.toolSpecs())
     }
 
     private fun admitsPullRequests(userId: UUID): Boolean =
@@ -95,6 +97,7 @@ class BuddyToolExecutor(
     fun execute(call: BuddyToolCallDto, userId: UUID): String =
         when {
             buddyPlanTools.handles(call.name) -> buddyPlanTools.execute(call, userId)
+            buddyBoardTools.handles(call.name) -> buddyBoardTools.execute(call, userId)
             else -> when (call.name) {
                 GET_MY_METRICS -> getMyMetrics(userId)
                 GET_MY_COMPETENCIES -> getMyCompetencies(userId)

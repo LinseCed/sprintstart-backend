@@ -61,6 +61,9 @@ class RampService(
     private val projectMembershipApi: ProjectMembershipApi,
     private val contributionService: ContributionService,
     private val trackService: TrackService,
+    // The board shows the same task on a card; which task somebody is on is not a question two
+    // readers should be able to answer differently.
+    private val currentTaskReader: CurrentTaskReader,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     /**
@@ -80,7 +83,7 @@ class RampService(
 
         val credited = creditAcceptedWork(hireId, projectId, accepted)
         val autonomy = evaluateAutonomy(hireId, projectId, accepted, track)
-        val currentTask = currentTask(hireId, projectId)
+        val currentTask = currentTaskReader.currentTaskFor(hireId, projectId)
 
         return MyRampResponse(
             stage = stageOf(accepted.size, autonomy.reached),
@@ -267,21 +270,6 @@ class RampService(
             .findAllByHireIdAndProjectId(hireId, projectId)
             .any { !it.createdAt.isBefore(opened) && !it.createdAt.isAfter(accepted) }
     }
-
-    /**
-     * The task a hire is on: their claimed goal, or their assigned Task 0 before they have one.
-     *
-     * Read-only — unlike `TaskZeroService.getForHire`, this never assigns. Seeing where you are on
-     * the ramp must not be what hands you your first task.
-     */
-    private fun currentTask(hireId: UUID, projectId: UUID) =
-        userGoalRepository
-            .findByUserIdAndProjectId(hireId, projectId)
-            ?.sourceProposalId
-            ?.let { starterWorkTaskProposalRepository.findById(it).orElse(null) }
-            ?: taskZeroAssignmentRepository
-                .findByHireIdAndProjectId(hireId, projectId)
-                ?.let { starterWorkTaskProposalRepository.findById(it.proposalId).orElse(null) }
 
     private fun requireMember(hireId: UUID, projectId: UUID): ProjectMember =
         projectMembershipApi.getProjectMembers(projectId).firstOrNull { it.userId == hireId }

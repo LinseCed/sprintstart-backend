@@ -12,7 +12,9 @@ import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.jwt.Jwt
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
@@ -65,6 +67,34 @@ class BoardController(
                 HttpStatus.NOT_FOUND,
                 "You are not a member of that project",
             )
+
+    @Operation(
+        summary = "Take a card off my board",
+        description = "Removes a card from your board for good. The buddy will not put it back — " +
+            "a dismissal is a decision, not a gesture the next page load undoes. Dismissing a " +
+            "card that is already gone is not an error.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "Card dismissed"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "404", description = "No such card on a board of yours"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @DeleteMapping("/me/board/cards/{cardId}")
+    @PreAuthorize("hasAnyRole('USER', 'PM', 'HR', 'ADMIN')")
+    fun dismissCard(
+        @Parameter(hidden = true)
+        @AuthenticationPrincipal jwt: Jwt,
+        @PathVariable cardId: UUID,
+    ) {
+        // A card on somebody else's board and a card that does not exist answer the same, on
+        // purpose: a 403 here would confirm that a given id is a real card of somebody's.
+        if (!boardService.dismiss(resolveUserId(jwt), cardId)) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "No such card on your board")
+        }
+    }
 
     private fun resolveUserId(jwt: Jwt): UUID =
         userApi.getUserIdByAuthId(jwt.subject).orElseThrow {
