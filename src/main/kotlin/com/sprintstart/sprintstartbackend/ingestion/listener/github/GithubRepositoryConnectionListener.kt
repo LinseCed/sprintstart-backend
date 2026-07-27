@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.ingestion.listener.github
 
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.initial.GithubRepositoryConnectionInitiatedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.initial.GithubRepositoryConnectionInitiationFailedEvent
-import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
 import com.sprintstart.sprintstartbackend.ingestion.service.IngestionRunLifeCycleService
@@ -13,7 +13,7 @@ import java.util.UUID
 @Component
 internal class GithubRepositoryConnectionListener(
     private val ingestionRunLifeCycleService: IngestionRunLifeCycleService,
-    private val githubRepositoryConnectionRepository: GithubRepositoryConnectionRepository,
+    private val githubRepositoryApi: GithubRepositoryApi,
 ) {
     @EventListener
     fun on(
@@ -49,5 +49,5 @@ internal class GithubRepositoryConnectionListener(
     private fun resolveRepositoryId(
         owner: String,
         name: String,
-    ): UUID? = githubRepositoryConnectionRepository.findByOwnerAndName(owner, name)?.id
+    ): UUID? = githubRepositoryApi.getRepositoryIdByOwnerAndName(owner, name)
 }

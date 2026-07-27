@@ -1,9 +1,8 @@
 package com.sprintstart.sprintstartbackend.ingestion.listener
 
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateStartedEvent
-import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
-import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.listener.github.GithubRepositoryUpdateListener
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
@@ -18,17 +17,16 @@ import java.util.UUID
 
 class GithubRepositoryUpdateListenerTest {
     private val ingestionRunLifeCycleService = mockk<IngestionRunLifeCycleService>()
-    private val githubRepositoryConnectionRepository = mockk<GithubRepositoryConnectionRepository>()
+    private val githubRepositoryApi = mockk<GithubRepositoryApi>()
     private val listener =
-        GithubRepositoryUpdateListener(ingestionRunLifeCycleService, githubRepositoryConnectionRepository)
+        GithubRepositoryUpdateListener(ingestionRunLifeCycleService, githubRepositoryApi)
 
     @Test
     fun `update started event starts connected github run with resolved repository metadata`() {
         val runId = UUID.randomUUID()
         val repositoryId = UUID.randomUUID()
         every { ingestionRunLifeCycleService.startRun(any(), any(), any(), any(), any(), any(), any()) } just runs
-        every { githubRepositoryConnectionRepository.findByOwnerAndName("owner", "repo") } returns
-            mockk<GithubRepositoryConnection> { every { id } returns repositoryId }
+        every { githubRepositoryApi.getRepositoryIdByOwnerAndName("owner", "repo") } returns repositoryId
 
         listener.on(
             GithubRepositoryUpdateStartedEvent(
@@ -55,8 +53,7 @@ class GithubRepositoryUpdateListenerTest {
         val runId = UUID.randomUUID()
         val repositoryId = UUID.randomUUID()
         every { ingestionRunLifeCycleService.startRun(any(), any(), any(), any(), any(), any(), any()) } just runs
-        every { githubRepositoryConnectionRepository.findByOwnerAndName("owner", "repo") } returns
-            mockk<GithubRepositoryConnection> { every { id } returns repositoryId }
+        every { githubRepositoryApi.getRepositoryIdByOwnerAndName("owner", "repo") } returns repositoryId
 
         listener.on(
             GithubRepositoryUpdateFailedEvent(

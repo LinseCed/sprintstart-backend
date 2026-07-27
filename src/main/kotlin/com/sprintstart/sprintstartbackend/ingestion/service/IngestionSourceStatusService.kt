@@ -1,8 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
-import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
-import com.sprintstart.sprintstartbackend.connectors.github.service.toSourceStatus
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubSourceInstanceDto
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.SourceInstanceIngestionStatusResponse
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
@@ -17,12 +16,12 @@ import java.util.UUID
  *
  * Where [IngestionStatusService] collapses everything into one aggregate row per source system,
  * this service returns one row per connected GitHub repository: it takes the repository's current
- * connection status and snapshot timestamps and attaches the counters of that repository's latest
- * ingestion run.
+ * connection status and snapshot timestamps (via the GitHub module API) and attaches the counters
+ * of that repository's latest ingestion run.
  */
 @Service
 class IngestionSourceStatusService(
-    private val githubRepositoryConnectionRepository: GithubRepositoryConnectionRepository,
+    private val githubRepositoryApi: GithubRepositoryApi,
     private val ingestionRunRepository: IngestionRunRepository,
     private val artifactRepository: ArtifactRepository,
 ) {
@@ -35,32 +34,21 @@ class IngestionSourceStatusService(
      */
     @Transactional(readOnly = true)
     @Tracked("Retrieving ingestion status per source instance")
-    fun getStatusPerSourceInstance(projectId: UUID? = null): List<SourceInstanceIngestionStatusResponse> {
-        val connections =
-            if (projectId != null) {
-                githubRepositoryConnectionRepository.findAllByProjectId(projectId)
-            } else {
-                githubRepositoryConnectionRepository.findAll()
-            }
+    fun getStatusPerSourceInstance(projectId: UUID? = null): List<SourceInstanceIngestionStatusResponse> =
+        githubRepositoryApi.getSourceInstances(projectId).map { it.toStatusResponse() }
 
-        return connections
-            .sortedWith(compareBy({ it.owner }, { it.name }))
-            .map { it.toStatusResponse() }
-    }
-
-    private fun GithubRepositoryConnection.toStatusResponse(): SourceInstanceIngestionStatusResponse {
+    private fun GithubSourceInstanceDto.toStatusResponse(): SourceInstanceIngestionStatusResponse {
         val component = "$owner/$name"
-        val lastRun = ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(id)
-        val snapshot = snapshot
+        val lastRun = ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(repositoryId)
         return SourceInstanceIngestionStatusResponse(
             sourceSystem = SourceSystem.GITHUB,
             sourceId = component,
-            repositoryId = id,
+            repositoryId = repositoryId,
             owner = owner,
             name = name,
             sourceUrl = "https://github.com/$component",
-            connectionStatus = toSourceStatus(),
-            enabled = sourceEnabled,
+            connectionStatus = status,
+            enabled = enabled,
             lastRunTime = lastRun?.startedAt,
             ingestedCount = lastRun?.ingestedCount ?: 0,
             updatedCount = lastRun?.updatedCount ?: 0,
@@ -68,9 +56,9 @@ class IngestionSourceStatusService(
             failedCount = lastRun?.failedCount ?: 0,
             failedItems = lastRun?.failedItems ?: emptyList(),
             artifactCount = artifactRepository.countByComponent(component),
-            lastCommitsSyncAt = snapshot?.lastCommitsSyncAt,
-            lastIssuesSyncAt = snapshot?.lastIssuesSyncAt,
-            lastPullRequestsSyncAt = snapshot?.lastPullRequestsSyncAt,
+            lastCommitsSyncAt = lastCommitsSyncAt,
+            lastIssuesSyncAt = lastIssuesSyncAt,
+            lastPullRequestsSyncAt = lastPullRequestsSyncAt,
         )
     }
 }

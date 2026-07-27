@@ -1,9 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.connectors.github.models.ConnectionState
-import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
-import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositorySnapshot
-import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubSourceInstanceDto
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.AiSyncStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
@@ -18,11 +16,11 @@ import java.time.Instant
 import java.util.UUID
 
 class IngestionSourceStatusServiceTest {
-    private val githubRepositoryConnectionRepository = mockk<GithubRepositoryConnectionRepository>()
+    private val githubRepositoryApi = mockk<GithubRepositoryApi>()
     private val ingestionRunRepository = mockk<IngestionRunRepository>()
     private val artifactRepository = mockk<ArtifactRepository>()
     private val service =
-        IngestionSourceStatusService(githubRepositoryConnectionRepository, ingestionRunRepository, artifactRepository)
+        IngestionSourceStatusService(githubRepositoryApi, ingestionRunRepository, artifactRepository)
 
     @Test
     fun `maps connected repository with its latest run counters and snapshot timestamps`() {
@@ -30,17 +28,15 @@ class IngestionSourceStatusServiceTest {
         val commitsAt = Instant.parse("2026-07-06T10:00:00Z")
         val issuesAt = Instant.parse("2026-07-06T11:00:00Z")
         val prAt = Instant.parse("2026-07-06T12:00:00Z")
-        val connection = connection(
-            id = repositoryId,
+        val instance = GithubSourceInstanceDto(
+            repositoryId = repositoryId,
             owner = "SprintStartProject",
             name = "sprintstart-frontend",
-            sourceEnabled = true,
-            connectionState = ConnectionState.UP_TO_DATE,
-            snapshot = mockk<GithubRepositorySnapshot> {
-                every { lastCommitsSyncAt } returns commitsAt
-                every { lastIssuesSyncAt } returns issuesAt
-                every { lastPullRequestsSyncAt } returns prAt
-            },
+            status = "CONNECTED",
+            enabled = true,
+            lastCommitsSyncAt = commitsAt,
+            lastIssuesSyncAt = issuesAt,
+            lastPullRequestsSyncAt = prAt,
         )
         val run = IngestionRun(
             id = UUID.randomUUID(),
@@ -56,7 +52,7 @@ class IngestionSourceStatusServiceTest {
             status = IngestionRunStatus.COMPLETED,
             aiSyncStatus = AiSyncStatus.SUCCEEDED,
         )
-        every { githubRepositoryConnectionRepository.findAll() } returns listOf(connection)
+        every { githubRepositoryApi.getSourceInstances(null) } returns listOf(instance)
         every { ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(repositoryId) } returns run
         every { artifactRepository.countByComponent("SprintStartProject/sprintstart-frontend") } returns 128
 
@@ -84,15 +80,17 @@ class IngestionSourceStatusServiceTest {
     @Test
     fun `reports disabled status and empty counters when repository has no run or snapshot`() {
         val repositoryId = UUID.randomUUID()
-        val connection = connection(
-            id = repositoryId,
+        val instance = GithubSourceInstanceDto(
+            repositoryId = repositoryId,
             owner = "owner",
             name = "repo",
-            sourceEnabled = false,
-            connectionState = ConnectionState.UP_TO_DATE,
-            snapshot = null,
+            status = "DISABLED",
+            enabled = false,
+            lastCommitsSyncAt = null,
+            lastIssuesSyncAt = null,
+            lastPullRequestsSyncAt = null,
         )
-        every { githubRepositoryConnectionRepository.findAll() } returns listOf(connection)
+        every { githubRepositoryApi.getSourceInstances(null) } returns listOf(instance)
         every { ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(repositoryId) } returns null
         every { artifactRepository.countByComponent("owner/repo") } returns 0
 
@@ -113,15 +111,17 @@ class IngestionSourceStatusServiceTest {
     fun `filters by project id when provided`() {
         val projectId = UUID.randomUUID()
         val repositoryId = UUID.randomUUID()
-        val connection = connection(
-            id = repositoryId,
+        val instance = GithubSourceInstanceDto(
+            repositoryId = repositoryId,
             owner = "owner",
             name = "repo",
-            sourceEnabled = true,
-            connectionState = ConnectionState.OUT_OF_DATE,
-            snapshot = null,
+            status = "OUT_OF_DATE",
+            enabled = true,
+            lastCommitsSyncAt = null,
+            lastIssuesSyncAt = null,
+            lastPullRequestsSyncAt = null,
         )
-        every { githubRepositoryConnectionRepository.findAllByProjectId(projectId) } returns listOf(connection)
+        every { githubRepositoryApi.getSourceInstances(projectId) } returns listOf(instance)
         every { ingestionRunRepository.findFirstByRepositoryIdOrderByStartedAtDesc(repositoryId) } returns null
         every { artifactRepository.countByComponent("owner/repo") } returns 5
 
@@ -131,21 +131,4 @@ class IngestionSourceStatusServiceTest {
         assertThat(response.connectionStatus).isEqualTo("OUT_OF_DATE")
         assertThat(response.artifactCount).isEqualTo(5)
     }
-
-    private fun connection(
-        id: UUID,
-        owner: String,
-        name: String,
-        sourceEnabled: Boolean,
-        connectionState: ConnectionState,
-        snapshot: GithubRepositorySnapshot?,
-    ): GithubRepositoryConnection =
-        mockk {
-            every { this@mockk.id } returns id
-            every { this@mockk.owner } returns owner
-            every { this@mockk.name } returns name
-            every { this@mockk.sourceEnabled } returns sourceEnabled
-            every { this@mockk.connectionState } returns connectionState
-            every { this@mockk.snapshot } returns snapshot
-        }
 }

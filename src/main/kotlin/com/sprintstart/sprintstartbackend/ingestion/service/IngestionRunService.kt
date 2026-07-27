@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.IngestionRunPageResponse
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.IngestionRunResponse
@@ -31,7 +31,7 @@ import java.util.UUID
 @Service
 class IngestionRunService(
     private val ingestionRunRepository: IngestionRunRepository,
-    private val githubRepositoryConnectionRepository: GithubRepositoryConnectionRepository,
+    private val githubRepositoryApi: GithubRepositoryApi,
 ) {
     /**
      * Returns the newest ingestion runs first.
@@ -125,7 +125,7 @@ class IngestionRunService(
     }
 
     private fun resolveProjectRepositoryIds(projectId: UUID): List<UUID> =
-        githubRepositoryConnectionRepository.findAllByProjectId(projectId).map { it.id }
+        githubRepositoryApi.getRepositoryIdsByProject(projectId)
 }
 
 /**

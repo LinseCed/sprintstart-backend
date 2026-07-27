@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
-import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.AiSyncStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
@@ -29,8 +28,8 @@ import java.util.UUID
 
 class IngestionRunServiceTest {
     private val ingestionRunRepository = mockk<IngestionRunRepository>()
-    private val githubRepositoryConnectionRepository = mockk<GithubRepositoryConnectionRepository>()
-    private val service = IngestionRunService(ingestionRunRepository, githubRepositoryConnectionRepository)
+    private val githubRepositoryApi = mockk<GithubRepositoryApi>()
+    private val service = IngestionRunService(ingestionRunRepository, githubRepositoryApi)
 
     @Test
     fun `getRecentRuns returns empty list when repository has no runs`() {
@@ -174,14 +173,13 @@ class IngestionRunServiceTest {
     fun `getRuns resolves projectId to connected repository ids`() {
         val projectId = UUID.randomUUID()
         val repositoryId = UUID.randomUUID()
-        every { githubRepositoryConnectionRepository.findAllByProjectId(projectId) } returns
-            listOf(mockk<GithubRepositoryConnection> { every { id } returns repositoryId })
+        every { githubRepositoryApi.getRepositoryIdsByProject(projectId) } returns listOf(repositoryId)
         val emptyPage: Page<IngestionRun> = PageImpl(emptyList(), PageRequest.of(0, 20), 0)
         every { ingestionRunRepository.findAll(any<Specification<IngestionRun>>(), any<Pageable>()) } returns emptyPage
 
         val response = service.getRuns(page = 1, size = 20, projectId = projectId)
 
-        verify(exactly = 1) { githubRepositoryConnectionRepository.findAllByProjectId(projectId) }
+        verify(exactly = 1) { githubRepositoryApi.getRepositoryIdsByProject(projectId) }
         assertThat(response.items).isEmpty()
         assertThat(response.page.totalElements).isEqualTo(0)
     }

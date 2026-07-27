@@ -1,9 +1,8 @@
 package com.sprintstart.sprintstartbackend.ingestion.listener
 
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.initial.GithubRepositoryConnectionInitiatedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.initial.GithubRepositoryConnectionInitiationFailedEvent
-import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
-import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.listener.github.GithubRepositoryConnectionListener
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
@@ -18,17 +17,16 @@ import java.util.UUID
 
 class GithubRepositoryConnectionListenerTest {
     private val ingestionRunLifeCycleService = mockk<IngestionRunLifeCycleService>()
-    private val githubRepositoryConnectionRepository = mockk<GithubRepositoryConnectionRepository>()
+    private val githubRepositoryApi = mockk<GithubRepositoryApi>()
     private val listener =
-        GithubRepositoryConnectionListener(ingestionRunLifeCycleService, githubRepositoryConnectionRepository)
+        GithubRepositoryConnectionListener(ingestionRunLifeCycleService, githubRepositoryApi)
 
     @Test
     fun `initiated event starts connected github run with resolved repository metadata`() {
         val runId = UUID.randomUUID()
         val repositoryId = UUID.randomUUID()
         every { ingestionRunLifeCycleService.startRun(any(), any(), any(), any(), any(), any(), any()) } just runs
-        every { githubRepositoryConnectionRepository.findByOwnerAndName("owner", "repo") } returns
-            mockk<GithubRepositoryConnection> { every { id } returns repositoryId }
+        every { githubRepositoryApi.getRepositoryIdByOwnerAndName("owner", "repo") } returns repositoryId
 
         listener.on(
             GithubRepositoryConnectionInitiatedEvent(
@@ -54,7 +52,7 @@ class GithubRepositoryConnectionListenerTest {
     fun `failed initiation event starts failed github run and leaves repository id null when unknown`() {
         val runId = UUID.randomUUID()
         every { ingestionRunLifeCycleService.startRun(any(), any(), any(), any(), any(), any(), any()) } just runs
-        every { githubRepositoryConnectionRepository.findByOwnerAndName("owner", "repo") } returns null
+        every { githubRepositoryApi.getRepositoryIdByOwnerAndName("owner", "repo") } returns null
 
         listener.on(
             GithubRepositoryConnectionInitiationFailedEvent(
