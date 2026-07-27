@@ -84,6 +84,8 @@ data class BoardCardResponse(
     JsonSubTypes.Type(value = OpenPullRequestsContent::class, name = "OPEN_PULL_REQUESTS"),
     JsonSubTypes.Type(value = CurrentTaskContent::class, name = "CURRENT_TASK"),
     JsonSubTypes.Type(value = SuggestedTasksContent::class, name = "SUGGESTED_TASKS"),
+    JsonSubTypes.Type(value = CompetencyProgressContent::class, name = "COMPETENCY_PROGRESS"),
+    JsonSubTypes.Type(value = MemoryRecapContent::class, name = "MEMORY_RECAP"),
     JsonSubTypes.Type(value = NoteContent::class, name = "NOTE"),
     JsonSubTypes.Type(value = LinkContent::class, name = "LINK"),
     JsonSubTypes.Type(value = ChecklistContent::class, name = "CHECKLIST"),
@@ -238,3 +240,52 @@ data class ChecklistItemResponse(
     val text: String,
     val done: Boolean,
 )
+
+/**
+ * What the hire has shown they can do, and what they are short of.
+ *
+ * Split into held and in-progress rather than given a percentage, for the reason the ramp gives for
+ * having none: a percentage of somebody's competence is a number nobody can act on, and the two
+ * lists say the same thing in a form they can.
+ *
+ * Level-0 rows are excluded. They mean "asked, saw no evidence" — placed but unknown — and reading
+ * them as competencies would report a skill the hire has never shown.
+ */
+data class CompetencyProgressContent(
+    override val kind: BoardCardKind = BoardCardKind.COMPETENCY_PROGRESS,
+    /** Meets its target level: shown, not merely started. */
+    val held: List<BoardCompetencyResponse>,
+    /** Progress made, target not yet met. */
+    val inProgress: List<BoardCompetencyResponse>,
+) : BoardCardContent
+
+/** One competency, with the bar it is measured against — never a score out of a hundred. */
+data class BoardCompetencyResponse(
+    val competencyKey: String,
+    val label: String,
+    val level: Int,
+    val targetLevel: Int,
+)
+
+/**
+ * What the mentor remembers about this hire, in the mentor's own words.
+ *
+ * The one card whose content a model wrote, which is why it is labelled as such rather than
+ * presented as fact. It exists because the buddy's memory is what carries continuity across visits
+ * now that the transcript is not replayed, and until now a hire could not see what their mentor
+ * thinks it knows about them — let alone tell it that it is wrong.
+ *
+ * [memory] is null before the first visit has been folded, which is a real state and reads as "we
+ * have not talked yet" rather than as an empty card.
+ */
+data class MemoryRecapContent(
+    override val kind: BoardCardKind = BoardCardKind.MEMORY_RECAP,
+    val memory: String?,
+    /**
+     * How many messages the memory covers.
+     *
+     * Shown because it is the honest measure of how much the mentor is working from: a memory
+     * folded from two messages and one folded from two hundred read the same otherwise.
+     */
+    val messagesRemembered: Int,
+) : BoardCardContent

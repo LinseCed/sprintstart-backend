@@ -18,6 +18,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.board.LinkCar
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.NoteCardRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCardContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCardResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardMomentKey
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardMomentResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardPullRequestResponse
@@ -26,15 +27,19 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardS
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardVocabularyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.ChecklistContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.ChecklistItemResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.CompetencyProgressContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.CurrentTaskContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.LinkContent
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.MemoryRecapContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.NoteContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.OpenPullRequestsContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathToFirstContributionContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.SuggestedTasksContent
+import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import kotlinx.serialization.json.Json
@@ -77,6 +82,8 @@ class BoardService(
     private val openPullRequestReader: OpenPullRequestReader,
     private val currentTaskReader: CurrentTaskReader,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
+    private val myCompetencyService: MyCompetencyService,
+    private val buddySessionRepository: BuddySessionRepository,
 ) {
     /**
      * This hire's board on this project, cards hydrated.
@@ -353,7 +360,53 @@ class BoardService(
         BoardCardKind.OPEN_PULL_REQUESTS -> openPullRequestsContent(member, projectId)
         BoardCardKind.CURRENT_TASK -> currentTaskContent(member.userId, projectId)
         BoardCardKind.SUGGESTED_TASKS -> suggestedTasksContent(member.userId, projectId)
+        BoardCardKind.COMPETENCY_PROGRESS -> competencyProgressContent(member.userId)
+        BoardCardKind.MEMORY_RECAP -> memoryRecapContent(member.userId)
         BoardCardKind.NOTE, BoardCardKind.LINK, BoardCardKind.CHECKLIST -> authoredContent(payload)
+    }
+
+    /**
+     * The hire's ledger, split at the bar rather than summed into a percentage.
+     *
+     * The same read and the same level-0 exclusion as the buddy's `get_my_competencies` tool, so
+     * the card and the answer in the conversation cannot count differently. Level 0 means "asked,
+     * saw no evidence" — a placement, not a competency — and including it would report a skill
+     * nobody has shown.
+     *
+     * The ledger is global rather than per project: a competency earned here is earned. The card
+     * sits on a project's board because that is where the hire is, not because the skills are.
+     */
+    private fun competencyProgressContent(userId: UUID): CompetencyProgressContent {
+        val (held, inProgress) = myCompetencyService
+            .getCompetenciesForUser(userId)
+            .filter { it.level > 0 }
+            .partition { it.level >= it.targetLevel }
+        return CompetencyProgressContent(
+            held = held.map { it.toBoardResponse() },
+            inProgress = inProgress.map { it.toBoardResponse() },
+        )
+    }
+
+    private fun MyCompetencyResponse.toBoardResponse() = BoardCompetencyResponse(
+        competencyKey = competencyKey,
+        label = label,
+        level = level,
+        targetLevel = targetLevel,
+    )
+
+    /**
+     * What the mentor remembers, read and never written.
+     *
+     * Deliberately not [BuddyService.getOrCreateSession]: hydrating a card must not be what starts
+     * somebody's buddy session. A hire who has never opened the buddy has no session, and that is
+     * the honest thing for this card to say.
+     */
+    private fun memoryRecapContent(userId: UUID): MemoryRecapContent {
+        val session = buddySessionRepository.findByUserId(userId)
+        return MemoryRecapContent(
+            memory = session?.summary,
+            messagesRemembered = session?.summarizedCount ?: 0,
+        )
     }
 
     /**

@@ -64,6 +64,26 @@ enum class BoardCardKind(
      */
     SUGGESTED_TASKS(Placement.MENTOR),
 
+    /**
+     * What the hire has shown they can do, and what they are still short of.
+     *
+     * Placed rather than baseline because it is only worth looking at once there is something on
+     * the ledger — an empty "competencies held: 0" on day one tells somebody they have achieved
+     * nothing, which is both true and useless.
+     */
+    COMPETENCY_PROGRESS(Placement.MENTOR),
+
+    /**
+     * What the mentor remembers about this hire, in its own words.
+     *
+     * The buddy's memory is what carries continuity across visits now that the transcript is not
+     * replayed, and it has been entirely invisible: a hire could not see what their mentor thinks
+     * it knows about them, let alone correct it. This card is that memory made visible. It is the
+     * one card whose content the model wrote — and it is labelled as the mentor's own words rather
+     * than presented as a fact about the hire, because that is what it is.
+     */
+    MEMORY_RECAP(Placement.MENTOR),
+
     /** Something the hire wrote down. Markdown, theirs, and nothing reads it back as fact. */
     NOTE(Placement.AUTHORED),
 
