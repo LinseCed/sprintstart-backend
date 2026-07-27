@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.GithubReposit
 import com.sprintstart.sprintstartbackend.connectors.github.repository.GithubRepositoryConnectionRepository
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.time.Instant
@@ -102,6 +103,25 @@ class GithubRepositoryApiServiceTest {
         val result = service.getSourceInstances(projectId).single()
 
         assertThat(result.status).isEqualTo("OUT_OF_DATE")
+    }
+
+    @Test
+    fun `removeProjectFromAllRepositories drops the project from every linked connection`() {
+        val projectId = UUID.randomUUID()
+        val otherProjectId = UUID.randomUUID()
+        val firstProjects = mutableSetOf(projectId, otherProjectId)
+        val secondProjects = mutableSetOf(projectId)
+        val first = mockk<GithubRepositoryConnection> { every { projectIdsInternal } returns firstProjects }
+        val second = mockk<GithubRepositoryConnection> { every { projectIdsInternal } returns secondProjects }
+        every { repository.findAllByProjectId(projectId) } returns listOf(first, second)
+        val saved = slot<List<GithubRepositoryConnection>>()
+        every { repository.saveAll(capture(saved)) } answers { firstArg() }
+
+        service.removeProjectFromAllRepositories(projectId)
+
+        assertThat(firstProjects).containsExactly(otherProjectId)
+        assertThat(secondProjects).isEmpty()
+        assertThat(saved.captured).containsExactly(first, second)
     }
 
     private fun connection(

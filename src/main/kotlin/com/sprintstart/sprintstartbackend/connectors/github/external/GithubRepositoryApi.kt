@@ -40,4 +40,15 @@ interface GithubRepositoryApi {
      * @return Source-instance views ordered by owner and name for stable rendering.
      */
     fun getSourceInstances(projectId: UUID? = null): List<GithubSourceInstanceDto>
+
+    /**
+     * Removes a project from every repository connection linked to it.
+     *
+     * Called when a project is deleted so no connection keeps referencing a project that no longer
+     * exists. The repository connections themselves are kept. Idempotent: a project with no linked
+     * connections is a no-op.
+     *
+     * @param projectId The project to unlink from all repository connections.
+     */
+    fun removeProjectFromAllRepositories(projectId: UUID)
 }

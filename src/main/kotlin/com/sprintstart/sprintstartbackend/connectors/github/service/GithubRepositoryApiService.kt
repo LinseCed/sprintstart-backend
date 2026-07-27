@@ -50,6 +50,13 @@ class GithubRepositoryApiService(
             .map { it.toSourceInstanceDto() }
     }
 
+    @Transactional
+    override fun removeProjectFromAllRepositories(projectId: UUID) {
+        val connections = githubRepositoryConnectionRepository.findAllByProjectId(projectId)
+        connections.forEach { it.projectIdsInternal.remove(projectId) }
+        githubRepositoryConnectionRepository.saveAll(connections)
+    }
+
     private fun GithubRepositoryConnection.toSourceInstanceDto(): GithubSourceInstanceDto {
         val snapshot = snapshot
         return GithubSourceInstanceDto(
