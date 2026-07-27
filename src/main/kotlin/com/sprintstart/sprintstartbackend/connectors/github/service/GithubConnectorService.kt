@@ -270,9 +270,10 @@ class GithubConnectorService(
 
         eventPublisher.publishEvent(
             GithubRepositoryResourcesFetchingStartedEvent(
-                transactionId,
-                repository.owner,
-                repository.name,
+                transactionId = transactionId,
+                repositoryId = repository.id,
+                owner = repository.owner,
+                name = repository.name,
             ),
         )
 

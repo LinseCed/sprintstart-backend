@@ -115,9 +115,10 @@ class GithubUpdatesService(
 
         eventPublisher.publishEvent(
             GithubRepositoryResourcesFetchingStartedEvent(
-                transactionId,
-                githubRepository.owner,
-                githubRepository.name,
+                transactionId = transactionId,
+                repositoryId = githubRepository.id,
+                owner = githubRepository.owner,
+                name = githubRepository.name,
             ),
         )
 
