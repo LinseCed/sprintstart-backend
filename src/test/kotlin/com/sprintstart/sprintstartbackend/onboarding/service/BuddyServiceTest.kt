@@ -222,7 +222,7 @@ class BuddyServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { buddySessionRepository.findByUserId(userId) } returns session
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
-            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             val saved = mutableListOf<BuddyMessage>()
             every { buddyMessageRepository.save(capture(saved)) } answers { firstArg() }
             coEvery { onboardingAiClient.buddyAgentTurn(any()) } returns finalReply("Set up like so.")
@@ -243,7 +243,7 @@ class BuddyServiceTest {
                 BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Hello!"),
             )
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
-            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             val requests = mutableListOf<BuddyAgentRequest>()
             coEvery { onboardingAiClient.buddyAgentTurn(capture(requests)) } returns finalReply("More detail.")
 
@@ -263,7 +263,7 @@ class BuddyServiceTest {
             every { buddySessionRepository.findByUserId(userId) } returns session
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
-            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             coEvery { onboardingAiClient.buddyAgentTurn(any()) } returns finalReply("ok")
 
             service.sendMessageForMe(authId, "First").toList()
@@ -278,7 +278,7 @@ class BuddyServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { buddySessionRepository.findByUserId(userId) } returns session
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
-            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             val saved = mutableListOf<BuddyMessage>()
             every { buddyMessageRepository.save(capture(saved)) } answers { firstArg() }
             coEvery { onboardingAiClient.buddyAgentTurn(any()) } returns finalReply("No question is too basic.")
@@ -296,7 +296,7 @@ class BuddyServiceTest {
             every { buddySessionRepository.findByUserId(userId) } returns session
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
-            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
 
             val toolCall = BuddyToolCallDto(id = "call_0", name = "get_my_metrics")
             val paused = BuddyAgentResponse(
@@ -335,7 +335,7 @@ class BuddyServiceTest {
             every { buddySessionRepository.findByUserId(userId) } returns session
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
-            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
 
             val actionCall = BuddyToolCallDto(id = "call_0", name = "claim_task_zero")
             val paused = BuddyAgentResponse(
@@ -385,7 +385,7 @@ class BuddyServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { buddySessionRepository.findByUserId(userId) } returns session
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
-            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             val saved = mutableListOf<BuddyMessage>()
             every { buddyMessageRepository.save(capture(saved)) } answers { firstArg() }
             coEvery { onboardingAiClient.buddyAgentTurn(any()) } throws
@@ -405,7 +405,7 @@ class BuddyServiceTest {
             every { buddySessionRepository.findByUserId(userId) } returns session
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
-            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             coEvery { onboardingAiClient.buddyAgentTurn(any()) } returns finalReply("done")
 
             val events: List<BuddyStreamEvent> = service.sendMessageForMe(authId, "Hi").toList()
@@ -428,7 +428,7 @@ class BuddyServiceTest {
                 BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "recent answer"),
             )
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
-            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             val requests = mutableListOf<BuddyAgentRequest>()
             coEvery { onboardingAiClient.buddyAgentTurn(capture(requests)) } returns finalReply("More detail.")
 
@@ -461,7 +461,7 @@ class BuddyServiceTest {
                 }
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
             every { buddySessionRepository.save(any()) } answers { firstArg() }
-            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             val requests = mutableListOf<BuddyAgentRequest>()
             coEvery { onboardingAiClient.buddyAgentTurn(capture(requests)) } returns BuddyAgentResponse(
                 final = true,
@@ -494,7 +494,7 @@ class BuddyServiceTest {
                 }
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
             every { buddySessionRepository.save(any()) } answers { firstArg() }
-            every { buddyToolExecutor.toolSpecs() } returns emptyList()
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             val toolCall = BuddyToolCallDto(id = "call_0", name = "get_my_metrics")
             val requests = mutableListOf<BuddyAgentRequest>()
             coEvery { onboardingAiClient.buddyAgentTurn(capture(requests)) } returnsMany listOf(

@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySo
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.RampStage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.AutonomyMilestone
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTrack
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.ramp.AutonomyResponse
@@ -59,6 +60,7 @@ class RampService(
     private val knowledgeRequestRepository: KnowledgeRequestRepository,
     private val projectMembershipApi: ProjectMembershipApi,
     private val contributionService: ContributionService,
+    private val trackService: TrackService,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     /**
@@ -73,16 +75,17 @@ class RampService(
     @Transactional
     fun getForHire(hireId: UUID, projectId: UUID): MyRampResponse {
         val member = requireMember(hireId, projectId)
+        val track = trackService.forMember(member)
         val accepted = contributionService.forHire(member, projectId).filter { it.isAccepted }
 
         val credited = creditAcceptedWork(hireId, projectId, accepted)
-        val autonomy = evaluateAutonomy(hireId, projectId, accepted)
+        val autonomy = evaluateAutonomy(hireId, projectId, accepted, track)
         val currentTask = currentTask(hireId, projectId)
 
         return MyRampResponse(
             stage = stageOf(accepted.size, autonomy.reached),
             currentTask = currentTask?.toResponse(),
-            unlockedBy = unlockedBy(accepted.size, autonomy.reached),
+            unlockedBy = unlockedBy(accepted.size, autonomy.reached, track),
             mergedCount = accepted.size,
             creditedCompetencyKeys = credited,
             autonomy = autonomy,
@@ -109,14 +112,20 @@ class RampService(
         else -> RampStage.TASK_TWO_PLUS
     }
 
-    // The wording still says "merged" because every contribution is a merged pull request today.
-    // Per-track vocabulary is a later slice; inventing neutral copy now would make this read worse
-    // for the only hires who currently see it.
-    private fun unlockedBy(acceptedCount: Int, autonomous: Boolean): String = when {
-        autonomous -> "You shipped a change with no help and no rework"
-        acceptedCount == 0 -> "You haven't merged anything here yet — that's the whole first step"
-        acceptedCount == 1 -> "You merged your first change here"
-        else -> "You've merged $acceptedCount changes here"
+    /**
+     * What the hire has done, in their own track's words.
+     *
+     * An engineer reads exactly what they read before ("You merged your first change here"); a
+     * delivery lead reads about facilitated ceremonies. The sentence structure is fixed and the
+     * nouns come from the track, which is the whole reason vocabulary is structured fields rather
+     * than free text a track could rewrite.
+     */
+    private fun unlockedBy(acceptedCount: Int, autonomous: Boolean, track: OnboardingTrack): String = when {
+        autonomous -> "You ${track.contributionVerbPast} a ${track.contributionNoun} with no help and no rework"
+        acceptedCount == 0 ->
+            "You haven't ${track.contributionVerbPast} anything here yet — that's the whole first step"
+        acceptedCount == 1 -> "You ${track.contributionVerbPast} your first ${track.contributionNoun} here"
+        else -> "You've ${track.contributionVerbPast} $acceptedCount ${track.contributionNounPlural} here"
     }
 
     /**
@@ -188,6 +197,7 @@ class RampService(
         hireId: UUID,
         projectId: UUID,
         accepted: List<Contribution>,
+        track: OnboardingTrack,
     ): AutonomyResponse {
         autonomyMilestoneRepository.findByHireIdAndProjectId(hireId, projectId)?.let {
             return AutonomyResponse(
@@ -204,15 +214,15 @@ class RampService(
                 reached = false,
                 reachedAt = null,
                 provenByArtifactId = null,
-                blockers = listOf("No merged change here yet"),
+                blockers = listOf("No ${track.contributionVerbPast} ${track.contributionNoun} here yet"),
             )
 
         val blockers = mutableListOf<String>()
         if (latest.returnedCount > 0) {
-            blockers += "Your last merged change was sent back for rework"
+            blockers += "Your last ${track.contributionVerbPast} ${track.contributionNoun} was sent back for rework"
         }
         if (neededHelp(hireId, projectId, latest)) {
-            blockers += "You pulled in a person while you were on your last change"
+            blockers += "You pulled in a person while you were on your last ${track.contributionNoun}"
         }
         if (blockers.isNotEmpty()) {
             return AutonomyResponse(

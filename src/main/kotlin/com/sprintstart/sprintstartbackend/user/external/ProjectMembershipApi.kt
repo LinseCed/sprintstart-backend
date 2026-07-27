@@ -36,4 +36,13 @@ data class ProjectMember(
     val displayName: String,
     val githubLogin: String?,
     val joinedAt: Instant?,
+    /**
+     * Which onboarding track this person's role on this project puts them on, if it declares one.
+     *
+     * Carried here rather than fetched separately because onboarding already resolves the member
+     * and would otherwise need a second round trip per hire on every metrics read. Null means the
+     * role declares no track, which onboarding resolves to its default — the mapping from key to
+     * track is the onboarding module's business, not this one's.
+     */
+    val onboardingTrackKey: String? = null,
 )
