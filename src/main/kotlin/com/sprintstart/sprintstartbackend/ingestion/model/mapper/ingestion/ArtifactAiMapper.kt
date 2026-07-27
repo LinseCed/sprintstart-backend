@@ -23,5 +23,8 @@ class ArtifactAiMapper {
         language = artifact.language,
         state = artifact.state,
         labels = artifact.labels.toList(),
+        // Same reason as `labels`: `projectIds` reads a lazy collection, so it is copied here
+        // inside the session rather than serialized after it closes.
+        projectIds = artifact.projectIds.map { it.toString() },
     )
 }

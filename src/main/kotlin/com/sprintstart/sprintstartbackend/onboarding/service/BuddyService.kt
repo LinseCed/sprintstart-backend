@@ -160,6 +160,8 @@ class BuddyService(
         // per hop: it cannot change mid-conversation, and re-reading it would cost a membership
         // lookup on every step of the agent loop.
         val vocabulary = vocabularyFor(userId)
+        // Resolved once per turn, for the same reason: membership cannot change mid-conversation.
+        val projectIds = projectIdsFor(userId)
 
         // Fold the oldest part of the window into the summary once it outgrows the window. The
         // cursor arithmetic never reaches the just-sent user message (summarizeUpto <= the window's
@@ -176,7 +178,7 @@ class BuddyService(
             while (answer == null && step < MAX_AGENT_STEPS) {
                 step++
                 val response = onboardingAiClient.buddyAgentTurn(
-                    agentRequest(messages, tools, step, session, summarizeUpto, vocabulary),
+                    agentRequest(messages, tools, step, session, summarizeUpto, vocabulary, projectIds),
                 )
                 citations = response.citations
                 response.updatedSummary?.let { updatedSummary = it }
@@ -251,6 +253,7 @@ class BuddyService(
         session: BuddySession,
         summarizeUpto: Int?,
         vocabulary: BuddyVocabularyDto,
+        projectIds: List<String>,
     ): BuddyAgentRequest =
         BuddyAgentRequest(
             messages = messages,
@@ -261,7 +264,26 @@ class BuddyService(
             // the running conversation has no system message yet, so withholding it after the
             // first hop would let a resumed turn fall back to the engineering wording.
             vocabulary = vocabulary,
+            // Same reason, and the same every hop: retrieval happens on the AI side on any hop the
+            // model chooses to search, so a scope sent only on the first would silently widen.
+            projectIds = projectIds,
         )
+
+    /**
+     * The projects whose material this hire may be shown, as ids.
+     *
+     * Every project they are on rather than one of them: the buddy is not a per-project surface,
+     * and a hire onboarding on two projects asking "how do we deploy" means either. An empty list
+     * means the AI searches everything, which is the honest answer for somebody on no project yet
+     * — there is nothing narrower that would be true.
+     */
+    private fun projectIdsFor(userId: UUID): List<String> =
+        userApi
+            .getUsersByIds(listOf(userId))
+            .firstOrNull()
+            ?.projects
+            .orEmpty()
+            .map { it.projectId.toString() }
 
     /**
      * Runs one tool the AI asked for, emitting the event(s) the client needs to see, and returns

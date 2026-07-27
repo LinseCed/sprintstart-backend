@@ -62,6 +62,15 @@ data class BuddyAgentRequest(
      * exactly as it did before tracks existed.
      */
     @SerialName("vocabulary") val vocabulary: BuddyVocabularyDto = BuddyVocabularyDto(),
+    /**
+     * The projects this hire is on, scoping what `search_docs` may retrieve.
+     *
+     * Several is ordinary — somebody onboarding on two projects should find material from both,
+     * and from neither of anybody else's. Empty searches the whole corpus, which is right only on
+     * a deployment serving one project; material belonging to no project stays searchable either
+     * way, so nothing ingested before projects were carried disappears.
+     */
+    @SerialName("project_ids") val projectIds: List<String> = emptyList(),
 )
 
 /**
