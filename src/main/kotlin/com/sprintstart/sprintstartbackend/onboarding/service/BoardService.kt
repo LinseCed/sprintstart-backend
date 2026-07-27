@@ -13,9 +13,12 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardM
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardMomentResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardPullRequestResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardSuggestedTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardVocabularyResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.CurrentTaskContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.OpenPullRequestsContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathToFirstContributionContent
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.SuggestedTasksContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
@@ -23,6 +26,7 @@ import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -46,6 +50,7 @@ import java.util.UUID
  * tool of the same name cannot describe different states. Nothing is copied onto the card row: a
  * second record of facts that already live somewhere durable is the one that goes stale.
  */
+@Suppress("TooManyFunctions") // One hydration function per card kind, plus read/place/dismiss.
 @Service
 class BoardService(
     private val boardRepository: BoardRepository,
@@ -54,6 +59,8 @@ class BoardService(
     private val trackService: TrackService,
     private val onboardingMetricsService: OnboardingMetricsService,
     private val openPullRequestReader: OpenPullRequestReader,
+    private val currentTaskReader: CurrentTaskReader,
+    private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
 ) {
     /**
      * This hire's board on this project, cards hydrated.
@@ -91,10 +98,93 @@ class BoardService(
                         kind = card.kind,
                         owner = card.owner,
                         position = card.position,
+                        placedAt = card.placedAt,
                         content = hydrate(card.kind, member, projectId, timeline),
                     )
                 },
         )
+    }
+
+    /**
+     * Puts a card on this hire's board on the mentor's behalf.
+     *
+     * Auto-applied rather than confirm-gated, unlike every action in `BuddyActionService`: those
+     * change the hire's onboarding — a claimed goal, a submitted answer, a colleague asked to
+     * confirm something — and a mistake there costs somebody real work. A card costs one dismissal.
+     * Gating it behind a button would make the mentor ask permission to point at something, which
+     * is not how anybody helps.
+     *
+     * What it will not do is the interesting part, and all three refusals come back as sentences
+     * the mentor can relay rather than as silence:
+     * - **A kind this hire's track cannot support** is refused outright. See [supports].
+     * - **A card the hire dismissed is never put back.** Sticky removal is the whole reason a
+     *   dismissed card keeps its row, and it has to bind the mentor as well as the baseline.
+     * - **A card already there is left alone**, position included. Re-placing would let the mentor
+     *   rearrange a board the hire has arranged.
+     *
+     * @param userId The hire whose board it is.
+     * @param projectId The project the board belongs to.
+     * @param kind The card to place.
+     * @return What happened, in a form the caller can turn into a line for the model.
+     */
+    @Transactional
+    fun place(userId: UUID, projectId: UUID, kind: BoardCardKind): PlacementOutcome {
+        val member = memberOrNull(userId, projectId) ?: return PlacementOutcome.NOT_A_MEMBER
+        if (!supports(trackService.forMember(member), kind)) return PlacementOutcome.UNSUPPORTED
+
+        val board = boardRepository.findByUserIdAndProjectId(userId, projectId)
+            ?: boardRepository.save(Board(userId = userId, projectId = projectId))
+        val existing = boardCardRepository.findAllByBoardId(board.id)
+
+        existing.firstOrNull { it.kind == kind }?.let { card ->
+            return if (card.state == BoardCardState.DISMISSED) {
+                PlacementOutcome.DISMISSED_BY_HIRE
+            } else {
+                PlacementOutcome.ALREADY_THERE
+            }
+        }
+
+        boardCardRepository.save(
+            BoardCard(
+                boardId = board.id,
+                kind = kind,
+                owner = BoardCardOwner.AI,
+                position = (existing.maxOfOrNull { it.position } ?: -1) + 1,
+                // Dated, because the board says "your buddy put this here" only about cards it
+                // actually did.
+                placedAt = Instant.now(),
+            ),
+        )
+        return PlacementOutcome.PLACED
+    }
+
+    /**
+     * Takes a card off the hire's board, for good.
+     *
+     * The row survives with [BoardCardState.DISMISSED] rather than being deleted, which is what
+     * makes the removal stick: both the baseline and the mentor consult these rows before adding
+     * anything, so a card the hire said no to stays gone. Deleting it would turn a decision into a
+     * gesture the next page load undoes.
+     *
+     * Dismissing an already-dismissed card is a no-op, so a double click is not an error.
+     *
+     * @param userId The caller, who must own the board the card is on.
+     * @param cardId The card to remove.
+     * @return False when no such card is on any board of theirs — which is the same answer for a
+     * card that does not exist and one belonging to somebody else, on purpose.
+     */
+    @Transactional
+    fun dismiss(userId: UUID, cardId: UUID): Boolean {
+        val card = boardCardRepository.findById(cardId).orElse(null) ?: return false
+        val board = boardRepository.findById(card.boardId).orElse(null) ?: return false
+        if (board.userId != userId) return false
+
+        if (card.state != BoardCardState.DISMISSED) {
+            card.state = BoardCardState.DISMISSED
+            card.updatedAt = Instant.now()
+            boardCardRepository.save(card)
+        }
+        return true
     }
 
     /**
@@ -140,11 +230,23 @@ class BoardService(
      * gated and for the same reason: a permanently empty "your open pull requests" card in front of
      * somebody who will never have one is the invisible-hire problem in card form.
      */
-    private fun relevantKinds(track: OnboardingTrack): List<BoardCardKind> = buildList {
-        add(BoardCardKind.PATH_TO_FIRST_CONTRIBUTION)
-        if (track.admits(ContributionEvidenceKind.PULL_REQUEST)) {
-            add(BoardCardKind.OPEN_PULL_REQUESTS)
-        }
+    private fun relevantKinds(track: OnboardingTrack): List<BoardCardKind> =
+        BoardCardKind.entries.filter { it.baseline && supports(track, it) }
+
+    /**
+     * Whether this hire's track could ever give this card something true to say.
+     *
+     * The one hard gate on placement, and it applies to the mentor as much as to the baseline: the
+     * buddy must not be able to put a pull-request card in front of somebody whose work is never a
+     * pull request, however reasonable that seemed mid-conversation. Same rule, same place, as the
+     * tool mounting it mirrors.
+     */
+    private fun supports(track: OnboardingTrack, kind: BoardCardKind): Boolean = when (kind) {
+        BoardCardKind.OPEN_PULL_REQUESTS -> track.admits(ContributionEvidenceKind.PULL_REQUEST)
+        BoardCardKind.PATH_TO_FIRST_CONTRIBUTION,
+        BoardCardKind.CURRENT_TASK,
+        BoardCardKind.SUGGESTED_TASKS,
+        -> true
     }
 
     private fun hydrate(
@@ -155,7 +257,54 @@ class BoardService(
     ): BoardCardContent = when (kind) {
         BoardCardKind.PATH_TO_FIRST_CONTRIBUTION -> pathContent(member, timeline)
         BoardCardKind.OPEN_PULL_REQUESTS -> openPullRequestsContent(member, projectId)
+        BoardCardKind.CURRENT_TASK -> currentTaskContent(member.userId, projectId)
+        BoardCardKind.SUGGESTED_TASKS -> suggestedTasksContent(member.userId, projectId)
     }
+
+    /**
+     * The task the hire is on, read — never assigned.
+     *
+     * Read through [CurrentTaskReader] rather than `TaskZeroService.getForHire`, which assigns on
+     * read: a board card is hydrated on every page load, so hydration that could assign would hand
+     * somebody their first task because they glanced at a page.
+     *
+     * A card with no task on it is a real state and says so, because the alternative — the card
+     * vanishing when the goal is cleared — would look like the board losing things.
+     */
+    private fun currentTaskContent(userId: UUID, projectId: UUID): CurrentTaskContent {
+        val task = currentTaskReader.currentTaskFor(userId, projectId)
+        return CurrentTaskContent(
+            taskId = task?.id,
+            title = task?.title,
+            summary = task?.summary,
+            url = task?.sourceUrl,
+            // A goal is what somebody chose; Task 0 is what they were handed. Worth distinguishing,
+            // because only one of the two is theirs to change their mind about.
+            chosen = task != null && currentTaskReader.isClaimedGoal(userId, projectId),
+        )
+    }
+
+    /**
+     * Good next tasks, ranked, with the reasons and never the score.
+     *
+     * The reasons are the point: the ranker exists to explain itself, and a number is not something
+     * a hire can act on. Same read, same cap, as the buddy's `get_suggested_tasks` tool — so the
+     * card and the answer in the conversation list the same tasks in the same order.
+     */
+    private fun suggestedTasksContent(userId: UUID, projectId: UUID): SuggestedTasksContent =
+        SuggestedTasksContent(
+            tasks = starterWorkTaskProposalService
+                .matchForUserId(userId, projectId)
+                .take(MAX_SUGGESTED_TASKS)
+                .map { match ->
+                    BoardSuggestedTaskResponse(
+                        taskId = match.task.id,
+                        title = match.task.title,
+                        url = match.task.sourceUrl,
+                        reasons = match.reasons,
+                    )
+                },
+        )
 
     /**
      * The path card's content, from the same timeline the PM dashboard reads.
@@ -207,4 +356,28 @@ class BoardService(
 
     private fun memberOrNull(userId: UUID, projectId: UUID): ProjectMember? =
         projectMembershipApi.getProjectMembers(projectId).firstOrNull { it.userId == userId }
+
+    /**
+     * What placing a card did.
+     *
+     * Every outcome is reported rather than collapsed into a boolean, because the mentor has to say
+     * something afterwards and "I've put that on your board" is only true for one of them. A buddy
+     * that cannot tell a refusal from a success will claim the success.
+     */
+    enum class PlacementOutcome {
+        PLACED,
+        ALREADY_THERE,
+
+        /** The hire took this card off their board before; it is not going back. */
+        DISMISSED_BY_HIRE,
+
+        /** This hire's track can never give the card anything true to say. */
+        UNSUPPORTED,
+        NOT_A_MEMBER,
+    }
+
+    private companion object {
+        /** Matches the buddy tool's cap, so the card and the conversation list the same tasks. */
+        const val MAX_SUGGESTED_TASKS = 3
+    }
 }

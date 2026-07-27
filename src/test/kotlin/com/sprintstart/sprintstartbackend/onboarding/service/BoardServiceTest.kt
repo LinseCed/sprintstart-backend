@@ -6,26 +6,35 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Board
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTrack
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardMomentKey
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardMomentResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.CurrentTaskContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.OpenPullRequestsContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathToFirstContributionContent
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.SuggestedTasksContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.Optional
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -40,6 +49,8 @@ class BoardServiceTest {
     private val trackService: TrackService = mockk()
     private val onboardingMetricsService: OnboardingMetricsService = mockk()
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
+    private val currentTaskReader: CurrentTaskReader = mockk()
+    private val starterWorkTaskProposalService: StarterWorkTaskProposalService = mockk()
 
     private val now: Instant = Instant.parse("2026-07-27T12:00:00Z")
     private val hireId: UUID = UUID.randomUUID()
@@ -52,6 +63,8 @@ class BoardServiceTest {
         trackService,
         onboardingMetricsService,
         OpenPullRequestReader(artifactIngestionApi, Clock.fixed(now, ZoneOffset.UTC)),
+        currentTaskReader,
+        starterWorkTaskProposalService,
     )
 
     private val engineering = OnboardingTrack(
@@ -81,6 +94,10 @@ class BoardServiceTest {
         every { boardRepository.save(any()) } answers { firstArg() }
         every { boardCardRepository.saveAll(any<List<BoardCard>>()) } answers { firstArg() }
         every { boardCardRepository.findAllByBoardId(any()) } returns emptyList()
+        every { boardCardRepository.save(any()) } answers { firstArg() }
+        every { currentTaskReader.currentTaskFor(hireId, projectId) } returns null
+        every { currentTaskReader.isClaimedGoal(hireId, projectId) } returns false
+        every { starterWorkTaskProposalService.matchForUserId(hireId, projectId) } returns emptyList()
     }
 
     private fun member(
@@ -372,6 +389,214 @@ class BoardServiceTest {
         title = "PR $number",
         sourceUrl = "https://example.test/pr/$number",
     )
+
+    // ---- the mentor places (slice 1) ----
+
+    @Test
+    fun `placing a card the board does not keep itself adds it, dated`() {
+        val board = existingBoard()
+        val saved = slot<BoardCard>()
+        every { boardCardRepository.save(capture(saved)) } answers { firstArg() }
+
+        val outcome = service.place(hireId, projectId, BoardCardKind.SUGGESTED_TASKS)
+
+        assertEquals(BoardService.PlacementOutcome.PLACED, outcome)
+        assertEquals(board.id, saved.captured.boardId)
+        // Dated, because the board claims "your buddy added this" only about cards it actually did.
+        assertNotNull(saved.captured.placedAt)
+    }
+
+    @Test
+    fun `a card the hire dismissed is never put back by the mentor`() {
+        val board = existingBoard()
+        every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(
+            card(board, BoardCardKind.SUGGESTED_TASKS, state = BoardCardState.DISMISSED),
+        )
+
+        // Sticky removal has to bind the mentor too, or dismissing is a gesture the next
+        // conversation undoes.
+        assertEquals(
+            BoardService.PlacementOutcome.DISMISSED_BY_HIRE,
+            service.place(hireId, projectId, BoardCardKind.SUGGESTED_TASKS),
+        )
+        verify(exactly = 0) { boardCardRepository.save(any()) }
+    }
+
+    @Test
+    fun `placing a card that is already there changes nothing`() {
+        val board = existingBoard()
+        every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(
+            card(board, BoardCardKind.SUGGESTED_TASKS, position = 3),
+        )
+
+        // Re-placing would let the mentor reshuffle a board the hire has arranged.
+        assertEquals(
+            BoardService.PlacementOutcome.ALREADY_THERE,
+            service.place(hireId, projectId, BoardCardKind.SUGGESTED_TASKS),
+        )
+        verify(exactly = 0) { boardCardRepository.save(any()) }
+    }
+
+    @Test
+    fun `the mentor cannot place a card this hire's track can never fill`() {
+        existingBoard()
+        every { trackService.forMember(any()) } returns scrumMaster
+
+        // The same gate the baseline obeys. However reasonable it seemed mid-conversation, a
+        // pull-request card in front of somebody whose work is never a pull request says nothing.
+        assertEquals(
+            BoardService.PlacementOutcome.UNSUPPORTED,
+            service.place(hireId, projectId, BoardCardKind.OPEN_PULL_REQUESTS),
+        )
+        verify(exactly = 0) { boardCardRepository.save(any()) }
+    }
+
+    @Test
+    fun `placing for a project the hire is not on does nothing`() {
+        every { projectMembershipApi.getProjectMembers(projectId) } returns emptyList()
+
+        assertEquals(
+            BoardService.PlacementOutcome.NOT_A_MEMBER,
+            service.place(hireId, projectId, BoardCardKind.SUGGESTED_TASKS),
+        )
+    }
+
+    // ---- the hire removes (slice 1) ----
+
+    @Test
+    fun `dismissing marks the card rather than deleting it`() {
+        val board = existingBoard()
+        val card = card(board, BoardCardKind.SUGGESTED_TASKS)
+        every { boardCardRepository.findById(card.id) } returns Optional.of(card)
+        every { boardRepository.findById(board.id) } returns Optional.of(board)
+
+        assertTrue(service.dismiss(hireId, card.id))
+
+        // The surviving row is the whole mechanism: it is what later placements consult.
+        assertEquals(BoardCardState.DISMISSED, card.state)
+        verify { boardCardRepository.save(card) }
+        verify(exactly = 0) { boardCardRepository.delete(any()) }
+    }
+
+    @Test
+    fun `a card on somebody else's board answers the same as one that does not exist`() {
+        val otherBoard = Board(userId = UUID.randomUUID(), projectId = projectId)
+        val card = card(otherBoard, BoardCardKind.SUGGESTED_TASKS)
+        val strangerId = UUID.randomUUID()
+        every { boardCardRepository.findById(card.id) } returns Optional.of(card)
+        every { boardCardRepository.findById(strangerId) } returns Optional.empty()
+        every { boardRepository.findById(otherBoard.id) } returns Optional.of(otherBoard)
+
+        // A 403 here would confirm that a given id is a real card of somebody's.
+        assertFalse(service.dismiss(hireId, card.id))
+        assertFalse(service.dismiss(hireId, strangerId))
+    }
+
+    @Test
+    fun `dismissing twice is not an error`() {
+        val board = existingBoard()
+        val card = card(board, BoardCardKind.SUGGESTED_TASKS, state = BoardCardState.DISMISSED)
+        every { boardCardRepository.findById(card.id) } returns Optional.of(card)
+        every { boardRepository.findById(board.id) } returns Optional.of(board)
+
+        assertTrue(service.dismiss(hireId, card.id))
+        verify(exactly = 0) { boardCardRepository.save(any()) }
+    }
+
+    // ---- what the placeable cards say ----
+
+    @Test
+    fun `the current-task card reads the task, and reading never assigns one`() {
+        val board = existingBoard()
+        every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(
+            card(board, BoardCardKind.CURRENT_TASK),
+        )
+        every { currentTaskReader.currentTaskFor(hireId, projectId) } returns StarterWorkTaskProposal(
+            sourceId = "github:org/repo:ISSUE:7",
+            title = "Fix the flaky login test",
+            summary = "It fails about one run in five.",
+            sourceUrl = "https://example.test/issues/7",
+        )
+        every { currentTaskReader.isClaimedGoal(hireId, projectId) } returns true
+
+        val content = service.currentTaskCard()
+
+        assertEquals("Fix the flaky login test", content.title)
+        // Chosen, not handed: only one of those is theirs to change their mind about.
+        assertTrue(content.chosen)
+    }
+
+    @Test
+    fun `a hire with no task still gets the card, saying so`() {
+        val board = existingBoard()
+        every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(
+            card(board, BoardCardKind.CURRENT_TASK),
+        )
+
+        val content = service.currentTaskCard()
+
+        // A card that vanishes when the goal is cleared reads as the board losing things.
+        assertNull(content.taskId)
+        assertFalse(content.chosen)
+    }
+
+    @Test
+    fun `the suggestions card carries the reasons and no score`() {
+        val board = existingBoard()
+        every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(
+            card(board, BoardCardKind.SUGGESTED_TASKS),
+        )
+        every { starterWorkTaskProposalService.matchForUserId(hireId, projectId) } returns listOf(
+            ranked("Fix a typo", listOf("You have worked in this repository before")),
+        )
+
+        val tasks = service.suggestionsCard().tasks
+
+        assertEquals(listOf("You have worked in this repository before"), tasks.first().reasons)
+    }
+
+    private fun card(
+        board: Board,
+        kind: BoardCardKind,
+        state: BoardCardState = BoardCardState.ACTIVE,
+        position: Int = 0,
+    ) = BoardCard(
+        boardId = board.id,
+        kind = kind,
+        owner = BoardCardOwner.AI,
+        state = state,
+        position = position,
+    )
+
+    private fun ranked(title: String, reasons: List<String>) = RankedStarterWorkTaskResponse(
+        task = StarterWorkTaskProposalResponse(
+            id = UUID.randomUUID(),
+            sourceId = "src-$title",
+            title = title,
+            summary = null,
+            rationale = null,
+            sourceUrl = null,
+            competencyKeys = emptyList(),
+            status = ProposalStatus.APPROVED,
+            taskZeroEligible = false,
+        ),
+        score = 1.0,
+        matchedCompetencyKeys = emptyList(),
+        taskType = TaskType.BUG,
+        reasons = reasons,
+    )
+
+    private fun BoardService.currentTaskCard(): CurrentTaskContent =
+        getBoard(hireId, projectId)!!
+            .cards
+            .first { it.kind == BoardCardKind.CURRENT_TASK }
+            .content as CurrentTaskContent
+
+    private fun BoardService.suggestionsCard(): SuggestedTasksContent =
+        getBoard(hireId, projectId)!!
+            .cards
+            .first { it.kind == BoardCardKind.SUGGESTED_TASKS }
+            .content as SuggestedTasksContent
 
     private fun BoardService.pathCard(): PathToFirstContributionContent =
         getBoard(hireId, projectId)!!

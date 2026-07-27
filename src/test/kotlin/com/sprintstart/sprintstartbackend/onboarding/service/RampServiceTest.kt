@@ -76,6 +76,9 @@ class RampServiceTest {
         // The default engineering track, so every copy assertion below is the copy an engineer
         // reads today -- the vocabulary swap must not have moved it.
         mockk<TrackService> { every { forMember(any()) } returns engineeringTrack() },
+        // The real reader over the same mocked repositories: "which task is this person on" is one
+        // answer shared with the board, and these tests are what pin it.
+        CurrentTaskReader(userGoalRepository, taskZeroAssignmentRepository, proposalRepository),
         Clock.fixed(now, ZoneOffset.UTC),
     )
 

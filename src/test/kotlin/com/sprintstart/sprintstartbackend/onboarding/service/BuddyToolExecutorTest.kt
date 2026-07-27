@@ -34,6 +34,7 @@ class BuddyToolExecutorTest {
     private val knowledgeBaseService: KnowledgeBaseService = mockk()
     private val userApi: UserApi = mockk()
     private val buddyPlanTools: BuddyPlanTools = mockk(relaxed = true)
+    private val buddyBoardTools: BuddyBoardTools = mockk(relaxed = true)
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
     private val projectMembershipApi: ProjectMembershipApi = mockk()
 
@@ -50,6 +51,7 @@ class BuddyToolExecutorTest {
         knowledgeBaseService,
         userApi,
         buddyPlanTools,
+        buddyBoardTools,
         // The real reader, not a mock: which pull requests count as open and which one leads are
         // its judgements now, and these tests are about the buddy still reporting them.
         OpenPullRequestReader(artifactIngestionApi),

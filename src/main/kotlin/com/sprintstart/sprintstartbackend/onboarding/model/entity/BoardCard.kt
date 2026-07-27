@@ -65,6 +65,16 @@ class BoardCard(
      */
     @Column(nullable = false)
     var position: Int,
+    /**
+     * When the mentor put this card here, or null when the board keeps it as part of the baseline.
+     *
+     * Not a redundant twin of [owner], which answers who may *change* a card. This answers where it
+     * came from, and it is user-visible: "the board keeps this for you" and "your buddy put this
+     * here on Tuesday" are different claims, and only one of them is true of a card nobody chose.
+     * Saying the stronger one about a card the board seeded would be the board's first lie.
+     */
+    @Column(name = "placed_at")
+    var placedAt: Instant? = null,
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now(),
     @Column(name = "updated_at", nullable = false)

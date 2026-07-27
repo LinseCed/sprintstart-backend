@@ -41,4 +41,34 @@ enum class BoardCardKind {
      * who will never have one is the invisible-hire problem in card form.
      */
     OPEN_PULL_REQUESTS,
+
+    /**
+     * The task the hire is on, and where it came from.
+     *
+     * Not part of the baseline, because it is only true some of the time — somebody with no claimed
+     * goal and no Task 0 is not "between tasks", they simply have no task, and a card saying so is
+     * a card about nothing. The mentor places it, and confirming `claim_goal` places it too.
+     */
+    CURRENT_TASK,
+
+    /**
+     * Good next tasks for the hire, ranked, each with the plain reason it was suggested.
+     *
+     * The other half of the pair: worth pinning when somebody is looking for work, pointless when
+     * they already have some. Which of those is true is exactly the kind of thing the mentor knows
+     * from the conversation and the board does not.
+     */
+    SUGGESTED_TASKS,
+    ;
+
+    /**
+     * Whether the board keeps this card without being asked.
+     *
+     * The split is between *what a hire always needs* and *what the mentor decided was worth
+     * keeping*. A baseline card is placed deterministically on every board read, so nobody depends
+     * on the model noticing their pull request has been waiting a week. Everything else is placed
+     * deliberately — that is what makes the board curated rather than generated.
+     */
+    val baseline: Boolean
+        get() = this == PATH_TO_FIRST_CONTRIBUTION || this == OPEN_PULL_REQUESTS
 }
