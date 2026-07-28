@@ -5,8 +5,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTas
 import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.RungState
 import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.SetupReadinessResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.SetupRungResponse
-import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeProposalRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import org.springframework.stereotype.Service
@@ -33,8 +31,6 @@ import java.util.UUID
 @Service
 class SetupReadinessService(
     private val competencyGraphAuthoringService: CompetencyGraphAuthoringService,
-    private val competencyProposalRepository: CompetencyProposalRepository,
-    private val competencyEdgeProposalRepository: CompetencyEdgeProposalRepository,
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val projectMembershipApi: ProjectMembershipApi,
     private val trackService: TrackService,
@@ -43,7 +39,7 @@ class SetupReadinessService(
     fun getReadiness(projectId: UUID): SetupReadinessResponse {
         val approvedCompetencies = competencyGraphAuthoringService.getGraph().competencies.size
         val rungs = listOf(
-            skillMapRung(approvedCompetencies),
+            vocabularyRung(approvedCompetencies),
             starterTasksRung(),
             tracksRung(projectId),
         )
@@ -54,32 +50,25 @@ class SetupReadinessService(
         )
     }
 
-    private fun skillMapRung(approvedCompetencies: Int): SetupRungResponse {
-        val pendingNodes = competencyProposalRepository.findAllByStatus(ProposalStatus.PROPOSED).size
-        val pendingEdges = competencyEdgeProposalRepository.findAllByStatus(ProposalStatus.PROPOSED).size
-        val pending = pendingNodes + pendingEdges
-        return when {
-            pending > 0 -> rung(
-                SKILL_MAP,
-                RungState.WARN,
-                approvedCompetencies,
-                "$pendingNodes ${competencyWord(pendingNodes)} and $pendingEdges " +
-                    "${edgeWord(pendingEdges)} are waiting for your review.",
-            )
-            approvedCompetencies == 0 -> rung(
+    /**
+     * Whether a vocabulary exists to teach and measure against.
+     *
+     * No longer counts anything "waiting for your review": competency proposals are gone, because
+     * generation writes live rows and a human corrects them rather than gating them. So this rung
+     * reports what exists rather than what somebody owes.
+     */
+    private fun vocabularyRung(competencies: Int): SetupRungResponse =
+        if (competencies == 0) {
+            rung(
                 SKILL_MAP,
                 RungState.WARN,
                 0,
-                "No competencies yet. Generate a skill map from the ingested corpus.",
+                "No competencies yet. They are generated from the ingested corpus — connect a " +
+                    "repository, or add one by hand.",
             )
-            else -> rung(
-                SKILL_MAP,
-                RungState.OK,
-                approvedCompetencies,
-                "$approvedCompetencies ${competencyWord(approvedCompetencies)} approved.",
-            )
+        } else {
+            rung(SKILL_MAP, RungState.OK, competencies, "$competencies ${competencyWord(competencies)}.")
         }
-    }
 
     /**
      * Whether there is starter work to claim — and whether it covers every track in use.
@@ -193,8 +182,6 @@ class SetupReadinessService(
         SetupRungResponse(key = key, state = state, count = count, detail = detail)
 
     private fun competencyWord(n: Int) = if (n == 1) "competency" else "competencies"
-
-    private fun edgeWord(n: Int) = if (n == 1) "edge" else "edges"
 
     private fun taskWord(n: Int) = if (n == 1) "task" else "tasks"
 

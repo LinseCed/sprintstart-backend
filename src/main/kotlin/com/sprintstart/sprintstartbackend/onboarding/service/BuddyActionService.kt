@@ -275,7 +275,7 @@ class BuddyActionService(
         boardService.place(userId, projectId, BoardCardKind.CURRENT_TASK)
         return BuddyActionResponse(
             ok = true,
-            message = "You're now working toward “${goal.label}” — I'll shape your next steps around it. " +
+            message = "You're now working toward “${goal.title}” — I'll shape your next steps around it. " +
                 "It's on your board too, so you won't have to go looking for it.",
         )
     }

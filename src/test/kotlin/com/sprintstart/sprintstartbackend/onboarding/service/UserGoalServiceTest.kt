@@ -1,11 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGoal
-import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -23,38 +20,30 @@ import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
+/**
+ * Unit tests for claiming a starter task as a goal.
+ *
+ * A goal used to point at a `CONTRIBUTION` competency minted on approval, and half of this file used
+ * to guard that indirection: resolving through a derived key rather than a label, and 404ing when
+ * the node and the proposal table disagreed. The goal points at the proposal now, so the indirection
+ * — and the failure mode it needed guarding against — is gone.
+ */
 class UserGoalServiceTest {
     private val userGoalRepository: UserGoalRepository = mockk(relaxed = true)
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository = mockk()
-    private val competencyRepository: CompetencyRepository = mockk()
     private val userApi: UserApi = mockk()
-    private val service = UserGoalService(
-        userGoalRepository,
-        starterWorkTaskProposalRepository,
-        competencyRepository,
-        userApi,
-    )
+    private val service = UserGoalService(userGoalRepository, starterWorkTaskProposalRepository, userApi)
 
     private val userId: UUID = UUID.randomUUID()
     private val projectId: UUID = UUID.randomUUID()
     private val authId = "auth-1"
 
-    // The key approval derives from this sourceId, which is what the goal must resolve through.
-    private val sourceId = "github:acme/repo:ISSUE:42"
-    private val contributionKey = "github-acme-repo-issue-42"
-
     private fun approvedProposal() = StarterWorkTaskProposal(
-        sourceId = sourceId,
+        sourceId = "github:acme/repo:ISSUE:42",
         title = "Fix the login redirect",
         summary = "A small, well-scoped bug",
         sourceUrl = "https://github.com/acme/repo/issues/42",
     ).apply { status = ProposalStatus.APPROVED }
-
-    private fun contributionNode() = Competency(
-        key = contributionKey,
-        label = "Fix the login redirect",
-        kind = CompetencyKind.CONTRIBUTION,
-    )
 
     private fun stageUser() {
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
@@ -66,21 +55,18 @@ class UserGoalServiceTest {
     @Nested
     inner class ClaimForMe {
         @Test
-        fun `resolves the contribution node through the derived key, not the label`() {
+        fun `describes the goal in the task's own words`() {
             stageUser()
             val proposal = approvedProposal()
             every { starterWorkTaskProposalRepository.findById(proposal.id) } returns Optional.of(proposal)
-            // Renamed by a PM since approval (#50 made labels editable). Resolving on the label
-            // would fail here; resolving on the derived key must not care.
-            every { competencyRepository.findByKey(contributionKey) } returns
-                contributionNode().apply { label = "Login redirect fix (renamed)" }
             every { userGoalRepository.findByUserIdAndProjectId(userId, projectId) } returns null
 
             val result = service.claimForMe(authId, projectId, proposal.id)
 
-            assertEquals(contributionKey, result.competencyKey)
-            assertEquals("Login redirect fix (renamed)", result.label)
-            verify { competencyRepository.findByKey(contributionKey) }
+            // The wording of the work, not of a synthetic skill node derived from it.
+            assertEquals(proposal.id, result.proposalId)
+            assertEquals("Fix the login redirect", result.title)
+            assertEquals("https://github.com/acme/repo/issues/42", result.sourceUrl)
         }
 
         @Test
@@ -88,7 +74,6 @@ class UserGoalServiceTest {
             stageUser()
             val proposal = approvedProposal()
             every { starterWorkTaskProposalRepository.findById(proposal.id) } returns Optional.of(proposal)
-            every { competencyRepository.findByKey(contributionKey) } returns contributionNode()
             every { userGoalRepository.findByUserIdAndProjectId(userId, projectId) } returns null
             val saved = slot<UserGoal>()
             every { userGoalRepository.save(capture(saved)) } answers { saved.captured }
@@ -97,7 +82,6 @@ class UserGoalServiceTest {
 
             assertEquals(userId, saved.captured.userId)
             assertEquals(projectId, saved.captured.projectId)
-            assertEquals(contributionKey, saved.captured.competencyKey)
             assertEquals(proposal.id, saved.captured.sourceProposalId)
         }
 
@@ -108,10 +92,9 @@ class UserGoalServiceTest {
             val existing = UserGoal(
                 userId = userId,
                 projectId = projectId,
-                competencyKey = "some-older-contribution",
+                sourceProposalId = UUID.randomUUID(),
             )
             every { starterWorkTaskProposalRepository.findById(proposal.id) } returns Optional.of(proposal)
-            every { competencyRepository.findByKey(contributionKey) } returns contributionNode()
             every { userGoalRepository.findByUserIdAndProjectId(userId, projectId) } returns existing
             val saved = slot<UserGoal>()
             every { userGoalRepository.save(capture(saved)) } answers { saved.captured }
@@ -119,7 +102,7 @@ class UserGoalServiceTest {
             service.claimForMe(authId, projectId, proposal.id)
 
             assertEquals(existing.id, saved.captured.id)
-            assertEquals(contributionKey, saved.captured.competencyKey)
+            assertEquals(proposal.id, saved.captured.sourceProposalId)
         }
 
         @Test
@@ -136,46 +119,29 @@ class UserGoalServiceTest {
             assertEquals(HttpStatus.CONFLICT, exception.statusCode)
             verify(exactly = 0) { userGoalRepository.save(any()) }
         }
-
-        @Test
-        fun `404s when the approved task has no contribution node`() {
-            stageUser()
-            val proposal = approvedProposal()
-            every { starterWorkTaskProposalRepository.findById(proposal.id) } returns Optional.of(proposal)
-            every { competencyRepository.findByKey(contributionKey) } returns null
-
-            val exception = assertThrows<ResponseStatusException> {
-                service.claimForMe(authId, projectId, proposal.id)
-            }
-
-            // Claiming a goal that isn't a node would leave the path aiming at nothing.
-            assertEquals(HttpStatus.NOT_FOUND, exception.statusCode)
-            verify(exactly = 0) { userGoalRepository.save(any()) }
-        }
     }
 
     @Nested
     inner class FindForUser {
         @Test
-        fun `returns the goal when its node is still in the graph`() {
+        fun `returns the goal in the task's words`() {
+            val proposal = approvedProposal()
             every { userGoalRepository.findByUserIdAndProjectId(userId, projectId) } returns
-                UserGoal(userId = userId, projectId = projectId, competencyKey = contributionKey)
+                UserGoal(userId = userId, projectId = projectId, sourceProposalId = proposal.id)
+            every { starterWorkTaskProposalRepository.findById(proposal.id) } returns Optional.of(proposal)
 
-            val goal = service.findForUser(userId, projectId, setOf(contributionKey, "kotlin"))
-
-            assertEquals(contributionKey, goal?.competencyKey)
+            assertEquals("Fix the login redirect", service.findForUser(userId, projectId)?.title)
         }
 
         @Test
-        fun `reads as no goal once a PM removes the node`() {
+        fun `reads as no goal once the task is gone`() {
+            val missingId = UUID.randomUUID()
             every { userGoalRepository.findByUserIdAndProjectId(userId, projectId) } returns
-                UserGoal(userId = userId, projectId = projectId, competencyKey = contributionKey)
+                UserGoal(userId = userId, projectId = projectId, sourceProposalId = missingId)
+            every { starterWorkTaskProposalRepository.findById(missingId) } returns Optional.empty()
 
-            // Graph authoring can remove a contribution node; a stale goal must degrade to "no
-            // goal" rather than pointing the path at something that is no longer there.
-            val goal = service.findForUser(userId, projectId, setOf("kotlin"))
-
-            assertNull(goal)
+            // A stale goal degrades to "no goal" rather than describing work that no longer exists.
+            assertNull(service.findForUser(userId, projectId))
         }
     }
 }

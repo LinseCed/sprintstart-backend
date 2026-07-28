@@ -4,7 +4,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEv
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.RejectProposalRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.ClaimGoalRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GoalView
+import com.sprintstart.sprintstartbackend.onboarding.model.response.goal.GoalView
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.GenerateStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.ProposedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse

@@ -1,21 +1,22 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContentProvenance
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModulePageKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.NodeState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ModulePage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ModulePageCitation
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GoalView
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathEdge
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathNode
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathView
+import com.sprintstart.sprintstartbackend.onboarding.model.response.goal.GoalView
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyModuleRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
@@ -28,14 +29,26 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
+/**
+ * Unit tests for the buddy's plan-and-material tools.
+ *
+ * The plan is a **learning area**, not a curriculum: what this project teaches, against what the
+ * hire holds. The tests that used to assert graph ordering are gone with the edges — and their
+ * absence is now asserted, because handing the model an order to recite is the thing this change
+ * exists to stop.
+ */
 class BuddyPlanToolsTest {
-    private val competencyPathService: CompetencyPathService = mockk()
     private val competencyModuleRepository: CompetencyModuleRepository = mockk()
+    private val competencyRepository: CompetencyRepository = mockk()
+    private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
+    private val userGoalService: UserGoalService = mockk()
     private val verificationRepository: VerificationRepository = mockk()
     private val userApi: UserApi = mockk()
     private val tools = BuddyPlanTools(
-        competencyPathService,
         competencyModuleRepository,
+        competencyRepository,
+        userCompetencyStateRepository,
+        userGoalService,
         verificationRepository,
         userApi,
     )
@@ -66,22 +79,32 @@ class BuddyPlanToolsTest {
             listOf(userWith(ProjectDto(projectId, "Checkout", null)))
     }
 
-    private fun node(
-        key: String,
-        label: String,
-        state: NodeState,
-        level: Int?,
-        targetLevel: Int = 2,
-        moduleId: UUID? = null,
-    ) = PathNode(
-        key = key,
-        label = label,
-        kind = CompetencyKind.SKILL,
-        state = state,
-        level = level,
-        targetLevel = targetLevel,
-        moduleId = moduleId,
+    private fun competency(key: String, label: String, targetLevel: Int = 2) =
+        Competency(key = key, label = label, kind = CompetencyKind.SKILL, targetLevel = targetLevel)
+
+    private fun moduleFor(key: String, title: String) = CompetencyModule(
+        competencyKey = key,
+        projectId = projectId,
+        version = 1,
+        status = ModuleStatus.ACTIVE,
+        title = title,
     )
+
+    private fun ledger(vararg entries: Pair<String, Int>) {
+        every { userCompetencyStateRepository.findAllByUserId(userId) } returns
+            entries.map { (key, level) ->
+                UserCompetencyState(
+                    userId = userId,
+                    competencyKey = key,
+                    level = level,
+                    source = CompetencySource.ASSESSED,
+                )
+            }
+    }
+
+    private fun noGoal() {
+        every { userGoalService.findForUser(userId, projectId) } returns null
+    }
 
     @Test
     fun `exposes the learning-plan and module tools`() {
@@ -91,85 +114,91 @@ class BuddyPlanToolsTest {
     }
 
     @Test
-    fun `reads the plan in graph order with reasons, levels, and module availability`() {
+    fun `splits what the project teaches into gaps and what is already met`() {
         onOneProject()
-        val reactModuleId = UUID.randomUUID()
-        every { competencyPathService.getPathForUser(userId, projectId) } returns PathView(
-            nodes = listOf(
-                node("kotlin", "Kotlin", NodeState.MASTERED, level = 2),
-                node("react", "React", NodeState.AVAILABLE, level = 0, moduleId = reactModuleId),
-                node("testing", "Testing", NodeState.AVAILABLE, level = 1, targetLevel = 3),
-                node("ci", "CI pipelines", NodeState.AVAILABLE, level = 0),
-                node("docker", "Docker", NodeState.AVAILABLE, level = 0),
-            ),
-            edges = listOf(
-                PathEdge(from = "kotlin", to = "react"),
-                PathEdge(from = "react", to = "testing"),
-                PathEdge(from = "testing", to = "ci"),
-                PathEdge(from = "ci", to = "docker"),
-            ),
-            graphVersion = 1,
-        )
+        noGoal()
         every { competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE) } returns
-            listOf(
-                CompetencyModule(
-                    competencyKey = "react",
-                    projectId = projectId,
-                    version = 1,
-                    status = ModuleStatus.ACTIVE,
-                    title = "React basics",
-                    id = reactModuleId,
-                ),
+            listOf(moduleFor("kotlin", "Kotlin basics"), moduleFor("react", "React basics"))
+        every { competencyRepository.findAllByKeyIn(any()) } returns
+            listOf(competency("kotlin", "Kotlin"), competency("react", "React"))
+        ledger("kotlin" to 2, "react" to 0)
+
+        val result = tools.execute(planCall, userId)
+
+        assertThat(result).contains("Already met: Kotlin.")
+        assertThat(result).contains("React (no evidence yet)")
+        assertThat(result).contains("React basics")
+    }
+
+    /**
+     * The property the whole retirement turns on: the plan must not hand the model an order to
+     * recite. Sequencing is its judgement in conversation, where a hire can question it.
+     */
+    @Test
+    fun `states no ordering between competencies`() {
+        onOneProject()
+        noGoal()
+        every { competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE) } returns
+            listOf(moduleFor("kotlin", "Kotlin basics"), moduleFor("react", "React basics"))
+        every { competencyRepository.findAllByKeyIn(any()) } returns
+            listOf(competency("kotlin", "Kotlin"), competency("react", "React"))
+        ledger()
+
+        val result = tools.execute(planCall, userId)
+
+        assertThat(result).doesNotContain("usually comes after")
+        assertThat(result).doesNotContain("Next up")
+        assertThat(result).contains("shelf, not an order")
+    }
+
+    @Test
+    fun `partial progress reads as a level against its bar, never as a score`() {
+        onOneProject()
+        noGoal()
+        every { competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE) } returns
+            listOf(moduleFor("react", "React basics"))
+        every { competencyRepository.findAllByKeyIn(any()) } returns
+            listOf(competency("react", "React", targetLevel = 3))
+        ledger("react" to 1)
+
+        assertThat(tools.execute(planCall, userId)).contains("React (at level 1 of 3)")
+    }
+
+    @Test
+    fun `names the goal in the task's own words`() {
+        onOneProject()
+        every { userGoalService.findForUser(userId, projectId) } returns
+            GoalView(
+                proposalId = UUID.randomUUID(),
+                title = "Fix the login redirect",
+                summary = null,
+                sourceUrl = null,
             )
+        every { competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE) } returns
+            listOf(moduleFor("react", "React basics"))
+        every { competencyRepository.findAllByKeyIn(any()) } returns listOf(competency("react", "React"))
+        ledger()
 
-        val result = tools.execute(planCall, userId)
-
-        assertThat(result).contains("Learning plan on Checkout")
-        // No goal claimed, so the plan says so and points at the move that fills it in --
-        // which is the hire's, not a PM approving a baseline nothing reads any more.
-        assertThat(result).contains("nothing claimed yet — offer to claim a goal")
-        assertThat(result).contains("React (level 0/2) — usually comes after Kotlin. Module: “React basics”")
-        assertThat(result).contains("Testing (level 1/3) — usually comes after React. No published module yet")
-        assertThat(result).contains("After that:")
-        assertThat(result).contains("Docker (level 0/2) — usually comes after CI pipelines")
-        assertThat(result).contains("Already met: Kotlin")
-        // Reasons travel; no score or internal state name does.
-        assertThat(result).doesNotContain("AVAILABLE")
+        assertThat(tools.execute(planCall, userId)).contains("Working toward: Fix the login redirect")
     }
 
+    /**
+     * A project with no published module has no learning area, and saying so beats naming gaps with
+     * nothing behind them.
+     */
     @Test
-    fun `names the goal and what stands between the hire and it`() {
+    fun `no published modules is an answer, not an error`() {
         onOneProject()
-        every { competencyPathService.getPathForUser(userId, projectId) } returns PathView(
-            nodes = listOf(node("kotlin", "Kotlin", NodeState.AVAILABLE, level = 0)),
-            edges = emptyList(),
-            graphVersion = 1,
-            goal = GoalView(
-                competencyKey = "contrib-fix-login",
-                label = "Fix the login redirect",
-                remainingCount = 2,
-                isReachable = false,
-            ),
-        )
-        every { competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE) } returns
-            emptyList()
+        noGoal()
+        every {
+            competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE)
+        } returns emptyList()
+        ledger()
 
         val result = tools.execute(planCall, userId)
 
-        assertThat(result).contains("Working toward: Fix the login redirect — 2 prerequisite(s) still to go.")
-    }
-
-    @Test
-    fun `an empty plan is an answer, not an error`() {
-        onOneProject()
-        every { competencyPathService.getPathForUser(userId, projectId) } returns
-            PathView(nodes = emptyList(), edges = emptyList(), graphVersion = 1)
-        every { competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE) } returns
-            emptyList()
-
-        val result = tools.execute(planCall, userId)
-
-        assertThat(result).contains("no learning plan yet")
+        assertThat(result).contains("no learning area")
+        assertThat(result).contains("search_docs")
     }
 
     @Test

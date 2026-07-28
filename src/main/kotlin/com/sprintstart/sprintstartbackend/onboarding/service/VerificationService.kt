@@ -63,7 +63,6 @@ class VerificationService(
     private val competencyModuleRepository: CompetencyModuleRepository,
     private val competencyRepository: CompetencyRepository,
     private val userCompetencyStateRepository: UserCompetencyStateRepository,
-    private val competencyGraphVersionService: CompetencyGraphVersionService,
     private val onboardingAiClient: OnboardingAiClient,
     private val githubRepositoryApi: GithubRepositoryApi,
     private val userApi: UserApi,
@@ -170,7 +169,6 @@ class VerificationService(
                 feedback = graded.feedback,
                 hint = graded.hint,
                 attemptNo = context.attemptNo,
-                graphVersion = competencyGraphVersionService.currentVersion(),
             ),
         )
 

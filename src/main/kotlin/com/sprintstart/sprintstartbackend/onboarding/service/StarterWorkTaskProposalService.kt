@@ -2,14 +2,10 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
@@ -17,7 +13,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.ProposedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
-import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
@@ -55,10 +50,8 @@ import java.util.UUID
 class StarterWorkTaskProposalService(
     private val onboardingAiClient: OnboardingAiClient,
     private val competencyRepository: CompetencyRepository,
-    private val competencyEdgeRepository: CompetencyEdgeRepository,
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val userCompetencyStateRepository: UserCompetencyStateRepository,
-    private val competencyGraphVersionService: CompetencyGraphVersionService,
     private val githubHistoryPriorService: GithubHistoryPriorService,
     private val artifactIngestionApi: ArtifactIngestionApi,
     private val userApi: UserApi,
@@ -233,7 +226,6 @@ class StarterWorkTaskProposalService(
     @Transactional
     fun approve(id: UUID): StarterWorkTaskProposalResponse {
         val proposal = findPendingProposal(id)
-        materialiseContributionNode(proposal)
         proposal.status = ProposalStatus.APPROVED
         proposal.decidedAt = Instant.now()
         return proposal.toResponse()
@@ -269,52 +261,7 @@ class StarterWorkTaskProposalService(
                 onboardingTrackKey = request.onboardingTrackKey?.trim()?.takeIf { it.isNotBlank() },
             ),
         )
-        materialiseContributionNode(proposal)
         return proposal.toResponse()
-    }
-
-    /**
-     * Creates the `CONTRIBUTION` [Competency] a task becomes and wires a `PREREQUISITE` edge from
-     * each tagged key that is a live competency, then bumps the graph version.
-     *
-     * Shared by [approve] and [createTask] so a mined and a hand-authored task land in the graph
-     * identically. A tagged key that isn't a live competency is skipped rather than blocking, and an
-     * already-present node or edge is left alone -- both paths are idempotent w.r.t. the graph.
-     */
-    private fun materialiseContributionNode(proposal: StarterWorkTaskProposal) {
-        val contributionKey = contributionKeyFor(proposal.sourceId)
-
-        if (!competencyRepository.existsByKey(contributionKey)) {
-            competencyRepository.save(
-                Competency(
-                    key = contributionKey,
-                    label = proposal.title,
-                    description = proposal.summary,
-                    kind = CompetencyKind.CONTRIBUTION,
-                    repoRef = proposal.sourceUrl,
-                ),
-            )
-            competencyGraphVersionService.recordNodeAdded(contributionKey)
-        }
-
-        val liveKeys = competencyRepository.findAllByKeyIn(proposal.competencyKeys).map { it.key }.toSet()
-        proposal.competencyKeys
-            .filter { it in liveKeys }
-            .forEach { prereqKey ->
-                if (!competencyEdgeRepository.existsByFromKeyAndToKeyAndKind(
-                        prereqKey,
-                        contributionKey,
-                        EdgeKind.PREREQUISITE,
-                    )
-                ) {
-                    competencyEdgeRepository.save(
-                        CompetencyEdge(fromKey = prereqKey, toKey = contributionKey, kind = EdgeKind.PREREQUISITE),
-                    )
-                    competencyGraphVersionService.recordEdgeAdded(prereqKey, contributionKey, EdgeKind.PREREQUISITE)
-                }
-            }
-
-        competencyGraphVersionService.bump()
     }
 
     /**
@@ -497,18 +444,6 @@ class StarterWorkTaskProposalService(
          * finds no ingested artifact -- both degrade to "no signal" rather than misattributing.
          */
         private const val HAND_AUTHORED_SOURCE_PREFIX = "authored:"
-
-        /**
-         * Derives a stable, deterministic competency key for the CONTRIBUTION node an approved
-         * task becomes.
-         *
-         * Deliberately a pure function of [sourceId] and nothing else, so the mapping from task to
-         * node survives everything a PM can change: a node's label, description and kind are all
-         * editable, so matching a task to its node on any of those would break the first time
-         * somebody renamed it.
-         */
-        fun contributionKeyFor(sourceId: String): String =
-            sourceId.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
     }
 
     private fun findPendingProposal(id: UUID): StarterWorkTaskProposal {

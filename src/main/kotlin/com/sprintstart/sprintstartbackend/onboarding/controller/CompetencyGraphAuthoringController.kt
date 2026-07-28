@@ -1,10 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
-import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyEdgeRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.UpdateCompetencyRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyGraphResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.DeleteCompetencyResponse
@@ -22,7 +19,6 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
-import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
@@ -167,55 +163,5 @@ class CompetencyGraphAuthoringController(
     @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
     fun deleteCompetency(@PathVariable key: String): DeleteCompetencyResponse {
         return competencyGraphAuthoringService.deleteCompetency(key)
-    }
-
-    /**
-     * Adds a hand-authored edge between two live competencies.
-     */
-    @Operation(
-        summary = "Add a competency edge",
-        description = "Adds a hand-authored edge between two live competencies",
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Edge created"),
-            ApiResponse(responseCode = "400", description = "Self-edge, or the edge would create a prerequisite cycle"),
-            ApiResponse(responseCode = "401", description = "Authentication required"),
-            ApiResponse(responseCode = "403", description = "Insufficient role"),
-            ApiResponse(responseCode = "404", description = "An endpoint is not a live competency"),
-            ApiResponse(responseCode = "409", description = "The edge already exists"),
-        ],
-    )
-    @ResponseStatus(HttpStatus.OK)
-    @PostMapping("/edges")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
-    fun createEdge(@RequestBody request: CreateCompetencyEdgeRequest): CompetencyEdgeResponse {
-        return competencyGraphAuthoringService.createEdge(request)
-    }
-
-    /**
-     * Removes one edge from the live graph, leaving both endpoints in place.
-     */
-    @Operation(
-        summary = "Remove a competency edge",
-        description = "Removes one edge from the live graph; both endpoint competencies are kept",
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Edge removed"),
-            ApiResponse(responseCode = "401", description = "Authentication required"),
-            ApiResponse(responseCode = "403", description = "Insufficient role"),
-            ApiResponse(responseCode = "404", description = "No such edge in the live graph"),
-        ],
-    )
-    @ResponseStatus(HttpStatus.OK)
-    @DeleteMapping("/edges")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
-    fun deleteEdge(
-        @RequestParam fromKey: String,
-        @RequestParam toKey: String,
-        @RequestParam(defaultValue = "PREREQUISITE") kind: EdgeKind,
-    ): CompetencyEdgeResponse {
-        return competencyGraphAuthoringService.deleteEdge(fromKey, toKey, kind)
     }
 }

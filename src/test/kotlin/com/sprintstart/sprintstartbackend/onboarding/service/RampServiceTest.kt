@@ -146,7 +146,6 @@ class RampServiceTest {
             UserGoal(
                 userId = hireId,
                 projectId = projectId,
-                competencyKey = "github-acme-api-issue-1",
                 sourceProposalId = proposal.id,
                 claimedAt = claimedAt,
             )

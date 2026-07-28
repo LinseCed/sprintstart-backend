@@ -3,16 +3,12 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
 import com.sprintstart.sprintstartbackend.connectors.github.external.dto.PullRequestEvidence
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModulePageKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.NodeState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeResult
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ModulePage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
@@ -53,7 +49,6 @@ class VerificationServiceTest {
     private val competencyModuleRepository: CompetencyModuleRepository = mockk()
     private val competencyRepository: CompetencyRepository = mockk()
     private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
-    private val competencyGraphVersionService: CompetencyGraphVersionService = mockk()
     private val onboardingAiClient: OnboardingAiClient = mockk()
     private val githubRepositoryApi: GithubRepositoryApi = mockk()
     private val userApi: UserApi = mockk()
@@ -64,7 +59,6 @@ class VerificationServiceTest {
         competencyModuleRepository,
         competencyRepository,
         userCompetencyStateRepository,
-        competencyGraphVersionService,
         onboardingAiClient,
         githubRepositoryApi,
         userApi,
@@ -163,7 +157,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 3
             every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns null
             val savedState = slot<UserCompetencyState>()
             every { userCompetencyStateRepository.save(capture(savedState)) } answers { savedState.captured }
@@ -174,7 +167,6 @@ class VerificationServiceTest {
             assertTrue(result.passed)
             assertEquals(CompetencySource.VERIFIED, savedState.captured.source)
             assertEquals(1, savedState.captured.level)
-            assertEquals(3, result.graphVersion)
             coVerify(exactly = 0) { onboardingAiClient.gradeKnowledge(any(), any(), any(), any(), any()) }
         }
 
@@ -185,7 +177,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
             val savedAttempt = slot<VerificationAttempt>()
             every { verificationAttemptRepository.save(capture(savedAttempt)) } answers { savedAttempt.captured }
 
@@ -208,7 +199,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery {
                 onboardingAiClient.gradeKnowledge(
                     "Explain it",
@@ -235,7 +225,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery { onboardingAiClient.gradeKnowledge(any(), any(), any(), any(), any()) } throws
                 OnboardingAiException(503, "", "AI unavailable")
 
@@ -268,7 +257,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) } returns evidence
             coEvery { onboardingAiClient.gradeArtifact("Explain it", "closes the ticket", any()) } returns
                 GradeResult(passed = true, score = 1.0, feedback = "Satisfies the rubric.")
@@ -305,7 +293,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) } returns evidence
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
@@ -341,7 +328,6 @@ class VerificationServiceTest {
             every { userApi.getGithubLoginByUserId(userId) } returns null
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) } returns evidence
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
@@ -367,7 +353,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
             every {
                 verificationAttemptRepository.existsByVerificationIdAndAnswerAndPassedIsTrueAndUserIdNot(
                     verification.id,
@@ -400,7 +385,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 42) } returns null
             val saved = slot<VerificationAttempt>()
             every { verificationAttemptRepository.save(capture(saved)) } answers { firstArg() }
@@ -422,7 +406,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
             val result = service.submitModuleAttemptForMe(
@@ -449,7 +432,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
             coEvery { githubRepositoryApi.getPullRequestEvidence(repositoryConnectionId, 99) } returns null
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
@@ -523,7 +505,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 2
-            every { competencyGraphVersionService.currentVersion() } returns 1
             every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns null
             every { userCompetencyStateRepository.save(any()) } answers { firstArg() }
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
@@ -546,7 +527,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
             every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns existing
             every { verificationAttemptRepository.save(any()) } answers { firstArg() }
 
@@ -573,7 +553,6 @@ class VerificationServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             stubModule(module, verification)
             every { verificationAttemptRepository.countByVerificationIdAndUserId(verification.id, userId) } returns 0
-            every { competencyGraphVersionService.currentVersion() } returns 1
             every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns null
             val savedState = slot<UserCompetencyState>()
             every { userCompetencyStateRepository.save(capture(savedState)) } answers { savedState.captured }
@@ -581,19 +560,10 @@ class VerificationServiceTest {
 
             service.submitModuleAttemptForMe(authId, module.id, SubmitVerificationAttemptRequest("done"))
 
-            val kotlin = Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL)
-            val domainModel = Competency(key = "domain-model", label = "Domain model", kind = CompetencyKind.CONCEPT)
-            val edge = CompetencyEdge(fromKey = "kotlin", toKey = "domain-model", kind = EdgeKind.PREREQUISITE)
-            val projection = PathProjectionService(GraphTraversalService()).project(
-                competencies = listOf(kotlin, domainModel),
-                edges = listOf(edge),
-                targetKeys = setOf("kotlin", "domain-model"),
-                ledger = mapOf("kotlin" to savedState.captured.level),
-                graphVersion = 1,
-            )
-
-            assertEquals(NodeState.MASTERED, projection.nodes.first { it.key == "kotlin" }.state)
-            assertEquals(NodeState.AVAILABLE, projection.nodes.first { it.key == "domain-model" }.state)
+            // Passing an intermediate check clears the default bar, which is what "met" means now
+            // that there is no projection to ask. The bar lives on the competency; the ledger level
+            // is the only thing a pass moves.
+            assertEquals(Competency.DEFAULT_TARGET_LEVEL, savedState.captured.level)
         }
     }
 

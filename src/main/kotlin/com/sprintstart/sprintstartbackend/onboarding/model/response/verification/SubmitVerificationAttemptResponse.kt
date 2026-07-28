@@ -17,5 +17,4 @@ data class SubmitVerificationAttemptResponse(
     // Escalating hint for the next attempt; null when passed.
     val hint: String? = null,
     val attemptNo: Int,
-    val graphVersion: Int,
 )

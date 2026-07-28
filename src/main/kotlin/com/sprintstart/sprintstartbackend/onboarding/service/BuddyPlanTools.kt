@@ -1,14 +1,13 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.NodeState
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathEdge
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathNode
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.PathView
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyModuleRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.VerificationRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.serialization.json.JsonPrimitive
@@ -25,18 +24,27 @@ import java.util.UUID
  * The buddy's plan-and-material tools: what the hire should learn next, and the content to teach
  * it from.
  *
- * The competency graph stopped being a hire-facing UI and became the buddy's working memory:
- * [GET_LEARNING_PLAN] reads the same projection `GET /me/path` serves (the claimed goal and
- * everything it needs, ordered by prerequisite edges, state derived from the ledger) and reads it
- * *to* the hire with reasons —
- * never scores. [GET_MODULE] hands the buddy a published competency module's pages, with their
- * citations, so teaching stays grounded in the PM-approved material rather than improvised. Both
- * are executed strictly on behalf of the resolved caller, like every buddy tool.
+ * The competency graph stopped being a hire-facing UI and became the buddy's working memory. With
+ * its structure retired it is a **learning area**, not a curriculum: [GET_LEARNING_PLAN] reads what
+ * this project teaches — the competencies with a published module — against the hire's own ledger,
+ * and reports what they already hold and where the gaps are. Reasons, never scores.
+ *
+ * There is deliberately **no ordering**. Prerequisite edges ranked rather than gated, were mined
+ * from a code corpus, and reached the hire through a `PathEdge` that had dropped the edge kind — so
+ * a `RELATED` edge, the kind that explicitly means *not* ordering, could be spoken as "usually comes
+ * after". Sequencing a hire's learning is now the model's judgement in conversation, where it can be
+ * questioned, rather than a DAG's assertion that could not be.
+ *
+ * [GET_MODULE] hands the buddy a published module's pages with their citations, so teaching stays
+ * grounded in real material rather than improvised. Both run strictly on behalf of the resolved
+ * caller, like every buddy tool.
  */
 @Component
 class BuddyPlanTools(
-    private val competencyPathService: CompetencyPathService,
     private val competencyModuleRepository: CompetencyModuleRepository,
+    private val competencyRepository: CompetencyRepository,
+    private val userCompetencyStateRepository: UserCompetencyStateRepository,
+    private val userGoalService: UserGoalService,
     private val verificationRepository: VerificationRepository,
     private val userApi: UserApi,
 ) {
@@ -63,92 +71,87 @@ class BuddyPlanTools(
         if (projects.isEmpty()) {
             return "You are not a member of any project yet, so there is no learning plan."
         }
+        val ledger = userCompetencyStateRepository
+            .findAllByUserId(userId)
+            .associate { it.competencyKey to it.level }
+
         return projects
-            .map { project ->
-                val path = competencyPathService.getPathForUser(userId, project.projectId)
-                val moduleTitleById = competencyModuleRepository
-                    .findAllByProjectIdAndStatus(project.projectId, ModuleStatus.ACTIVE)
-                    .associate { it.id to it.title }
-                describePlan(project.name, path, moduleTitleById)
-            }.joinToString("\n\n")
+            .map { project -> describePlan(userId, project.projectId, project.name, ledger) }
+            .joinToString("\n\n")
     }
 
+    /**
+     * What this project teaches, against what the hire already holds.
+     *
+     * The learning area is exactly the competencies with a **published module** on this project.
+     * Naming a gap with no material behind it would be telling a hire they are missing something and
+     * then having nothing to offer; anything else they need to know is what `search_docs` is for.
+     */
     private fun describePlan(
+        userId: UUID,
+        projectId: UUID,
         projectName: String,
-        path: PathView,
-        moduleTitleById: Map<UUID, String>,
+        ledger: Map<String, Int>,
     ): String {
-        if (path.nodes.isEmpty()) {
-            // The plan is the claimed goal and what it needs, so an empty one means no goal --
-            // and claiming one is the hire's own move, through claim_goal. The old copy sent them
-            // to wait on a PM approving a baseline, which stopped being a thing the path reads.
-            return "On $projectName there is no learning plan yet, because no goal has been " +
-                "claimed. Ask what they would like to work toward and offer to claim it — that " +
-                "is what fills the plan in."
+        val modules = competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE)
+        val goal = userGoalService.findForUser(userId, projectId)
+        val goalLine = goal
+            ?.let { "- Working toward: ${it.title}" }
+            ?: "- Working toward: nothing claimed yet — offer to claim a goal."
+
+        if (modules.isEmpty()) {
+            return "On $projectName nothing has a published module yet, so there is no learning " +
+                "area to teach from — answer from the docs with search_docs instead.\n$goalLine"
         }
 
-        val labelByKey = path.nodes.associate { it.key to it.label }
-        val mastered = path.nodes.filter { it.state == NodeState.MASTERED }
-        val available = path.nodes.filter { it.state == NodeState.AVAILABLE }
+        val moduleByKey = modules.associateBy { it.competencyKey }
+        val competencies = competencyRepository
+            .findAllByKeyIn(moduleByKey.keys.toList())
+            .sortedBy { it.label }
+        val (held, gaps) = competencies.partition { (ledger[it.key] ?: 0) >= it.targetLevel }
 
         return buildString {
-            appendLine("Learning plan on $projectName:")
-            val goal = path.goal
-            if (goal != null) {
-                appendLine(
-                    "- Working toward: ${goal.label} — " +
-                        if (goal.isReachable) {
-                            "every prerequisite is met, it can be started now."
-                        } else {
-                            "${goal.remainingCount} prerequisite(s) still to go."
-                        },
-                )
+            appendLine("Learning area on $projectName:")
+            appendLine(goalLine)
+
+            if (gaps.isEmpty()) {
+                appendLine("No gaps — they already meet everything this project teaches.")
             } else {
-                appendLine("- Working toward: nothing claimed yet — offer to claim a goal.")
+                appendLine("Gaps:")
+                gaps.forEach { appendLine("- ${describeGap(it, ledger, moduleByKey)}") }
             }
 
-            appendLine("Next up (in the order the graph suggests):")
-            available.take(NEXT_UP_COUNT).forEach { node ->
-                appendLine("- ${describeNode(node, path.edges, labelByKey, moduleTitleById)}")
+            if (held.isNotEmpty()) {
+                appendLine("Already met: ${held.joinToString(", ") { it.label }}.")
             }
-            val later = available.drop(NEXT_UP_COUNT)
-            if (later.isNotEmpty()) {
-                appendLine("After that:")
-                later.forEach { node ->
-                    appendLine("- ${describeNode(node, path.edges, labelByKey, moduleTitleById)}")
-                }
-            }
-
-            if (mastered.isNotEmpty()) {
-                appendLine("Already met: ${mastered.joinToString(", ") { it.label }}.")
-            }
+            appendLine(
+                "This is a shelf, not an order to follow. Bring one up when it would help with " +
+                    "what they are actually working on, and say why it is relevant then.",
+            )
         }.trim()
     }
 
     /**
-     * One plan line: the node, how far along it is, and *why it sits where it sits*. The reason
-     * comes from the prerequisite edges, stated as an ordering hint — edges rank, they never lock
-     * (the #74 rule: a hire hears reasons, never a score).
+     * One gap: what it is, how far along they are, and the material that covers it.
+     *
+     * Stated as a level against its bar rather than as a score — the #74 rule is that a hire hears
+     * reasons, never a number standing in for one.
      */
-    private fun describeNode(
-        node: PathNode,
-        edges: List<PathEdge>,
-        labelByKey: Map<String, String>,
-        moduleTitleById: Map<UUID, String>,
+    private fun describeGap(
+        competency: Competency,
+        ledger: Map<String, Int>,
+        moduleByKey: Map<String, CompetencyModule>,
     ): String {
-        val prerequisites = edges
-            .filter { it.to == node.key }
-            .mapNotNull { labelByKey[it.from] }
-        val reason = if (prerequisites.isEmpty()) {
-            "a good place to start"
+        val level = ledger[competency.key] ?: 0
+        val progress = if (level == 0) {
+            "no evidence yet"
         } else {
-            "usually comes after ${prerequisites.joinToString(", ")}"
+            "at level $level of ${competency.targetLevel}"
         }
-        val module = node.moduleId
-            ?.let { moduleTitleById[it] }
-            ?.let { " Module: “$it” — offer to teach it." }
-            ?: " No published module yet — teach from the docs instead."
-        return "${node.label} (level ${node.level ?: 0}/${node.targetLevel}) — $reason.$module"
+        val material = moduleByKey[competency.key]
+            ?.let { " Module: “${it.title}” — offer to teach it." }
+            .orEmpty()
+        return "${competency.label} ($progress).$material"
     }
 
     private fun getModule(userId: UUID, competencyKey: String): String {
@@ -218,23 +221,20 @@ class BuddyPlanTools(
         const val GET_LEARNING_PLAN = "get_learning_plan"
         const val GET_MODULE = "get_module"
 
-        // How many available nodes are framed as "next up" before the rest become "after that" --
-        // enough to choose from, few enough to stay a plan rather than a backlog.
-        const val NEXT_UP_COUNT = 3
-
         // Page bodies are capped so one tool result can't crowd out the whole prompt; the buddy
         // teaches, it does not need to quote the page verbatim end to end.
         const val MAX_PAGE_BODY_CHARS = 1500
 
         val GET_LEARNING_PLAN_SPEC = BuddyToolSpecDto(
             name = GET_LEARNING_PLAN,
-            description = "The hire's learning plan on their project(s): what they are working " +
-                "toward (the goal they claimed), which competencies are next " +
-                "in the order the graph suggests, how far along each is against its target level, " +
-                "and whether a module teaches it. Consult this BEFORE recommending what to learn " +
-                "or work on — the plan determines sequence, never your own intuition. State the " +
-                "reasons it gives ('usually comes after X'); never invent an order or mention " +
-                "scores. Takes no arguments — it always reads the caller.",
+            description = "The hire's learning area on their project(s): what they are working " +
+                "toward (the goal they claimed), which competencies this project teaches, how far " +
+                "along they are against each one's target level, and which module covers it. " +
+                "Consult this BEFORE offering to teach something, so you only offer material that " +
+                "exists. It is a shelf, not a sequence — there is no prescribed order, so bring a " +
+                "gap up when it is relevant to what the hire is actually doing and say why it is " +
+                "relevant. Never read a level out as a score. Takes no arguments — it always reads " +
+                "the caller.",
             parameters = buildJsonObject {
                 put("type", "object")
                 put("properties", buildJsonObject { })

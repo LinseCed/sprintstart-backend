@@ -6,7 +6,6 @@ import com.sprintstart.sprintstartbackend.ingestion.external.TaskSourceArtifact
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedStarterTaskSchema
@@ -16,7 +15,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.GithubHistoryP
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
-import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
@@ -49,10 +47,8 @@ import kotlin.test.assertTrue
 class StarterWorkTaskProposalServiceTest {
     private val onboardingAiClient: OnboardingAiClient = mockk()
     private val competencyRepository: CompetencyRepository = mockk()
-    private val competencyEdgeRepository: CompetencyEdgeRepository = mockk()
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository = mockk()
     private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
-    private val competencyGraphVersionService: CompetencyGraphVersionService = mockk(relaxed = true)
     private val githubHistoryPriorService: GithubHistoryPriorService = mockk()
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
     private val userApi: UserApi = mockk()
@@ -63,10 +59,8 @@ class StarterWorkTaskProposalServiceTest {
     private val service = StarterWorkTaskProposalService(
         onboardingAiClient,
         competencyRepository,
-        competencyEdgeRepository,
         starterWorkTaskProposalRepository,
         userCompetencyStateRepository,
-        competencyGraphVersionService,
         githubHistoryPriorService,
         artifactIngestionApi,
         userApi,
@@ -217,59 +211,6 @@ class StarterWorkTaskProposalServiceTest {
     @Nested
     inner class Approve {
         @Test
-        fun `creates a CONTRIBUTION competency and prerequisite edges for known keys`() {
-            val proposal = StarterWorkTaskProposal(
-                sourceId = "github:org/repo:ISSUE:1",
-                title = "Fix typo",
-                summary = "Fix a typo",
-                competencyKeys = mutableListOf("docs", "unknown-key"),
-            )
-            every { starterWorkTaskProposalRepository.findById(proposal.id) } returns Optional.of(proposal)
-            every { competencyRepository.existsByKey("github-org-repo-issue-1") } returns false
-            every { competencyRepository.save(any<Competency>()) } answers { firstArg() }
-            every { competencyRepository.findAllByKeyIn(listOf("docs", "unknown-key")) } returns
-                listOf(Competency(key = "docs", label = "Docs", kind = CompetencyKind.SKILL))
-            every {
-                competencyEdgeRepository.existsByFromKeyAndToKeyAndKind(
-                    "docs",
-                    "github-org-repo-issue-1",
-                    EdgeKind.PREREQUISITE,
-                )
-            } returns false
-            every { competencyEdgeRepository.save(any()) } answers { firstArg() }
-
-            val result = service.approve(proposal.id)
-
-            assertEquals(ProposalStatus.APPROVED, proposal.status)
-            assertEquals(ProposalStatus.APPROVED, result.status)
-            verify(exactly = 1) {
-                competencyRepository.save(
-                    match<Competency> { it.key == "github-org-repo-issue-1" && it.kind == CompetencyKind.CONTRIBUTION },
-                )
-            }
-            verify(exactly = 1) { competencyGraphVersionService.recordNodeAdded("github-org-repo-issue-1") }
-            verify(exactly = 1) {
-                competencyEdgeRepository.save(
-                    match { it.fromKey == "docs" && it.toKey == "github-org-repo-issue-1" },
-                )
-            }
-            verify(exactly = 1) { competencyGraphVersionService.bump() }
-        }
-
-        @Test
-        fun `does not recreate the contribution competency if it already exists`() {
-            val proposal = StarterWorkTaskProposal(sourceId = "github:org/repo:ISSUE:2", title = "Existing")
-            every { starterWorkTaskProposalRepository.findById(proposal.id) } returns Optional.of(proposal)
-            every { competencyRepository.existsByKey("github-org-repo-issue-2") } returns true
-            every { competencyRepository.findAllByKeyIn(emptyList()) } returns emptyList()
-
-            service.approve(proposal.id)
-
-            verify(exactly = 0) { competencyRepository.save(any()) }
-            verify(exactly = 0) { competencyGraphVersionService.recordNodeAdded(any()) }
-        }
-
-        @Test
         fun `throws 404 when no proposal matches`() {
             val id = UUID.randomUUID()
             every { starterWorkTaskProposalRepository.findById(id) } returns Optional.empty()
@@ -292,52 +233,6 @@ class StarterWorkTaskProposalServiceTest {
 
     @Nested
     inner class CreateTask {
-        @Test
-        fun `creates an APPROVED task and materialises its contribution node`() {
-            val slot = slot<StarterWorkTaskProposal>()
-            every { starterWorkTaskProposalRepository.save(capture(slot)) } answers { slot.captured }
-            every { competencyRepository.existsByKey(any()) } returns false
-            every { competencyRepository.save(any<Competency>()) } answers { firstArg() }
-            every { competencyRepository.findAllByKeyIn(any()) } returns emptyList()
-
-            val result = service.createTask(CreateStarterWorkTaskRequest(title = "Add dark mode"))
-
-            // A PM authoring a task is the review -- it is born approved, not proposed.
-            assertEquals(ProposalStatus.APPROVED, result.status)
-            assertEquals("Add dark mode", result.title)
-            // The synthetic source id is deliberately not a github: id, so ranking finds no repo for it.
-            assertTrue(slot.captured.sourceId.startsWith("authored:"))
-            verify(exactly = 1) {
-                competencyRepository.save(
-                    match<Competency> { it.kind == CompetencyKind.CONTRIBUTION && it.label == "Add dark mode" },
-                )
-            }
-            verify(exactly = 1) { competencyGraphVersionService.recordNodeAdded(any()) }
-            verify(exactly = 1) { competencyGraphVersionService.bump() }
-        }
-
-        @Test
-        fun `wires prerequisite edges for keys that are live competencies and skips the rest`() {
-            val slot = slot<StarterWorkTaskProposal>()
-            every { starterWorkTaskProposalRepository.save(capture(slot)) } answers { slot.captured }
-            every { competencyRepository.existsByKey(any()) } returns false
-            every { competencyRepository.save(any<Competency>()) } answers { firstArg() }
-            every { competencyRepository.findAllByKeyIn(listOf("kotlin", "ghost")) } returns
-                listOf(Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL))
-            every {
-                competencyEdgeRepository.existsByFromKeyAndToKeyAndKind(eq("kotlin"), any(), EdgeKind.PREREQUISITE)
-            } returns false
-            every { competencyEdgeRepository.save(any()) } answers { firstArg() }
-
-            service.createTask(
-                CreateStarterWorkTaskRequest(title = "Add dark mode", competencyKeys = listOf("kotlin", "ghost")),
-            )
-
-            // "kotlin" is live -> an edge; "ghost" is not a competency -> skipped, not an error.
-            verify(exactly = 1) { competencyEdgeRepository.save(match { it.fromKey == "kotlin" }) }
-            verify(exactly = 0) { competencyEdgeRepository.save(match { it.fromKey == "ghost" }) }
-        }
-
         @Test
         fun `rejects a blank title`() {
             val ex = assertThrows<ResponseStatusException> {

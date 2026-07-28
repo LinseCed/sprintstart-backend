@@ -2,9 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.repository
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -37,7 +35,6 @@ class CompetencyGraphRepositoryTest
     @Autowired
     constructor(
         private val competencyRepository: CompetencyRepository,
-        private val competencyEdgeRepository: CompetencyEdgeRepository,
         private val userCompetencyStateRepository: UserCompetencyStateRepository,
     ) {
         @Test
@@ -86,46 +83,6 @@ class CompetencyGraphRepositoryTest
                 )
             }.isInstanceOf(DataIntegrityViolationException::class.java)
         }
-
-        @Test
-        fun `findAllByToKey and findAllByFromKey return the incident edges`() {
-            competencyEdgeRepository.saveAll(
-                listOf(
-                    prerequisite(from = "kotlin", to = "our-domain-model"),
-                    prerequisite(from = "spring-boot", to = "our-domain-model"),
-                    prerequisite(from = "our-domain-model", to = "jpa-persistence"),
-                ),
-            )
-
-            val intoDomainModel = competencyEdgeRepository.findAllByToKey("our-domain-model")
-            val outOfDomainModel = competencyEdgeRepository.findAllByFromKey("our-domain-model")
-
-            assertThat(intoDomainModel.map { it.fromKey }).containsExactlyInAnyOrder("kotlin", "spring-boot")
-            assertThat(outOfDomainModel.map { it.toKey }).containsExactly("jpa-persistence")
-        }
-
-        @Test
-        fun `rejects a duplicate edge for the same from-to-kind triple`() {
-            competencyEdgeRepository.saveAndFlush(prerequisite(from = "kotlin", to = "our-domain-model"))
-
-            assertThatThrownBy {
-                competencyEdgeRepository.saveAndFlush(prerequisite(from = "kotlin", to = "our-domain-model"))
-            }.isInstanceOf(DataIntegrityViolationException::class.java)
-        }
-
-        @Test
-        fun `allows edges between the same nodes when the kind differs`() {
-            competencyEdgeRepository.saveAndFlush(prerequisite(from = "kotlin", to = "our-domain-model"))
-
-            competencyEdgeRepository.saveAndFlush(
-                CompetencyEdge(fromKey = "kotlin", toKey = "our-domain-model", kind = EdgeKind.RELATED),
-            )
-
-            assertThat(competencyEdgeRepository.findAllByFromKey("kotlin")).hasSize(2)
-        }
-
-        private fun prerequisite(from: String, to: String): CompetencyEdge =
-            CompetencyEdge(fromKey = from, toKey = to, kind = EdgeKind.PREREQUISITE)
 
         @Test
         fun `persists and looks up a user competency state entry`() {

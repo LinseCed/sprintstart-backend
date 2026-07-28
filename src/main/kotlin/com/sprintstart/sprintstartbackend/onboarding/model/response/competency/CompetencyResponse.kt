@@ -1,10 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.response.competency
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 
 /**
- * A live competency node as a PM authoring it sees it.
+ * One competency as a PM authoring it sees it.
  *
  * [key] is returned but never accepted as input -- a PM needs to see the identity the ledger is
  * keyed by, and needs to be told it is not what they are renaming.
@@ -16,45 +15,20 @@ data class CompetencyResponse(
     val kind: CompetencyKind,
     val targetLevel: Int,
     val invariant: Boolean,
-    val repoRef: String?,
-)
-
-/** A live competency edge as a PM authoring it sees it. */
-data class CompetencyEdgeResponse(
-    val fromKey: String,
-    val toKey: String,
-    val kind: EdgeKind,
 )
 
 /**
- * The whole live graph, for a PM authoring it.
+ * The whole competency vocabulary, for a PM authoring it.
  *
- * Distinct from a hire's projected path in three ways that matter: it is not filtered by any
- * project's baseline, it carries no per-user state (nothing here is mastered or locked — that is
- * a property of a person, not of the graph), and it resolves at the head version rather than at
- * anyone's pin. A PM edits what the graph *is*.
+ * Carries no per-user state: nothing here is met or unmet, because that is a property of a person
+ * rather than of the vocabulary. It is a flat list — prerequisite structure was retired with the
+ * graph, so there is no ordering to convey and no version to resolve at.
  */
 data class CompetencyGraphResponse(
     val competencies: List<CompetencyResponse>,
-    val edges: List<CompetencyEdgeResponse>,
-    val graphVersion: Int,
 )
 
-/**
- * The outcome of removing a competency node from the graph.
- *
- * [edgesRemoved] is surfaced because deleting one node silently detaches every edge touching it,
- * and a PM should see how much of the graph's structure that took with it.
- */
+/** The outcome of removing a competency. */
 data class DeleteCompetencyResponse(
     val key: String,
-    val edgesRemoved: Int,
-    val graphVersion: Int,
-)
-
-/** The outcome of approving a set of proposals as one graph version. */
-data class ApproveGraphBatchResponse(
-    val competenciesApproved: Int,
-    val edgesApproved: Int,
-    val graphVersion: Int,
 )
