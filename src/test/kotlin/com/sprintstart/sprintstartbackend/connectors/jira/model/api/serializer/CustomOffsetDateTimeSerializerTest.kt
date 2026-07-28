@@ -15,7 +15,9 @@ class CustomOffsetDateTimeSerializerTest {
     @Test
     fun `deserialize parses Jira offset without colon`() {
         @Serializable
-        data class Wrapper(@Serializable(with = CustomOffsetDateTimeSerializer::class) val value: OffsetDateTime)
+        data class Wrapper(
+            @Serializable(with = CustomOffsetDateTimeSerializer::class) val value: OffsetDateTime,
+        )
 
         val result = jsonParser.decodeFromString<Wrapper>("{\"value\": \"2021-03-31T20:06:28.202+0200\"}")
 
@@ -31,7 +33,9 @@ class CustomOffsetDateTimeSerializerTest {
     @Test
     fun `deserialize parses standard ISO offset with colon`() {
         @Serializable
-        data class Wrapper(@Serializable(with = CustomOffsetDateTimeSerializer::class) val value: OffsetDateTime)
+        data class Wrapper(
+            @Serializable(with = CustomOffsetDateTimeSerializer::class) val value: OffsetDateTime,
+        )
 
         val result = jsonParser.decodeFromString<Wrapper>("{\"value\": \"2021-03-31T20:06:28.202+02:00\"}")
 
@@ -41,7 +45,9 @@ class CustomOffsetDateTimeSerializerTest {
     @Test
     fun `deserialize parses UTC zulu offset`() {
         @Serializable
-        data class Wrapper(@Serializable(with = CustomOffsetDateTimeSerializer::class) val value: OffsetDateTime)
+        data class Wrapper(
+            @Serializable(with = CustomOffsetDateTimeSerializer::class) val value: OffsetDateTime,
+        )
 
         val result = jsonParser.decodeFromString<Wrapper>("{\"value\": \"2021-03-31T20:06:28.202Z\"}")
 

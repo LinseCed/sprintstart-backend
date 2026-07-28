@@ -26,7 +26,8 @@ class JiraArtifactMapper {
             issueId = event.issue.id,
             issueKey = event.issue.key,
             summary = event.issue.fields.summary,
-            description = event.issue.fields.description?.content ?: "",
+            description = event.issue.fields.description
+                ?.content ?: "",
             createdBy = event.getCreator(),
             reportedBy = event.getReporter(),
             assignee = event.getAssignee(),
@@ -39,7 +40,8 @@ class JiraArtifactMapper {
             comments = event.getComments(),
             statusName = event.issue.fields.status.name,
             statusDescription = event.issue.fields.status.description,
-            statusCategory = event.issue.fields.status.category?.name
+            statusCategory = event.issue.fields.status.category
+                ?.name
                 ?: event.issue.fields.status.name,
             projectIds = event.projectIds,
         )
@@ -62,10 +64,14 @@ fun JiraIssueFetchedEvent.getCreator(): JiraAuthor {
     return JiraAuthor(
         displayName = this.issue.fields.creator.displayName,
         active = this.issue.fields.creator.active,
-        createdAt = this.issue.fields.creator.created?.toInstant()
-            ?: this.issue.fields.created.toInstant(),
-        updatedAt = this.issue.fields.creator.updated?.toInstant()
-            ?: this.issue.fields.updated.toInstant(),
+        createdAt = this.issue.fields.creator.created
+            ?.toInstant()
+            ?: this.issue.fields.created
+                .toInstant(),
+        updatedAt = this.issue.fields.creator.updated
+            ?.toInstant()
+            ?: this.issue.fields.updated
+                .toInstant(),
     )
 }
 
@@ -73,10 +79,14 @@ fun JiraIssueFetchedEvent.getReporter(): JiraAuthor {
     return JiraAuthor(
         displayName = this.issue.fields.reporter.displayName,
         active = this.issue.fields.reporter.active,
-        createdAt = this.issue.fields.reporter.created?.toInstant()
-            ?: this.issue.fields.created.toInstant(),
-        updatedAt = this.issue.fields.reporter.updated?.toInstant()
-            ?: this.issue.fields.updated.toInstant(),
+        createdAt = this.issue.fields.reporter.created
+            ?.toInstant()
+            ?: this.issue.fields.created
+                .toInstant(),
+        updatedAt = this.issue.fields.reporter.updated
+            ?.toInstant()
+            ?: this.issue.fields.updated
+                .toInstant(),
     )
 }
 
@@ -90,9 +100,11 @@ fun JiraIssueFetchedEvent.getAssignee(): JiraAuthor? {
             displayName = it.displayName,
             active = it.active,
             createdAt = it.created?.toInstant()
-                ?: this.issue.fields.created.toInstant(),
+                ?: this.issue.fields.created
+                    .toInstant(),
             updatedAt = it.updated?.toInstant()
-                ?: this.issue.fields.updated.toInstant(),
+                ?: this.issue.fields.updated
+                    .toInstant(),
         )
     }
 }
@@ -138,9 +150,11 @@ fun JiraIssueFetchedEvent.getComments(): List<JiraIssueComment> {
                 it.author.displayName,
                 it.author.active,
                 it.author.created?.toInstant()
-                    ?: this.issue.fields.created.toInstant(),
+                    ?: this.issue.fields.created
+                        .toInstant(),
                 it.author.updated?.toInstant()
-                    ?: this.issue.fields.updated.toInstant(),
+                    ?: this.issue.fields.updated
+                        .toInstant(),
             ),
             content = it.body.content,
         )

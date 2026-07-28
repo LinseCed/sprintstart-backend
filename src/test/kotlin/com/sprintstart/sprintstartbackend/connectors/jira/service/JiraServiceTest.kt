@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.connectors.jira.JiraClient
 import com.sprintstart.sprintstartbackend.connectors.jira.jiraCredential
 import com.sprintstart.sprintstartbackend.connectors.jira.jiraInstance
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.ConnectJiraInstanceRequest
+import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstanceConfig
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraCredentialNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraInstanceNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraInstanceUnavailableException
@@ -169,7 +170,13 @@ class JiraServiceTest {
 
                 assertThat(transactionId).isNotNull()
                 verify { instanceRepository.save(any()) }
-                verify { configRepository.save(match { (it as com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstanceConfig).nextSyncAt == expectedNextSyncAt }) }
+                verify {
+                    configRepository.save(
+                        match {
+                            (it as JiraInstanceConfig).nextSyncAt == expectedNextSyncAt
+                        },
+                    )
+                }
             }
         }
 
