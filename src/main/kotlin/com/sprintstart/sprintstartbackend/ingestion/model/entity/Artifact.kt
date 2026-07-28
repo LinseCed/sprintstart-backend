@@ -35,7 +35,7 @@ class Artifact(
     val mime: String?,
     val language: String?,
     @Column(nullable = false, columnDefinition = "TEXT")
-    val metadata: String = "{}",
+    var metadata: String = "{}",
     @ElementCollection
     @CollectionTable(
         name = "artifact_projects",

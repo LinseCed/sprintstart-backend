@@ -45,6 +45,7 @@ class JiraArtifactProviderService(
             existing.title = command.summary
             existing.content = command.description
             existing.addProjectIds(command.projectIds)
+            existing.metadata = artifactMetadataJsonMapper.toJson(command.toMetadata())
             val ingestionRun = ingestionRunRepository.findByIdForUpdate(runId).orElseThrow {
                 IngestionRunNotFoundException(runId)
             }
