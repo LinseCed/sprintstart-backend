@@ -14,9 +14,10 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 /**
- * "Is this project ready to onboard someone?" answered as a ladder of the two setup stages the
- * onboarding module owns: an approved skill map, and a stocked pool of starter tasks. (The corpus
- * stage lives in the ingestion module; see [SetupReadinessResponse].)
+ * "Is this project ready to onboard someone?" answered as a ladder of the three setup stages the
+ * onboarding module owns: an approved skill map, a stocked pool of starter tasks, and roles that say
+ * which track their people onboard on. (The corpus stage lives in the ingestion module; see
+ * [SetupReadinessResponse].)
  *
  * Two rungs have gone since it was written, both because the work behind them stopped existing. A
  * buddy for every hire went with the human-buddy loop — the AI buddy needs no assignment. A chosen
@@ -44,6 +45,7 @@ class SetupReadinessService(
         val rungs = listOf(
             skillMapRung(approvedCompetencies),
             starterTasksRung(),
+            tracksRung(projectId),
         )
         return SetupReadinessResponse(
             projectId = projectId,
@@ -124,6 +126,53 @@ class SetupReadinessService(
     }
 
     /**
+     * Whether the roles on this project say which track their people onboard on.
+     *
+     * Track resolution is total by design — a role that declares nothing lands on the default rather
+     * than blocking (see [TrackService]). That is the right behaviour and the wrong silence: a
+     * delivery lead whose role declares no track is onboarded, measured and *spoken to* in
+     * engineering words, and nothing anywhere says so. It is the invisible-hire failure this
+     * initiative exists to kill, one level up — the hire is not broken, they are quietly mis-served.
+     *
+     * The warning fires only when **some** role here declares a track and others do not. That is the
+     * case where the information to act on exists: somebody adopted tracks and these roles were left
+     * behind. A project where *no* role declares one has not adopted tracks at all, and nothing
+     * distinguishes it from a team that really is all engineers — so it reads OK and simply states
+     * the wording everyone gets, which is what a PM with a designer needs to notice. Warning there
+     * instead would fire on every project that predates tracks, and a rung that cannot be cleared
+     * without changing nothing real is how a ladder stops being read.
+     */
+    private fun tracksRung(projectId: UUID): SetupRungResponse {
+        val members = projectMembershipApi.getProjectMembers(projectId)
+        val declared = members.count { it.onboardingTrackKey != null }
+        val undeclared = members.size - declared
+        val defaultLabel = trackService.default().label
+        return when {
+            members.isEmpty() -> rung(TRACKS, RungState.OK, 0, "No roles to set a track on yet.")
+            undeclared == 0 -> rung(
+                TRACKS,
+                RungState.OK,
+                declared,
+                "Every role here says which track its people onboard on.",
+            )
+            declared > 0 -> rung(
+                TRACKS,
+                RungState.WARN,
+                declared,
+                "$undeclared of ${members.size} ${personWord(members.size)} here have no track on " +
+                    "their role, so they onboard in $defaultLabel wording while the rest do not. " +
+                    "Set one on each role if that is not the work they do.",
+            )
+            else -> rung(
+                TRACKS,
+                RungState.OK,
+                0,
+                "No role here sets a track, so everyone onboards in $defaultLabel wording.",
+            )
+        }
+    }
+
+    /**
      * Tracks that some role points at but no claimable task serves.
      *
      * Read from the tracks roles actually use rather than every track that exists: warning about a
@@ -149,8 +198,11 @@ class SetupReadinessService(
 
     private fun taskWord(n: Int) = if (n == 1) "task" else "tasks"
 
+    private fun personWord(n: Int) = if (n == 1) "person" else "people"
+
     private companion object {
         const val SKILL_MAP = "skill-map"
         const val STARTER_TASKS = "starter-tasks"
+        const val TRACKS = "tracks"
     }
 }
