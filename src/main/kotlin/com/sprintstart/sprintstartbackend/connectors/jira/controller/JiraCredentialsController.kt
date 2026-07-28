@@ -61,7 +61,8 @@ internal class JiraCredentialsController(
      * Retrieves all Jira credentials associated with the specified user's email.
      *
      * @param userEmail the email address of the user whose Jira credentials are to be retrieved
-     * @return a ResponseEntity containing a list of JiraCredentialsDto objects representing the user's Jira credentials
+     * @return a ResponseEntity containing a list of JiraCredentialsDto
+     *         objects representing the user's credentials
      */
     @Operation(
         summary = "Gets all Jira credentials of a user",
@@ -90,7 +91,8 @@ internal class JiraCredentialsController(
      *
      * This operation deletes the specified Jira credential based on the given request details.
      *
-     * @param request The details of the Jira credential to be removed. This must contain valid and complete information.
+     * @param request The details of the Jira credential to be removed. This must contain valid and
+     *                 complete information.
      * @return A ResponseEntity with no content indicating successful removal of the credential.
      */
     @Operation(

@@ -6,4 +6,3 @@ import kotlinx.serialization.Serializable
 data class JiraProjectResponse(
     val key: String,
 )
-

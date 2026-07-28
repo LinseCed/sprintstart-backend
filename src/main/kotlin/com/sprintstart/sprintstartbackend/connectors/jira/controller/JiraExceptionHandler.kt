@@ -71,7 +71,7 @@ internal class JiraExceptionHandler {
      * @return A `ResponseEntity` object with status `502 Bad Gateway` and an `ErrorResponse` body.
      */
     @ExceptionHandler(JiraInstanceUnavailableException::class)
-    fun handleInstanceUnavailable(ex: JiraResourceNotFoundException): ResponseEntity<ErrorResponse> =
+    fun handleInstanceUnavailable(ex: JiraInstanceUnavailableException): ResponseEntity<ErrorResponse> =
         ResponseEntity
             .status(HttpStatus.BAD_GATEWAY)
             .body(ErrorResponse(ex.message))

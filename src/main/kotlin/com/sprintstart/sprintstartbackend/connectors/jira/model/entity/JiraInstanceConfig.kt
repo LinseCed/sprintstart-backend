@@ -30,6 +30,6 @@ internal class JiraInstanceConfig(
     @Column(columnDefinition = "TEXT")
     @Convert(converter = ScheduleSpecJpaConverter::class)
     var spec: ScheduleSpec = ScheduleSpec.Daily(time = LocalTime.of(2, 0)),
-    @Column("next_sync_at")
+    @Column(name = "next_sync_at")
     var nextSyncAt: Instant? = null,
 )

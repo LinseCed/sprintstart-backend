@@ -10,9 +10,10 @@ import java.util.UUID
 internal interface JiraInstanceRepository : JpaRepository<JiraInstance, String> {
     @Query(
         """
-       SELECT i FROM jira_instances i WHERE i.project_id = :projectId
-    """,
-        nativeQuery = true,
+        SELECT i FROM JiraInstance i
+        JOIN i.projectIds p
+        WHERE p = :projectId
+        """,
     )
     fun findByProjectId(projectId: UUID): List<JiraInstance>
 }

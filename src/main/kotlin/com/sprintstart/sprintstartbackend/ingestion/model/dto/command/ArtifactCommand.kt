@@ -11,7 +11,6 @@ import com.sprintstart.sprintstartbackend.ingestion.model.dto.JiraProject
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.UploadArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import java.time.Instant
-import java.time.OffsetDateTime
 import java.util.UUID
 
 sealed interface ArtifactCommand

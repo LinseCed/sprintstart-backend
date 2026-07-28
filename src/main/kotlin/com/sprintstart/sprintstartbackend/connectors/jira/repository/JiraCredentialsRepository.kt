@@ -10,9 +10,9 @@ import org.springframework.stereotype.Repository
 internal interface JiraCredentialsRepository : JpaRepository<JiraCredential, JiraCredentialsId> {
     @Query(
         """
-        select c from jira_credentials c where c.user_email = :userEmail
-    """,
-        nativeQuery = true,
+        SELECT c FROM JiraCredential c
+        WHERE c.id.userEmail = :userEmail
+        """,
     )
     fun findAllByUserEmail(userEmail: String): List<JiraCredential>
 }

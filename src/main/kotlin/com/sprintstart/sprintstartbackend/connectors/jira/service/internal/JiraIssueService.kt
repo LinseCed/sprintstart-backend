@@ -9,75 +9,69 @@ import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.Jir
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredential
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentialsId
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstance
-import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraIssue
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraCredentialNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraCredentialsRepository
 import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraInstanceRepository
-import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraIssueRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
+import java.time.Instant
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 @Service
 internal class JiraIssueService(
-    private val issueRepository: JiraIssueRepository,
-    private val instanceRepository: JiraInstanceRepository,
     private val jiraClient: JiraClient,
-    private val eventPublisher: ApplicationEventPublisher,
+    private val instanceRepository: JiraInstanceRepository,
     private val credentialsRepository: JiraCredentialsRepository,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
+    private val jqlDateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+
     /**
-     * Fetches and ingests all issues from a Jira instance for the specified list of project IDs.
+     * Fetches and ingests all issues of multiple Jira projects for a specific Jira instance.
      *
-     * @param instance The Jira instance from which issues need to be fetched.
-     * @param credentials The credentials required to access the Jira instance.
-     * @param projectId A list of project IDs for which issues need to be fetched and ingested.
-     * @param transactionId A unique identifier for the transaction or operation being executed.
+     * @param instance The Jira instance containing the details of the projects whose issues need to be fetched.
+     * @param credentialsId The credentials identifier used to authenticate with the Jira instance.
+     * @param transactionId The unique transaction identifier associated with this operation.
      */
     @Tracked("Fetching & ingesting all jira instance's issues of a list of projects")
     suspend fun searchAndIngestAllIssuesOfProjects(
         instance: JiraInstance,
-        credentials: JiraCredential,
-        projectId: List<String>,
+        credentialsId: JiraCredentialsId,
         transactionId: UUID,
     ) {
-        projectId.forEach {
-            searchAndIngestAllIssuesOfProject(instance, credentials, it, transactionId)
+        instance.jiraProjectKeys.forEach {
+            searchAndIngestAllIssuesOfProject(instance.instanceUrl, credentialsId, it, transactionId)
         }
     }
 
     /**
-     * Fetches and processes all issues for a given Jira project and ingests them into the system.
+     * Fetches all issues of a specified project from a given Jira instance and ingests them into the system.
      *
-     * @param instance The Jira instance from which to fetch issues.
-     * @param credentials The credentials required to authenticate against the Jira instance.
-     * @param projectId The ID of the Jira project whose issues need to be fetched.
-     * @param transactionId A unique transaction identifier used for tracking the operation.
+     * @param instanceUrl The base URL of the Jira instance containing the project.
+     * @param credentialsId The identifier for the Jira credentials to use for authentication.
+     * @param projectKey The unique key of the Jira project whose issues are to be fetched.
+     * @param transactionId The unique identifier for the transaction context in which this operation is performed.
      */
     @Tracked("Fetching & ingesting all jira instance's issues of a single project")
     suspend fun searchAndIngestAllIssuesOfProject(
-        instance: JiraInstance,
-        credentials: JiraCredential,
-        projectId: String,
+        instanceUrl: String,
+        credentialsId: JiraCredentialsId,
+        projectKey: String,
         transactionId: UUID,
     ) {
-        val issues = runCatching {
-            jiraClient.searchIssues(
-                instance.instanceUrl,
-                credentials,
-                "project=$projectId",
-            )
-        }.onFailure {
-            eventPublisher.publishEvent(JiraResourceFetchingFailedEvent(transactionId, it.message ?: "Unknown error"))
-            throw it
-        }.getOrNull() ?: return
+        val credentials = fetchCredentials(credentialsId, transactionId)
+        val issues = fetchIssues(instanceUrl, credentials, "project=\"$projectKey\"", transactionId) ?: return
 
-        if (issues.isEmpty()) return
+        if (issues.isEmpty()) {
+            return
+        }
 
-        processAndIngestIssues(instance, issues, transactionId)
+        processAndIngestIssues(instanceUrl, issues, transactionId)
     }
 
     /**
@@ -94,7 +88,7 @@ internal class JiraIssueService(
         instance.status = ConnectionState.UPDATING
         instanceRepository.save(instance)
 
-        val newAndUpdatedIssues = fetchNewAndUpdatedIssuesFromInstance(instance, transactionId)
+        val newAndUpdatedIssues = fetchNewAndUpdatedIssues(instance.instanceUrl, transactionId)
 
         if (newAndUpdatedIssues.isEmpty()) {
             instance.status = ConnectionState.UP_TO_DATE
@@ -120,86 +114,107 @@ internal class JiraIssueService(
         instance.status = ConnectionState.UPDATING
         instanceRepository.save(instance)
 
-        val newAndUpdatedIssues = fetchNewAndUpdatedIssuesFromInstance(instance, transactionId)
+        val newAndUpdatedIssues = fetchNewAndUpdatedIssues(instance.instanceUrl, transactionId)
 
         if (newAndUpdatedIssues.isNotEmpty()) {
-            processAndIngestIssues(instance, newAndUpdatedIssues, transactionId)
+            processAndIngestIssues(instance.instanceUrl, newAndUpdatedIssues, transactionId)
         }
+
         instance.status = ConnectionState.UP_TO_DATE
         instanceRepository.save(instance)
     }
 
     /**
-     * Fetches new and updated issues from a specified Jira instance based on the given JQL query.
+     * Fetches a list of new and updated issues from a Jira instance based on the given parameters.
      *
-     * @param instance The Jira instance containing details such as URL, credentials, and last update timestamp.
-     * @param transactionId A unique identifier for the ongoing transaction, used for tracking and logging.
-     * @return A list of JiraIssueResponse objects representing the new or updated issues fetched from the Jira instance.
-     * If no issues are found or an error occurs, an empty list is returned.
-     * @throws JiraCredentialNotFoundException if the credentials for the specified Jira instance are not found.
+     * @param instanceUrl The URL of the Jira instance to fetch issues from.
+     * @param transactionId A unique identifier representing the current transaction.
+     * @return A list of `JiraIssueResponse` objects containing information about the new and updated issues.
      */
-    private suspend fun fetchNewAndUpdatedIssuesFromInstance(
-        instance: JiraInstance,
+    private suspend fun fetchNewAndUpdatedIssues(
+        instanceUrl: String,
         transactionId: UUID,
     ): List<JiraIssueResponse> {
-        val jql =
-            "project = \"MYPROJ\" AND (created >= \"${instance.lastUpdate}\" OR updated >= \"${instance.lastUpdate}\")"
-        val credentials = withContext(Dispatchers.IO) {
-            credentialsRepository
-                .findById(
-                    JiraCredentialsId(
-                        instance.updateCredentialUserEmail,
-                        instance.updateCredentialName,
-                    ),
-                )
-        }.orElseThrow {
-            eventPublisher.publishEvent(JiraResourceFetchingFailedEvent(transactionId, "Invalid credentials"))
-            JiraCredentialNotFoundException(instance.updateCredentialUserEmail, instance.updateCredentialName)
+        val instance = instanceRepository.findById(instanceUrl).orElse(null) ?: return emptyList()
+        val credentialsId = JiraCredentialsId(instance.updateCredentialUserEmail, instance.updateCredentialName)
+        val credentials = fetchCredentials(credentialsId, transactionId)
+
+        val jql = buildString {
+            append("project in (${instance.jiraProjectKeys.joinToString(", ") { "\"$it\"" }}) ")
+            append("AND (created >= \"${formatJqlDate(instance.lastUpdate)}\" ")
+            append("OR updated >= \"${formatJqlDate(instance.lastUpdate)}\") ")
         }
 
-        return runCatching {
-            jiraClient.searchIssues(instance.instanceUrl, credentials, jql)
-        }.onFailure {
-            eventPublisher.publishEvent(JiraResourceFetchingFailedEvent(transactionId, it.message ?: "Unknown error"))
-            throw it
-        }.getOrNull() ?: emptyList()
+        return fetchIssues(instanceUrl, credentials, jql, transactionId) ?: emptyList()
     }
 
     /**
-     * Processes and ingests a list of Jira issues from a specified Jira instance.
+     * Fetches a list of Jira issues based on the provided JQL query.
      *
-     * @param instance The Jira instance from which issues are being processed and ingested.
-     * @param issues A list of Jira issues, represented as JiraIssueResponse objects, to be processed and ingested.
-     * @param transactionId A unique identifier for the transaction or operation being executed.
+     * @param instanceUrl The URL of the Jira instance to connect to.
+     * @param credentials The credentials required to authenticate with the Jira instance.
+     * @param jql The Jira Query Language (JQL) string used to filter issues.
+     * @param transactionId The unique transaction identifier for tracking the operation.
+     * @return A list of JiraIssueResponse objects representing the fetched issues, or null if an error occurs.
+     * @throws Exception If an error occurs during the fetching of Jira issues.
      */
-    private suspend fun processAndIngestIssues(
-        instance: JiraInstance,
+    private suspend fun fetchIssues(
+        instanceUrl: String,
+        credentials: JiraCredential,
+        jql: String,
+        transactionId: UUID,
+    ): List<JiraIssueResponse>? = try {
+        jiraClient.searchIssues(instanceUrl, credentials, jql)
+    } catch (e: Exception) {
+        eventPublisher.publishEvent(JiraResourceFetchingFailedEvent(transactionId, e.message ?: "Unknown error"))
+        throw e
+    }
+
+    /**
+     * Retrieves the Jira credentials associated with the given credentials ID. If the credentials
+     * are not found, a `JiraResourceFetchingFailedEvent` is published and a `JiraCredentialNotFoundException`
+     * is thrown.
+     *
+     * @param credentialsId The ID of the credentials to fetch.
+     * @param transactionId The unique transaction identifier associated with the operation.
+     * @return The JiraCredential object associated with the provided credentials ID.
+     * @throws JiraCredentialNotFoundException If the credentials are invalid or not found.
+     */
+    private fun fetchCredentials(
+        credentialsId: JiraCredentialsId,
+        transactionId: UUID,
+    ): JiraCredential = credentialsRepository.findById(credentialsId).orElse(null) ?: run {
+        eventPublisher.publishEvent(JiraResourceFetchingFailedEvent(transactionId, "Invalid credentials"))
+        throw JiraCredentialNotFoundException(credentialsId.userEmail, credentialsId.name)
+    }
+
+    private fun processAndIngestIssues(
+        instanceUrl: String,
         issues: List<JiraIssueResponse>,
         transactionId: UUID,
     ) {
-        issues
-            .map { JiraIssue(it.id, instance) }
-            .forEach { issueRepository.save(it) }
-
-        issues.forEach { ingestIssue(it, instance, transactionId) }
+        issues.forEach { issue ->
+            eventPublisher.publishEvent(
+                JiraIssueFetchedEvent(
+                    transactionId,
+                    instanceUrl,
+                    instanceUrl,
+                    issue,
+                ),
+            )
+        }
 
         eventPublisher.publishEvent(JiraResourceFetchingCompleteEvent(transactionId))
     }
 
     /**
-     * Publishes an event indicating that a Jira issue has been fetched.
+     * Formats the given `Instant` into a string representation suitable for JQL (Jira Query Language) queries.
      *
-     * @param issue The Jira issue to be ingested, represented as a JiraIssueResponse.
-     * @param instance The Jira instance from which the issue was fetched.
-     * @param transactionId A unique identifier for the operation or transaction.
+     * The formatted date is in the "yyyy-MM-dd HH:mm" pattern and is adjusted to UTC time zone.
+     *
+     * @param instant The `Instant` representing the date and time to be formatted.
+     * @return A string representation of the given `Instant` in "yyyy-MM-dd HH:mm" format in UTC time zone.
      */
-    private suspend fun ingestIssue(issue: JiraIssueResponse, instance: JiraInstance, transactionId: UUID) {
-        val event = JiraIssueFetchedEvent(
-            transactionId,
-            instance.instanceUrl,
-            instance.instanceUrl,
-            issue,
-        )
-        eventPublisher.publishEvent(event)
-    }
+    private fun formatJqlDate(instant: Instant): String =
+        jqlDateFormatter.format(instant.atZone(ZoneOffset.UTC))
 }

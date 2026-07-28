@@ -9,106 +9,71 @@ import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraR
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
 import kotlinx.serialization.Serializable
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import java.net.URLEncoder
+import java.util.Base64
 
 @Component
 internal class JiraClient(
     private val webClient: WebClient,
 ) {
-    private val defaultMaxResults = 100
-    private val defaultFields = listOf(
-        "issuetype",
-        "project",
-        "parent",
-        "resolution",
-        "resolutiondate",
-        "created",
-        "priority",
-        "labels",
-        "versions",
-        "assignee",
-        "updated",
-        "status",
-        "components",
-        "issuekey",
-        "description",
-        "timetracking",
-        "summary",
-        "creator",
-        "subtasks",
-        "reporter",
-        "duedate",
-        "comment",
-        "environment",
-        "issuelinks",
-    )
-    private val defaultExpand = listOf("changelog")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
-     * Searches a given Jira Cloud instance's issues and retrieves all issues from all projects the user has access to,
-     * along with a number of metadata on the issue, and allows filtering issues via JQL.
+     * Searches for issues in a Jira instance based on a JQL query and specified fields.
      *
-     * @param baseUrl The base url of the Jira Instance to fetch issues from.
-     * @param credentials The Jira Cloud user credentials used for auth.
-     * @param jql The jql filter for the issues.
-     * @param fields A list of extra fields to fetch per issue.
-     * @param expand A list of properties to also include with each issue, as an extension.
-     * @param extraFields Additional fields to fetch.
-     * @return A list of Jira Cloud issue responses.
+     * @param baseUrl The base URL of the Jira instance.
+     * @param credentials The credentials required to authenticate with the Jira instance.
+     * @param jql The JQL (Jira Query Language) string used to filter issues.
+     * @param fields A list of fields to be included in the search results. Defaults to a predefined set of fields.
+     * @param expand A list of expandable properties to include in the response. Defaults to a predefined set of
+     *        expansions.
+     * @param extraFields Additional fields to include in the search results, which will be appended to the fields
+     *        list.
+     * @return A list of issues matching the JQL query, represented as `JiraIssueResponse` objects.
      */
     suspend fun searchIssues(
         baseUrl: String,
         credentials: JiraCredential,
         jql: String,
-        fields: List<String> = defaultFields,
-        expand: List<String> = defaultExpand,
+        fields: List<String> = DEFAULT_FIELDS,
+        expand: List<String> = DEFAULT_EXPAND,
         extraFields: List<String> = emptyList(),
     ): List<JiraIssueResponse> {
         val requestFields = (fields + extraFields).joinToString(",")
         val requestExpand = expand.joinToString(",")
 
-        return doFetchAll<PaginatedIssuesSearchResponse>(
-            "$baseUrl/rest/api/3/search/jql",
-            credentials,
-            jql,
-            requestFields,
-            requestExpand,
+        return fetchIssuePages(
+            baseUrl = baseUrl,
+            credentials = credentials,
+            jql = jql,
+            fields = requestFields,
+            expand = requestExpand,
         ).flatMap { it.issues }
     }
 
     /**
-     * Searches a given Jira Cloud instance for projects and returns a list of [JiraProjectResponse], including all
-     * projects the fetching user has access to using the given credentials.
+     * Retrieves a list of Jira projects from a specified Jira instance.
      *
-     * @param baseUrl The base url of the Jira Instance to fetch issues from.
-     * @param credentials description
-     * @return description
+     * @param baseUrl The base URL of the Jira instance.
+     * @param credentials The credentials required to authenticate with the Jira instance.
+     * @return A list of projects available in the Jira instance, represented as `JiraProjectResponse` objects.
      */
     suspend fun searchProjects(
         baseUrl: String,
         credentials: JiraCredential,
-    ): List<JiraProjectResponse> {
-        return doFetchAll<PaginatedProjectsSearchResponse>(
-            "$baseUrl/rest/api/3/project/search",
-            credentials,
-            null,
-            null,
-            null,
-        ).flatMap { it.values }
-    }
+    ): List<JiraProjectResponse> = fetchProjectPages(baseUrl, credentials).flatMap { it.values }
 
     /**
-     * Checks remote Jira instance server capabilities, including a failsafe for if the given url does not point to a Jira
-     * instance.
+     * Checks the capabilities of a Jira instance to determine if it is valid and reachable.
+     * Invokes the server information endpoint of the specified Jira instance and validates the response.
      *
-     * Right now the only validated capability is the server title, but depending on how strict we want to be we could also
-     * validate server versions, deployment types, etc...
-     *
-     * @param url The url to check capabilities of.
-     * @return true, if a valid Jira instance is available under the given url, otherwise false.
+     * @param url The base URL of the Jira instance to be checked.
+     * @return `true` if the Jira instance is reachable and recognized as a valid Jira instance; `false` otherwise.
      */
+    @Suppress("SwallowedException")
     suspend fun checkInstanceCapabilities(url: String): Boolean {
         val serverInfo = try {
             webClient
@@ -116,97 +81,139 @@ internal class JiraClient(
                 .uri("$url/rest/api/3/serverInfo")
                 .sync()
                 .perform<JiraServerCapabilitiesResponse>()
-        } catch (e: Exception) {
+        } catch (e: WebClientException) {
+            logger.warn("Jira instance at $url is not reachable", e)
+            return false
+        } catch (e: kotlinx.serialization.SerializationException) {
+            logger.warn("Jira instance at $url returned unexpected response", e)
             return false
         }
         return serverInfo.serverTitle == "Jira"
     }
 
     /**
-     * Fetches paginated resources from a Jira Cloud instance via the REST api and deserializes into [T].
+     * Fetches multiple pages of issue search results from a Jira instance using pagination.
      *
-     * By default, Jira Cloud's REST api only allows paginated results. Therefore to fetch all resources, instead of a
-     * hardcoded maximum, we loop and retrieve the max amount of issues until we have it all, using the provided
-     * `nextPageToken`.
+     * This method continuously requests pages of issues from the Jira API based on a provided JQL query,
+     * until all pages are retrieved or the `isLast` flag is encountered in the response.
      *
-     * @param url The base url of the Jira Instance to fetch issues from.
-     * @param jql The jql filter for the issues.
-     * @param fields A list of extra fields to fetch per issue.
-     * @param expand A list of properties to also include with each issue, as an extension.
-     * @param credentials The Jira Cloud user credentials used for auth.
-     * @return A list of deserialized [T], fetched from the Jira Cloud instance.
+     * @param baseUrl The base URL of the Jira instance.
+     * @param credentials The credentials required to authenticate with the Jira instance.
+     * @param jql The JQL (Jira Query Language) string used to filter issues.
+     * @param fields A comma-separated list of fields to be included in the search results.
+     * @param expand A comma-separated list of expandable properties to include in the response.
+     * @return A list of `PaginatedIssuesSearchResponse` objects representing the paged search results.
      */
-    private suspend inline fun <reified T> doFetchAll(
-        url: String,
+    private suspend fun fetchIssuePages(
+        baseUrl: String,
         credentials: JiraCredential,
-        jql: String?,
-        fields: String?,
-        expand: String?,
-    ): List<T> {
-        val results = mutableListOf<T>()
+        jql: String,
+        fields: String,
+        expand: String,
+    ): List<PaginatedIssuesSearchResponse> {
+        val results = mutableListOf<PaginatedIssuesSearchResponse>()
+
+        do {
+            val query = buildMap {
+                put("jql", jql)
+                put("maxResults", DEFAULT_MAX_RESULTS.toString())
+                put("fields", fields)
+                put("expand", expand)
+                results.lastOrNull()?.nextPageToken?.let { put("nextPageToken", it) }
+            }
+            val page: PaginatedIssuesSearchResponse = performGet(
+                buildUri("$baseUrl/rest/api/3/search/jql", query),
+                credentials,
+            )
+            results.add(page)
+        } while (results.last().let { !it.isLast && it.nextPageToken != null })
+
+        return results
+    }
+
+    /**
+     * Fetches multiple pages of project search results from a Jira instance using pagination.
+     *
+     * This method continuously retrieves pages of projects from the Jira API until all pages
+     * are retrieved or the `isLast` flag is encountered in the response.
+     *
+     * @param baseUrl The base URL of the Jira instance.
+     * @param credentials The credentials required to authenticate with the Jira instance.
+     * @return A list of `PaginatedProjectsSearchResponse` objects representing the paged search results.
+     */
+    private suspend fun fetchProjectPages(
+        baseUrl: String,
+        credentials: JiraCredential,
+    ): List<PaginatedProjectsSearchResponse> {
+        val results = mutableListOf<PaginatedProjectsSearchResponse>()
         var startAt = 0
 
         while (true) {
             val query = buildMap {
-                jql?.let { put("jql", jql) }
                 put("startAt", startAt.toString())
-                put("maxResult", defaultMaxResults.toString())
-                fields?.let { put("fields", fields) }
-                expand?.let { put("expand", expand) }
+                put("maxResults", DEFAULT_MAX_RESULTS.toString())
             }
-            val uri = buildUri(url, query)
+            val page: PaginatedProjectsSearchResponse = performGet(
+                buildUri("$baseUrl/rest/api/3/project/search", query),
+                credentials,
+            )
+            results.add(page)
 
-            val page: PageableResponse<T> = performGet(uri, credentials)
-
-            results.addAll(page.getValues())
-
-            if (page.isLast()) {
+            if (page.isLast) {
                 break
             }
-            startAt += defaultMaxResults
+            startAt += DEFAULT_MAX_RESULTS
         }
 
         return results
     }
 
     /**
-     * Performs a GET request to a given uri synchronously and returns the returned values deserialized into [T].
+     * Performs an HTTP GET request to the specified URI and deserializes the response into the specified type [T].
      *
-     * @param uri The uri to request.
-     * @param credentials The credentials used for authorization.
-     * @return The resulting json deserialized into [T].
-     * @throws [JiraAuthException] (401/403) if the request was denied by the origin.
-     * @throws [JiraResourceNotFoundException] (404) if the requested endpoint does not exist.
+     * In case of specific HTTP error responses, it throws domain-specific exceptions such as [JiraAuthException]
+     * for authentication errors or [JiraResourceNotFoundException] for missing resources.
+     *
+     * @param uri The URI of the resource to fetch.
+     * @param credentials The Jira credentials required for authentication.
+     * @return The deserialized response of type [T].
+     * @throws JiraAuthException If authentication fails (e.g., HTTP 401 or 403).
+     * @throws JiraResourceNotFoundException If the resource is not found (HTTP 404).
+     * @throws WebClientException For other HTTP errors or transport-related issues.
      */
     private suspend inline fun <reified T> performGet(
         uri: String,
         credentials: JiraCredential,
-    ): T {
-        return try {
-            webClient
-                .get()
-                .uri(uri)
-                .header("Authorization", credentials.authorizationHeader())
-                .header("Accept", "application/json")
-                .sync()
-                .perform<T>()
-        } catch (e: WebClientException) {
-            when (e.statusCode) {
-                401 -> throw JiraAuthException(HttpStatus.UNAUTHORIZED, e.body)
-                403 -> throw JiraAuthException(HttpStatus.FORBIDDEN, e.body)
-                404 -> throw JiraResourceNotFoundException("Jira resource not found at $uri: ${e.body}")
-                else -> throw e
-            }
+    ): T = try {
+        webClient
+            .get()
+            .uri(uri)
+            .header("Authorization", credentials.basicAuthorizationHeader())
+            .header("Accept", "application/json")
+            .sync()
+            .perform<T>()
+    } catch (e: WebClientException) {
+        when (e.statusCode) {
+            401 -> throw JiraAuthException(HttpStatus.UNAUTHORIZED, e.body, e)
+
+            403 -> throw JiraAuthException(HttpStatus.FORBIDDEN, e.body, e)
+
+            404 -> throw JiraResourceNotFoundException(
+                "Jira resource not found at $uri: ${e.body}",
+                e,
+            )
+
+            else -> throw e
         }
     }
 
     /**
-     * Builds a valid Jira Cloud Rest Api request uri out of the base Jira Cloud instance url, the endpoint path, and a
-     * number of request filters.
+     * Constructs a URI by appending encoded query parameters to the specified base URL.
      *
-     * @param baseUrl The base uri to the Jira Cloud instance (`https://my-app.atlassian.net ...`)
-     * @param query The query to append to the path (`... ?key1=value1&key2=value2& ...`)
-     * @return The formatted request uri (`baseUrl/path/query`)
+     * @param baseUrl The base URL to which query parameters will be appended.
+     * @param query A map of query parameters where the keys and values represent the parameter names and values, respectively.
+     *              Both keys and values will be URL-encoded.
+     * @return A full URI string composed of the base URL and the encoded query parameters.
      */
     private fun buildUri(baseUrl: String, query: Map<String, String>): String {
         val queryString = query.entries.joinToString("&") { (key, value) ->
@@ -216,76 +223,71 @@ internal class JiraClient(
     }
 
     /**
-     * Extends [JiraCredential] by formatting the credential values as a valid credential authorization header in Jira
-     * Cloud requests.
+     * Constructs a Basic Authorization header value using the encoded credentials of the Jira user.
      *
-     * @return The formatted credential values.
+     * The method combines the user's email and authentication token from the JiraCredential instance,
+     * encodes the combination in Base64, and formats it as a Basic Authorization header.
+     *
+     * @return A string representation of the Basic Authorization header.
      */
-    private fun JiraCredential.authorizationHeader(): String = "${this.id.userEmail}:${this.authToken}"
+    private fun JiraCredential.basicAuthorizationHeader(): String {
+        val credentials = "${this.id.userEmail}:${this.authToken}"
+        val encoded = Base64.getEncoder().encodeToString(credentials.toByteArray(Charsets.UTF_8))
+        return "Basic $encoded"
+    }
 
     /**
-     * Encodes a given string into a valid path string.
+     * Encodes the string as a URL path segment using the UTF-8 character set.
      *
-     * That means replacing all characters that are invalid in paths (for example ' ') with their UTF-8 representations.
-     * In the case of ' ', that means '%20'.
+     * This method applies URL encoding to the string, ensuring that special characters
+     * are correctly encoded for use in a URL path. For example, spaces are replaced
+     * with `%20` and other reserved characters are properly escaped.
      *
-     * @return The encoded string, ready for use in a path.
+     * @return The URL-encoded representation of the string, suitable for inclusion in a URL path.
      */
-    private fun String.encodePath(): String {
-        return URLEncoder.encode(this, Charsets.UTF_8)
+    private fun String.encodePath(): String = URLEncoder.encode(this, Charsets.UTF_8)
+
+    companion object {
+        private const val DEFAULT_MAX_RESULTS = 100
+        private val DEFAULT_FIELDS = listOf(
+            "issuetype",
+            "project",
+            "parent",
+            "resolution",
+            "resolutiondate",
+            "created",
+            "priority",
+            "labels",
+            "versions",
+            "assignee",
+            "updated",
+            "status",
+            "components",
+            "issuekey",
+            "description",
+            "timetracking",
+            "summary",
+            "creator",
+            "subtasks",
+            "reporter",
+            "duedate",
+            "comment",
+            "environment",
+            "issuelinks",
+        )
+        private val DEFAULT_EXPAND = listOf("changelog")
     }
 }
 
-interface PageableResponse<T> {
-    fun getValues(): List<T>
-
-    fun isLast(): Boolean
-}
-
-/**
- * Represents a paginated response for a search query returning Jira issues.
- *
- * This class wraps [JiraIssueResponse] objects in a paginated format, providing information about the current page
- * and whether it's the last one.
- *
- * @property issues The list of `JiraIssueResponse` objects representing the Jira issues in the current page.
- * @property isLast A boolean flag indicating whether this is the last page of results.
- * @property nextPageToken An optional token used to fetch the next page of results, or `null` if no further pages exist.
- */
 @Serializable
 data class PaginatedIssuesSearchResponse(
     val issues: List<JiraIssueResponse>,
     val isLast: Boolean = false,
     val nextPageToken: String? = null,
-) : PageableResponse<JiraIssueResponse> {
-    override fun getValues(): List<JiraIssueResponse> {
-        return this.issues
-    }
+)
 
-    override fun isLast(): Boolean {
-        return this.isLast
-    }
-}
-
-/**
- * Represents the response of a paginated search for Jira projects.
- *
- * This class wraps [JiraProjectResponse] objects in a paginated format, providing information about the current page
- * and whether it's the last one.
- *
- * @property isLast Indicates whether the current page is the last page in the paginated result set.
- * @property values A list of Jira project responses representing the projects in the current page.
- */
 @Serializable
 data class PaginatedProjectsSearchResponse(
     val isLast: Boolean,
     val values: List<JiraProjectResponse>,
-) : PageableResponse<JiraProjectResponse> {
-    override fun getValues(): List<JiraProjectResponse> {
-        return this.values
-    }
-
-    override fun isLast(): Boolean {
-        return this.isLast
-    }
-}
+)

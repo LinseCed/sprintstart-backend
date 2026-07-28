@@ -70,7 +70,8 @@ internal class JiraInstanceConfigService(
      * Retrieves the configuration details of a specific Jira instance.
      *
      * @param instanceUrl The URL of the Jira instance for which the configuration is being retrieved.
-     * @return An instance of [GetJiraInstanceConfigResponse] containing the configuration details of the specified Jira instance.
+     * @return An instance of [GetJiraInstanceConfigResponse] containing the configuration details of the specified Jira
+     *         instance.
      * @throws JiraInstanceNotConnectedException If no configuration is found for the given Jira instance URL.
      */
     @Transactional(readOnly = true)
@@ -110,22 +111,15 @@ internal class JiraInstanceConfigService(
     /**
      * Retrieves a list of Jira instances that are due for synchronization at the specified time.
      *
-     * @param now An instance of [Instant] representing the current time to determine which Jira instances are due for sync.
+     * @param now An instance of [Instant] representing the current time to determine which Jira instances are due for
+     *            sync.
      * @return A list of [JiraInstance] that are scheduled to be synchronized at the specified time.
      * @throws JiraInstanceConfigNotFoundException if any configuration referenced during lookup is not found.
      */
     @Transactional(readOnly = true)
     @Tracked("Retrieving all Jira instances due for sync now")
     fun findAllJiraInstanceConfigsDueForSync(now: Instant): List<JiraInstanceConfig> {
-        val dueConfigs = configRepository.findAllDue(now)
-
-        return dueConfigs.map {
-            configRepository
-                .findById(it.id!!)
-                .orElseThrow {
-                    JiraInstanceConfigNotFoundException(it.id!!)
-                }
-        }
+        return configRepository.findAllByNextSyncAtIsLessThanEqual(now)
     }
 
     /**

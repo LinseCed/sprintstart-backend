@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import java.util.*
+import java.util.UUID
 
 @Tag(
     name = "Jira Connector",
@@ -73,8 +73,10 @@ internal class JiraController(
      *
      * This process will initialize the fetching of all issues from all projects within the specified instance.
      *
-     * @param request an instance of [ConnectJiraInstanceRequest] containing details required to connect the Jira instance.
-     * @return a [ResponseEntity] with an empty body and HTTP status 202 (Accepted) if the connection request is successfully initiated.
+     * @param request an instance of [ConnectJiraInstanceRequest] containing details required to connect the Jira
+     *                instance.
+     * @return a [ResponseEntity] with an empty body and HTTP status 202 (Accepted) if the connection request is
+     *         successfully initiated.
      */
     @Operation(
         summary = "Connect a jira instance to the jira connector",

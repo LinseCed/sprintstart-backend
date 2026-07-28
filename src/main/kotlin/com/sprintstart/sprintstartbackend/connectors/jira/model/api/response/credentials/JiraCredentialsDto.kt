@@ -5,11 +5,9 @@ import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCrede
 internal data class JiraCredentialsDto(
     val userEmail: String,
     val displayName: String,
-    val accessToken: String,
 )
 
 internal fun JiraCredential.toDto() = JiraCredentialsDto(
     userEmail = this.id.userEmail,
     displayName = this.id.name,
-    accessToken = this.authToken,
 )

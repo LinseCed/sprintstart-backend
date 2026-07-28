@@ -3,8 +3,6 @@ package com.sprintstart.sprintstartbackend.connectors.jira.model.api.response
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.serializer.CustomAdfDeserializer
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.serializer.CustomOffsetDateTimeSerializer
 import kotlinx.serialization.Serializable
-import tools.jackson.databind.annotation.JsonDeserialize
-import tools.jackson.databind.annotation.JsonSerialize
 import java.time.OffsetDateTime
 
 @Serializable
@@ -72,7 +70,7 @@ data class JiraIssueType(
 data class JiraIssueDescription(
     val type: String,
     val version: Int,
-    @JsonDeserialize(using = CustomAdfDeserializer::class)
+    @Serializable(with = CustomAdfDeserializer::class)
     val content: String,
 )
 
@@ -119,6 +117,6 @@ data class JiraAuthor(
 
 @Serializable
 data class JiraIssueCommentBody(
-    @JsonDeserialize(using = CustomAdfDeserializer::class)
+    @Serializable(with = CustomAdfDeserializer::class)
     val content: String,
 )

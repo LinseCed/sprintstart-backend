@@ -120,7 +120,8 @@ internal class JiraInstanceConfigController(
      * Retrieves the configuration of a specific Jira instance based on its ID.
      *
      * @param instanceId The unique identifier of the Jira instance whose configuration is to be retrieved.
-     * @return A [ResponseEntity] containing a [GetJiraInstanceConfigResponse] with the configuration of the specified Jira instance.
+     * @return A [ResponseEntity] containing a [GetJiraInstanceConfigResponse] with the configuration of the
+     *         specified Jira instance.
      */
     @Operation(
         summary = "Retrieves the configuration of a specific Jira instance",

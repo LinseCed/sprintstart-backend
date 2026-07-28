@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.connectors.jira
 
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraInstanceDto
-import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstance
 import com.sprintstart.sprintstartbackend.connectors.jira.service.JiraService
 import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorSource
 import com.sprintstart.sprintstartbackend.connectors.overview.models.IConnector

@@ -12,7 +12,7 @@ import java.time.format.DateTimeFormatter
 /**
  * Defines custom serialization and deserialization behavior for [OffsetDateTime] objects.
  *
- * The "normal" kotlinx `@Serializable` annotation can't natively serialize and deserialize objects of type 
+ * The "normal" kotlinx `@Serializable` annotation can't natively serialize and deserialize objects of type
  * [OffsetDateTime]. This class defines the serialization and deserialization behavior manually, so that it can be
  * applied as custom serializer for the specific field to work with kotlinx's `@Serializable` annotation.
  */

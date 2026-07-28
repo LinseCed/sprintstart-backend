@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.connectors.jira
 
 import com.sprintstart.sprintstartbackend.connectors.jira.service.JiraInstanceConfigService
-import com.sprintstart.sprintstartbackend.connectors.jira.service.JiraService
 import com.sprintstart.sprintstartbackend.connectors.jira.service.JiraUpdateService
 import com.sprintstart.sprintstartbackend.shared.scheduler.ScheduledExecutor
 import org.springframework.scheduling.annotation.Scheduled

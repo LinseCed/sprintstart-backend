@@ -5,14 +5,14 @@ import java.time.Instant
 import java.util.UUID
 
 internal data class JiraInstanceDto(
-    var instanceUrl: String,
-    var displayName: String,
-    var lastUpdate: Instant,
-    var projectIds: MutableSet<UUID>,
-    var sourceEnabled: Boolean,
-    var status: String,
-    var updateCredentialName: String,
-    var updateCredentialUserEmail: String,
+    val instanceUrl: String,
+    val displayName: String,
+    val lastUpdate: Instant,
+    val projectIds: MutableSet<UUID>,
+    val sourceEnabled: Boolean,
+    val status: String,
+    val updateCredentialName: String,
+    val updateCredentialUserEmail: String,
 )
 
 internal fun JiraInstance.toDto() = JiraInstanceDto(
