@@ -41,6 +41,18 @@ class ProjectUserAssignment(
     @MapsId("projectId")
     @JoinColumn(name = "project_id", nullable = false)
     val project: Project,
+    /**
+     * The roles this person holds **on this project** — the only place roles live.
+     *
+     * They used to live on the user with no project dimension, which meant "developer" was a fact
+     * about a person rather than about a person on a project. This set is now the single source;
+     * [User.projectRoles] is derived from it as the union across somebody's assignments, for the
+     * surfaces whose question really is global.
+     *
+     * Empty is a real state and means "on this project, no role set yet" — not "no roles anywhere".
+     * The setup ladder's `tracks` rung reports it, which is the point: an unroled member is
+     * onboarded in default wording and somebody should know.
+     */
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "user_project_assignment_roles",
@@ -83,24 +95,4 @@ class ProjectUserAssignment(
         user = user,
         project = project,
     )
-
-    /**
-     * The roles this person actually holds here: the ones set on this assignment, falling back to
-     * the ones set on the user.
-     *
-     * This codebase has **two** role mechanisms — [projectRoles] on the assignment and
-     * [User.projectRoles] on the user — and the precedence between them is defined here, once, so
-     * that no two surfaces can answer the question differently. Before this existed they did:
-     * `AdminProjectMapper` read the assignment's set alone, which is why the admin project user
-     * list showed nobody as holding any role.
-     *
-     * **The assignment's set currently has no writer anywhere**, so today this always resolves to
-     * the user's roles. That is not an argument for deleting the branch — it is the seam that
-     * per-project roles would arrive through (somebody a developer on one project and a delivery
-     * lead on another, which is the grain role tracks assume), and having one definition means
-     * populating it later changes every reader at once instead of some of them. Whether to populate
-     * it or drop the mechanism is an open decision; either way it is decided in one place.
-     */
-    val effectiveProjectRoles: Set<ProjectRole>
-        get() = projectRoles.ifEmpty { user.projectRoles }
 }

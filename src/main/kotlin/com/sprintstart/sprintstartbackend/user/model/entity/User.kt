@@ -13,6 +13,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.JoinTable
 import jakarta.persistence.ManyToMany
+import jakarta.persistence.OneToMany
 import jakarta.persistence.Table
 import java.time.Instant
 import java.util.UUID
@@ -72,29 +73,31 @@ class User(
         inverseJoinColumns = [JoinColumn(name = "project_id")],
     )
     var projects: MutableSet<Project> = mutableSetOf(),
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-        name = "user_project_roles",
-        joinColumns = [
-            jakarta.persistence.JoinColumn(
-                name = "user_id",
-                foreignKey = jakarta.persistence.ForeignKey(
-                    name = "fk_upr_user_id",
-                    foreignKeyDefinition = "FOREIGN KEY (user_id) REFERENCES sprintstart_users ON DELETE CASCADE",
-                ),
-            ),
-        ],
-        inverseJoinColumns = [
-            jakarta.persistence.JoinColumn(
-                name = "role_id",
-                foreignKey = jakarta.persistence.ForeignKey(
-                    name = "fk_upr_role_id",
-                    foreignKeyDefinition = "FOREIGN KEY (role_id) REFERENCES " +
-                        "sprintstart_project_roles ON DELETE CASCADE",
-                ),
-            ),
-        ],
-    )
+    /**
+     * This user's project assignments, read-only from here.
+     *
+     * The inverse side of [ProjectUserAssignment.user], so nothing is ever written through it —
+     * assignments are created and roled via `ProjectUserAssignment` itself. It exists so that the
+     * global question ("what roles does this person hold?") can be answered from the per-project
+     * data, which is now the only place roles live.
+     */
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     @org.hibernate.annotations.BatchSize(size = 50)
-    var projectRoles: MutableSet<ProjectRole> = mutableSetOf(),
-)
+    val projectAssignments: MutableSet<ProjectUserAssignment> = mutableSetOf(),
+) {
+    /**
+     * Every role this person holds, across every project they are on.
+     *
+     * **Derived, not stored.** Roles used to live here directly, in a `user_project_roles` table
+     * with no project dimension at all — so "developer" was a fact about a person rather than about
+     * a person *on a project*, and somebody who ships code on one project and runs delivery on
+     * another could not be described. Roles now hang off the assignment, and this is the honest
+     * global answer: the union across their projects.
+     *
+     * Use this only where the question really is global (a user list, a profile, a search filter).
+     * Anywhere a project is in hand, read [ProjectUserAssignment.projectRoles] instead — collapsing
+     * to the union there would put a role somebody holds elsewhere in front of this project.
+     */
+    val projectRoles: Set<ProjectRole>
+        get() = projectAssignments.flatMapTo(mutableSetOf()) { it.projectRoles }
+}

@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.model.response.project
 
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
+import com.sprintstart.sprintstartbackend.user.model.response.user.ProjectRoleSummary
 import java.util.UUID
 
 data class AdminProjectListResponse(
@@ -39,7 +40,13 @@ data class ProjectUserResponse(
     val firstName: String,
     val lastName: String,
     val roles: Set<Role>,
-    val projectRoles: List<String>,
+    /**
+     * The roles this person holds **on this project**, with ids.
+     *
+     * Ids rather than bare names because this list is now editable from the project surface, and
+     * removing a role by name would take the wrong one off whenever two roles share a name.
+     */
+    val projectRoles: List<ProjectRoleSummary>,
     val enabled: Boolean,
 )
 

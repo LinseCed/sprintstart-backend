@@ -43,20 +43,18 @@ internal class ProjectMembershipApiService(
     /**
      * The single onboarding track this assignment's roles agree on, or null.
      *
-     * Precedence between the two role mechanisms is not decided here — it is
-     * [ProjectUserAssignment.effectiveProjectRoles], defined once so no two surfaces can answer it
-     * differently. Worth knowing while reading this: the assignment's own set has no writer, so in
-     * practice these are the user's roles. The earlier note here claimed this read the roles held
-     * *on this project* first "since that is the right grain"; it is the right grain, but it is not
-     * a grain the data has ever had.
+     * Reads the roles held **on this project**, which is now the only place roles live — so the
+     * grain this always wanted is finally the grain the data has. Somebody who ships code here and
+     * runs delivery elsewhere gets each project's own vocabulary.
      *
      * Disagreement resolves to null, not to a winner. Somebody holding two roles with different
-     * tracks is a real situation (a PM who also ships code), and picking one arbitrarily would put
-     * the wrong vocabulary in front of them. Null lets onboarding fall back to its default, which
-     * is the same answer they got before tracks existed.
+     * tracks *on the same project* is a real situation (a PM who also ships code), and picking one
+     * arbitrarily would put the wrong vocabulary in front of them. Null lets onboarding fall back to
+     * its default, which is the same answer they got before tracks existed. An assignment with no
+     * roles at all resolves to null for the same reason, and the setup ladder reports it.
      */
     private fun trackKeyFor(assignment: ProjectUserAssignment): String? =
-        assignment.effectiveProjectRoles
+        assignment.projectRoles
             .mapNotNull { it.onboardingTrackKey }
             .distinct()
             .singleOrNull()

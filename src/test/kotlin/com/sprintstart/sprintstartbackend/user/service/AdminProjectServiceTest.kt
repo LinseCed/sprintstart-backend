@@ -102,25 +102,27 @@ class AdminProjectServiceTest {
         assertThat(result.sources.map { it.type }).containsExactly("GITHUB")
         assertThat(result.users).hasSize(1)
         assertThat(result.users.single().roles).containsExactly(Role.USER)
-        assertThat(result.users.single().projectRoles).containsExactly("MANAGER")
+        assertThat(
+            result.users
+                .single()
+                .projectRoles
+                .map { it.name },
+        ).containsExactly("MANAGER")
     }
 
     /**
-     * The shape every real deployment is in, and the bug it caused.
+     * Roles are read from the assignment, which is now the only place they live.
      *
-     * Roles are written to [User.projectRoles] by `ProjectRoleService.assignRoleToUser`; **nothing
-     * anywhere writes the assignment's own set**. This response read the assignment's set alone, so
-     * `GET /admin/projects/{id}/users` reported every member of every project as holding no project
-     * role — silently, with the frontend's role badges simply never rendering.
+     * Before per-project roles this list was empty for everybody: it read the assignment's set while
+     * every writer wrote a flat user-level one, so `GET /admin/projects/{id}/users` silently reported
+     * every member of every project as holding no role.
      */
     @Test
-    fun `project roles fall back to the user's when the assignment carries none`() {
+    fun `project roles come from the assignment`() {
         val project = project()
-        val user = user().apply {
-            roles.add(Role.USER)
-            projectRoles.add(ProjectRole(name = "DEVELOPER", description = "Ships code"))
-        }
+        val user = user().apply { roles.add(Role.USER) }
         val assignment = ProjectUserAssignment(user = user, project = project)
+        assignment.projectRoles.add(ProjectRole(name = "DEVELOPER", description = "Ships code"))
 
         every { projectRepository.findById(project.id) } returns Optional.of(project)
         every { projectSourceApi.findSourcesByProjectId(project.id) } returns emptyList()
@@ -128,18 +130,29 @@ class AdminProjectServiceTest {
 
         val result = service.getProjectById(project.id)
 
-        assertThat(result.users.single().projectRoles).containsExactly("DEVELOPER")
+        assertThat(
+            result.users
+                .single()
+                .projectRoles
+                .map { it.name },
+        ).containsExactly("DEVELOPER")
     }
 
-    /** Roles set on the assignment win, so populating that set later needs no change here. */
+    /**
+     * The capability the whole change exists for: somebody who ships code here and runs delivery
+     * elsewhere reads as a developer *here*. Under the flat model both roles described them
+     * everywhere, and their onboarding track could only pick one or give up.
+     */
     @Test
-    fun `roles on the assignment take precedence over the user's`() {
-        val project = project()
-        val user = user().apply {
-            projectRoles.add(ProjectRole(name = "DEVELOPER", description = "Ships code"))
-        }
+    fun `a role held on another project does not leak into this one`() {
+        val project = project(name = "SprintStart Backend")
+        val otherProject = project(name = "SprintStart Delivery")
+        val user = user()
         val assignment = ProjectUserAssignment(user = user, project = project)
-        assignment.projectRoles.add(ProjectRole(name = "DELIVERY_LEAD", description = "Runs delivery"))
+        assignment.projectRoles.add(ProjectRole(name = "DEVELOPER", description = "Ships code"))
+        val elsewhere = ProjectUserAssignment(user = user, project = otherProject)
+        elsewhere.projectRoles.add(ProjectRole(name = "DELIVERY_LEAD", description = "Runs delivery"))
+        user.projectAssignments += setOf(assignment, elsewhere)
 
         every { projectRepository.findById(project.id) } returns Optional.of(project)
         every { projectSourceApi.findSourcesByProjectId(project.id) } returns emptyList()
@@ -147,7 +160,14 @@ class AdminProjectServiceTest {
 
         val result = service.getProjectById(project.id)
 
-        assertThat(result.users.single().projectRoles).containsExactly("DELIVERY_LEAD")
+        assertThat(
+            result.users
+                .single()
+                .projectRoles
+                .map { it.name },
+        ).containsExactly("DEVELOPER")
+        // ...while the global view still knows about both.
+        assertThat(user.projectRoles.map { it.name }).containsExactlyInAnyOrder("DEVELOPER", "DELIVERY_LEAD")
     }
 
     @Test
