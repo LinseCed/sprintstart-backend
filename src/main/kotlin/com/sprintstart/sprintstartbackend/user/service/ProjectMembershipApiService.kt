@@ -43,20 +43,21 @@ internal class ProjectMembershipApiService(
     /**
      * The single onboarding track this assignment's roles agree on, or null.
      *
-     * Reads the roles held **on this project** first, since that is the right grain: somebody can
-     * be a developer on one project and a delivery lead on another. It falls back to the user's
-     * global roles only when the assignment carries none, because this codebase has two role
-     * mechanisms — `ProjectUserAssignment.projectRoles` and `User.projectRoles` — and which one is
-     * populated depends on which surface created the assignment. That duplication predates tracks
-     * and is worth resolving on its own; guessing between them here would just hide it.
+     * Precedence between the two role mechanisms is not decided here — it is
+     * [ProjectUserAssignment.effectiveProjectRoles], defined once so no two surfaces can answer it
+     * differently. Worth knowing while reading this: the assignment's own set has no writer, so in
+     * practice these are the user's roles. The earlier note here claimed this read the roles held
+     * *on this project* first "since that is the right grain"; it is the right grain, but it is not
+     * a grain the data has ever had.
      *
      * Disagreement resolves to null, not to a winner. Somebody holding two roles with different
      * tracks is a real situation (a PM who also ships code), and picking one arbitrarily would put
      * the wrong vocabulary in front of them. Null lets onboarding fall back to its default, which
      * is the same answer they got before tracks existed.
      */
-    private fun trackKeyFor(assignment: ProjectUserAssignment): String? {
-        val roles = assignment.projectRoles.ifEmpty { assignment.user.projectRoles }
-        return roles.mapNotNull { it.onboardingTrackKey }.distinct().singleOrNull()
-    }
+    private fun trackKeyFor(assignment: ProjectUserAssignment): String? =
+        assignment.effectiveProjectRoles
+            .mapNotNull { it.onboardingTrackKey }
+            .distinct()
+            .singleOrNull()
 }
