@@ -102,7 +102,12 @@ class AdminProjectServiceTest {
         assertThat(result.sources.map { it.type }).containsExactly("GITHUB")
         assertThat(result.users).hasSize(1)
         assertThat(result.users.single().roles).containsExactly(Role.USER)
-        assertThat(result.users.single().projectRoles).containsExactly("MANAGER")
+        assertThat(
+            result.users
+                .single()
+                .projectRoles
+                .map { it.name },
+        ).containsExactly("MANAGER")
     }
 
     /**
@@ -125,7 +130,12 @@ class AdminProjectServiceTest {
 
         val result = service.getProjectById(project.id)
 
-        assertThat(result.users.single().projectRoles).containsExactly("DEVELOPER")
+        assertThat(
+            result.users
+                .single()
+                .projectRoles
+                .map { it.name },
+        ).containsExactly("DEVELOPER")
     }
 
     /**
@@ -150,7 +160,12 @@ class AdminProjectServiceTest {
 
         val result = service.getProjectById(project.id)
 
-        assertThat(result.users.single().projectRoles).containsExactly("DEVELOPER")
+        assertThat(
+            result.users
+                .single()
+                .projectRoles
+                .map { it.name },
+        ).containsExactly("DEVELOPER")
         // ...while the global view still knows about both.
         assertThat(user.projectRoles.map { it.name }).containsExactlyInAnyOrder("DEVELOPER", "DELIVERY_LEAD")
     }

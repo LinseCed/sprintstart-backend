@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.user.model.request.CreateProjectRoleRe
 import com.sprintstart.sprintstartbackend.user.model.request.UpdateRoleSkillsRequest
 import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillResponse
 import com.sprintstart.sprintstartbackend.user.model.response.skill.UpdateRoleSkillsResponse
+import com.sprintstart.sprintstartbackend.user.model.response.user.ProjectRoleSummary
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRoleRepository
 import com.sprintstart.sprintstartbackend.user.repository.ProjectUserAssignmentRepository
 import com.sprintstart.sprintstartbackend.user.repository.SkillRepository
@@ -79,6 +80,25 @@ class ProjectRoleService(
         holders.forEach { it.projectRoles.removeIf { role -> role.id == roleId } }
         projectUserAssignmentRepository.saveAll(holders)
         projectRoleRepository.deleteById(roleId)
+    }
+
+    /**
+     * The roles somebody holds **on one project**.
+     *
+     * Needed because the per-person surfaces show the union across their projects, which cannot be
+     * edited: taking a role off has to say *where*. 404 rather than an empty list when they are not
+     * on the project, so "holds no role here" and "is not here" stay distinguishable.
+     */
+    @Transactional(readOnly = true)
+    fun getRolesForUserOnProject(userId: UUID, projectId: UUID): List<ProjectRoleSummary> {
+        val assignment = projectUserAssignmentRepository.findByProjectIdAndUserId(projectId, userId)
+            ?: throw ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "User $userId is not assigned to project $projectId",
+            )
+        return assignment.projectRoles
+            .map { ProjectRoleSummary(id = it.id, name = it.name) }
+            .sortedBy { it.name }
     }
 
     /**

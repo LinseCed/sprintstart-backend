@@ -9,6 +9,7 @@ import com.sprintstart.sprintstartbackend.user.model.response.project.AdminProje
 import com.sprintstart.sprintstartbackend.user.model.response.project.ProjectSourceResponse
 import com.sprintstart.sprintstartbackend.user.model.response.project.ProjectUserResponse
 import com.sprintstart.sprintstartbackend.user.model.response.project.ProjectUserSummaryResponse
+import com.sprintstart.sprintstartbackend.user.model.response.user.ProjectRoleSummary
 
 fun Project.toAdminListResponse(
     sources: List<ProjectSourceDto>,
@@ -53,8 +54,11 @@ fun ProjectUserAssignment.toProjectUserResponse(): ProjectUserResponse {
         firstName = user.firstname,
         lastName = user.lastname,
         roles = user.roles.toSet(),
-        // The roles held on *this* project, which is now the only place roles live.
-        projectRoles = projectRoles.map { it.name }.sorted(),
+        // The roles held on *this* project, which is now the only place roles live. Carries ids so
+        // the project surface can take one off without matching on a name.
+        projectRoles = projectRoles
+            .map { ProjectRoleSummary(id = it.id, name = it.name) }
+            .sortedBy { it.name },
         enabled = user.enabled,
     )
 }

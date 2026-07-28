@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.user.model.request.SetProjectRoleTrack
 import com.sprintstart.sprintstartbackend.user.model.request.UpdateRoleSkillsRequest
 import com.sprintstart.sprintstartbackend.user.model.response.skill.GetSkillResponse
 import com.sprintstart.sprintstartbackend.user.model.response.skill.UpdateRoleSkillsResponse
+import com.sprintstart.sprintstartbackend.user.model.response.user.ProjectRoleSummary
 import com.sprintstart.sprintstartbackend.user.service.ProjectRoleService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -133,6 +134,33 @@ class ProjectRoleController(
     ) {
         projectRoleService.deleteRole(roleId)
     }
+
+    /**
+     * The roles a user holds on one project.
+     *
+     * @param projectId The UUID of the project.
+     * @param userId The UUID of the user.
+     * @return The roles held there; 404 when the user is not on that project.
+     */
+    @Operation(
+        summary = "Roles a user holds on a project",
+        description = "What this person does on this project, which is where roles are held.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Roles returned"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "The user is not assigned to that project"),
+        ],
+    )
+    @GetMapping("/projects/{projectId}/users/{userId}/project-roles")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
+    fun getRolesForUserOnProject(
+        @Parameter(description = "UUID of the project") @PathVariable projectId: UUID,
+        @Parameter(description = "UUID of the user") @PathVariable userId: UUID,
+    ): List<ProjectRoleSummary> = projectRoleService.getRolesForUserOnProject(userId, projectId)
 
     /**
      * Gives a user a project role, on one project.
