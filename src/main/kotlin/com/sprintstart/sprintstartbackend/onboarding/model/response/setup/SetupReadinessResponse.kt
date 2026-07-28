@@ -22,7 +22,7 @@ data class SetupReadinessResponse(
 )
 
 data class SetupRungResponse(
-    /** Stable key the client renders off: `skill-map`, `baseline`, `starter-tasks`, `human-loop`. */
+    /** Stable key the client renders off: `skill-map`, `starter-tasks`, `tracks`. */
     val key: String,
     val state: RungState,
     /** The positive quantity for this rung (approved competencies, baseline entries, ...) -- never a pending count. */

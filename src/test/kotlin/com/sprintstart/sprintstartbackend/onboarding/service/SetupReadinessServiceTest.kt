@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.setup.SetupR
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
+import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every
 import io.mockk.mockk
@@ -23,12 +24,18 @@ class SetupReadinessServiceTest {
     private val competencyProposals: CompetencyProposalRepository = mockk()
     private val edgeProposals: CompetencyEdgeProposalRepository = mockk()
     private val starterWork: StarterWorkTaskProposalRepository = mockk()
-    private val membership: ProjectMembershipApi = mockk()
+
+    // An empty project by default: the tracks rung reads the member list, and cases that are not
+    // about tracks should not have to describe a team.
+    private val membership: ProjectMembershipApi = mockk {
+        every { getProjectMembers(any()) } returns emptyList()
+    }
 
     // No track beyond the default is in use by default, so an uncovered-track warning cannot fire
     // in the existing cases; coverage has its own tests below.
     private val tracks: TrackService = mockk {
         every { tracksInUse() } returns emptyList()
+        every { default() } returns ENGINEERING
     }
 
     private val projectId: UUID = UUID.randomUUID()
@@ -105,8 +112,9 @@ class SetupReadinessServiceTest {
         assertThat(response.ready).isTrue()
         // Two rungs have gone, each when the work behind it stopped existing: the human-loop rung
         // with the buddy loop, and the baseline rung when the path became goal-directed and nothing
-        // read the selection any more.
-        assertThat(response.rungs.map { it.key }).containsExactly("skill-map", "starter-tasks")
+        // read the selection any more. `tracks` arrived with role tracks.
+        assertThat(response.rungs.map { it.key })
+            .containsExactly("skill-map", "starter-tasks", "tracks")
     }
 
     @Test
@@ -150,5 +158,93 @@ class SetupReadinessServiceTest {
         )
 
         assertThat(rungOf(service.getReadiness(projectId), "starter-tasks").state).isEqualTo(RungState.OK)
+    }
+
+    private fun member(trackKey: String?) = ProjectMember(
+        userId = UUID.randomUUID(),
+        displayName = "A colleague",
+        githubLogin = null,
+        joinedAt = null,
+        onboardingTrackKey = trackKey,
+    )
+
+    private fun team(vararg trackKeys: String?) {
+        every { membership.getProjectMembers(projectId) } returns trackKeys.map { member(it) }
+    }
+
+    /**
+     * The gap this rung exists for: track resolution falls back rather than blocking, which is
+     * right, but until now nothing said it had happened. A role left undeclared next to roles that
+     * are declared is somebody being onboarded in the wrong words with no signal anywhere.
+     */
+    @Test
+    fun `roles left without a track while others have one is a warning`() {
+        approvedCompetencies(4)
+        pendingGraph(nodes = 0, edges = 0)
+        starterTasks(approved = 2, pending = 0)
+        team("delivery", null, null)
+
+        val response = service.getReadiness(projectId)
+        val rung = rungOf(response, "tracks")
+
+        assertThat(rung.state).isEqualTo(RungState.WARN)
+        assertThat(rung.detail).contains("2 of 3 people", "Engineering")
+        // The count is the positive quantity, per the rung contract -- never the pending one.
+        assertThat(rung.count).isEqualTo(1)
+        assertThat(response.ready).isFalse()
+    }
+
+    @Test
+    fun `every role declaring a track is the cleared state`() {
+        approvedCompetencies(4)
+        pendingGraph(nodes = 0, edges = 0)
+        starterTasks(approved = 2, pending = 0)
+        team("delivery", "engineering")
+
+        val rung = rungOf(service.getReadiness(projectId), "tracks")
+
+        assertThat(rung.state).isEqualTo(RungState.OK)
+        assertThat(rung.count).isEqualTo(2)
+    }
+
+    /**
+     * A project that never adopted tracks is indistinguishable from a team that really is all
+     * engineers, so there is nothing to warn about -- but the wording everyone gets is said out
+     * loud, which is what a PM with a designer needs in order to notice.
+     */
+    @Test
+    fun `no role declaring a track states the default wording instead of warning`() {
+        approvedCompetencies(4)
+        pendingGraph(nodes = 0, edges = 0)
+        starterTasks(approved = 2, pending = 0)
+        team(null, null)
+
+        val response = service.getReadiness(projectId)
+        val rung = rungOf(response, "tracks")
+
+        assertThat(rung.state).isEqualTo(RungState.OK)
+        assertThat(rung.detail).contains("Engineering")
+        // Warning here would fire on every project predating tracks and could not be cleared by
+        // changing anything real, which is how a ladder stops being read.
+        assertThat(response.ready).isTrue()
+    }
+
+    @Test
+    fun `a project with nobody on it has no track gap to report`() {
+        approvedCompetencies(4)
+        pendingGraph(nodes = 0, edges = 0)
+        starterTasks(approved = 2, pending = 0)
+
+        assertThat(rungOf(service.getReadiness(projectId), "tracks").state).isEqualTo(RungState.OK)
+    }
+
+    private companion object {
+        val ENGINEERING = OnboardingTrack(
+            key = OnboardingTrack.DEFAULT_KEY,
+            label = "Engineering",
+            contributionNoun = "change",
+            contributionNounPlural = "changes",
+            contributionVerbPast = "merged",
+        )
     }
 }
