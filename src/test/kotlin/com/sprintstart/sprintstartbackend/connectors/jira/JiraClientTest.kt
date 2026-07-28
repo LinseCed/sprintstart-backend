@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.connectors.jira
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredential
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentialsId
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
+import com.sprintstart.sprintstartbackend.shared.web.WebClientException
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import okhttp3.mockwebserver.MockResponse
@@ -11,6 +12,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.net.http.HttpClient
 import java.util.Base64
 
@@ -26,7 +28,10 @@ class JiraClientTest {
     @BeforeEach
     fun setUp() {
         mockWebServer.start()
-        val httpClient = HttpClient.newBuilder().build()
+        val httpClient = HttpClient
+            .newBuilder()
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build()
         jiraClient = JiraClient(WebClient(httpClient, jsonParser))
     }
 
@@ -101,6 +106,24 @@ class JiraClientTest {
                 "isLast": $isLast$tokenPart
             }
             """.trimIndent()
+    }
+
+    @Test
+    fun `searchProjects does not follow redirects to avoid dropping Authorization header`() {
+        val baseUrl = mockWebServer.url("/").toString().trimEnd('/')
+        val credential = JiraCredential(JiraCredentialsId("user@example.com", "token"), "secret")
+
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(302)
+                .setHeader("Location", "$baseUrl/redirected/project/search"),
+        )
+
+        val exception = assertThrows<WebClientException> {
+            runBlocking { jiraClient.searchProjects(baseUrl, credential) }
+        }
+
+        assertThat(exception.statusCode).isEqualTo(302)
     }
 
     @Test

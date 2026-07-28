@@ -190,6 +190,8 @@ internal class JiraClient(
             .uri(uri)
             .header("Authorization", credentials.basicAuthorizationHeader())
             .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .header("User-Agent", "SprintStart-Jira-Client/1.0")
             .sync()
             .perform<T>()
     } catch (e: WebClientException) {
@@ -231,7 +233,7 @@ internal class JiraClient(
      * @return A string representation of the Basic Authorization header.
      */
     private fun JiraCredential.basicAuthorizationHeader(): String {
-        val credentials = "${this.id.userEmail}:${this.authToken}"
+        val credentials = "${this.id.userEmail.trim()}:${this.authToken.trim()}"
         val encoded = Base64.getEncoder().encodeToString(credentials.toByteArray(Charsets.UTF_8))
         return "Basic $encoded"
     }

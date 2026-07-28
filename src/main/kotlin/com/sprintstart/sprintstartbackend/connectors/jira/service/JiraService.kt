@@ -37,6 +37,7 @@ internal class JiraService(
     private val applicationScope: CoroutineScope,
     private val jiraIssueService: JiraIssueService,
     private val eventPublisher: ApplicationEventPublisher,
+    private val jiraInstanceConfigService: JiraInstanceConfigService,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -169,6 +170,7 @@ internal class JiraService(
             updateCredentialUserEmail = request.userEmail,
         )
         val config = JiraInstanceConfig(instance = instance)
+        config.nextSyncAt = jiraInstanceConfigService.calculateNextSyncAt(config.schedule)
 
         instanceRepository.save(instance)
         configRepository.save(config)

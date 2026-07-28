@@ -14,7 +14,7 @@ internal class JiraCredential(
     @Id
     var id: JiraCredentialsId,
     @Convert(converter = SymmetricEncryptedStringConverter::class)
-    @Column(name = "auth_token", nullable = false)
+    @Column(name = "auth_token", nullable = false, columnDefinition = "TEXT")
     var authToken: String,
 )
 

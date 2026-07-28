@@ -28,12 +28,13 @@ class Artifact(
     @Enumerated(EnumType.STRING)
     @Column(name = "artifact_type", nullable = false)
     val artifactType: ArtifactType,
+    @Column(columnDefinition = "TEXT")
     var title: String?,
     @Column(columnDefinition = "TEXT")
     var content: String?,
     val mime: String?,
     val language: String?,
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     val metadata: String = "{}",
     @ElementCollection
     @CollectionTable(

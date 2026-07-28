@@ -38,7 +38,9 @@ class CustomOffsetDateTimeSerializer : KSerializer<OffsetDateTime> {
      * @return The resulting [OffsetDateTime] object.
      */
     override fun deserialize(decoder: Decoder): OffsetDateTime {
-        val format = DateTimeFormatter.ISO_OFFSET_DATE_TIME
-        return OffsetDateTime.parse(decoder.decodeString(), format)
+        val raw = decoder.decodeString()
+        // Jira returns offsets without a colon (e.g. +0200), while ISO_OFFSET_DATE_TIME expects +02:00.
+        val normalized = raw.replace(Regex("""([+\-]\d{2})(\d{2})$"""), "$1:$2")
+        return OffsetDateTime.parse(normalized, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
     }
 }

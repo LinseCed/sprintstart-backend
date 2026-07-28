@@ -46,6 +46,7 @@ class JiraServiceTest {
     private val jiraClient = mockk<JiraClient>()
     private val jiraIssueService = mockk<JiraIssueService>(relaxUnitFun = true)
     private val eventPublisher = mockk<org.springframework.context.ApplicationEventPublisher>(relaxUnitFun = true)
+    private val jiraInstanceConfigService = mockk<JiraInstanceConfigService>(relaxUnitFun = true)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val applicationScope = kotlinx.coroutines.CoroutineScope(UnconfinedTestDispatcher())
@@ -54,6 +55,7 @@ class JiraServiceTest {
 
     @BeforeEach
     fun setUp() {
+        every { jiraInstanceConfigService.calculateNextSyncAt(any()) } returns java.time.Instant.now()
         service = JiraService(
             credentialsRepository,
             instanceRepository,
@@ -62,6 +64,7 @@ class JiraServiceTest {
             applicationScope,
             jiraIssueService,
             eventPublisher,
+            jiraInstanceConfigService,
         )
     }
 
@@ -153,18 +156,20 @@ class JiraServiceTest {
         @Test
         fun `should connect new instance when not already connected`() {
             runTest {
+                val expectedNextSyncAt = java.time.Instant.now()
                 val credential = jiraCredential(request.userEmail, request.tokenName)
                 every { instanceRepository.findById(request.url) } returns Optional.empty()
                 every { credentialsRepository.findById(any()) } returns Optional.of(credential)
                 coEvery { jiraClient.checkInstanceCapabilities(request.url) } returns true
                 coEvery { jiraClient.searchProjects(request.url, credential) } returns emptyList()
+                every { jiraInstanceConfigService.calculateNextSyncAt(any()) } returns expectedNextSyncAt
                 every { instanceRepository.save(any()) } answers { firstArg() }
                 every { configRepository.save(any()) } answers { firstArg() }
                 val transactionId = service.connectInstanceIfNeeded(request)
 
                 assertThat(transactionId).isNotNull()
                 verify { instanceRepository.save(any()) }
-                verify { configRepository.save(any()) }
+                verify { configRepository.save(match { (it as com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstanceConfig).nextSyncAt == expectedNextSyncAt }) }
             }
         }
 
