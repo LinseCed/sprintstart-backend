@@ -39,20 +39,20 @@ data class JiraIssueFields(
     val summary: String,
     val issueType: JiraIssueType,
     val creator: JiraAuthor,
-    // TODO: val components
-    // TODO: val subtasks
+    // val components
+    // val subtasks
     @Serializable(with = CustomOffsetDateTimeSerializer::class)
     val created: OffsetDateTime,
     val description: JiraIssueDescription,
     val project: JiraIssueProject,
     val reporter: JiraAuthor,
-    // TODO: val resolution
-    // TODO: val timetracking
-    // TODO: val labels
-    // TODO: val environment
-    // TODO: val versions
-    // TODO: val duedate
-    // TODO: val resolutiondate
+    // val resolution
+    // val timetracking
+    // val labels
+    // val environment
+    // val versions
+    // val duedate
+    // val resolutiondate
     val comment: JiraIssueCommentField,
     val assignee: JiraAuthor?,
     @Serializable(with = CustomOffsetDateTimeSerializer::class)

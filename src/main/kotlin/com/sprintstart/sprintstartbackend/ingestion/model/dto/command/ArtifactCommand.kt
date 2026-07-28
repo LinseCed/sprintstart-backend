@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.ingestion.model.dto.command
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.ArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.JiraArtifactMetadataWrapper
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.JiraAuthor
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.JiraIssueComment
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.JiraIssueHistory
@@ -53,7 +54,22 @@ data class JiraArtifactCommand(
     val statusName: String,
     val statusDescription: String,
     val statusCategory: String,
-) : ArtifactCommand
+    val projectIds: Set<UUID> = emptySet(),
+) : ArtifactCommand {
+    fun toMetadata(): JiraArtifactMetadataWrapper = JiraArtifactMetadataWrapper(
+        issueType = issueType,
+        issueKey = issueKey,
+        statusName = statusName,
+        statusDescription = statusDescription,
+        statusCategory = statusCategory,
+        createdBy = createdBy,
+        reportedBy = reportedBy,
+        assignee = assignee,
+        project = project,
+        history = history,
+        comments = comments,
+    )
+}
 
 data class UploadArtifactCommand(
     val ingestionRunId: UUID,

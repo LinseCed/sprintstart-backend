@@ -20,7 +20,7 @@ class JiraArtifactMapper {
             ingestionRunId = event.transactionId,
             sourceSystem = SourceSystem.JIRA,
             sourceId = event.instanceId,
-            sourceUrl = event.instanceUrl,
+            sourceUrl = event.sourceUrl,
             artifactType = ArtifactType.ISSUE,
             issueType = event.getIssueType(),
             issueId = event.issue.id,
@@ -40,6 +40,7 @@ class JiraArtifactMapper {
             statusName = event.issue.fields.status.name,
             statusDescription = event.issue.fields.status.description,
             statusCategory = event.issue.fields.status.category.name,
+            projectIds = event.projectIds,
         )
     }
 }

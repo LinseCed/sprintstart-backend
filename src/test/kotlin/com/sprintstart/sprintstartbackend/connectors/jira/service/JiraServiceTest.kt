@@ -5,7 +5,6 @@ import com.sprintstart.sprintstartbackend.connectors.jira.JiraClient
 import com.sprintstart.sprintstartbackend.connectors.jira.jiraCredential
 import com.sprintstart.sprintstartbackend.connectors.jira.jiraInstance
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.ConnectJiraInstanceRequest
-import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentialsId
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraCredentialNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraInstanceNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraInstanceUnavailableException
@@ -30,7 +29,6 @@ import java.util.UUID
 import kotlin.test.assertFailsWith
 
 @OptIn(ExperimentalCoroutinesApi::class)
-
 private suspend inline fun <reified T : Throwable> assertThrowsSuspend(block: suspend () -> Unit): T {
     try {
         block()
@@ -40,6 +38,7 @@ private suspend inline fun <reified T : Throwable> assertThrowsSuspend(block: su
     }
     throw AssertionError("Expected ${T::class.simpleName} but no exception was thrown")
 }
+
 class JiraServiceTest {
     private val credentialsRepository = mockk<JiraCredentialsRepository>()
     private val instanceRepository = mockk<JiraInstanceRepository>()
@@ -47,6 +46,8 @@ class JiraServiceTest {
     private val jiraClient = mockk<JiraClient>()
     private val jiraIssueService = mockk<JiraIssueService>(relaxUnitFun = true)
     private val eventPublisher = mockk<org.springframework.context.ApplicationEventPublisher>(relaxUnitFun = true)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val applicationScope = kotlinx.coroutines.CoroutineScope(UnconfinedTestDispatcher())
 
     private lateinit var service: JiraService

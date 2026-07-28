@@ -56,13 +56,13 @@ class JiraInstanceConfigControllerTest {
             val request = ConfigureAllJiraInstancesRequest(ScheduleSpec.Daily(LocalTime.of(2, 0)), true)
             every { service.configureAll(request) } returns Unit
 
-            mockMvc.perform(
-                put("/api/v1/jira/config")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
-            )
-                .andExpect(status().isNoContent)
+            mockMvc
+                .perform(
+                    put("/api/v1/jira/config")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(status().isNoContent)
 
             verify { service.configureAll(request) }
         }
@@ -81,7 +81,8 @@ class JiraInstanceConfigControllerTest {
             )
             every { service.getAll() } returns listOf(response)
 
-            mockMvc.perform(get("/api/v1/jira/config").with(adminJwt))
+            mockMvc
+                .perform(get("/api/v1/jira/config").with(adminJwt))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$[0].instanceUrl").value("https://jira.example.com"))
         }
@@ -91,16 +92,17 @@ class JiraInstanceConfigControllerTest {
     inner class ConfigureInstance {
         @Test
         fun `should return 204 when configured`() {
-            val request = ConfigureJiraInstanceRequest("https://jira.example.com", ScheduleSpec.Daily(LocalTime.of(2, 0)), true)
+            val request =
+                ConfigureJiraInstanceRequest("https://jira.example.com", ScheduleSpec.Daily(LocalTime.of(2, 0)), true)
             every { service.configureInstance(request) } returns Unit
 
-            mockMvc.perform(
-                put("/api/v1/jira/config/configure")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
-            )
-                .andExpect(status().isNoContent)
+            mockMvc
+                .perform(
+                    put("/api/v1/jira/config/configure")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(status().isNoContent)
 
             verify { service.configureInstance(request) }
         }
@@ -119,7 +121,8 @@ class JiraInstanceConfigControllerTest {
             )
             every { service.getConfigOfInstance("jira-1") } returns response
 
-            mockMvc.perform(get("/api/v1/jira/config/{instanceId}", "jira-1").with(adminJwt))
+            mockMvc
+                .perform(get("/api/v1/jira/config/{instanceId}", "jira-1").with(adminJwt))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.instanceUrl").value("https://jira.example.com"))
         }

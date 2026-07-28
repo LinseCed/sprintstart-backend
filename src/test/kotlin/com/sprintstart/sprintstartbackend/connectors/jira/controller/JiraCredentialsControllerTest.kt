@@ -56,34 +56,35 @@ class JiraCredentialsControllerTest {
             val request = AddCredentialRequest("user@example.com", "token", "secret")
             every { service.addCredentials(request) } returns Unit
 
-            mockMvc.perform(
-                post("/api/v1/jira/credentials")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
-            )
-                .andExpect(status().isNoContent)
+            mockMvc
+                .perform(
+                    post("/api/v1/jira/credentials")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(status().isNoContent)
 
             verify { service.addCredentials(request) }
         }
 
         @Test
         fun `should return 400 for invalid request`() {
-            val request = """
+            val request =
+                """
                 {
                     "userEmail": "not-an-email",
                     "tokenName": "",
                     "authToken": ""
                 }
-            """.trimIndent()
+                """.trimIndent()
 
-            mockMvc.perform(
-                post("/api/v1/jira/credentials")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(request)
-                    .with(adminJwt),
-            )
-                .andExpect(status().isBadRequest)
+            mockMvc
+                .perform(
+                    post("/api/v1/jira/credentials")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request)
+                        .with(adminJwt),
+                ).andExpect(status().isBadRequest)
         }
     }
 
@@ -91,10 +92,20 @@ class JiraCredentialsControllerTest {
     inner class GetCredentialsOfUser {
         @Test
         fun `should return 200 with credentials`() {
-            every { service.getCredentialsOfUser("user@example.com") } returns listOf(JiraCredentialsDto("user@example.com", "token"))
+            every { service.getCredentialsOfUser("user@example.com") } returns listOf(
+                JiraCredentialsDto(
+                    "user@example.com",
+                    "token",
+                ),
+            )
 
-            mockMvc.perform(get("/api/v1/jira/credentials/{userEmail}", "user@example.com").with(adminJwt))
-                .andExpect(status().isOk)
+            mockMvc
+                .perform(
+                    get(
+                        "/api/v1/jira/credentials/{userEmail}",
+                        "user@example.com",
+                    ).with(adminJwt),
+                ).andExpect(status().isOk)
                 .andExpect(jsonPath("$[0].userEmail").value("user@example.com"))
         }
     }
@@ -106,13 +117,13 @@ class JiraCredentialsControllerTest {
             val request = DeleteJiraCredentialRequest("user@example.com", "token")
             every { service.removeCredential(request) } returns Unit
 
-            mockMvc.perform(
-                delete("/api/v1/jira/credentials")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
-            )
-                .andExpect(status().isNoContent)
+            mockMvc
+                .perform(
+                    delete("/api/v1/jira/credentials")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(status().isNoContent)
         }
     }
 
@@ -123,13 +134,13 @@ class JiraCredentialsControllerTest {
             val request = ChangeJiraCredentialNameRequest("user@example.com", "token", "newToken")
             every { service.changeCredentialName(request) } returns JiraCredentialsDto("user@example.com", "newToken")
 
-            mockMvc.perform(
-                patch("/api/v1/jira/credentials/patch/name")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
-            )
-                .andExpect(status().isOk)
+            mockMvc
+                .perform(
+                    patch("/api/v1/jira/credentials/patch/name")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(status().isOk)
                 .andExpect(jsonPath("$.displayName").value("newToken"))
         }
     }
@@ -141,13 +152,13 @@ class JiraCredentialsControllerTest {
             val request = ChangeJiraCredentialTokenRequest("user@example.com", "token", "newSecret")
             every { service.changeCredentialToken(request) } returns JiraCredentialsDto("user@example.com", "token")
 
-            mockMvc.perform(
-                patch("/api/v1/jira/credentials/patch/token")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
-            )
-                .andExpect(status().isOk)
+            mockMvc
+                .perform(
+                    patch("/api/v1/jira/credentials/patch/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(status().isOk)
         }
     }
 }

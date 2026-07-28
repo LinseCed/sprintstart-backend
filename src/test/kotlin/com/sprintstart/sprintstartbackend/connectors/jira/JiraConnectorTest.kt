@@ -4,9 +4,9 @@ import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.Jir
 import com.sprintstart.sprintstartbackend.connectors.jira.service.JiraService
 import com.sprintstart.sprintstartbackend.connectors.overview.models.ConnectorSource
 import io.mockk.every
+import io.mockk.junit5.MockKExtension
 import io.mockk.mockk
 import io.mockk.verify
-import io.mockk.junit5.MockKExtension
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test

@@ -2,6 +2,23 @@ package com.sprintstart.sprintstartbackend.ingestion.model.dto
 
 import java.time.Instant
 
+/**
+ * Wrapper for all Jira-specific metadata that is stored as JSON in the artifact's metadata column.
+ */
+data class JiraArtifactMetadataWrapper(
+    val issueType: JiraIssueType,
+    val issueKey: String,
+    val statusName: String,
+    val statusDescription: String,
+    val statusCategory: String,
+    val createdBy: JiraAuthor,
+    val reportedBy: JiraAuthor,
+    val assignee: JiraAuthor?,
+    val project: JiraProject,
+    val history: JiraIssueHistory,
+    val comments: List<JiraIssueComment>,
+) : ArtifactMetadata
+
 data class JiraProject(
     val key: String,
     val name: String,

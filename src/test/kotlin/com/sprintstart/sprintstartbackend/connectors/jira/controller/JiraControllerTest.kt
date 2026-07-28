@@ -19,8 +19,6 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.junit5.MockKExtension
-import io.mockk.verify
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -84,7 +82,8 @@ class JiraControllerTest {
         fun `should return 200 with instances when authenticated as ADMIN`() {
             every { service.getInstances() } returns listOf(instanceDto())
 
-            mockMvc.perform(get("/api/v1/jira/instances").with(adminJwt))
+            mockMvc
+                .perform(get("/api/v1/jira/instances").with(adminJwt))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$[0].instanceUrl").value("https://jira.example.com"))
         }
@@ -93,7 +92,8 @@ class JiraControllerTest {
         fun `should return 200 with instances when authenticated as PM`() {
             every { service.getInstances() } returns listOf(instanceDto())
 
-            mockMvc.perform(get("/api/v1/jira/instances").with(pmJwt))
+            mockMvc
+                .perform(get("/api/v1/jira/instances").with(pmJwt))
                 .andExpect(status().isOk)
         }
 
@@ -102,14 +102,16 @@ class JiraControllerTest {
             val projectId = UUID.randomUUID()
             every { service.getInstances(projectId) } returns listOf(instanceDto())
 
-            mockMvc.perform(get("/api/v1/jira/instances").param("projectId", projectId.toString()).with(adminJwt))
+            mockMvc
+                .perform(get("/api/v1/jira/instances").param("projectId", projectId.toString()).with(adminJwt))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$[0].instanceUrl").value("https://jira.example.com"))
         }
 
         @Test
         fun `should return 401 when not authenticated`() {
-            mockMvc.perform(get("/api/v1/jira/instances"))
+            mockMvc
+                .perform(get("/api/v1/jira/instances"))
                 .andExpect(status().isUnauthorized)
         }
     }
@@ -127,16 +129,17 @@ class JiraControllerTest {
             )
             coEvery { service.connectInstanceIfNeeded(request) } returns UUID.randomUUID()
 
-            val asyncResult = mockMvc.perform(
-                post("/api/v1/jira/connect")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
-            )
-                .andExpect(request().asyncStarted())
+            val asyncResult = mockMvc
+                .perform(
+                    post("/api/v1/jira/connect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(request().asyncStarted())
                 .andReturn()
 
-            mockMvc.perform(asyncDispatch(asyncResult))
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
                 .andExpect(status().isAccepted)
 
             coVerify { service.connectInstanceIfNeeded(request) }
@@ -144,7 +147,8 @@ class JiraControllerTest {
 
         @Test
         fun `should return 400 for invalid request`() {
-            val request = """
+            val request =
+                """
                 {
                     "displayName": "",
                     "url": "",
@@ -152,15 +156,15 @@ class JiraControllerTest {
                     "tokenName": "",
                     "projectId": null
                 }
-            """.trimIndent()
+                """.trimIndent()
 
-            mockMvc.perform(
-                post("/api/v1/jira/connect")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(request)
-                    .with(adminJwt),
-            )
-                .andExpect(status().isBadRequest)
+            mockMvc
+                .perform(
+                    post("/api/v1/jira/connect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(request)
+                        .with(adminJwt),
+                ).andExpect(status().isBadRequest)
         }
 
         @Test
@@ -173,12 +177,12 @@ class JiraControllerTest {
                 projectId = UUID.randomUUID(),
             )
 
-            mockMvc.perform(
-                post("/api/v1/jira/connect")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)),
-            )
-                .andExpect(status().isUnauthorized)
+            mockMvc
+                .perform(
+                    post("/api/v1/jira/connect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)),
+                ).andExpect(status().isUnauthorized)
         }
     }
 
@@ -190,16 +194,17 @@ class JiraControllerTest {
             val response = UpdateJiraInstanceResponse(UUID.randomUUID())
             coEvery { updateService.updateJiraInstance(request.instanceUrl, true) } returns response
 
-            val asyncResult = mockMvc.perform(
-                post("/api/v1/jira/update")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
-            )
-                .andExpect(request().asyncStarted())
+            val asyncResult = mockMvc
+                .perform(
+                    post("/api/v1/jira/update")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(request().asyncStarted())
                 .andReturn()
 
-            mockMvc.perform(asyncDispatch(asyncResult))
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
                 .andExpect(status().isAccepted)
                 .andExpect(jsonPath("$.transactionId").value(response.transactionId.toString()))
         }
@@ -219,50 +224,59 @@ class JiraControllerTest {
         fun `should return 404 when instance not connected`() {
             coEvery { service.connectInstanceIfNeeded(request) } throws JiraInstanceNotConnectedException(request.url)
 
-            val asyncResult = mockMvc.perform(
-                post("/api/v1/jira/connect")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
-            )
-                .andExpect(request().asyncStarted())
+            val asyncResult = mockMvc
+                .perform(
+                    post("/api/v1/jira/connect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(request().asyncStarted())
                 .andReturn()
 
-            mockMvc.perform(asyncDispatch(asyncResult))
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
                 .andExpect(status().isNotFound)
         }
 
         @Test
         fun `should return 404 when credentials not found`() {
-            coEvery { service.connectInstanceIfNeeded(request) } throws JiraCredentialNotFoundException(request.userEmail, request.tokenName)
-
-            val asyncResult = mockMvc.perform(
-                post("/api/v1/jira/connect")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
+            coEvery { service.connectInstanceIfNeeded(request) } throws JiraCredentialNotFoundException(
+                request.userEmail,
+                request.tokenName,
             )
-                .andExpect(request().asyncStarted())
+
+            val asyncResult = mockMvc
+                .perform(
+                    post("/api/v1/jira/connect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(request().asyncStarted())
                 .andReturn()
 
-            mockMvc.perform(asyncDispatch(asyncResult))
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
                 .andExpect(status().isNotFound)
         }
 
         @Test
         fun `should return 401 when jira auth fails`() {
-            coEvery { service.connectInstanceIfNeeded(request) } throws JiraAuthException(org.springframework.http.HttpStatus.UNAUTHORIZED, "Unauthorized")
-
-            val asyncResult = mockMvc.perform(
-                post("/api/v1/jira/connect")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
+            coEvery { service.connectInstanceIfNeeded(request) } throws JiraAuthException(
+                org.springframework.http.HttpStatus.UNAUTHORIZED,
+                "Unauthorized",
             )
-                .andExpect(request().asyncStarted())
+
+            val asyncResult = mockMvc
+                .perform(
+                    post("/api/v1/jira/connect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(request().asyncStarted())
                 .andReturn()
 
-            mockMvc.perform(asyncDispatch(asyncResult))
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
                 .andExpect(status().isUnauthorized)
         }
 
@@ -270,16 +284,17 @@ class JiraControllerTest {
         fun `should return 502 when instance unavailable`() {
             coEvery { service.connectInstanceIfNeeded(request) } throws JiraInstanceUnavailableException(request.url)
 
-            val asyncResult = mockMvc.perform(
-                post("/api/v1/jira/connect")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
-            )
-                .andExpect(request().asyncStarted())
+            val asyncResult = mockMvc
+                .perform(
+                    post("/api/v1/jira/connect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(request().asyncStarted())
                 .andReturn()
 
-            mockMvc.perform(asyncDispatch(asyncResult))
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
                 .andExpect(status().isBadGateway)
         }
 
@@ -287,33 +302,38 @@ class JiraControllerTest {
         fun `should return 404 when resource not found`() {
             coEvery { service.connectInstanceIfNeeded(request) } throws JiraResourceNotFoundException("Issue not found")
 
-            val asyncResult = mockMvc.perform(
-                post("/api/v1/jira/connect")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
-            )
-                .andExpect(request().asyncStarted())
+            val asyncResult = mockMvc
+                .perform(
+                    post("/api/v1/jira/connect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(request().asyncStarted())
                 .andReturn()
 
-            mockMvc.perform(asyncDispatch(asyncResult))
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
                 .andExpect(status().isNotFound)
         }
 
         @Test
         fun `should return 400 when credential already exists`() {
-            coEvery { service.connectInstanceIfNeeded(request) } throws JiraCredentialAlreadyExistsException(request.userEmail, request.tokenName)
-
-            val asyncResult = mockMvc.perform(
-                post("/api/v1/jira/connect")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request))
-                    .with(adminJwt),
+            coEvery { service.connectInstanceIfNeeded(request) } throws JiraCredentialAlreadyExistsException(
+                request.userEmail,
+                request.tokenName,
             )
-                .andExpect(request().asyncStarted())
+
+            val asyncResult = mockMvc
+                .perform(
+                    post("/api/v1/jira/connect")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .with(adminJwt),
+                ).andExpect(request().asyncStarted())
                 .andReturn()
 
-            mockMvc.perform(asyncDispatch(asyncResult))
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
                 .andExpect(status().isBadRequest)
         }
     }
@@ -325,11 +345,13 @@ class JiraControllerTest {
             val response = UpdateJiraInstanceResponse(UUID.randomUUID())
             coEvery { updateService.updateAllJiraInstances() } returns listOf(response)
 
-            val asyncResult = mockMvc.perform(post("/api/v1/jira/update-all").with(adminJwt))
+            val asyncResult = mockMvc
+                .perform(post("/api/v1/jira/update-all").with(adminJwt))
                 .andExpect(request().asyncStarted())
                 .andReturn()
 
-            mockMvc.perform(asyncDispatch(asyncResult))
+            mockMvc
+                .perform(asyncDispatch(asyncResult))
                 .andExpect(status().isAccepted)
                 .andExpect(jsonPath("$[0].transactionId").value(response.transactionId.toString()))
         }

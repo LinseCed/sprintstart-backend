@@ -9,6 +9,7 @@ import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCrede
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraCredentialNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraCredentialsRepository
 import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraInstanceRepository
+import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraIssueRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -29,13 +30,15 @@ class JiraIssueServiceTest {
     private val jiraClient = mockk<JiraClient>()
     private val instanceRepository = mockk<JiraInstanceRepository>()
     private val credentialsRepository = mockk<JiraCredentialsRepository>()
+    private val issueRepository = mockk<JiraIssueRepository>(relaxUnitFun = true)
     private val eventPublisher = mockk<org.springframework.context.ApplicationEventPublisher>(relaxUnitFun = true)
 
     private lateinit var service: JiraIssueService
 
     @BeforeEach
     fun setUp() {
-        service = JiraIssueService(jiraClient, instanceRepository, credentialsRepository, eventPublisher)
+        service =
+            JiraIssueService(jiraClient, instanceRepository, credentialsRepository, issueRepository, eventPublisher)
     }
 
     @Nested
@@ -44,12 +47,15 @@ class JiraIssueServiceTest {
         fun `should fetch issues for each project key`() = runTest {
             val instance = jiraInstance(jiraProjectKeys = mutableSetOf("TEST", "DEV"))
             val credential = jiraCredential()
-            val issues = listOf(mockk<JiraIssueResponse>())
             every { credentialsRepository.findById(any()) } returns Optional.of(credential)
-            coEvery { jiraClient.searchIssues(instance.instanceUrl, credential, any()) } returns issues
+            coEvery { jiraClient.searchIssues(instance.instanceUrl, credential, any()) } returns emptyList()
             every { instanceRepository.save(any()) } answers { firstArg() }
 
-            service.searchAndIngestAllIssuesOfProjects(instance, JiraCredentialsId("user@example.com", "token"), UUID.randomUUID())
+            service.searchAndIngestAllIssuesOfProjects(
+                instance,
+                JiraCredentialsId("user@example.com", "token"),
+                UUID.randomUUID(),
+            )
 
             coVerify(exactly = 2) { jiraClient.searchIssues(instance.instanceUrl, credential, any()) }
         }
@@ -91,13 +97,12 @@ class JiraIssueServiceTest {
     @Nested
     inner class UpdateInstance {
         @Test
-        fun `should set status to UP_TO_DATE after processing updates`() = runTest {
+        fun `should set status to UP_TO_DATE after processing empty updates`() = runTest {
             val instance = jiraInstance()
             val credential = jiraCredential()
-            val issue = mockk<JiraIssueResponse>()
             every { instanceRepository.findById(instance.instanceUrl) } returns Optional.of(instance)
             every { credentialsRepository.findById(any()) } returns Optional.of(credential)
-            coEvery { jiraClient.searchIssues(instance.instanceUrl, credential, any()) } returns listOf(issue)
+            coEvery { jiraClient.searchIssues(instance.instanceUrl, credential, any()) } returns emptyList()
             every { instanceRepository.save(any()) } answers { firstArg() }
 
             service.updateInstance(instance, UUID.randomUUID())
@@ -110,11 +115,12 @@ class JiraIssueServiceTest {
     inner class FetchCredentials {
         @Test
         fun `should throw when credentials not found`() = runTest {
+            val instance = jiraInstance()
             every { credentialsRepository.findById(any()) } returns Optional.empty()
 
             assertFailsWith<JiraCredentialNotFoundException> {
                 service.searchAndIngestAllIssuesOfProject(
-                    "https://jira.example.com",
+                    instance,
                     JiraCredentialsId("missing@example.com", "token"),
                     "TEST",
                     UUID.randomUUID(),

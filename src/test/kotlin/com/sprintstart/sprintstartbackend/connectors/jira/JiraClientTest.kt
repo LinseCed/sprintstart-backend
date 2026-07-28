@@ -174,12 +174,13 @@ class JiraClientTest {
     private fun projectSearchResponse(
         projects: List<String>,
         isLast: Boolean,
-    ): String = """
+    ): String =
+        """
         {
             "values": [${projects.joinToString(", ")}],
             "isLast": $isLast
         }
-    """.trimIndent()
+        """.trimIndent()
 
     private fun projectJson(key: String): String = "{\"key\": \"$key\"}"
 

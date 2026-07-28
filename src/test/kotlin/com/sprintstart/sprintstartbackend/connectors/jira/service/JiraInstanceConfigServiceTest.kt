@@ -1,10 +1,9 @@
 package com.sprintstart.sprintstartbackend.connectors.jira.service
 
-import com.sprintstart.sprintstartbackend.connectors.jira.jiraInstance
 import com.sprintstart.sprintstartbackend.connectors.jira.jiraInstanceConfig
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.config.ConfigureAllJiraInstancesRequest
-import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstanceConfig
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.request.config.ConfigureJiraInstanceRequest
+import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstanceConfig
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraInstanceNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraInstanceConfigRepository
 import com.sprintstart.sprintstartbackend.shared.scheduler.CronBuilder
@@ -105,7 +104,11 @@ class JiraInstanceConfigServiceTest {
         @Test
         fun `should update specific config`() {
             val config = jiraInstanceConfig()
-            val request = ConfigureJiraInstanceRequest("https://jira.example.com", ScheduleSpec.Daily(LocalTime.of(4, 0)), false)
+            val request = ConfigureJiraInstanceRequest(
+                "https://jira.example.com",
+                ScheduleSpec.Daily(LocalTime.of(4, 0)),
+                false,
+            )
             every { configRepository.findById(request.instanceUrl) } returns Optional.of(config)
             every { cronBuilder.build(request.schedule) } returns "0 0 4 * * *"
             every { configRepository.save(config) } answers { firstArg() }

@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.listener.jira
 
+import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues.JiraIssueDeletedEvent
 import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues.JiraIssueFetchedEvent
 import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues.JiraResourceFetchingCompleteEvent
 import com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues.JiraResourceFetchingFailedEvent
@@ -31,6 +32,11 @@ internal class JiraIssueListener(
     @EventListener
     fun on(event: JiraIssueFetchedEvent) {
         jiraArtifactProviderService.persistArtifact(mapper.toCommand(event))
+    }
+
+    @EventListener
+    fun on(event: JiraIssueDeletedEvent) {
+        jiraArtifactProviderService.deleteFileArtifact(event)
     }
 
     @EventListener

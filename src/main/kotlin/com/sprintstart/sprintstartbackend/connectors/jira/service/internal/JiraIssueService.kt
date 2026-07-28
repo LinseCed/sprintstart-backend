@@ -9,9 +9,11 @@ import com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.Jir
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredential
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraCredentialsId
 import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraInstance
+import com.sprintstart.sprintstartbackend.connectors.jira.model.entity.JiraIssue
 import com.sprintstart.sprintstartbackend.connectors.jira.model.exceptions.JiraCredentialNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraCredentialsRepository
 import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraInstanceRepository
+import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraIssueRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -27,6 +29,7 @@ internal class JiraIssueService(
     private val jiraClient: JiraClient,
     private val instanceRepository: JiraInstanceRepository,
     private val credentialsRepository: JiraCredentialsRepository,
+    private val issueRepository: JiraIssueRepository,
     private val eventPublisher: ApplicationEventPublisher,
 ) {
     private val jqlDateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
@@ -45,33 +48,33 @@ internal class JiraIssueService(
         transactionId: UUID,
     ) {
         instance.jiraProjectKeys.forEach {
-            searchAndIngestAllIssuesOfProject(instance.instanceUrl, credentialsId, it, transactionId)
+            searchAndIngestAllIssuesOfProject(instance, credentialsId, it, transactionId)
         }
     }
 
     /**
      * Fetches all issues of a specified project from a given Jira instance and ingests them into the system.
      *
-     * @param instanceUrl The base URL of the Jira instance containing the project.
+     * @param instance The Jira instance containing the details of the project whose issues need to be fetched.
      * @param credentialsId The identifier for the Jira credentials to use for authentication.
      * @param projectKey The unique key of the Jira project whose issues are to be fetched.
      * @param transactionId The unique identifier for the transaction context in which this operation is performed.
      */
     @Tracked("Fetching & ingesting all jira instance's issues of a single project")
     suspend fun searchAndIngestAllIssuesOfProject(
-        instanceUrl: String,
+        instance: JiraInstance,
         credentialsId: JiraCredentialsId,
         projectKey: String,
         transactionId: UUID,
     ) {
         val credentials = fetchCredentials(credentialsId, transactionId)
-        val issues = fetchIssues(instanceUrl, credentials, "project=\"$projectKey\"", transactionId) ?: return
+        val issues = fetchIssues(instance.instanceUrl, credentials, "project=\"$projectKey\"", transactionId) ?: return
 
         if (issues.isEmpty()) {
             return
         }
 
-        processAndIngestIssues(instanceUrl, issues, transactionId)
+        processAndIngestIssues(instance, issues, transactionId)
     }
 
     /**
@@ -117,7 +120,7 @@ internal class JiraIssueService(
         val newAndUpdatedIssues = fetchNewAndUpdatedIssues(instance.instanceUrl, transactionId)
 
         if (newAndUpdatedIssues.isNotEmpty()) {
-            processAndIngestIssues(instance.instanceUrl, newAndUpdatedIssues, transactionId)
+            processAndIngestIssues(instance, newAndUpdatedIssues, transactionId)
         }
 
         instance.status = ConnectionState.UP_TO_DATE
@@ -188,18 +191,38 @@ internal class JiraIssueService(
         throw JiraCredentialNotFoundException(credentialsId.userEmail, credentialsId.name)
     }
 
+    /**
+     * Processes and ingests a list of Jira issues by upserting the tracking entity and
+     * publishing corresponding events for artifact creation or update.
+     *
+     * Unlike the previous delete-and-recreate approach, this method simply saves the
+     * `JiraIssue` entity (which acts as an upsert by its @Id) and publishes a
+     * `JiraIssueFetchedEvent` with a proper per-issue source URL and the instance's
+     * project associations. The artifact provider service handles update-in-place logic.
+     *
+     * @param instance The Jira instance to which the issues belong.
+     * @param issues The list of Jira issues to be processed and ingested.
+     * @param transactionId The unique identifier for the transaction during which the issues are processed.
+     */
     private fun processAndIngestIssues(
-        instanceUrl: String,
+        instance: JiraInstance,
         issues: List<JiraIssueResponse>,
         transactionId: UUID,
     ) {
-        issues.forEach { issue ->
+        for (issue in issues) {
+            val issueEntity = JiraIssue(issue.id, instance)
+            issueRepository.save(issueEntity)
+
+            val sourceUrl = "${instance.instanceUrl}/browse/${issue.key}"
+
             eventPublisher.publishEvent(
                 JiraIssueFetchedEvent(
-                    transactionId,
-                    instanceUrl,
-                    instanceUrl,
-                    issue,
+                    transactionId = transactionId,
+                    instanceId = instance.instanceUrl,
+                    instanceUrl = instance.instanceUrl,
+                    sourceUrl = sourceUrl,
+                    issue = issue,
+                    projectIds = instance.projectIds,
                 ),
             )
         }

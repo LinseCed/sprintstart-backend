@@ -211,7 +211,7 @@ internal class JiraClient(
      * Constructs a URI by appending encoded query parameters to the specified base URL.
      *
      * @param baseUrl The base URL to which query parameters will be appended.
-     * @param query A map of query parameters where the keys and values represent the parameter names and values, respectively.
+     * @param query A map of query parameters where the keys and values represent the parameter names and values.
      *              Both keys and values will be URL-encoded.
      * @return A full URI string composed of the base URL and the encoded query parameters.
      */
