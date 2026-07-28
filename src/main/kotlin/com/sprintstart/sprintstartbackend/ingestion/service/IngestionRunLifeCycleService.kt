@@ -38,6 +38,10 @@ class IngestionRunLifeCycleService(
      * @param sourceSystem The external system that owns the run.
      * @param status The initial or replacement lifecycle status.
      * @param failureReason Optional run-level failure reason for startup failures.
+     * @param sourceInstanceId Optional connector-neutral id of the source instance this run belongs
+     * to (for GitHub the connected repository id).
+     * @param sourceInstanceRef Optional denormalized label of the source instance (for GitHub
+     * "owner/name").
      */
     @Transactional
     @Tracked("Starting ingestion run")
@@ -46,6 +50,8 @@ class IngestionRunLifeCycleService(
         sourceSystem: SourceSystem,
         status: IngestionRunStatus,
         failureReason: String? = null,
+        sourceInstanceId: UUID? = null,
+        sourceInstanceRef: String? = null,
     ) {
         val ingestionRun = ingestionRunRepository.findByIdOrNull(transactionId)
         if (ingestionRun == null) {
@@ -54,6 +60,8 @@ class IngestionRunLifeCycleService(
             val ingestionRun = IngestionRun(
                 id = transactionId,
                 sourceSystem = sourceSystem,
+                sourceInstanceId = sourceInstanceId,
+                sourceInstanceRef = sourceInstanceRef,
                 status = status,
                 failureReason = failureReason,
                 finishedAt = if (status == IngestionRunStatus.FAILED) Instant.now() else null,
@@ -67,6 +75,9 @@ class IngestionRunLifeCycleService(
             if (status == IngestionRunStatus.FAILED) {
                 ingestionRun.aiSyncStatus = AiSyncStatus.NOT_APPLICABLE
             }
+            // Backfill source-instance metadata if a later lifecycle call resolved it.
+            if (ingestionRun.sourceInstanceId == null) ingestionRun.sourceInstanceId = sourceInstanceId
+            if (ingestionRun.sourceInstanceRef == null) ingestionRun.sourceInstanceRef = sourceInstanceRef
         }
     }
 

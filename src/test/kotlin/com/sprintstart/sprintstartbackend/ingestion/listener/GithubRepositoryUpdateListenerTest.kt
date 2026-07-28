@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.listener
 
+import com.sprintstart.sprintstartbackend.connectors.github.external.GithubRepositoryApi
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.github.external.events.update.GithubRepositoryUpdateStartedEvent
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
@@ -16,12 +17,16 @@ import java.util.UUID
 
 class GithubRepositoryUpdateListenerTest {
     private val ingestionRunLifeCycleService = mockk<IngestionRunLifeCycleService>()
-    private val listener = GithubRepositoryUpdateListener(ingestionRunLifeCycleService)
+    private val githubRepositoryApi = mockk<GithubRepositoryApi>()
+    private val listener =
+        GithubRepositoryUpdateListener(ingestionRunLifeCycleService, githubRepositoryApi)
 
     @Test
-    fun `update started event starts connected github run`() {
+    fun `update started event starts connected github run with resolved repository metadata`() {
         val runId = UUID.randomUUID()
-        every { ingestionRunLifeCycleService.startOrUpdateRun(any(), any(), any(), any()) } just runs
+        val repositoryId = UUID.randomUUID()
+        every { ingestionRunLifeCycleService.startOrUpdateRun(any(), any(), any(), any(), any(), any()) } just runs
+        every { githubRepositoryApi.getRepositoryIdByOwnerAndName("owner", "repo") } returns repositoryId
 
         listener.on(
             GithubRepositoryUpdateStartedEvent(
@@ -36,15 +41,18 @@ class GithubRepositoryUpdateListenerTest {
                 transactionId = runId,
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.CONNECTED,
-                failureReason = null,
+                sourceInstanceId = repositoryId,
+                sourceInstanceRef = "owner/repo",
             )
         }
     }
 
     @Test
-    fun `update failed event starts failed github run with failure reason`() {
+    fun `update failed event starts failed github run with failure reason and repository metadata`() {
         val runId = UUID.randomUUID()
-        every { ingestionRunLifeCycleService.startOrUpdateRun(any(), any(), any(), any()) } just runs
+        val repositoryId = UUID.randomUUID()
+        every { ingestionRunLifeCycleService.startOrUpdateRun(any(), any(), any(), any(), any(), any()) } just runs
+        every { githubRepositoryApi.getRepositoryIdByOwnerAndName("owner", "repo") } returns repositoryId
 
         listener.on(
             GithubRepositoryUpdateFailedEvent(
@@ -61,6 +69,8 @@ class GithubRepositoryUpdateListenerTest {
                 sourceSystem = SourceSystem.GITHUB,
                 status = IngestionRunStatus.FAILED,
                 failureReason = "Snapshot missing",
+                sourceInstanceId = repositoryId,
+                sourceInstanceRef = "owner/repo",
             )
         }
     }
