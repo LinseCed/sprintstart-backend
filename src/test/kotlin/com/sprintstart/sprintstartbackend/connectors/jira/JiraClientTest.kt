@@ -103,6 +103,86 @@ class JiraClientTest {
             """.trimIndent()
     }
 
+    @Test
+    fun `searchProjects sends Basic auth and paginates`() {
+        val baseUrl = mockWebServer.url("/").toString().trimEnd('/')
+        val credential = JiraCredential(JiraCredentialsId("user@example.com", "token"), "secret")
+
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(projectSearchResponse(listOf(projectJson("PROJ")), isLast = false)),
+        )
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(projectSearchResponse(listOf(projectJson("NEXT")), isLast = true)),
+        )
+
+        val projects = runBlocking { jiraClient.searchProjects(baseUrl, credential) }
+
+        assertThat(projects).hasSize(2)
+        assertThat(projects.map { it.key }).containsExactly("PROJ", "NEXT")
+
+        val request = mockWebServer.takeRequest()
+        assertThat(request.getHeader("Authorization")).startsWith("Basic ")
+    }
+
+    @Test
+    fun `checkInstanceCapabilities returns true for a valid Jira server`() {
+        val baseUrl = mockWebServer.url("/").toString().trimEnd('/')
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"serverTitle\": \"Jira\"}"),
+        )
+
+        val result = runBlocking { jiraClient.checkInstanceCapabilities(baseUrl) }
+
+        assertThat(result).isTrue()
+    }
+
+    @Test
+    fun `checkInstanceCapabilities returns false when server title is not Jira`() {
+        val baseUrl = mockWebServer.url("/").toString().trimEnd('/')
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody("{\"serverTitle\": \"Confluence\"}"),
+        )
+
+        val result = runBlocking { jiraClient.checkInstanceCapabilities(baseUrl) }
+
+        assertThat(result).isFalse()
+    }
+
+    @Test
+    fun `checkInstanceCapabilities returns false when instance is not reachable`() {
+        val baseUrl = mockWebServer.url("/").toString().trimEnd('/')
+        mockWebServer.enqueue(MockResponse().setResponseCode(503))
+
+        val result = runBlocking { jiraClient.checkInstanceCapabilities(baseUrl) }
+
+        assertThat(result).isFalse()
+        assertThat(mockWebServer.takeRequest().path).isEqualTo("/rest/api/3/serverInfo")
+    }
+
+    private fun projectSearchResponse(
+        projects: List<String>,
+        isLast: Boolean,
+    ): String = """
+        {
+            "values": [${projects.joinToString(", ")}],
+            "isLast": $isLast
+        }
+    """.trimIndent()
+
+    private fun projectJson(key: String): String = "{\"key\": \"$key\"}"
+
     private fun issueJson(id: String, key: String): String {
         return """
             {
