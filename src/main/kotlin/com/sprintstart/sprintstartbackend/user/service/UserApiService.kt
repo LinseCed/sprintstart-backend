@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.model.entity.Project
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
+import com.sprintstart.sprintstartbackend.user.model.entity.ProjectUserAssignment
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.model.mapper.toUserApiDto
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRepository
@@ -82,8 +83,16 @@ class UserApiService(
             }
 
             if (!roleIds.isNullOrEmpty()) {
-                val projectRolesJoin = root.join<User, ProjectRole>("projectRoles", JoinType.INNER)
-                predicates.add(projectRolesJoin.get<UUID>("id").`in`(roleIds))
+                // Roles hang off the assignment now, so this travels through it: "holds one of these
+                // roles on *some* project". That is the same question the flat user-level join used
+                // to answer, and the right one for a user search — narrowing it to a project would
+                // need a project to narrow to, which this filter does not take. Combining it with
+                // `projectIds` still works, but the two are independent: they can match via
+                // different projects, which is the pre-existing behaviour of two separate joins.
+                val roleJoin = root
+                    .join<User, ProjectUserAssignment>("projectAssignments", JoinType.INNER)
+                    .join<ProjectUserAssignment, ProjectRole>("projectRoles", JoinType.INNER)
+                predicates.add(roleJoin.get<UUID>("id").`in`(roleIds))
             }
 
             if (!projectIds.isNullOrEmpty()) {
