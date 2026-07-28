@@ -11,7 +11,6 @@ import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.model.mapper.toUserApiDto
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRepository
-import com.sprintstart.sprintstartbackend.user.repository.ProjectUserAssignmentRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import jakarta.persistence.criteria.JoinType
 import jakarta.persistence.criteria.Predicate
@@ -34,7 +33,6 @@ import java.util.UUID
 class UserApiService(
     private val userRepository: UserRepository,
     private val projectRepository: ProjectRepository,
-    private val projectUserAssignmentRepository: ProjectUserAssignmentRepository,
 ) : UserApi {
     /**
      * Checks whether a user with the given identifier exists.
@@ -147,19 +145,6 @@ class UserApiService(
     @Transactional(readOnly = true)
     override fun getGithubLoginByUserId(userId: UUID): String? =
         userRepository.findById(userId).map { it.githubLogin }.orElse(null)
-
-    @Transactional(readOnly = true)
-    override fun getProjectRolesForUser(userId: UUID, projectId: UUID): List<ProjectRoleDto> {
-        val assignment = projectUserAssignmentRepository.findByProjectIdAndUserId(projectId, userId)
-            ?: return emptyList()
-        return assignment.projectRoles.map { role ->
-            ProjectRoleDto(
-                roleId = role.id,
-                name = role.name,
-                description = role.description,
-            )
-        }
-    }
 
     @Transactional(readOnly = true)
     override fun userHasAccessToProject(authId: String, projectId: UUID): Boolean {

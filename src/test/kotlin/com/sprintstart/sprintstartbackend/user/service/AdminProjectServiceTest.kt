@@ -105,6 +105,51 @@ class AdminProjectServiceTest {
         assertThat(result.users.single().projectRoles).containsExactly("MANAGER")
     }
 
+    /**
+     * The shape every real deployment is in, and the bug it caused.
+     *
+     * Roles are written to [User.projectRoles] by `ProjectRoleService.assignRoleToUser`; **nothing
+     * anywhere writes the assignment's own set**. This response read the assignment's set alone, so
+     * `GET /admin/projects/{id}/users` reported every member of every project as holding no project
+     * role — silently, with the frontend's role badges simply never rendering.
+     */
+    @Test
+    fun `project roles fall back to the user's when the assignment carries none`() {
+        val project = project()
+        val user = user().apply {
+            roles.add(Role.USER)
+            projectRoles.add(ProjectRole(name = "DEVELOPER", description = "Ships code"))
+        }
+        val assignment = ProjectUserAssignment(user = user, project = project)
+
+        every { projectRepository.findById(project.id) } returns Optional.of(project)
+        every { projectSourceApi.findSourcesByProjectId(project.id) } returns emptyList()
+        every { assignmentRepository.findAllByProjectId(project.id) } returns listOf(assignment)
+
+        val result = service.getProjectById(project.id)
+
+        assertThat(result.users.single().projectRoles).containsExactly("DEVELOPER")
+    }
+
+    /** Roles set on the assignment win, so populating that set later needs no change here. */
+    @Test
+    fun `roles on the assignment take precedence over the user's`() {
+        val project = project()
+        val user = user().apply {
+            projectRoles.add(ProjectRole(name = "DEVELOPER", description = "Ships code"))
+        }
+        val assignment = ProjectUserAssignment(user = user, project = project)
+        assignment.projectRoles.add(ProjectRole(name = "DELIVERY_LEAD", description = "Runs delivery"))
+
+        every { projectRepository.findById(project.id) } returns Optional.of(project)
+        every { projectSourceApi.findSourcesByProjectId(project.id) } returns emptyList()
+        every { assignmentRepository.findAllByProjectId(project.id) } returns listOf(assignment)
+
+        val result = service.getProjectById(project.id)
+
+        assertThat(result.users.single().projectRoles).containsExactly("DELIVERY_LEAD")
+    }
+
     @Test
     fun `getProjectById throws 404 when project does not exist`() {
         val projectId = UUID.randomUUID()

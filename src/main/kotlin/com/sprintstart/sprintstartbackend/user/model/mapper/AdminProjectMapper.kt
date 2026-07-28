@@ -53,7 +53,10 @@ fun ProjectUserAssignment.toProjectUserResponse(): ProjectUserResponse {
         firstName = user.firstname,
         lastName = user.lastname,
         roles = user.roles.toSet(),
-        projectRoles = projectRoles.map { it.name }.sorted(),
+        // `effectiveProjectRoles`, not the assignment's own set: nothing writes that set, so this
+        // reported every member of every project as holding no role at all. The endpoint documents
+        // "global and project-specific roles" and the project-specific half was always empty.
+        projectRoles = effectiveProjectRoles.map { it.name }.sorted(),
         enabled = user.enabled,
     )
 }
