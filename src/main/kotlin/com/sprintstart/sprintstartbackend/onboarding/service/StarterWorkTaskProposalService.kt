@@ -38,12 +38,14 @@ import java.util.UUID
 /**
  * Orchestrates AI-mined starter-work task proposals, PM review, and hire-fit matching.
  *
- * Mirrors [CompetencyProposalService]'s proposal-only relationship with the AI service, adapted
- * to a single AI-mined artifact per row instead of a node/edge pair (see
- * [StarterWorkTaskProposal]). Approving a proposal is this module's first producer of
- * `CONTRIBUTION`-kind [Competency] nodes -- the graph's terminal/goal-node kind -- wiring in
- * `PREREQUISITE` edges from every tagged competency key so the task becomes a reachable goal once
- * a hire has built the skills it requires.
+ * Approving a proposal used to mint a `CONTRIBUTION` competency with `PREREQUISITE` edges from
+ * every tagged key, so the task became a graph node a hire could reach once they had the skills.
+ * With the graph retired, approving marks the row approved and nothing else: a goal points at the
+ * task itself.
+ *
+ * [StarterWorkTaskProposal.competencyKeys] still matters, as one of the four signals
+ * [StarterWorkMatcher] ranks a task by. It says what the work exercises; it no longer gates who
+ * may claim it.
  */
 @Service
 @Suppress("TooManyFunctions")
@@ -61,8 +63,7 @@ class StarterWorkTaskProposalService(
     transactionManager: PlatformTransactionManager,
 ) {
     // The AI call is a long-running suspend operation, so it must not run inside a
-    // transaction (a DB connection would be pinned for its whole duration) -- same
-    // reasoning as CompetencyProposalService.
+    // transaction (a DB connection would be pinned for its whole duration).
     private val txTemplate = TransactionTemplate(transactionManager)
     private val readTxTemplate = TransactionTemplate(transactionManager).apply { isReadOnly = true }
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -214,12 +215,10 @@ class StarterWorkTaskProposalService(
             .map { it.toResponse() }
 
     /**
-     * Approves a proposed starter-work task, creating a real `CONTRIBUTION` [Competency] and
-     * wiring `PREREQUISITE` edges from each of its tagged competency keys.
+     * Approves a proposed starter-work task, making it claimable.
      *
-     * A tagged key that isn't (yet) a live competency is skipped rather than blocking the whole
-     * approval -- unlike [CompetencyProposalService.approveEdge]'s hard 409, since a starter-work
-     * task's competency tags are enrichment, not the thing being approved.
+     * Nothing is materialised alongside it any more: a goal points at this proposal, so approving
+     * is a status change and a timestamp.
      *
      * @throws ResponseStatusException 404 if no PROPOSED task proposal matches [id].
      */
