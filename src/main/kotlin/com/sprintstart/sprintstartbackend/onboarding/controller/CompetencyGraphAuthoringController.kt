@@ -23,29 +23,27 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * A PM authoring the live competency graph directly, as opposed to
- * [CompetencyGraphProposalController]'s review queue for what the AI proposed.
+ * A PM authoring the live competency vocabulary: reading it, adding to it, correcting it, removing
+ * from it.
  *
- * Split from that controller because the two are genuinely different jobs: one decides what
- * enters the graph, this one changes what is already in it. `HR` can review proposals but not
- * author, so every endpoint here is `ADMIN`/`PM`.
+ * Reading is open to `HR` as well — the vocabulary is what every readout names — but changing it is
+ * `ADMIN`/`PM`.
  */
 @RestController
 @RequestMapping("/api/v1/onboarding/competency-graph")
 @Tag(
     name = "Onboarding - Competency Graph Authoring",
-    description = "Edit, remove and connect competencies in the live graph",
+    description = "Read, add, edit and remove competencies",
 )
 class CompetencyGraphAuthoringController(
     private val competencyGraphAuthoringService: CompetencyGraphAuthoringService,
 ) {
     /**
-     * Reads the whole live graph, for the PM authoring surface.
+     * Reads the whole live vocabulary, for the PM authoring surface.
      */
     @Operation(
-        summary = "Read the live competency graph",
-        description = "Returns every visible competency and edge at the head version, unfiltered by any baseline " +
-            "and carrying no per-user state",
+        summary = "Read the live competency vocabulary",
+        description = "Returns every live competency as a flat list, carrying no per-user state",
     )
     @ApiResponses(
         value = [
@@ -62,7 +60,7 @@ class CompetencyGraphAuthoringController(
     }
 
     /**
-     * Reads one live competency, including the fields the projected path omits.
+     * Reads one live competency's full authoring detail.
      */
     @Operation(
         summary = "Read a live competency",
@@ -84,15 +82,14 @@ class CompetencyGraphAuthoringController(
     }
 
     /**
-     * Creates a hand-authored competency node, with no AI proposal in the loop.
+     * Creates a hand-authored competency.
      *
-     * The origination counterpart to [CompetencyGraphProposalController]'s approve: AI mining is
-     * one way to seed the graph, this is the other. Returns the created node, whose `key` may
-     * differ from what was sent -- it is slugified into the graph's house style.
+     * Returns the created competency, whose `key` may differ from what was sent -- it is slugified
+     * into the vocabulary's house style.
      */
     @Operation(
         summary = "Create a competency by hand",
-        description = "Hand-authors a new competency node in the live graph, with no AI proposal — AI help is optional",
+        description = "Adds a new competency to the live vocabulary",
     )
     @ApiResponses(
         value = [
@@ -100,7 +97,7 @@ class CompetencyGraphAuthoringController(
             ApiResponse(responseCode = "400", description = "Blank key or label, or target level outside 1..4"),
             ApiResponse(responseCode = "401", description = "Authentication required"),
             ApiResponse(responseCode = "403", description = "Insufficient role"),
-            ApiResponse(responseCode = "409", description = "A competency with this key already exists in the graph"),
+            ApiResponse(responseCode = "409", description = "A competency with this key already exists"),
         ],
     )
     @ResponseStatus(HttpStatus.OK)
@@ -113,8 +110,8 @@ class CompetencyGraphAuthoringController(
     /**
      * Applies a PM's edit to a live competency node.
      *
-     * The competency's `key` is not editable — it is the identity every ledger row, edge and
-     * module points at. The label is what a PM renames.
+     * The competency's `key` is not editable — it is the identity every ledger row and module
+     * points at. The label is what a PM renames.
      */
     @Operation(
         summary = "Edit a live competency",
@@ -140,19 +137,19 @@ class CompetencyGraphAuthoringController(
     }
 
     /**
-     * Removes a competency and every edge touching it from the live graph.
+     * Deletes a competency from the live vocabulary.
      *
-     * The node leaves every hire's path, but nobody loses a competency they already earned: the
-     * ledger is independent of graph visibility, and this records the removal rather than
-     * deleting anything.
+     * Nobody loses a competency they already earned, and no authored module is destroyed: both are
+     * keyed by the competency *key* rather than by a foreign key, so both survive the row going.
+     * A module simply stops appearing until a competency with that key exists again.
      */
     @Operation(
-        summary = "Remove a competency from the graph",
-        description = "Removes a competency and its edges from the live graph; earned ledger entries are kept",
+        summary = "Remove a competency",
+        description = "Deletes a competency; earned ledger entries and authored modules are kept",
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "Competency removed from the graph"),
+            ApiResponse(responseCode = "200", description = "Competency removed"),
             ApiResponse(responseCode = "401", description = "Authentication required"),
             ApiResponse(responseCode = "403", description = "Insufficient role"),
             ApiResponse(responseCode = "404", description = "No live competency found with the given key"),
