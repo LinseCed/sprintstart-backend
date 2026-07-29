@@ -69,7 +69,7 @@ class CompetencyModuleService(
     transactionManager: PlatformTransactionManager,
 ) {
     // The AI call is a long-running suspend operation, so it must not run inside a
-    // transaction -- same reasoning as BlueprintService/CompetencyProposalService.
+    // transaction (a DB connection would be pinned for its whole duration).
     private val txTemplate = TransactionTemplate(transactionManager)
     private val readTxTemplate = TransactionTemplate(transactionManager).apply { isReadOnly = true }
     private val logger = LoggerFactory.getLogger(javaClass)

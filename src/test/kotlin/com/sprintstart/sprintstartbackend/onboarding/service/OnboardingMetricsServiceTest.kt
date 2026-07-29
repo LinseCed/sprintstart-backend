@@ -370,7 +370,12 @@ class OnboardingMetricsServiceTest {
             every { projectMembershipApi.getProjectMembers(projectId) } returns listOf(hire)
             every { artifactIngestionApi.getAuthoredPullRequests(projectId, "hire") } returns emptyList()
             every { userGoalRepository.findByUserIdAndProjectId(hire.userId, projectId) } returns
-                UserGoal(userId = hire.userId, projectId = projectId, competencyKey = "k", claimedAt = claimedAt)
+                UserGoal(
+                    userId = hire.userId,
+                    projectId = projectId,
+                    sourceProposalId = UUID.randomUUID(),
+                    claimedAt = claimedAt,
+                )
 
             assertEquals(claimedAt, service.getHireTimeline(hire.userId, projectId)?.firstTaskClaimedAt)
         }

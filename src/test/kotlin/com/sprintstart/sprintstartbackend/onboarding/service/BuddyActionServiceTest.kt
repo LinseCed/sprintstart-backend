@@ -4,8 +4,8 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.response.goal.GoalView
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.MyOrientationResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GoalView
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.MyTaskZeroResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.verification.SubmitVerificationAttemptResponse
@@ -113,7 +113,6 @@ class BuddyActionServiceTest {
             feedback = feedback,
             hint = hint,
             attemptNo = 1,
-            graphVersion = 1,
         )
 
     // -- specs / dispatch -------------------------------------------------------------------------
@@ -352,8 +351,10 @@ class BuddyActionServiceTest {
         onOneProject()
         val taskId = UUID.randomUUID()
         every { userGoalService.claimForMe(authId, projectId, taskId) } returns GoalView(
-            competencyKey = "contrib-fix-login",
-            label = "Fix the login redirect",
+            proposalId = taskId,
+            title = "Fix the login redirect",
+            summary = null,
+            sourceUrl = null,
         )
 
         val result = service.perform(BuddyActionRequest(action = "claim_goal", taskId = taskId), jwt)
@@ -368,8 +369,10 @@ class BuddyActionServiceTest {
         onOneProject()
         val taskId = UUID.randomUUID()
         every { userGoalService.claimForMe(authId, projectId, taskId) } returns GoalView(
-            competencyKey = "contrib-fix-login",
-            label = "Fix the login redirect",
+            proposalId = taskId,
+            title = "Fix the login redirect",
+            summary = null,
+            sourceUrl = null,
         )
 
         val result = service.perform(BuddyActionRequest(action = "claim_goal", taskId = taskId), jwt)

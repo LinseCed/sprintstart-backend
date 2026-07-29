@@ -90,7 +90,6 @@ class LedgerProjectionBoundaryTest
                     score = 1.0,
                     feedback = "Self-attested.",
                     attemptNo = 1,
-                    graphVersion = 1,
                 ),
             )
 

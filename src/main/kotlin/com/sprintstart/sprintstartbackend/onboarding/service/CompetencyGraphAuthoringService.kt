@@ -1,18 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.EdgeKind
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyEdge
-import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyEdgeRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.UpdateCompetencyRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyEdgeResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyGraphResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.DeleteCompetencyResponse
-import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyEdgeRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphChangeRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyGraphVersionRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -20,120 +13,67 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 
 /**
- * A PM's direct authoring of the live competency graph: editing a node, removing one, and adding
- * or removing an edge by hand.
+ * Authoring the competency vocabulary: reading it, adding a competency, editing one, removing one.
  *
- * The counterpart to [CompetencyProposalService], which only offers a binary vote on what the AI
- * generated. A PM who spots a wrong label or a missing prerequisite had, until this service, only
- * two options: accept it wrong, or reject and regenerate the whole graph. That is not
- * "AI proposes, PM owns".
+ * ### It is a list now, not a graph
  *
- * ### Every write records a change row
+ * Prerequisite and related edges are gone, and with them traversal, versioning, pins, soft removal
+ * and the whole change-replay visibility model. Those existed to serve a DAG that **gated** a hire's
+ * progression and that a hire could *see*; the gates were retired, the hire-facing map was retired,
+ * and what remained was read by exactly one sentence in the buddy's learning plan — a sentence that
+ * could report a `RELATED` edge as a prerequisite, because the edge kind was dropped on the way out.
  *
- * [EffectiveGraphResolver] derives visibility purely by replaying [CompetencyGraphChange]
- * [com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyGraphChange] rows, so a
- * write straight to `competencies`/`competency_edges` without a change row produces a permanently
- * invisible ghost. Every mutation here goes through [CompetencyGraphVersionService] and bumps the
- * version, exactly like proposal approval does.
+ * So a competency is now a plain, durable name for something somebody can be proficient in. The
+ * ledger keys off it, a module teaches it, and the matcher counts it. Nothing orders it.
  *
- * ### Removal is recorded, not deleted
+ * ### Removal is a real delete now
  *
- * [deleteCompetency] records `NODE_REMOVED` (plus `EDGE_REMOVED` for every edge touching it) and
- * leaves every row in place. The node stops being replayed into the visible set, so it leaves
- * every hire's path -- but the ledger, the baseline entries and the authored module survive
- * untouched. Nobody un-earns a competency because a PM tidied the graph, and the removal is
- * reversible.
+ * Soft removal existed because visibility was replayed from change rows: deleting a row would have
+ * made a hire's earned progress unresolvable. Without that model there is nothing to replay, so
+ * removal deletes the row.
  *
- * ### Known limitation: edits are not deferrable
+ * Two things deliberately survive it, both keyed by the competency *key* rather than by a foreign
+ * key, which is what makes this safe:
+ * - **the ledger** — `user_competency_states` rows are untouched, so nobody un-earns a competency
+ *   because somebody tidied the vocabulary;
+ * - **its modules** — an authored module is real work and is not thrown away on a tidy-up. It simply
+ *   stops appearing in the learning area until a competency with that key exists again, which
+ *   re-adding it restores.
  *
- * A `NODE_MODIFIED` change classifies STRUCTURAL, but the hold-back does not actually apply to
- * it: the resolver replays change rows to decide *which* keys are visible and then reads content
- * live from the `competencies` table. So an edited label, kind or **target level** reaches every
- * hire immediately regardless of their pin -- and raising a target level can re-lock a node that
- * read as mastered. Deferring an edit would need per-version node content, which
- * `competency_graph_changes` does not carry. Documented rather than implied away.
+ * A deleted key can currently be re-proposed by the next generation run. Making deletion **sticky**,
+ * the way a dismissed board card binds the mentor, is S2 of the skill-map retirement — see
+ * `forks/SKILL_MAP_RETIREMENT_DESIGN.md`.
  */
 @Service
-@Suppress("TooManyFunctions")
 class CompetencyGraphAuthoringService(
     private val competencyRepository: CompetencyRepository,
-    private val competencyEdgeRepository: CompetencyEdgeRepository,
-    private val competencyGraphChangeRepository: CompetencyGraphChangeRepository,
-    private val competencyGraphVersionRepository: CompetencyGraphVersionRepository,
-    private val competencyGraphVersionService: CompetencyGraphVersionService,
-    private val effectiveGraphResolver: EffectiveGraphResolver,
-    private val graphTraversalService: GraphTraversalService,
 ) {
     /**
-     * The graph as it stands at the current head -- what a PM is authoring against.
+     * Reads one competency, so an editor can show what it currently says.
      *
-     * Every check in this service resolves against this rather than against
-     * `competencyRepository.findAll()`, because soft removal means the tables are a superset of
-     * the live graph: a removed node or edge still has its row. Asking the tables "does this
-     * exist?" would refuse to re-add something a PM removed, and would let a removed edge veto a
-     * new one as a cycle.
-     *
-     * Resolved with the pin at the head so nothing is held back -- a PM authors against what the
-     * graph actually is now, not against any individual hire's deferred view.
-     */
-    private fun headGraph(): EffectiveGraph {
-        val currentVersion = competencyGraphVersionService.currentVersion()
-        return effectiveGraphResolver.resolve(
-            pinnedVersion = currentVersion,
-            currentVersion = currentVersion,
-            versionHistory = competencyGraphVersionRepository.findAllByVersionGreaterThanOrderByVersionAsc(0),
-            changes = competencyGraphChangeRepository.findAll(),
-            allCompetencies = competencyRepository.findAll(),
-            allEdges = competencyEdgeRepository.findAll(),
-        )
-    }
-
-    /**
-     * Reads one live competency, so an editor can show what it currently says.
-     *
-     * The projected path deliberately carries only what a hire's map needs (label, kind, state),
-     * not `description`/`targetLevel`/`invariant` -- so without this an edit form would have to
-     * start blank on the fields a PM is most likely to be adjusting.
-     *
-     * @throws ResponseStatusException 404 if no competency has [key], or it was removed.
+     * @throws ResponseStatusException 404 if no competency has [key].
      */
     @Transactional(readOnly = true)
-    fun getCompetency(key: String): CompetencyResponse =
-        findVisibleCompetency(key, headGraph()).toAuthoringResponse()
+    fun getCompetency(key: String): CompetencyResponse = findCompetency(key).toAuthoringResponse()
 
-    /**
-     * The whole live graph at the head version — what a PM authors against.
-     *
-     * Until this existed the only way to see the graph as a whole was `GET /me/path`, a hire's
-     * projection: filtered to one project's baseline, carrying per-user node state, and resolved
-     * at that hire's pin. A PM looking at it saw their own onboarding, and on a project whose
-     * baseline selects nothing they saw an empty graph with nothing to edit.
-     */
+    /** The whole vocabulary — what a PM authors against. */
     @Transactional(readOnly = true)
-    fun getGraph(): CompetencyGraphResponse {
-        val graph = headGraph()
-        return CompetencyGraphResponse(
-            competencies = graph.competencies.map { it.toAuthoringResponse() },
-            edges = graph.edges.map { it.toAuthoringResponse() },
-            graphVersion = competencyGraphVersionService.currentVersion(),
+    fun getGraph(): CompetencyGraphResponse =
+        CompetencyGraphResponse(
+            competencies = competencyRepository.findAll().map { it.toAuthoringResponse() },
         )
-    }
 
     /**
-     * Creates a hand-authored competency node, with no AI proposal in the loop.
+     * Creates a hand-authored competency, with no AI proposal in the loop.
      *
-     * The counterpart to approving a proposal: a PM who wants a node the AI never suggested had, so
-     * far, no way to add one -- they could only edit or remove what was already there. This makes
-     * AI genuinely optional for the graph rather than merely reviewable.
+     * This is what makes the AI genuinely optional rather than merely reviewable: a PM who wants a
+     * competency the generator never suggested can add one.
      *
      * The key is slugified (see [CreateCompetencyRequest]) so it matches the house style and is
-     * URL-safe. If a row already exists for that key from a node a PM removed earlier, this reuses
-     * it rather than inserting a duplicate -- removal only records a change row, so the row and its
-     * unique key survive, exactly as [createEdge] handles a re-added edge. A key that is *currently
-     * visible* is a real conflict.
+     * URL-safe.
      *
      * @throws ResponseStatusException 400 if the key or label is blank or `targetLevel` is outside
-     * 1..4; 409 if a visible competency already has this key.
+     * 1..4; 409 if a competency already has this key.
      */
     @Transactional
     fun createCompetency(request: CreateCompetencyRequest): CompetencyResponse {
@@ -141,66 +81,42 @@ class CompetencyGraphAuthoringService(
         if (key.isBlank()) reject(HttpStatus.BAD_REQUEST, "key must not be blank")
         if (request.label.isBlank()) reject(HttpStatus.BAD_REQUEST, "label must not be blank")
         val targetLevel = request.targetLevel ?: Competency.DEFAULT_TARGET_LEVEL
-        if (targetLevel !in MIN_TARGET_LEVEL..MAX_TARGET_LEVEL) {
-            reject(
-                HttpStatus.BAD_REQUEST,
-                "targetLevel must be between $MIN_TARGET_LEVEL and $MAX_TARGET_LEVEL, got $targetLevel",
-            )
-        }
-        if (headGraph().competencies.any { it.key == key }) {
-            reject(HttpStatus.CONFLICT, "A competency with key $key already exists in the graph")
+        requireValidTargetLevel(targetLevel)
+        if (competencyRepository.findByKey(key) != null) {
+            reject(HttpStatus.CONFLICT, "A competency with key $key already exists")
         }
 
-        val label = request.label.trim()
-        val description = request.description?.trim()?.takeIf(String::isNotBlank)
-        // Reuse a soft-removed row so re-adding a key a PM removed does not hit the unique
-        // constraint -- the same reason createEdge checks existsBy before saving.
-        val competency = competencyRepository.findByKey(key)?.apply {
-            this.label = label
-            this.description = description
-            this.kind = request.kind
-            this.targetLevel = targetLevel
-            this.invariant = request.invariant
-        } ?: Competency(
+        val competency = Competency(
             key = key,
-            label = label,
-            description = description,
+            label = request.label.trim(),
+            description = request.description?.trim()?.takeIf(String::isNotBlank),
             kind = request.kind,
             targetLevel = targetLevel,
             invariant = request.invariant,
         )
-
         competencyRepository.save(competency)
-        competencyGraphVersionService.recordNodeAdded(key)
-        competencyGraphVersionService.bump()
         return competency.toAuthoringResponse()
     }
 
     /**
-     * Applies a PM's edit to one competency node.
+     * Applies an edit to one competency.
      *
-     * Omitted fields are left alone. [key] is not editable -- see [UpdateCompetencyRequest].
+     * Omitted fields are left alone. [key] is not editable — see [UpdateCompetencyRequest]: the
+     * ledger points at it, so renaming a key would orphan everybody's progress.
      *
      * @throws ResponseStatusException 404 if no competency has [key]; 400 if `targetLevel` is
-     * outside 1..4.
+     * outside 1..4 or `label` is blank.
      */
     @Transactional
     fun updateCompetency(key: String, request: UpdateCompetencyRequest): CompetencyResponse {
-        val competency = findVisibleCompetency(key, headGraph())
+        val competency = findCompetency(key)
 
         request.targetLevel?.let { level ->
-            if (level !in MIN_TARGET_LEVEL..MAX_TARGET_LEVEL) {
-                throw ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "targetLevel must be between $MIN_TARGET_LEVEL and $MAX_TARGET_LEVEL, got $level",
-                )
-            }
+            requireValidTargetLevel(level)
             competency.targetLevel = level
         }
         request.label?.let { label ->
-            if (label.isBlank()) {
-                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "label must not be blank")
-            }
+            if (label.isBlank()) reject(HttpStatus.BAD_REQUEST, "label must not be blank")
             competency.label = label.trim()
         }
         // A blank description is how a PM clears one, so it maps to null rather than being rejected.
@@ -209,161 +125,58 @@ class CompetencyGraphAuthoringService(
         request.invariant?.let { competency.invariant = it }
 
         competencyRepository.save(competency)
-        competencyGraphVersionService.recordNodeModified(key)
-        competencyGraphVersionService.bump()
         return competency.toAuthoringResponse()
     }
 
     /**
-     * Removes a competency node and every edge touching it from the visible graph.
+     * Removes a competency from the vocabulary.
      *
-     * Nothing is deleted: rows stay, change rows make them invisible. Any competency a hire has
-     * already earned stays on their ledger -- graph visibility and earned progress are
-     * independent, which is what makes this safe to do to a live graph.
+     * The ledger and any authored modules survive — see the class KDoc for why that is safe and what
+     * it means for a module whose competency is gone.
      *
      * @throws ResponseStatusException 404 if no competency has [key].
      */
     @Transactional
     fun deleteCompetency(key: String): DeleteCompetencyResponse {
-        val graph = headGraph()
-        findVisibleCompetency(key, graph)
-
-        // Edges are recorded as removed too: leaving them behind would keep dangling
-        // prerequisites in the replayed edge set, pointing at a node that is no longer there.
-        val touchingEdges = graph.edges.filter { it.fromKey == key || it.toKey == key }
-        touchingEdges.forEach {
-            competencyGraphVersionService.recordEdgeRemoved(it.fromKey, it.toKey, it.kind)
-        }
-        competencyGraphVersionService.recordNodeRemoved(key)
-        val version = competencyGraphVersionService.bump()
-
-        return DeleteCompetencyResponse(key = key, edgesRemoved = touchingEdges.size, graphVersion = version)
+        competencyRepository.delete(findCompetency(key))
+        return DeleteCompetencyResponse(key = key)
     }
 
-    /**
-     * Adds a hand-authored edge between two live competencies.
-     *
-     * @throws ResponseStatusException 404 if either endpoint is not a live competency; 409 if the
-     * edge already exists; 400 if it is a self-edge or would close a prerequisite cycle.
-     */
-    @Transactional
-    fun createEdge(request: CreateCompetencyEdgeRequest): CompetencyEdgeResponse {
-        val (fromKey, toKey, kind) = Triple(request.fromKey, request.toKey, request.kind)
-
-        val graph = headGraph()
-        validateNewEdge(fromKey, toKey, kind, graph)
-
-        // The row may already exist from an edge a PM removed earlier -- removal only records a
-        // change row, so re-adding must reuse the row rather than violate the unique constraint.
-        if (!competencyEdgeRepository.existsByFromKeyAndToKeyAndKind(fromKey, toKey, kind)) {
-            competencyEdgeRepository.save(CompetencyEdge(fromKey = fromKey, toKey = toKey, kind = kind))
-        }
-        competencyGraphVersionService.recordEdgeAdded(fromKey, toKey, kind)
-        competencyGraphVersionService.bump()
-        return CompetencyEdgeResponse(fromKey = fromKey, toKey = toKey, kind = kind)
-    }
-
-    /**
-     * Removes one edge from the visible graph, leaving both of its endpoints in place.
-     *
-     * As with [deleteCompetency], the row stays and a change row makes it invisible.
-     *
-     * @throws ResponseStatusException 404 if no such edge exists.
-     */
-    @Transactional
-    fun deleteEdge(fromKey: String, toKey: String, kind: EdgeKind): CompetencyEdgeResponse {
-        val isVisible = headGraph().edges.any {
-            it.fromKey == fromKey && it.toKey == toKey && it.kind == kind
-        }
-        if (!isVisible) {
-            throw ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "No $kind edge found from $fromKey to $toKey",
-            )
-        }
-        competencyGraphVersionService.recordEdgeRemoved(fromKey, toKey, kind)
-        competencyGraphVersionService.bump()
-        return CompetencyEdgeResponse(fromKey = fromKey, toKey = toKey, kind = kind)
-    }
-
-    /**
-     * Rejects a new edge that is malformed, duplicated, or would close a prerequisite cycle.
-     *
-     * Resolved against [graph] -- the *visible* graph -- rather than the tables, so an edge a PM
-     * removed neither blocks its own re-adding nor counts towards a cycle.
-     */
-    private fun validateNewEdge(fromKey: String, toKey: String, kind: EdgeKind, graph: EffectiveGraph) {
-        if (fromKey == toKey) {
-            reject(HttpStatus.BAD_REQUEST, "A competency cannot be its own prerequisite: $fromKey")
-        }
-        val visibleKeys = graph.competencies.map { it.key }.toSet()
-        val missingEndpoint = listOf(fromKey, toKey).firstOrNull { it !in visibleKeys }
-        if (missingEndpoint != null) {
-            reject(HttpStatus.NOT_FOUND, "No competency found with key: $missingEndpoint")
-        }
-        if (graph.edges.any { it.fromKey == fromKey && it.toKey == toKey && it.kind == kind }) {
-            reject(HttpStatus.CONFLICT, "A $kind edge from $fromKey to $toKey already exists")
-        }
-        rejectIfCycle(fromKey, toKey, kind, graph.edges)
-    }
-
-    /**
-     * Rejects an edge that would close a cycle in the prerequisite graph.
-     *
-     * Only [EdgeKind.PREREQUISITE] edges are checked: they are the only kind that gates and the
-     * only kind [GraphTraversalService] walks, so a [EdgeKind.RELATED] loop is harmless. A cycle
-     * would break both the topological ordering the path depends on and the layered layout the
-     * frontend draws, and neither fails loudly -- [GraphTraversalService.topologicalOrder]
-     * silently appends whatever it could not resolve.
-     */
-    private fun rejectIfCycle(fromKey: String, toKey: String, kind: EdgeKind, visibleEdges: List<CompetencyEdge>) {
-        if (kind != EdgeKind.PREREQUISITE) return
-
-        // Adding from -> to means "to requires from". That closes a cycle exactly when `from`
-        // already depends, transitively, on `to`.
-        val fromDependsOn = graphTraversalService.transitivePrerequisites(fromKey, visibleEdges)
-        if (toKey in fromDependsOn) {
-            throw ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "A prerequisite edge from $fromKey to $toKey would create a cycle: " +
-                    "$fromKey already requires $toKey, directly or indirectly",
-            )
-        }
-    }
-
-    private fun findVisibleCompetency(key: String, graph: EffectiveGraph): Competency =
-        graph.competencies.firstOrNull { it.key == key }
+    private fun findCompetency(key: String): Competency =
+        competencyRepository.findByKey(key)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No competency found with key: $key")
 
-    /**
-     * Normalises a hand-typed competency key into the graph's house style: lower-cased, with runs
-     * of non-alphanumeric characters collapsed to a single `-` and edge dashes trimmed. Matches
-     * `StarterWorkTaskProposalService.contributionKeyFor`, so every key in the graph -- mined,
-     * proposed or hand-authored -- shares one shape and is safe to carry in a URL path.
-     */
-    private fun slugifyKey(raw: String): String =
-        raw.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+    private fun requireValidTargetLevel(level: Int) {
+        if (level !in MIN_TARGET_LEVEL..MAX_TARGET_LEVEL) {
+            reject(
+                HttpStatus.BAD_REQUEST,
+                "targetLevel must be between $MIN_TARGET_LEVEL and $MAX_TARGET_LEVEL, got $level",
+            )
+        }
+    }
 
-    companion object {
-        private const val MIN_TARGET_LEVEL = 1
-        private const val MAX_TARGET_LEVEL = 4
+    private fun reject(status: HttpStatus, message: String): Nothing = throw ResponseStatusException(status, message)
+
+    private fun Competency.toAuthoringResponse() =
+        CompetencyResponse(
+            key = key,
+            label = label,
+            description = description,
+            kind = kind,
+            targetLevel = targetLevel,
+            invariant = invariant,
+        )
+
+    private companion object {
+        const val MIN_TARGET_LEVEL = 1
+        const val MAX_TARGET_LEVEL = 4
+
+        /** Kebab-cases a proposed key so hand-authored keys match the generator's house style. */
+        fun slugifyKey(raw: String): String =
+            raw
+                .trim()
+                .lowercase()
+                .replace(Regex("[^a-z0-9]+"), "-")
+                .trim('-')
     }
 }
-
-/** Pure mappers, kept top-level so the service stays under detekt's per-class function budget. */
-private fun Competency.toAuthoringResponse(): CompetencyResponse =
-    CompetencyResponse(
-        key = key,
-        label = label,
-        description = description,
-        kind = kind,
-        targetLevel = targetLevel,
-        invariant = invariant,
-        repoRef = repoRef,
-    )
-
-private fun CompetencyEdge.toAuthoringResponse(): CompetencyEdgeResponse =
-    CompetencyEdgeResponse(fromKey = fromKey, toKey = toKey, kind = kind)
-
-/** Throws a [ResponseStatusException]; expression-bodied so callers stay under detekt's throw budget. */
-private fun reject(status: HttpStatus, message: String): Nothing = throw ResponseStatusException(status, message)

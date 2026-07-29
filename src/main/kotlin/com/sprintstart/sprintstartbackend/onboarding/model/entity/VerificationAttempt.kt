@@ -12,11 +12,14 @@ import java.util.UUID
 /**
  * One graded attempt at a [Verification] — the audit trail behind a pass/fail.
  *
- * [graphVersion] stamps the competency graph version current at submission time (the same value
- * `PathView.graphVersion` reports), closing the gap Phase 2 slice 3 deferred to this issue. [hint]
- * is populated only on a failed attempt, escalating in specificity with [attemptNo] for
- * [com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType.KNOWLEDGE]
- * grading; it is not in the issue's literal field list but is persisted here for audit/history.
+ * Attempts point at a *verification*, never at whatever owns it, which is why this table has
+ * survived every rework: modules replaced steps, and the graph's structure was retired, without a
+ * single attempt row being repointed or lost.
+ *
+ * It used to also stamp the competency-graph version current at submission time, so an attempt could
+ * be read against the graph it was made under. There are no graph versions now, so the column was
+ * recording nothing. Dropping a version stamp is not the same as touching the history: every
+ * attempt, its answer, its grade and its date are untouched.
  */
 @Entity
 @Table(name = "verification_attempts")
@@ -40,8 +43,6 @@ class VerificationAttempt(
     val hint: String? = null,
     @Column(name = "attempt_no", nullable = false)
     val attemptNo: Int,
-    @Column(name = "graph_version", nullable = false)
-    val graphVersion: Int,
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now(),
 )

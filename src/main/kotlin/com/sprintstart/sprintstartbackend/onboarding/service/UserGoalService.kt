@@ -2,8 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGoal
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GoalView
-import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
+import com.sprintstart.sprintstartbackend.onboarding.model.response.goal.GoalView
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -30,16 +29,14 @@ import java.util.UUID
 class UserGoalService(
     private val userGoalRepository: UserGoalRepository,
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
-    private val competencyRepository: CompetencyRepository,
     private val userApi: UserApi,
 ) {
     /**
      * Claims an approved starter-work task as this hire's goal for [projectId], replacing any
      * goal they had claimed there before.
      *
-     * @throws ResponseStatusException 404 if the proposal or its CONTRIBUTION node doesn't exist;
-     * 409 if the proposal has not been approved (a PROPOSED or REJECTED task is not something a
-     * hire may commit to).
+     * @throws ResponseStatusException 404 if the proposal doesn't exist; 409 if it has not been
+     * approved (a PROPOSED or REJECTED task is not something a hire may commit to).
      */
     @Transactional
     fun claimForMe(authId: String, projectId: UUID, proposalId: UUID): GoalView {
@@ -54,42 +51,26 @@ class UserGoalService(
             )
         }
 
-        // Resolved through the same deterministic key derivation approval used, never by
-        // matching on label or URL -- a PM can rename a node, and a goal that stopped resolving
-        // because somebody fixed a typo would be a very confusing bug.
-        //
-        // Approval is what mints the node, so its absence means the graph and the proposal table
-        // disagree: claim a goal that isn't a node and the path would silently aim at nothing.
-        val contributionKey = StarterWorkTaskProposalService.contributionKeyFor(proposal.sourceId)
-        val contribution = competencyRepository.findByKey(contributionKey)
-            ?: throw ResponseStatusException(
-                HttpStatus.NOT_FOUND,
-                "Starter-work task $proposalId has no contribution node in the graph",
-            )
-
         val existing = userGoalRepository.findByUserIdAndProjectId(userId, projectId)
         val goal = existing?.apply {
-            competencyKey = contribution.key
             sourceProposalId = proposal.id
             claimedAt = Instant.now()
         } ?: UserGoal(
             userId = userId,
             projectId = projectId,
-            competencyKey = contribution.key,
             sourceProposalId = proposal.id,
         )
         userGoalRepository.save(goal)
 
         return GoalView(
-            competencyKey = contribution.key,
-            label = contribution.label,
+            proposalId = proposal.id,
+            title = proposal.title,
             summary = proposal.summary,
             sourceUrl = proposal.sourceUrl,
-            sourceProposalId = proposal.id,
         )
     }
 
-    /** Drops this hire's goal for [projectId]; the path falls back to the project's baseline. */
+    /** Drops this hire's goal for [projectId]. */
     @Transactional
     fun clearForMe(authId: String, projectId: UUID) {
         userGoalRepository.deleteByUserIdAndProjectId(resolveUserId(authId), projectId)
@@ -98,14 +79,21 @@ class UserGoalService(
     /**
      * This hire's claimed goal for [projectId], or `null` when they haven't picked one.
      *
-     * Resolved against the live graph so a goal whose node a PM has since removed reads as "no
+     * Resolved against the live proposal, so a goal whose task has since been removed reads as "no
      * goal" rather than pointing at something that is no longer there.
      */
     @Transactional(readOnly = true)
-    fun findForUser(userId: UUID, projectId: UUID, visibleKeys: Set<String>): UserGoal? =
-        userGoalRepository
-            .findByUserIdAndProjectId(userId, projectId)
-            ?.takeIf { it.competencyKey in visibleKeys }
+    fun findForUser(userId: UUID, projectId: UUID): GoalView? {
+        val goal = userGoalRepository.findByUserIdAndProjectId(userId, projectId) ?: return null
+        val proposal = starterWorkTaskProposalRepository.findById(goal.sourceProposalId).orElse(null)
+            ?: return null
+        return GoalView(
+            proposalId = proposal.id,
+            title = proposal.title,
+            summary = proposal.summary,
+            sourceUrl = proposal.sourceUrl,
+        )
+    }
 
     private fun resolveUserId(authId: String): UUID =
         userApi

@@ -16,13 +16,11 @@ import java.util.UUID
 /**
  * An AI-mined starter-work task (a GitHub issue) awaiting PM review.
  *
- * Mirrors [CompetencyProposal]'s proposal-only relationship with the live graph, adapted to a
- * single AI-mined artifact per row instead of a node/edge pair. Approving a proposal
+ * Approving one
  * ([com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkTaskProposalService.approve])
- * creates a real [Competency] of kind `CONTRIBUTION` -- the graph's terminal/goal-node kind --
- * plus `PREREQUISITE` edges from each of [competencyKeys], so the task becomes a reachable goal
- * node once a hire has built the skills it requires. The proposal row itself is never promoted in
- * place, and this table is never read by graph traversal/projection.
+ * used to mint a `CONTRIBUTION` [Competency] with `PREREQUISITE` edges from each of
+ * [competencyKeys], so the task became a graph node a hire could reach. There is no graph now, and
+ * a hire's goal points at this row directly -- so approving makes it claimable and creates nothing.
  */
 @Entity
 @Table(name = "starter_work_task_proposals")
@@ -41,8 +39,8 @@ class StarterWorkTaskProposal(
     val rationale: String? = null,
     @Column(name = "source_url", nullable = true)
     val sourceUrl: String? = null,
-    // The competency keys the AI judged this task exercises; approval wires each as a
-    // PREREQUISITE edge into the resulting CONTRIBUTION node.
+    // The competency keys the AI judged this task exercises. One of the four signals the matcher
+    // ranks a task by for a hire; it says what the work touches, never who may claim it.
     @ElementCollection
     @CollectionTable(
         name = "starter_work_task_proposal_competency_keys",

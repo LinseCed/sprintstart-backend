@@ -9,32 +9,24 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * The contribution a hire has claimed as the destination of their path, per project.
+ * The starter-work task a hire has claimed as their goal, per project.
  *
- * The north star is time-to-first-contribution, so a path should aim at a shipped change rather
- * than span the graph. This row is what makes that concrete: it names the `CONTRIBUTION`
- * competency a hire is working toward, and
- * [CompetencyPathService][com.sprintstart.sprintstartbackend.onboarding.service.CompetencyPathService]
- * adds it to the path's target set so its transitive prerequisites -- and only those, beyond the
- * project's baseline -- appear on the path.
+ * The north star is time-to-first-contribution, so a hire aims at a piece of real work rather than
+ * at a position in a curriculum. This row is what makes that concrete.
+ *
+ * ### Why this points at the proposal
+ *
+ * It used to name a `CompetencyKind.CONTRIBUTION` competency minted when a PM approved the task, so
+ * that a path could add the node's transitive prerequisites to its target set. With the graph's
+ * structure retired there are no prerequisites to add, and a contribution node was a competency
+ * nobody could ever be assessed on -- so the indirection bought nothing and could break: a goal
+ * stopped resolving whenever the node and the proposal table disagreed.
  *
  * ### Why this is stored rather than derived
  *
- * Hire→task matching is an AI call. Running it on every `GET /me/path` would put a model round
- * trip on the hottest read in the product, and would let a hire's destination change under them
- * between two page loads because the ranking moved. The hire claims one from their ranked matches
- * and it stays claimed until they change it.
- *
- * ### Identity
- *
- * [competencyKey] points at the CONTRIBUTION node, not at the proposal that created it -- the same
- * reasoning as everywhere else in the ledger: the key is the durable identity, and a path is
- * projected from the graph, not from the proposal table. [sourceProposalId] is kept so a client
- * can show the underlying task (its issue link, summary, scope rationale) without re-deriving
- * which proposal minted the node.
- *
- * Per `(userId, projectId)`: onboarding is per-project, so a hire onboarding onto two projects
- * aims at a different contribution in each.
+ * Hire→task matching is an AI call. Running it per read would put a model round trip on a hot path
+ * and would let a hire's destination change under them between two page loads because the ranking
+ * moved. The hire claims one from their ranked matches and it stays claimed until they change it.
  */
 @Entity
 @Table(
@@ -50,12 +42,9 @@ class UserGoal(
     val userId: UUID,
     @Column(name = "project_id", nullable = false)
     val projectId: UUID,
-    /** The CONTRIBUTION competency this path aims at. */
-    @Column(name = "competency_key", nullable = false)
-    var competencyKey: String,
-    /** The starter-work proposal that minted that node, for showing the underlying task. */
-    @Column(name = "source_proposal_id", nullable = true)
-    var sourceProposalId: UUID? = null,
+    /** The starter-work task being worked toward. */
+    @Column(name = "source_proposal_id", nullable = false)
+    var sourceProposalId: UUID,
     @Column(name = "claimed_at", nullable = false)
     var claimedAt: Instant = Instant.now(),
 )

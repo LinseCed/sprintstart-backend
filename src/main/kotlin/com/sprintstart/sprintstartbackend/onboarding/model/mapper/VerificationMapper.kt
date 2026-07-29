@@ -24,5 +24,4 @@ fun VerificationAttempt.toSubmitResponse(): SubmitVerificationAttemptResponse =
         feedback = feedback,
         hint = hint,
         attemptNo = attemptNo,
-        graphVersion = graphVersion,
     )
