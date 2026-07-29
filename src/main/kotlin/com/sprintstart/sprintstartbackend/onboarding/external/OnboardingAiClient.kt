@@ -2,7 +2,6 @@
 
 import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveCompetencySchema
-import com.sprintstart.sprintstartbackend.onboarding.external.model.ActiveEdgeSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ArtifactEvidenceDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssembleDiagramRequest
@@ -65,21 +64,29 @@ class OnboardingAiClient(
         }
 
     /**
-     * Runs the AI service's batch competency graph proposal job over the ingested corpus.
+     * Runs the AI service's batch competency proposal job over the ingested corpus.
      *
-     * The AI service is stateless: [activeCompetencies]/[activeEdges] (the backend's current
-     * live graph) drive dedup, and [lastFingerprint] drives idempotency -- there is no
-     * "active proposal" object on this side to carry it, unlike blueprint generation. A non-2xx
-     * response is wrapped in an [OnboardingAiException] carrying the upstream status/body.
+     * The AI service is stateless: [activeCompetencies] (the backend's current live vocabulary)
+     * drives dedup, and [lastFingerprint] drives idempotency -- there is no "active proposal"
+     * object on this side to carry it, unlike blueprint generation. A non-2xx response is wrapped
+     * in an [OnboardingAiException] carrying the upstream status/body.
      *
-     * @param activeCompetencies The backend's current live competency nodes.
-     * @param activeEdges The backend's current live prerequisite edges.
+     * The result is a flat vocabulary: it states no ordering. The relationship pass that used to
+     * follow the node pass went with the graph it described.
+     *
+     * **Nothing calls this or [streamCompetencyGraph] right now.** The PM proposal queue that did
+     * was retired with the graph, and the replacement — generation kicked off when a crawl
+     * finishes, so that "set up onboarding" collapses into "connect a repo" — is S3 of
+     * `forks/SKILL_MAP_RETIREMENT_DESIGN.md`. Until then the vocabulary is hand-authored through
+     * `CompetencyGraphAuthoringService`. This is the seam S3 calls, kept rather than deleted and
+     * rewritten one slice later.
+     *
+     * @param activeCompetencies The backend's current live competencies.
      * @param lastFingerprint The corpus fingerprint recorded from the most recent prior proposal, if any.
      * @return The proposal outcome returned by the AI service.
      */
     suspend fun proposeCompetencyGraph(
         activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
-        activeEdges: List<ActiveEdgeSchema> = emptyList(),
         lastFingerprint: String? = null,
     ): GraphProposalOutcome =
         try {
@@ -89,13 +96,12 @@ class OnboardingAiClient(
                 .body(
                     GenerateCompetencyGraphRequest(
                         activeCompetencies = activeCompetencies,
-                        activeEdges = activeEdges,
                         lastFingerprint = lastFingerprint,
                     ),
                 ).sync()
                 .perform<GraphProposalOutcome>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
-            val msg = "Failed to propose competency graph (HTTP ${e.statusCode}): ${e.body}"
+            val msg = "Failed to propose competencies (HTTP ${e.statusCode}): ${e.body}"
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 
@@ -446,22 +452,20 @@ class OnboardingAiClient(
         )
 
     /**
-     * Streams the AI service proposing competency graph nodes/edges.
+     * Streams the AI service proposing competencies.
      *
-     * The streaming twin of [proposeCompetencyGraph]: the AI emits a `stage` per pass, an `item`
-     * per grounded competency then per accepted edge, and a terminal `done` carrying the whole
-     * outcome the backend persists. The graph literally assembles, nodes-then-edges.
+     * The streaming twin of [proposeCompetencyGraph]: the AI emits a `stage` per phase, an `item`
+     * per grounded competency, and a terminal `done` carrying the whole outcome the backend
+     * persists. The vocabulary literally builds, one competency at a time.
      */
     fun streamCompetencyGraph(
         activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
-        activeEdges: List<ActiveEdgeSchema> = emptyList(),
         lastFingerprint: String? = null,
     ): Flow<AiProgressEvent> =
         streamProgress(
             "/api/v1/onboarding/competency-graph/propose/stream",
             GenerateCompetencyGraphRequest(
                 activeCompetencies = activeCompetencies,
-                activeEdges = activeEdges,
                 lastFingerprint = lastFingerprint,
             ),
         )
