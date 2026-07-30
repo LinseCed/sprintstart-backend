@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.feedback.Get
 import com.sprintstart.sprintstartbackend.onboarding.model.response.feedback.ReadOnboardingFeedbackResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.ModulePageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingFeedbackRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -34,6 +35,7 @@ class OnboardingFeedbackService(
      * @throws ResponseStatusException (not found) If no user with the given id could be found
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving all feedback for this user")
     fun getAllFeedbackForMe(authId: String): List<GetOnboardingFeedbackResponse> {
         val userId = getUserId(authId)
 
@@ -50,6 +52,7 @@ class OnboardingFeedbackService(
      * @throws ResponseStatusException (not found) if the user or page could not be found.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving all feedback this user left on a specific module page")
     fun getFeedbackByPageIdForMe(authId: String, pageId: UUID): List<GetOnboardingFeedbackResponse> {
         val userId = getUserId(authId)
         findPage(pageId)
@@ -70,6 +73,7 @@ class OnboardingFeedbackService(
      * @throws ResponseStatusException (not found) if the user or page could not be found.
      */
     @Transactional
+    @Tracked("Adding feedback for this user")
     fun createFeedbackForMe(authId: String, request: CreateOnboardingFeedbackRequest): GetOnboardingFeedbackResponse {
         val userId = getUserId(authId)
         val page = request.pageId?.let { findPage(it) }
@@ -96,6 +100,7 @@ class OnboardingFeedbackService(
      * Retrieves all feedback for all users.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving all feedback of all users")
     fun getAllFeedback(): List<GetAdminOnboardingFeedbackResponse> {
         return onboardingFeedbackRepository
             .findAllByOrderByCreatedAtAsc()
@@ -109,6 +114,7 @@ class OnboardingFeedbackService(
      * @throws ResponseStatusException (not found) if user or step with given id could not be found.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving all feedback of a specific user")
     fun getAllFeedbackByUserId(userId: UUID): List<GetAdminOnboardingFeedbackResponse> {
         if (!userApi.exists(userId)) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id: $userId")
@@ -126,6 +132,7 @@ class OnboardingFeedbackService(
      * @throws ResponseStatusException (not found) if no page with that id exists.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving all feedback for a specific module page")
     fun getAllFeedbackByPageId(pageId: UUID): List<GetAdminOnboardingFeedbackResponse> {
         if (!modulePageRepository.existsById(pageId)) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "No module page found with id: $pageId")
@@ -143,6 +150,7 @@ class OnboardingFeedbackService(
      * @throws ResponseStatusException (not found) if feedback with given id could not be found.
      */
     @Transactional
+    @Tracked("Marking feedback as read")
     fun markFeedbackAsRead(feedbackId: UUID): ReadOnboardingFeedbackResponse {
         val feedback = onboardingFeedbackRepository
             .findById(feedbackId)

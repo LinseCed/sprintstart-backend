@@ -5,12 +5,14 @@ import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.PageMetad
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
@@ -38,6 +40,8 @@ class ArtifactQueryService(
      * @return One artifact page together with pagination metadata.
      * @throws IllegalArgumentException when Spring Data rejects the requested page or page size.
      */
+    @Transactional(readOnly = true)
+    @Tracked("Retrieving list of all artifacts")
     fun getAllArtifacts(page: Int, size: Int, filter: String?): ArtifactPageResponse {
         val pageable = PageRequest.of(
             page - 1,
@@ -79,6 +83,8 @@ class ArtifactQueryService(
      * @throws ResponseStatusException `403` when the caller has no access to the project.
      * @throws IllegalArgumentException when Spring Data rejects the requested page or page size.
      */
+    @Transactional(readOnly = true)
+    @Tracked("Retrieving list of artifacts for project")
     fun getProjectArtifacts(
         page: Int,
         size: Int,
@@ -119,7 +125,7 @@ class ArtifactQueryService(
      * @param projectId The SprintStart project whose access is being checked.
      * @throws ResponseStatusException `403` when the caller has no access to the project.
      */
-    fun ensureAccessToProject(authId: String, projectId: UUID) {
+    private fun ensureAccessToProject(authId: String, projectId: UUID) {
         val userHasAccessToProject = userApi.userHasAccessToProject(authId, projectId)
         if (!userHasAccessToProject) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project with id $projectId")

@@ -1,7 +1,8 @@
 package com.sprintstart.sprintstartbackend.upload.service
 
+import com.sprintstart.sprintstartbackend.ApplicationConfig
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.upload.allowedExtensions
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.web.multipart.MultipartFile
 
@@ -13,8 +14,7 @@ import org.springframework.web.multipart.MultipartFile
  */
 @Service
 class UploadValidationService(
-    @Value("\${app.upload.max-file-size-bytes}")
-    private val maxFileSizeBytes: Long,
+    private val applicationConfig: ApplicationConfig,
 ) {
     /**
      * Applies all upload acceptance checks before storage is attempted.
@@ -27,6 +27,7 @@ class UploadValidationService(
      * @throws IllegalArgumentException when the file is empty, too large, has an unsafe filename,
      * or uses an unsupported extension.
      */
+    @Tracked("Validating uploaded file")
     fun validate(file: MultipartFile) {
         validateEmpty(file)
 
@@ -44,7 +45,7 @@ class UploadValidationService(
     }
 
     private fun validateSize(file: MultipartFile) {
-        if (file.size > maxFileSizeBytes) {
+        if (file.size > applicationConfig.upload.maxFileSizeBytes) {
             throw IllegalArgumentException(
                 "File exceeds maximum allowed size",
             )
@@ -79,13 +80,17 @@ class UploadValidationService(
 
     private fun extensionFor(filename: String): String {
         return when (filename.lowercase()) {
-            "dockerfile" -> "dockerfile"
-            else ->
+            "dockerfile" -> {
+                "dockerfile"
+            }
+
+            else -> {
                 filename
                     .substringAfterLast(
                         delimiter = ".",
                         missingDelimiterValue = "",
                     ).lowercase()
+            }
         }
     }
 }

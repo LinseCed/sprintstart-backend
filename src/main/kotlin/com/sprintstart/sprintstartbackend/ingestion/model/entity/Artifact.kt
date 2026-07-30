@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.model.entity
 
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import jakarta.persistence.CollectionTable
 import jakarta.persistence.Column
 import jakarta.persistence.ElementCollection
@@ -18,15 +19,16 @@ class Artifact(
     @Id
     val id: UUID = UUID.randomUUID(),
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "source_system", nullable = false)
     val sourceSystem: SourceSystem,
-    @Column(nullable = false)
+    @Column(name = "source_id", nullable = false)
     val sourceId: String,
-    @Column(length = 2048)
+    @Column(name = "source_url", length = 2048)
     val sourceUrl: String?,
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "artifact_type", nullable = false)
     val artifactType: ArtifactType,
+    @Column(columnDefinition = "TEXT")
     var title: String?,
     @Column(columnDefinition = "TEXT")
     var content: String?,
@@ -36,8 +38,9 @@ class Artifact(
     // unconditionally on every re-fetch by GithubArtifactProviderService, independent of the
     // content hash, since a state change alone doesn't move title/body.
     var state: String? = null,
-    @Column(nullable = false)
-    val metadata: String = "{}",
+    // `var` because Jira re-ingestion refreshes an issue's metadata in place.
+    @Column(nullable = false, columnDefinition = "TEXT")
+    var metadata: String = "{}",
     @ElementCollection
     @CollectionTable(
         name = "artifact_projects",
@@ -59,9 +62,11 @@ class Artifact(
     val labels: MutableList<String> = mutableListOf(),
     // `var` so a crawl can backfill rows written before these were persisted at all. They are
     // not part of the AI payload, so writing one never marks the artifact for re-embedding.
+    @Column(name = "created_at_source")
     var createdAtSource: Instant?,
+    @Column(name = "updated_at_source")
     var updatedAtSource: Instant?,
-    @Column(nullable = false)
+    @Column(name = "ingested_at", nullable = false)
     val ingestedAt: Instant = Instant.now(),
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ingestion_run_id")

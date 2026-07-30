@@ -1,9 +1,10 @@
 package com.sprintstart.sprintstartbackend.artifacts.controller
 
 import com.ninjasquad.springmockk.MockkBean
-import com.sprintstart.sprintstartbackend.artifacts.model.ai.AiArtifactSummaryStreamMessage
-import com.sprintstart.sprintstartbackend.artifacts.service.ArtifactSummaryService
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
+import com.sprintstart.sprintstartbackend.ingestion.controller.ArtifactSummaryController
+import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.AiArtifactSummaryStreamMessage
+import com.sprintstart.sprintstartbackend.ingestion.service.ArtifactSummaryService
 import io.mockk.every
 import io.mockk.verify
 import kotlinx.coroutines.flow.flowOf

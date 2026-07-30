@@ -27,12 +27,15 @@ class SourceClientTest {
             ai = com.sprintstart.sprintstartbackend.AiConfig(baseUrl = baseUrl),
             github = com.sprintstart.sprintstartbackend.GithubConfig(
                 baseUrl = "https://github.example.com",
-                repoBaseUrl = "https://repo.example.com",
                 cron = "0 0 * * *",
             ),
             crypto = com.sprintstart.sprintstartbackend.CryptoConfig(
                 masterKey = "test-master-key",
                 salt = "test-salt",
+            ),
+            upload = com.sprintstart.sprintstartbackend.UploadConfig(
+                directory = "/tmp/uploads",
+                maxFileSizeBytes = 100,
             ),
         )
         client = SourceClient(applicationConfig, webClient)

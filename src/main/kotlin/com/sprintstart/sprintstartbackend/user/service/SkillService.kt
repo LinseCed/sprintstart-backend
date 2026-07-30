@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.user.service
 
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.enums.SkillStatus
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.entity.Skill
@@ -25,11 +26,13 @@ class SkillService(
     private val projectRoleRepository: ProjectRoleRepository,
 ) {
     @Transactional(readOnly = true)
+    @Tracked("Retrieving all skills")
     fun getAllSkills(): List<GetSkillResponse> {
         return skillRepository.findAll().map { it.toGetResponse() }
     }
 
     @Transactional(readOnly = true)
+    @Tracked("Retrieving skill by id")
     fun getSkillById(skillId: UUID): GetSkillResponse {
         return skillRepository
             .findById(skillId)
@@ -38,6 +41,7 @@ class SkillService(
     }
 
     @Transactional
+    @Tracked("Creating skill")
     fun createSkill(request: CreateSkillRequest): CreateSkillResponse {
         val roles = findRolesByIds(request.roleIds)
         val existingSkill = skillRepository.findByNormalizedName(request.name)
@@ -64,6 +68,7 @@ class SkillService(
     }
 
     @Transactional
+    @Tracked("Updating skill")
     fun updateSkill(skillId: UUID, request: UpdateSkillRequest): UpdateSkillResponse {
         val skill = skillRepository
             .findById(skillId)
@@ -97,6 +102,7 @@ class SkillService(
      * Retires a skill so it can no longer be assigned to roles.
      */
     @Transactional
+    @Tracked("Retiring skill")
     fun retireSkill(skillId: UUID) {
         val skill = skillRepository
             .findById(skillId)

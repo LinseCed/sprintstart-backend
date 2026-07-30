@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.ingestion.service
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.UploadArtifactFailedMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.UploadArtifactStatus
 import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.UploadBatchDeletionFinishedEvent
 import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.UploadBatchFinishedEvent
@@ -35,6 +36,7 @@ class UploadIngestionRunService(
      * @throws IngestionRunNotFoundException when the run id is unknown.
      */
     @Transactional
+    @Tracked("Finishing upload ingestion run")
     fun finishUploadIngestionRun(event: UploadBatchFinishedEvent) {
         val run = ingestionRunRepository
             .findByIdForUpdate(event.transactionId)
@@ -68,6 +70,7 @@ class UploadIngestionRunService(
      * @throws IngestionRunNotFoundException when the run id is unknown.
      */
     @Transactional
+    @Tracked("Finishing upload deletion ingestion run")
     fun finishUploadDeletionIngestionRun(event: UploadBatchDeletionFinishedEvent) {
         val run = ingestionRunRepository
             .findByIdForUpdate(event.transactionId)

@@ -5,10 +5,13 @@ import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredArtifact
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.ingestion.external.RepositoryResponsiveness
 import com.sprintstart.sprintstartbackend.ingestion.external.TaskSourceArtifact
+import com.sprintstart.sprintstartbackend.ingestion.external.model.ArtifactDto
+import com.sprintstart.sprintstartbackend.ingestion.external.model.toDto
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMetadataJsonMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Duration
@@ -27,11 +30,13 @@ internal class ArtifactIngestionApiService(
     private val artifactMetadataJsonMapper: ArtifactMetadataJsonMapper,
 ) : ArtifactIngestionApi {
     @Transactional(readOnly = true)
+    @Tracked("Retrieving first ingestion time of component")
     override fun getFirstIngestedAt(component: String): Instant? {
         return artifactRepository.findFirstIngestedAt(component)
     }
 
     @Transactional(readOnly = true)
+    @Tracked("Retrieving first ingestion time of list of components")
     override fun getFirstIngestedAt(components: Collection<String>): Map<String, Instant> {
         return components
             .distinct()
@@ -41,16 +46,19 @@ internal class ArtifactIngestionApiService(
     }
 
     @Transactional(readOnly = true)
+    @Tracked("Checking if artifact exists")
     override fun exists(artifactId: UUID): Boolean {
         return artifactRepository.existsById(artifactId)
     }
 
     @Transactional(readOnly = true)
+    @Tracked("Checking if artifact exists in project")
     override fun existsInProject(projectId: UUID, artifactId: UUID): Boolean {
         return artifactRepository.findById(artifactId).map { it.projectIds.contains(projectId) }.orElse(false)
     }
 
     @Transactional(readOnly = true)
+    @Tracked("Retrieving hash of artifact")
     override fun getHash(artifactId: UUID): String? {
         return artifactRepository.findById(artifactId).orElse(null)?.hash
     }
@@ -117,17 +125,6 @@ internal class ArtifactIngestionApiService(
             }
     }
 
-    private fun hoursBetween(from: Instant?, to: Instant?): Long? {
-        if (from == null || to == null) return null
-        return Duration.between(from, to).toHours()
-    }
-
-    private fun median(values: List<Long>): Long? {
-        if (values.isEmpty()) return null
-        val sorted = values.sorted()
-        return sorted[(sorted.size - 1) / 2]
-    }
-
     @Transactional(readOnly = true)
     override fun getTaskSource(sourceId: String): TaskSourceArtifact? {
         val artifact = artifactRepository.findBySourceId(sourceId) ?: return null
@@ -138,4 +135,22 @@ internal class ArtifactIngestionApiService(
             sourceUrl = artifact.sourceUrl,
         )
     }
+
+    @Transactional(readOnly = true)
+    @Tracked("Retrieving artifact by id")
+    override fun findArtifactById(artifactId: UUID): ArtifactDto? {
+        return artifactRepository.findById(artifactId).map { it.toDto() }.orElse(null)
+    }
+}
+
+private fun hoursBetween(from: Instant?, to: Instant?): Long? {
+    if (from == null || to == null) return null
+    return Duration.between(from, to).toHours()
+}
+
+/** Lower median, so an even-sized sample reports a latency that actually occurred. */
+private fun median(values: List<Long>): Long? {
+    if (values.isEmpty()) return null
+    val sorted = values.sorted()
+    return sorted[(sorted.size - 1) / 2]
 }

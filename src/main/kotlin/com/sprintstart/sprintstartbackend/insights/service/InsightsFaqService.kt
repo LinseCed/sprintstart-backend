@@ -10,6 +10,7 @@ import com.sprintstart.sprintstartbackend.insights.model.dto.response.RefreshFaq
 import com.sprintstart.sprintstartbackend.insights.model.mapper.AiFaqGroupMapper
 import com.sprintstart.sprintstartbackend.insights.model.mapper.FaqResponseMapper
 import com.sprintstart.sprintstartbackend.insights.repository.FaqGroupRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -35,6 +36,7 @@ class InsightsFaqService(
      * Returns all cached recurring-question groups, most frequently asked first.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving FAQ overview")
     fun getFaqOverview(): FaqOverviewResponse {
         return faqResponseMapper.toOverviewResponse(
             faqGroupRepository.findAllByOrderByOccurrenceCountDesc(),
@@ -47,6 +49,7 @@ class InsightsFaqService(
      * @throws ResponseStatusException 404 if no group with [groupId] exists.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving FAQ group")
     fun getFaqGroup(groupId: UUID): FaqDetailResponse {
         val group = faqGroupRepository.findById(groupId).orElseThrow {
             ResponseStatusException(HttpStatus.NOT_FOUND, "FAQ group with id $groupId not found")
@@ -63,6 +66,7 @@ class InsightsFaqService(
      * @throws com.sprintstart.sprintstartbackend.insights.model.exceptions.InsightsAiException
      *   if the AI service does not return a grouping result.
      */
+    @Tracked("Refreshing FAQ groups")
     suspend fun refreshFaqGroups(): RefreshFaqResponse {
         val questions = chatQuestionApi
             .getAllUserQuestions()

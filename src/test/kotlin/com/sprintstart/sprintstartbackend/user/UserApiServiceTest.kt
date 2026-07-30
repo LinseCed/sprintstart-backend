@@ -125,8 +125,35 @@ class UserApiServiceTest {
         val user = user(project = Project(id = UUID.randomUUID(), name = "Project"))
 
         every { userRepository.findByAuthId("auth-1") } returns Optional.of(user)
+        every { projectRepository.findManagerAuthId(requestedProjectId) } returns Optional.empty()
 
         val result = userApi.userHasAccessToProject("auth-1", requestedProjectId)
+
+        assertThat(result).isFalse()
+    }
+
+    @Test
+    fun `userHasAccessToProject should return true when user manages the project without membership`() {
+        val managedProjectId = UUID.randomUUID()
+        val user = user(project = null)
+
+        every { userRepository.findByAuthId("auth-1") } returns Optional.of(user)
+        every { projectRepository.findManagerAuthId(managedProjectId) } returns Optional.of("auth-1")
+
+        val result = userApi.userHasAccessToProject("auth-1", managedProjectId)
+
+        assertThat(result).isTrue()
+    }
+
+    @Test
+    fun `userHasAccessToProject should return false when another user manages the project`() {
+        val managedProjectId = UUID.randomUUID()
+        val user = user(project = null)
+
+        every { userRepository.findByAuthId("auth-1") } returns Optional.of(user)
+        every { projectRepository.findManagerAuthId(managedProjectId) } returns Optional.of("auth-2")
+
+        val result = userApi.userHasAccessToProject("auth-1", managedProjectId)
 
         assertThat(result).isFalse()
     }

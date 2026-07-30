@@ -14,6 +14,7 @@ import com.sprintstart.sprintstartbackend.insights.model.mapper.AiKnowledgeGapMa
 import com.sprintstart.sprintstartbackend.insights.model.mapper.KnowledgeGapResponseMapper
 import com.sprintstart.sprintstartbackend.insights.repository.ComponentOwnerRepository
 import com.sprintstart.sprintstartbackend.insights.repository.KnowledgeGapRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -43,6 +44,7 @@ class KnowledgeGapsService(
      * Returns all cached knowledge gaps, most severe first and then by component name.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving all knowledge gaps")
     fun getKnowledgeGaps(): KnowledgeGapsOverviewResponse {
         val gaps = knowledgeGapRepository
             .findAll()
@@ -59,6 +61,7 @@ class KnowledgeGapsService(
      * @throws ResponseStatusException 404 if no gap with [gapId] exists.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving specific knowledge gap")
     fun getKnowledgeGap(gapId: UUID): KnowledgeGapResponse {
         val gap = knowledgeGapRepository.findById(gapId).orElseThrow {
             ResponseStatusException(HttpStatus.NOT_FOUND, "Knowledge gap with id $gapId not found")
@@ -72,6 +75,7 @@ class KnowledgeGapsService(
      * Returns the currently assigned owners of a component.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving component owners")
     fun getComponentOwners(component: String): List<KnowledgeGapOwnerResponse> {
         return resolveOwners(listOf(component))[component] ?: emptyList()
     }
@@ -80,6 +84,7 @@ class KnowledgeGapsService(
      * Replaces the owners of a component with the given users and returns the resolved owners.
      */
     @Transactional
+    @Tracked("Setting component owners")
     fun setComponentOwners(request: SetComponentOwnersRequest): List<KnowledgeGapOwnerResponse> {
         componentOwnerRepository.deleteByComponent(request.component)
         val owners = request.userIds
@@ -98,6 +103,7 @@ class KnowledgeGapsService(
      * @throws com.sprintstart.sprintstartbackend.insights.model.exceptions.KnowledgeGapsAiException
      *   if the AI service does not return a classification result.
      */
+    @Tracked("Refreshing knowledge gaps")
     suspend fun refreshKnowledgeGaps(): RefreshKnowledgeGapsResponse {
         val aiResponse = knowledgeGapsAiClient.detectKnowledgeGaps(AiKnowledgeGapsRequest())
         val gaps: List<KnowledgeGap> = aiResponse.gaps.map { aiKnowledgeGapMapper.toEntity(it) }

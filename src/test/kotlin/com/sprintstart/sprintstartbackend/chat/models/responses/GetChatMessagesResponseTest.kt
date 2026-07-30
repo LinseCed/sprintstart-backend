@@ -22,7 +22,7 @@ class GetChatMessagesResponseTest {
             UUID.randomUUID(),
             ChatRole.USER,
             chat,
-            emptyList(),
+            mutableListOf(),
             "Some content",
             OffsetDateTime.now(),
         )
@@ -35,7 +35,7 @@ class GetChatMessagesResponseTest {
             null,
             3,
         )
-        chatMessage.citations = listOf(citation)
+        chatMessage.citations = mutableListOf(citation)
 
         val request = chatMessage.toChatMessageResponse()
 

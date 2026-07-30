@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingTrackApi
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
 import com.sprintstart.sprintstartbackend.user.model.mapper.toGetResponse
 import com.sprintstart.sprintstartbackend.user.model.mapper.toUpdateRoleSkillsResponse
@@ -26,11 +27,13 @@ class ProjectRoleService(
     private val onboardingTrackApi: OnboardingTrackApi,
 ) {
     @Transactional(readOnly = true)
+    @Tracked("Retrieving all project roles")
     fun getAllRoles(): List<ProjectRole> {
         return projectRoleRepository.findAll()
     }
 
     @Transactional
+    @Tracked("Creating new project role")
     fun createRole(request: CreateProjectRoleRequest): ProjectRole {
         val role = ProjectRole(
             name = request.name,
@@ -68,6 +71,7 @@ class ProjectRoleService(
     }
 
     @Transactional
+    @Tracked("Deleting project role")
     fun deleteRole(roleId: UUID) {
         if (!projectRoleRepository.existsById(roleId)) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project role with id $roleId not found")
@@ -110,6 +114,7 @@ class ProjectRoleService(
      * already satisfied.
      */
     @Transactional
+    @Tracked("Assigning project role to user")
     fun assignRoleToUser(userId: UUID, projectId: UUID, roleId: UUID) {
         val assignment = projectUserAssignmentRepository.findByProjectIdAndUserId(projectId, userId)
             ?: throw ResponseStatusException(
@@ -126,6 +131,7 @@ class ProjectRoleService(
 
     /** Takes a role off somebody **on one project**, leaving whatever they hold elsewhere alone. */
     @Transactional
+    @Tracked("Unassigning project role from user")
     fun unassignRoleFromUser(userId: UUID, projectId: UUID, roleId: UUID) {
         val assignment = projectUserAssignmentRepository.findByProjectIdAndUserId(projectId, userId)
             ?: throw ResponseStatusException(
@@ -137,6 +143,7 @@ class ProjectRoleService(
     }
 
     @Transactional(readOnly = true)
+    @Tracked("Retrieving skills for project role")
     fun getSkillsForRole(roleId: UUID): List<GetSkillResponse> {
         if (!projectRoleRepository.existsById(roleId)) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "Project role with id $roleId not found")
@@ -151,6 +158,7 @@ class ProjectRoleService(
      * no role at all, since every skill must belong to at least one project role.
      */
     @Transactional
+    @Tracked("Updating skills for project role")
     fun setSkillsForRole(roleId: UUID, request: UpdateRoleSkillsRequest): List<UpdateRoleSkillsResponse> {
         val role = projectRoleRepository
             .findById(roleId)

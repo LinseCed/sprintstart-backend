@@ -1,12 +1,13 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactContentRedirectResponse
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactContentResponse
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactContentResult
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
-import com.sprintstart.sprintstartbackend.upload.external.UploadedArtifactReader
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.upload.external.api.UploadedArtifactReader
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -44,6 +45,7 @@ class ArtifactService(
      * requested project, or has no stored content.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving content of artifact")
     fun getArtifactContent(projectId: UUID, artifactId: UUID, authId: String): ArtifactContentResult {
         ensureAccessToProject(authId, projectId)
         val artifact = requireArtifact(artifactId)
@@ -83,6 +85,18 @@ class ArtifactService(
         throw ResponseStatusException(HttpStatus.NOT_FOUND, "Artifact content not found")
     }
 
+    /**
+     * Reads the uploaded bytes associated with the provided artifact.
+     *
+     * This method attempts to load the uploaded artifact's content by parsing its `sourceId` into a UUID,
+     * and then retrieving the bytes using the `UploadedArtifactReader`. If the `sourceId` is invalid or
+     * the artifact content cannot be retrieved, it returns `null`.
+     *
+     * @param artifact The artifact whose uploaded bytes are to be read. The `sourceId` field of the artifact
+     * must be a valid UUID representing the uploaded artifact.
+     * @return A byte array containing the uploaded artifact's content, or `null` if the `sourceId` is invalid
+     * or the content cannot be retrieved.
+     */
     private fun readUploadedBytes(artifact: Artifact): ByteArray? {
         val uploadArtifactId = runCatching {
             UUID.fromString(artifact.sourceId)
@@ -104,7 +118,7 @@ class ArtifactService(
      * @param projectId The project whose artifacts the caller wants to read.
      * @throws ResponseStatusException `403` when the caller has no access to the project.
      */
-    fun ensureAccessToProject(authId: String, projectId: UUID) {
+    private fun ensureAccessToProject(authId: String, projectId: UUID) {
         val userHasAccessToProject = userApi.userHasAccessToProject(authId, projectId)
         if (!userHasAccessToProject) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "No access to project with id $projectId")
@@ -118,7 +132,7 @@ class ArtifactService(
      * @return The persisted artifact entity.
      * @throws ResponseStatusException `404` when no artifact exists for the id.
      */
-    fun requireArtifact(artifactId: UUID): Artifact {
+    private fun requireArtifact(artifactId: UUID): Artifact {
         return artifactRepository
             .findById(artifactId)
             .orElseThrow {

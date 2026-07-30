@@ -54,13 +54,40 @@ class GithubRepositoryConfigController(
         ],
     )
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PutMapping("/global")
+    @PutMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('PM')")
-    fun configureGlobal(
+    fun configureAll(
         @Valid @RequestBody request: ConfigureRepositoryRequest,
     ): ResponseEntity<Unit> {
-        configService.configureGlobal(request)
+        configService.configureAll(request)
         return ResponseEntity.noContent().build()
+    }
+
+    /**
+     * Retrieves all repository update configurations.
+     *
+     * @return ResponseEntity containing a list of repository configuration responses.
+     */
+    @Operation(
+        summary = "Retrieve all repository configs",
+        description = "Allows retrieval of all repository update configurations",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Retrieved all repository configs successfully.",
+            ),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role to access this endpoint"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN') or hasRole('PM')")
+    fun getAll(): ResponseEntity<List<GetRepositoryConfigResponse>> {
+        val result = configService.getAll()
+        return ResponseEntity.ok(result)
     }
 
     /**

@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.ingestion.ArtifactIngestionClient
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.request.RunArtifactsAiSyncRequest
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -39,6 +40,7 @@ class RunArtifactsIngestionService(
      * @throws com.sprintstart.sprintstartbackend.upload.model.exceptions.IngestionResponseException
      * when the AI ingestion service rejects the request.
      */
+    @Tracked("Dispatching deindex for run")
     suspend fun deindexRunArtifacts(runId: UUID) {
         val artifactIdsToDeindex = withContext(Dispatchers.IO) {
             readTxTemplate.execute { loadDeindexIds(runId) }

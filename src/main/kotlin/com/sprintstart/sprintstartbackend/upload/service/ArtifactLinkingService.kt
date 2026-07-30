@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.upload.service
 
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.upload.model.entity.LinkedImage
 import com.sprintstart.sprintstartbackend.upload.model.entity.UploadedArtifact
 import com.sprintstart.sprintstartbackend.upload.repository.LinkedImageRepository
@@ -30,6 +31,7 @@ class ArtifactLinkingService(
      * @param uploadedArtifactsByFilename Batch artifacts keyed by their original filename.
      * @return The link rows persisted for resolvable markdown image references.
      */
+    @Tracked("Linking markdown images to uploaded artifacts")
     fun linkMarkdownImages(
         markdownArtifacts: List<Pair<UploadedArtifact, String>>,
         uploadedArtifactsByFilename: Map<String, UploadedArtifact>,

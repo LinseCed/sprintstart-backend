@@ -1,9 +1,11 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.SourceIngestionStatusResponse
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 /**
  * Builds the compact "latest status per source" view used by operational UIs.
@@ -26,6 +28,8 @@ class IngestionStatusService(
      * @return The latest exposed source status rows, including the empty-state row when no run
      * exists yet.
      */
+    @Transactional(readOnly = true)
+    @Tracked("Retrieving ingestion status")
     fun getIngestionStatusPerSource(): List<SourceIngestionStatusResponse> {
         val lastRun = ingestionRunRepository.findFirstByOrderByStartedAtDesc()
         val github = SourceIngestionStatusResponse(

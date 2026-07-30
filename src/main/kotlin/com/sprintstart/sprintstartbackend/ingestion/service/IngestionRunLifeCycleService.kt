@@ -1,12 +1,13 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.ingestion.events.RunFinishedEvent
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.AiSyncStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import jakarta.transaction.Transactional
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
@@ -37,13 +38,20 @@ class IngestionRunLifeCycleService(
      * @param sourceSystem The external system that owns the run.
      * @param status The initial or replacement lifecycle status.
      * @param failureReason Optional run-level failure reason for startup failures.
+     * @param sourceInstanceId Optional connector-neutral id of the source instance this run belongs
+     * to (for GitHub the connected repository id).
+     * @param sourceInstanceRef Optional denormalized label of the source instance (for GitHub
+     * "owner/name").
      */
     @Transactional
-    fun startRun(
+    @Tracked("Starting ingestion run")
+    fun startOrUpdateRun(
         transactionId: UUID,
         sourceSystem: SourceSystem,
         status: IngestionRunStatus,
         failureReason: String? = null,
+        sourceInstanceId: UUID? = null,
+        sourceInstanceRef: String? = null,
     ) {
         val ingestionRun = ingestionRunRepository.findByIdOrNull(transactionId)
         if (ingestionRun == null) {
@@ -52,8 +60,10 @@ class IngestionRunLifeCycleService(
             val ingestionRun = IngestionRun(
                 id = transactionId,
                 sourceSystem = sourceSystem,
+                sourceInstanceId = sourceInstanceId,
+                sourceInstanceRef = sourceInstanceRef,
                 status = status,
-                failureReason = failureReason,
+                failureReason = failureReason.truncateToDbLimit(),
                 finishedAt = if (status == IngestionRunStatus.FAILED) Instant.now() else null,
                 aiSyncStatus = initialAiSyncStatus,
             )
@@ -61,10 +71,13 @@ class IngestionRunLifeCycleService(
         } else {
             ingestionRun.status = status
             ingestionRun.finishedAt = if (status == IngestionRunStatus.FAILED) Instant.now() else null
-            ingestionRun.failureReason = failureReason
+            ingestionRun.failureReason = failureReason.truncateToDbLimit()
             if (status == IngestionRunStatus.FAILED) {
                 ingestionRun.aiSyncStatus = AiSyncStatus.NOT_APPLICABLE
             }
+            // Backfill source-instance metadata if a later lifecycle call resolved it.
+            if (ingestionRun.sourceInstanceId == null) ingestionRun.sourceInstanceId = sourceInstanceId
+            if (ingestionRun.sourceInstanceRef == null) ingestionRun.sourceInstanceRef = sourceInstanceRef
         }
     }
 
@@ -77,6 +90,7 @@ class IngestionRunLifeCycleService(
      * @throws IngestionRunNotFoundException when the run id is unknown.
      */
     @Transactional
+    @Tracked("Updating ingestion run status")
     fun updateRunStatus(transactionId: UUID, status: IngestionRunStatus) {
         val run = ingestionRunRepository
             .findByIdOrNull(transactionId)
@@ -94,6 +108,7 @@ class IngestionRunLifeCycleService(
      * @param run The managed ingestion run entity whose terminal status should be calculated.
      */
     @Transactional
+    @Tracked("Finishing ingestion run")
     fun finishRun(run: IngestionRun) {
         if (run.failedCount > 0) {
             if (run.ingestedCount > 0 || run.updatedCount > 0 || run.deletedCount > 0) {
@@ -124,6 +139,7 @@ class IngestionRunLifeCycleService(
      * @param runId The ingestion run whose AI sync just completed.
      */
     @Transactional
+    @Tracked("Marking AI sync succeeded")
     fun markAiSyncSucceeded(runId: UUID) {
         ingestionRunRepository.findByIdOrNull(runId)?.let { run ->
             run.aiSyncStatus = AiSyncStatus.SUCCEEDED
@@ -138,10 +154,25 @@ class IngestionRunLifeCycleService(
      * @param reason A short description of the failure, surfaced alongside the run.
      */
     @Transactional
+    @Tracked("Marking AI sync failed")
     fun markAiSyncFailed(runId: UUID, reason: String?) {
         ingestionRunRepository.findByIdOrNull(runId)?.let { run ->
             run.aiSyncStatus = AiSyncStatus.FAILED
-            run.aiSyncFailureReason = reason
+            run.aiSyncFailureReason = reason.truncateToDbLimit()
         }
     }
+}
+
+private const val FAILURE_REASON_MAX_LENGTH = 255
+
+/**
+ * Truncates the string to the maximum length supported by the database column.
+ *
+ * Failure reasons come from exception messages that can easily exceed the 255 character
+ * limit of the varchar column. This keeps the first 255 characters so the reason is still
+ * useful without failing the persistence layer.
+ */
+private fun String?.truncateToDbLimit(): String? {
+    if (this == null || this.length <= FAILURE_REASON_MAX_LENGTH) return this
+    return this.take(FAILURE_REASON_MAX_LENGTH - 1) + "…"
 }

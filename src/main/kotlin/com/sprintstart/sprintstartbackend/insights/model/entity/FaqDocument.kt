@@ -23,7 +23,6 @@ class FaqDocument(
     val documentRef: String,
     @Column(nullable = false)
     val title: String,
-    @Column(nullable = true)
     val source: String?,
     @ManyToOne(optional = false)
     @JoinColumn(name = "group_id", nullable = false)
