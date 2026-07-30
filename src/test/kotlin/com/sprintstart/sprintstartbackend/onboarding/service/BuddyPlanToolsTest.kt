@@ -79,8 +79,14 @@ class BuddyPlanToolsTest {
             listOf(userWith(ProjectDto(projectId, "Checkout", null)))
     }
 
-    private fun competency(key: String, label: String, targetLevel: Int = 2) =
-        Competency(key = key, label = label, kind = CompetencyKind.SKILL, targetLevel = targetLevel)
+    private fun competency(key: String, label: String, targetLevel: Int = 2, area: String? = null) =
+        Competency(
+            key = key,
+            label = label,
+            kind = CompetencyKind.SKILL,
+            targetLevel = targetLevel,
+            area = area,
+        )
 
     private fun moduleFor(key: String, title: String) = CompetencyModule(
         competencyKey = key,
@@ -281,5 +287,75 @@ class BuddyPlanToolsTest {
 
         assertThat(result).contains("No published module teaches 'react'")
         assertThat(result).contains("search_docs")
+    }
+
+    /**
+     * Grouping is what replaced prerequisite structure, so the plan has to convey it -- otherwise
+     * the buddy cannot answer "what else is about auth?", which is the question the area exists for.
+     */
+    @Test
+    fun `groups gaps under what they are about`() {
+        onOneProject()
+        noGoal()
+        every { competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE) } returns
+            listOf(
+                moduleFor("jwt", "JWT basics"),
+                moduleFor("sessions", "Sessions"),
+                moduleFor("chunking", "Chunking"),
+            )
+        every { competencyRepository.findAllByKeyIn(any()) } returns
+            listOf(
+                competency("jwt", "JWT validation", area = "Authentication"),
+                competency("sessions", "Session store", area = "Authentication"),
+                competency("chunking", "Chunking", area = "Ingestion"),
+            )
+        ledger()
+
+        val result = tools.execute(planCall, userId)
+
+        assertThat(result).contains("Authentication:")
+        assertThat(result).contains("Ingestion:")
+        // Neighbours to offer, explicitly not a sequence -- the retirement's whole point.
+        assertThat(result).contains("related subjects, not steps in a sequence")
+        assertThat(result).doesNotContain("usually comes after")
+    }
+
+    /**
+     * Until generation populates `area` (S3) most of a hand-authored vocabulary has none, and an
+     * "Ungrouped" heading over every single gap is a layer that carries no information.
+     */
+    @Test
+    fun `adds no heading when nothing is grouped yet`() {
+        onOneProject()
+        noGoal()
+        every { competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE) } returns
+            listOf(moduleFor("kotlin", "Kotlin basics"))
+        every { competencyRepository.findAllByKeyIn(any()) } returns listOf(competency("kotlin", "Kotlin"))
+        ledger()
+
+        val result = tools.execute(planCall, userId)
+
+        assertThat(result).contains("Kotlin (no evidence yet)")
+        assertThat(result).doesNotContain("Not grouped into an area yet")
+    }
+
+    @Test
+    fun `keeps ungrouped gaps visible below the grouped ones`() {
+        onOneProject()
+        noGoal()
+        every { competencyModuleRepository.findAllByProjectIdAndStatus(projectId, ModuleStatus.ACTIVE) } returns
+            listOf(moduleFor("jwt", "JWT basics"), moduleFor("kotlin", "Kotlin basics"))
+        every { competencyRepository.findAllByKeyIn(any()) } returns
+            listOf(
+                competency("jwt", "JWT validation", area = "Authentication"),
+                competency("kotlin", "Kotlin"),
+            )
+        ledger()
+
+        val result = tools.execute(planCall, userId)
+
+        assertThat(result).contains("Authentication:")
+        assertThat(result).contains("Not grouped into an area yet:")
+        assertThat(result).contains("Kotlin (no evidence yet)")
     }
 }

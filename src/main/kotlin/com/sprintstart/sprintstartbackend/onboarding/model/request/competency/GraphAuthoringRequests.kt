@@ -15,6 +15,14 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKi
 data class UpdateCompetencyRequest(
     val label: String? = null,
     val description: String? = null,
+    /**
+     * What this competency is about, for grouping -- "Authentication", "Ingestion".
+     *
+     * Blank clears it, the way a blank description does: ungrouping a competency is a real edit, and
+     * there is no other way to express it when an omitted field means "leave alone". An area that
+     * differs from one already in use only by case or spacing is stored as the one already in use.
+     */
+    val area: String? = null,
     val kind: CompetencyKind? = null,
     /** The proficiency rank (1..4) a hire must reach for this node to count as met. */
     val targetLevel: Int? = null,
@@ -38,6 +46,11 @@ data class CreateCompetencyRequest(
     val key: String,
     val label: String,
     val description: String? = null,
+    /**
+     * What this competency is about, for grouping -- "Authentication", "Ingestion". Optional:
+     * ungrouped is a real state, and is what everything predating the field reads as.
+     */
+    val area: String? = null,
     val kind: CompetencyKind,
     /**
      * The proficiency rank (1..4) a hire must reach for this node to count as met. Omitted, it
