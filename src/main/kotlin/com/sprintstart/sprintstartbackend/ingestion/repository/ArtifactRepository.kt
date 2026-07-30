@@ -91,6 +91,17 @@ interface ArtifactRepository : JpaRepository<Artifact, UUID> {
 
     fun countByAiSyncRunIdAndAiSyncState(runId: UUID, state: ArtifactAiSyncState): Long
 
+    /**
+     * Every project the run's artifacts belong to.
+     *
+     * An artifact can serve several projects (one repository connected to two of them), so this is
+     * a flattened distinct set rather than one project per run.
+     */
+    @Query(
+        "select distinct p from Artifact a join a.projectIdsInternal p where a.aiSyncRunId = :runId",
+    )
+    fun findDistinctProjectIdsByAiSyncRunId(runId: UUID): List<UUID>
+
     fun findAllByAiSyncRunIdAndAiSyncState(runId: UUID, state: ArtifactAiSyncState): List<Artifact>
 
     /**

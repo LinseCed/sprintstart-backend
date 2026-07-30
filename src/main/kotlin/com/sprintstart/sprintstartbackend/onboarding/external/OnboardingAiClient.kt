@@ -23,6 +23,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.ModulePropos
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OrientationOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposeModuleRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
+import com.sprintstart.sprintstartbackend.onboarding.external.model.TombstonedCompetencySchema
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
@@ -77,16 +78,20 @@ class OnboardingAiClient(
      * **Nothing calls this or [streamCompetencyGraph] right now.** The PM proposal queue that did
      * was retired with the graph, and the replacement — generation kicked off when a crawl
      * finishes, so that "set up onboarding" collapses into "connect a repo" — is S3 of
-     * `forks/SKILL_MAP_RETIREMENT_DESIGN.md`. Until then the vocabulary is hand-authored through
-     * `CompetencyGraphAuthoringService`. This is the seam S3 calls, kept rather than deleted and
-     * rewritten one slice later.
+     * `forks/SKILL_MAP_RETIREMENT_DESIGN.md`.
      *
-     * @param activeCompetencies The backend's current live competencies.
+     * @param activeCompetencies The backend's current live competencies, which drive dedup.
+     * @param existingAreas The grouping areas in use, so a proposal joins one rather than coining a
+     * synonym of it.
+     * @param tombstonedCompetencies What somebody deliberately removed. Blocked by key *and* by
+     * similarity, so a deletion cannot leak back under a rephrasing.
      * @param lastFingerprint The corpus fingerprint recorded from the most recent prior proposal, if any.
      * @return The proposal outcome returned by the AI service.
      */
     suspend fun proposeCompetencyGraph(
         activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
+        existingAreas: List<String> = emptyList(),
+        tombstonedCompetencies: List<TombstonedCompetencySchema> = emptyList(),
         lastFingerprint: String? = null,
     ): GraphProposalOutcome =
         try {
@@ -96,6 +101,8 @@ class OnboardingAiClient(
                 .body(
                     GenerateCompetencyGraphRequest(
                         activeCompetencies = activeCompetencies,
+                        existingAreas = existingAreas,
+                        tombstonedCompetencies = tombstonedCompetencies,
                         lastFingerprint = lastFingerprint,
                     ),
                 ).sync()
