@@ -1,10 +1,12 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
+import com.sprintstart.sprintstartbackend.ingestion.external.events.RunIndexedEvent
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.AiSyncStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactAiSyncState
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import jakarta.transaction.Transactional
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
 import java.util.UUID
@@ -25,6 +27,7 @@ import java.util.UUID
 class IngestionRunAiSyncStatusService(
     private val ingestionRunRepository: IngestionRunRepository,
     private val artifactRepository: ArtifactRepository,
+    private val publisher: ApplicationEventPublisher,
 ) {
     /**
      * Recomputes and stores one run's AI sync status.
@@ -60,8 +63,24 @@ class IngestionRunAiSyncStatusService(
             }
 
             else -> {
+                val wasAlreadyIndexed = run.aiSyncStatus == AiSyncStatus.SUCCEEDED
                 run.aiSyncStatus = AiSyncStatus.SUCCEEDED
                 run.aiSyncFailureReason = null
+
+                // The corpus now contains this run, which is the first moment anything can be
+                // derived from it. Published on the *transition* only: this method runs after
+                // every drained batch, and firing each time would start a generation run per
+                // batch instead of one per crawl.
+                if (!wasAlreadyIndexed) {
+                    publisher.publishEvent(
+                        RunIndexedEvent(
+                            runId = runId,
+                            projectIds = artifactRepository
+                                .findDistinctProjectIdsByAiSyncRunId(runId)
+                                .toSet(),
+                        ),
+                    )
+                }
             }
         }
     }

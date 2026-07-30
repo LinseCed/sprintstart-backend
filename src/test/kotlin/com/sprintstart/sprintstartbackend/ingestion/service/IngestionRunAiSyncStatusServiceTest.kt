@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
+import com.sprintstart.sprintstartbackend.ingestion.external.events.RunIndexedEvent
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.AiSyncStatus
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactAiSyncState
@@ -9,7 +10,9 @@ import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepositor
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.Test
+import org.springframework.context.ApplicationEventPublisher
 import java.util.Optional
 import java.util.UUID
 import kotlin.test.assertEquals
@@ -23,10 +26,13 @@ import kotlin.test.assertNull
 class IngestionRunAiSyncStatusServiceTest {
     private val ingestionRunRepository: IngestionRunRepository = mockk()
     private val artifactRepository: ArtifactRepository = mockk()
+    private val publisher: ApplicationEventPublisher = mockk(relaxed = true)
 
-    private val service = IngestionRunAiSyncStatusService(ingestionRunRepository, artifactRepository)
+    private val service =
+        IngestionRunAiSyncStatusService(ingestionRunRepository, artifactRepository, publisher)
 
     private val runId: UUID = UUID.randomUUID()
+    private val projectId: UUID = UUID.randomUUID()
 
     private fun run() = IngestionRun(
         id = runId,
@@ -55,11 +61,54 @@ class IngestionRunAiSyncStatusServiceTest {
         val run = run()
         every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
         stubCounts(pending = 0, failed = 0, synced = 4)
+        every { artifactRepository.findDistinctProjectIdsByAiSyncRunId(runId) } returns listOf(projectId)
 
         service.recompute(runId)
 
         assertEquals(AiSyncStatus.SUCCEEDED, run.aiSyncStatus)
         assertNull(run.aiSyncFailureReason)
+    }
+
+    /**
+     * The corpus containing the run is the first moment anything can be derived from it, and this
+     * is where that becomes observable outside ingestion.
+     */
+    @Test
+    fun `announces the corpus is indexed, with the projects the run touched`() {
+        val run = run()
+        every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
+        stubCounts(pending = 0, failed = 0, synced = 2)
+        every { artifactRepository.findDistinctProjectIdsByAiSyncRunId(runId) } returns listOf(projectId)
+
+        service.recompute(runId)
+
+        verify(exactly = 1) { publisher.publishEvent(RunIndexedEvent(runId, setOf(projectId))) }
+    }
+
+    /**
+     * The roll-up runs after every drained batch. Announcing each time would start a generation run
+     * per batch instead of one per crawl.
+     */
+    @Test
+    fun `announces once, not on every roll-up after the run is already indexed`() {
+        val run = run().apply { aiSyncStatus = AiSyncStatus.SUCCEEDED }
+        every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
+        stubCounts(pending = 0, failed = 0, synced = 2)
+
+        service.recompute(runId)
+
+        verify(exactly = 0) { publisher.publishEvent(any<RunIndexedEvent>()) }
+    }
+
+    @Test
+    fun `says nothing while artifacts are still queued`() {
+        val run = run()
+        every { ingestionRunRepository.findById(runId) } returns Optional.of(run)
+        stubCounts(pending = 1, failed = 0, synced = 2)
+
+        service.recompute(runId)
+
+        verify(exactly = 0) { publisher.publishEvent(any<RunIndexedEvent>()) }
     }
 
     @Test
