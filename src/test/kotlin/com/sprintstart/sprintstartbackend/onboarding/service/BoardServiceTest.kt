@@ -708,7 +708,7 @@ class BoardServiceTest {
             rationale = null,
             sourceUrl = null,
             competencyKeys = emptyList(),
-            status = ProposalStatus.APPROVED,
+            status = ProposalStatus.LIVE,
             taskZeroEligible = false,
         ),
         score = 1.0,

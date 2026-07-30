@@ -52,7 +52,7 @@ class TaskZeroService(
         val proposal = starterWorkTaskProposalRepository.findById(proposalId).orElseThrow {
             ResponseStatusException(HttpStatus.NOT_FOUND, "No starter-work task found with id $proposalId")
         }
-        if (proposal.status != ProposalStatus.APPROVED) {
+        if (proposal.status != ProposalStatus.LIVE) {
             throw ResponseStatusException(
                 HttpStatus.CONFLICT,
                 "Only an approved task can be flagged for Task 0",
@@ -121,7 +121,7 @@ class TaskZeroService(
     private fun nextEligibleTask(): StarterWorkTaskProposal? {
         val taken = taskZeroAssignmentRepository.findAllAssignedProposalIds().toSet()
         return starterWorkTaskProposalRepository
-            .findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.APPROVED)
+            .findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.LIVE)
             .filter { it.id !in taken }
             .minByOrNull { it.createdAt }
     }

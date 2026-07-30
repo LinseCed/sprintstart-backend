@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.listener
 
 import com.sprintstart.sprintstartbackend.ingestion.external.events.RunIndexedEvent
 import com.sprintstart.sprintstartbackend.onboarding.service.ModuleBackfillService
+import com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkTaskProposalService
 import com.sprintstart.sprintstartbackend.onboarding.service.VocabularyGenerationService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -25,6 +26,13 @@ import org.springframework.transaction.event.TransactionalEventListener
  * indexed and the vocabulary un-regenerated until the next crawl — recoverable, and quieter than
  * rolling back an ingestion because a model was unavailable.
  *
+ * ### Vocabulary, then modules, then claimable work
+ *
+ * A module hangs off a competency and a mined task is tagged with competency keys, so the
+ * vocabulary goes first or the other two describe a vocabulary that does not exist yet. Each pass
+ * is independent after that: one failing does not cancel the others, because a project with tasks
+ * and no modules is more useful than a project with neither.
+ *
  * ### Vocabulary first, then modules
  *
  * A module hangs off a competency, so generating modules before the competencies exist would cover
@@ -37,6 +45,7 @@ import org.springframework.transaction.event.TransactionalEventListener
 class CorpusIndexedListener(
     private val vocabularyGenerationService: VocabularyGenerationService,
     private val moduleBackfillService: ModuleBackfillService,
+    private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val applicationScope: CoroutineScope,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -58,6 +67,14 @@ class CorpusIndexedListener(
                 } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                     logger.error("Module backfill failed for project {}", projectId, e)
                 }
+            }
+
+            try {
+                // Mined tasks are live on arrival, so this is the last thing standing between
+                // "a repository is connected" and "a hire has something to claim".
+                starterWorkTaskProposalService.generate()
+            } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+                logger.error("Starter-work mining failed after run {}", event.runId, e)
             }
         }
     }

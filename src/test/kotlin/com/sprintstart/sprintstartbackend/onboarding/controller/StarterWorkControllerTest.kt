@@ -74,7 +74,7 @@ class StarterWorkControllerTest(
             rationale = "Small, well-scoped.",
             sourceUrl = "https://github.com/org/repo/issues/1",
             competencyKeys = listOf("docs"),
-            status = ProposalStatus.APPROVED,
+            status = ProposalStatus.LIVE,
             taskZeroEligible = false,
         )
 
@@ -109,7 +109,7 @@ class StarterWorkControllerTest(
         mockMvc
             .perform(get("/api/v1/onboarding/starter-work/approved").with(pmJwt))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$[0].status").value("APPROVED"))
+            .andExpect(jsonPath("$[0].status").value("LIVE"))
     }
 
     @Test
@@ -130,7 +130,7 @@ class StarterWorkControllerTest(
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(mapOf("title" to "Add dark mode"))),
             ).andExpect(status().isOk)
-            .andExpect(jsonPath("$.status").value("APPROVED"))
+            .andExpect(jsonPath("$.status").value("LIVE"))
     }
 
     @Test

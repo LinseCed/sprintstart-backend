@@ -64,7 +64,7 @@ class TaskZeroServiceTest {
         StarterWorkTaskProposal(
             sourceId = "github:org/repo:ISSUE:${UUID.randomUUID()}",
             title = "Fix a typo",
-            status = ProposalStatus.APPROVED,
+            status = ProposalStatus.LIVE,
             taskZeroEligible = eligible,
             createdAt = now.minus(Duration.ofDays(createdDaysAgo)),
         )
@@ -82,7 +82,7 @@ class TaskZeroServiceTest {
 
     @Test
     fun `setEligibility 409s on a task that is not approved`() {
-        val proposal = StarterWorkTaskProposal(sourceId = "s", title = "t", status = ProposalStatus.PROPOSED)
+        val proposal = StarterWorkTaskProposal(sourceId = "s", title = "t", status = ProposalStatus.REJECTED)
         every { proposalRepository.findById(proposal.id) } returns Optional.of(proposal)
 
         assertThrows<ResponseStatusException> { service.setEligibility(proposal.id, true) }
@@ -104,7 +104,7 @@ class TaskZeroServiceTest {
         every { assignmentRepository.findAllAssignedProposalIds() } returns emptyList()
         val older = task(createdDaysAgo = 5)
         val newer = task(createdDaysAgo = 1)
-        every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.APPROVED) } returns
+        every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.LIVE) } returns
             listOf(newer, older)
         val saved = slot<TaskZeroAssignment>()
         every { assignmentRepository.save(capture(saved)) } answers { firstArg() }
@@ -122,7 +122,7 @@ class TaskZeroServiceTest {
         noAuthoredPrs()
         every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
         every { assignmentRepository.findAllAssignedProposalIds() } returns emptyList()
-        every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.APPROVED) } returns emptyList()
+        every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.LIVE) } returns emptyList()
 
         val result = service.getForHire(hireId, projectId)
 
@@ -139,7 +139,7 @@ class TaskZeroServiceTest {
         val taken = task(createdDaysAgo = 5)
         val free = task(createdDaysAgo = 1)
         every { assignmentRepository.findAllAssignedProposalIds() } returns listOf(taken.id)
-        every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.APPROVED) } returns
+        every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.LIVE) } returns
             listOf(taken, free)
         val saved = slot<TaskZeroAssignment>()
         every { assignmentRepository.save(capture(saved)) } answers { firstArg() }
@@ -169,7 +169,7 @@ class TaskZeroServiceTest {
         isMember()
         every { assignmentRepository.findByHireIdAndProjectId(hireId, projectId) } returns null
         every { assignmentRepository.findAllAssignedProposalIds() } returns emptyList()
-        every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.APPROVED) } returns emptyList()
+        every { proposalRepository.findAllByStatusAndTaskZeroEligibleTrue(ProposalStatus.LIVE) } returns emptyList()
         every { artifactIngestionApi.getAuthoredPullRequests(projectId, "hire") } returns
             listOf(
                 AuthoredPullRequest(

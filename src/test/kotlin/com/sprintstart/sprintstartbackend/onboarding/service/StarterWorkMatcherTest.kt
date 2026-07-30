@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -24,11 +25,13 @@ class StarterWorkMatcherTest {
         type: TaskType = TaskType.OTHER,
         labels: Set<String> = emptySet(),
         repository: String? = "acme/api",
+        reviewed: Boolean = true,
     ) = StarterWorkMatcher.TaskFeatures(
         competencyKeys = competencies,
         taskType = type,
         labels = labels,
         repositoryFullName = repository,
+        reviewed = reviewed,
     )
 
     @Test
@@ -160,5 +163,53 @@ class StarterWorkMatcherTest {
             StarterWorkMatcher.score(hire, subject, null),
             StarterWorkMatcher.score(hire, subject, null),
         )
+    }
+
+    /**
+     * Review stopped being a gate and became a ranking signal, so what has to hold is that it
+     * *only* ranks: an unreviewed task is still suggested, and a good fit still wins.
+     */
+    @Nested
+    inner class UnreviewedTasks {
+        @Test
+        fun `an unreviewed task ranks below the same task reviewed`() {
+            val hire = profile(competencies = setOf("kotlin"))
+
+            val reviewed = StarterWorkMatcher.score(hire, task(competencies = setOf("kotlin")), null)
+            val unreviewed =
+                StarterWorkMatcher.score(hire, task(competencies = setOf("kotlin"), reviewed = false), null)
+
+            assertTrue(unreviewed.score < reviewed.score)
+        }
+
+        @Test
+        fun `the demotion carries a sentence a hire can read`() {
+            val result = StarterWorkMatcher.score(profile(), task(reviewed = false), null)
+
+            assertContains(result.reasons, "note: nobody has reviewed this task yet")
+        }
+
+        @Test
+        fun `a reviewed task says nothing about review at all`() {
+            val result = StarterWorkMatcher.score(profile(competencies = setOf("kotlin")), task(), null)
+
+            assertTrue(result.reasons.none { reason -> reason.contains("reviewed") })
+        }
+
+        /**
+         * The property that keeps the demotion a nudge rather than the approval gate it replaced:
+         * set it any heavier and an unreviewed task never surfaces, which is D1 undone.
+         */
+        @Test
+        fun `an unreviewed task that fits still beats a reviewed one that does not`() {
+            val hire = profile(competencies = setOf("kotlin"))
+
+            val fitsButUnreviewed =
+                StarterWorkMatcher.score(hire, task(competencies = setOf("kotlin"), reviewed = false), null)
+            val reviewedButUnrelated =
+                StarterWorkMatcher.score(hire, task(competencies = setOf("rust")), null)
+
+            assertTrue(fitsButUnreviewed.score > reviewedButUnrelated.score)
+        }
     }
 }

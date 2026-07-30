@@ -97,18 +97,58 @@ class StarterWorkTaskProposalServiceTest {
             assertEquals("github:org/repo:ISSUE:1", slot.captured.sourceId)
             assertEquals("Fix typo", slot.captured.title)
             assertEquals(listOf("docs"), slot.captured.competencyKeys)
-            assertEquals(ProposalStatus.PROPOSED, slot.captured.status)
+            // Claimable on arrival, and honest that nobody has looked at it yet.
+            assertEquals(ProposalStatus.LIVE, slot.captured.status)
+            assertEquals(false, slot.captured.reviewed)
             assertEquals(1, result.tasksProposed)
             assertEquals("proposed", result.status)
         }
 
+        /**
+         * The property that makes a rejection worth making: mining consults rejected rows, so a
+         * task somebody turned down is never mined back into existence. Without it they turn it
+         * down again after every crawl.
+         */
         @Test
-        fun `sends pool source ids excluding rejected and the live competency keys`() = runTest {
-            val pooledStatuses = listOf(ProposalStatus.PROPOSED, ProposalStatus.APPROVED)
+        fun `a rejected task is never mined back into existence`() = runTest {
+            every {
+                starterWorkTaskProposalRepository.findAllByStatusIn(
+                    listOf(ProposalStatus.LIVE, ProposalStatus.REJECTED),
+                )
+            } returns listOf(
+                StarterWorkTaskProposal(
+                    sourceId = "github:org/repo:ISSUE:1",
+                    title = "Nobody wanted this",
+                    status = ProposalStatus.REJECTED,
+                ),
+            )
+            every { competencyRepository.findAll() } returns emptyList()
+            coEvery { onboardingAiClient.proposeStarterWork(any(), any()) } returns
+                StarterWorkOutcome(
+                    status = "proposed",
+                    tasks = listOf(
+                        ProposedStarterTaskSchema(
+                            sourceId = "github:org/repo:ISSUE:1",
+                            title = "Nobody wanted this",
+                            summary = "",
+                            competencyKeys = emptyList(),
+                            rationale = "",
+                        ),
+                    ),
+                )
+
+            val result = service.generate()
+
+            assertEquals(0, result.tasksProposed)
+            verify(exactly = 0) { starterWorkTaskProposalRepository.save(any()) }
+        }
+
+        fun `sends the pooled source ids and the live competency keys`() = runTest {
+            val pooledStatuses = listOf(ProposalStatus.LIVE, ProposalStatus.REJECTED)
             every { starterWorkTaskProposalRepository.findAllByStatusIn(pooledStatuses) } returns
                 listOf(
-                    StarterWorkTaskProposal(sourceId = "s1", title = "t1", status = ProposalStatus.PROPOSED),
-                    StarterWorkTaskProposal(sourceId = "s2", title = "t2", status = ProposalStatus.APPROVED),
+                    StarterWorkTaskProposal(sourceId = "s1", title = "t1", status = ProposalStatus.LIVE),
+                    StarterWorkTaskProposal(sourceId = "s2", title = "t2", status = ProposalStatus.REJECTED),
                 )
             every { competencyRepository.findAll() } returns
                 listOf(Competency(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL))
@@ -170,7 +210,7 @@ class StarterWorkTaskProposalServiceTest {
                 StarterWorkTaskProposal(
                     sourceId = "github:org/repo:ISSUE:1",
                     title = "Fix typo",
-                    status = ProposalStatus.PROPOSED,
+                    status = ProposalStatus.LIVE,
                 ),
             )
             every { competencyRepository.findAll() } returns emptyList()
@@ -199,7 +239,7 @@ class StarterWorkTaskProposalServiceTest {
     inner class ListProposed {
         @Test
         fun `returns PROPOSED tasks`() {
-            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.PROPOSED) } returns
+            every { starterWorkTaskProposalRepository.findAllByStatusAndReviewedFalse(ProposalStatus.LIVE) } returns
                 listOf(StarterWorkTaskProposal(sourceId = "s1", title = "t1"))
 
             val result = service.listProposed()
@@ -288,7 +328,7 @@ class StarterWorkTaskProposalServiceTest {
                 sourceId = sourceId,
                 title = title,
                 competencyKeys = keys.toMutableList(),
-                status = ProposalStatus.APPROVED,
+                status = ProposalStatus.LIVE,
             )
 
         private fun noHistory() {
@@ -302,7 +342,7 @@ class StarterWorkTaskProposalServiceTest {
             every { userApi.getUserIdByAuthId("auth-1") } returns Optional.of(userId)
             every { userCompetencyStateRepository.findAllByUserId(userId) } returns
                 listOf(heldCompetency("kotlin"))
-            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED) } returns
+            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.LIVE) } returns
                 listOf(pooledTask("github:acme/api:ISSUE:1", "Task", "kotlin"))
             noHistory()
 
@@ -328,7 +368,7 @@ class StarterWorkTaskProposalServiceTest {
                     ),
                     heldCompetency("git", level = 2),
                 )
-            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED) } returns
+            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.LIVE) } returns
                 listOf(pooledTask("github:acme/api:ISSUE:1", "Unplaced", "kotlin"))
             noHistory()
 
@@ -352,7 +392,7 @@ class StarterWorkTaskProposalServiceTest {
                 TaskSourceArtifact(title = null, body = null, labels = listOf("bug"), sourceUrl = null)
             every { artifactIngestionApi.getTaskSource("github:acme/web:ISSUE:2") } returns
                 TaskSourceArtifact(title = null, body = null, labels = listOf("feature"), sourceUrl = null)
-            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED) } returns
+            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.LIVE) } returns
                 listOf(
                     pooledTask("github:acme/web:ISSUE:2", "Elsewhere"),
                     pooledTask("github:acme/api:ISSUE:1", "Familiar"),
@@ -374,7 +414,7 @@ class StarterWorkTaskProposalServiceTest {
                 TaskSourceArtifact(title = null, body = null, labels = listOf("refactor"), sourceUrl = null)
             every { artifactIngestionApi.getTaskSource("github:acme/api:ISSUE:2") } returns
                 TaskSourceArtifact(title = null, body = null, labels = listOf("documentation"), sourceUrl = null)
-            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED) } returns
+            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.LIVE) } returns
                 listOf(
                     pooledTask("github:acme/api:ISSUE:1", "Refactor the scheduler"),
                     pooledTask("github:acme/api:ISSUE:2", "Fix a typo"),
@@ -402,7 +442,7 @@ class StarterWorkTaskProposalServiceTest {
                     ),
                 )
             every { artifactIngestionApi.getTaskSource(any()) } returns null
-            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED) } returns
+            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.LIVE) } returns
                 listOf(pooledTask("github:acme/api:ISSUE:1", "Slow repo task"))
 
             val result = service.matchForUser("auth-1", projectId)
@@ -415,7 +455,7 @@ class StarterWorkTaskProposalServiceTest {
         @Test
         fun `returns nothing when the pool is empty`() {
             every { userApi.getUserIdByAuthId("auth-1") } returns Optional.of(userId)
-            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED) } returns emptyList()
+            every { starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.LIVE) } returns emptyList()
 
             val result = service.matchForUser("auth-1", projectId)
 

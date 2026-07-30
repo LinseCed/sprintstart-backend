@@ -6,6 +6,9 @@ import org.springframework.data.jpa.repository.JpaRepository
 import java.util.UUID
 
 interface StarterWorkTaskProposalRepository : JpaRepository<StarterWorkTaskProposal, UUID> {
+    /** The live pool nobody has vouched for yet -- what a PM's review surface shows. */
+    fun findAllByStatusAndReviewedFalse(status: ProposalStatus): List<StarterWorkTaskProposal>
+
     fun findAllByStatus(status: ProposalStatus): List<StarterWorkTaskProposal>
 
     fun findAllByStatusIn(statuses: Collection<ProposalStatus>): List<StarterWorkTaskProposal>

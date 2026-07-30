@@ -43,7 +43,7 @@ class UserGoalServiceTest {
         title = "Fix the login redirect",
         summary = "A small, well-scoped bug",
         sourceUrl = "https://github.com/acme/repo/issues/42",
-    ).apply { status = ProposalStatus.APPROVED }
+    ).apply { status = ProposalStatus.LIVE }
 
     private fun stageUser() {
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
@@ -108,7 +108,7 @@ class UserGoalServiceTest {
         @Test
         fun `409s for a task the PM has not approved`() {
             stageUser()
-            val proposal = approvedProposal().apply { status = ProposalStatus.PROPOSED }
+            val proposal = approvedProposal().apply { status = ProposalStatus.REJECTED }
             every { starterWorkTaskProposalRepository.findById(proposal.id) } returns Optional.of(proposal)
 
             val exception = assertThrows<ResponseStatusException> {

@@ -140,7 +140,7 @@ class RampServiceTest {
             sourceId = "github:acme/api:ISSUE:1",
             title = "A real change",
             competencyKeys = keys.toMutableList(),
-            status = ProposalStatus.APPROVED,
+            status = ProposalStatus.LIVE,
         )
         every { userGoalRepository.findByUserIdAndProjectId(hireId, projectId) } returns
             UserGoal(

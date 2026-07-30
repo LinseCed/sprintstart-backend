@@ -54,17 +54,21 @@ class SetupReadinessServiceTest {
 
     // Real rows rather than bare mocks: the rung now reads each task's track, and a mock would
     // answer that with whatever mockk invents rather than with the coverage the test describes.
-    private fun task(trackKey: String? = null) = StarterWorkTaskProposal(
+    private fun task(trackKey: String? = null, reviewed: Boolean = true) = StarterWorkTaskProposal(
         sourceId = "src-${UUID.randomUUID()}",
         title = "A starter task",
         onboardingTrackKey = trackKey,
+        reviewed = reviewed,
     )
 
-    private fun starterTasks(approved: Int, pending: Int, trackKey: String? = null) {
-        every { starterWork.findAllByStatus(ProposalStatus.APPROVED) } returns
-            List(approved) { task(trackKey) }
-        every { starterWork.findAllByStatus(ProposalStatus.PROPOSED) } returns
-            List(pending) { task() }
+    /**
+     * @param live Tasks in the claimable pool.
+     * @param unreviewed How many of them nobody has looked at. They are *part of* [live] now, not a
+     * separate queue waiting to be admitted.
+     */
+    private fun starterTasks(live: Int, unreviewed: Int = 0, trackKey: String? = null) {
+        every { starterWork.findAllByStatus(ProposalStatus.LIVE) } returns
+            List(live - unreviewed) { task(trackKey) } + List(unreviewed) { task(trackKey, reviewed = false) }
     }
 
     /**
@@ -77,7 +81,7 @@ class SetupReadinessServiceTest {
     @Test
     fun `an empty vocabulary points at the corpus, not at a review queue`() {
         approvedCompetencies(0)
-        starterTasks(approved = 0, pending = 0)
+        starterTasks(live = 0)
         every { membership.getProjectMembers(projectId) } returns emptyList()
 
         val response = service.getReadiness(projectId)
@@ -92,7 +96,7 @@ class SetupReadinessServiceTest {
     @Test
     fun `a fully set up project reads ready`() {
         approvedCompetencies(6)
-        starterTasks(approved = 2, pending = 0)
+        starterTasks(live = 2)
 
         val response = service.getReadiness(projectId)
 
@@ -109,7 +113,7 @@ class SetupReadinessServiceTest {
     fun `starter work covering no track a role is on is a warning, not readiness`() {
         approvedCompetencies(4)
         // Every approved task is engineering work; somebody is onboarding on delivery.
-        starterTasks(approved = 3, pending = 0, trackKey = "engineering")
+        starterTasks(live = 3, trackKey = "engineering")
         every { tracks.tracksInUse() } returns listOf(
             OnboardingTrack(
                 key = "delivery",
@@ -132,7 +136,7 @@ class SetupReadinessServiceTest {
     fun `an unscoped task counts as coverage for every track`() {
         approvedCompetencies(4)
         // Null means "suits any role", so it is coverage for everybody rather than for nobody.
-        starterTasks(approved = 2, pending = 0, trackKey = null)
+        starterTasks(live = 2, trackKey = null)
         every { tracks.tracksInUse() } returns listOf(
             OnboardingTrack(
                 key = "delivery",
@@ -166,7 +170,7 @@ class SetupReadinessServiceTest {
     @Test
     fun `roles left without a track while others have one is a warning`() {
         approvedCompetencies(4)
-        starterTasks(approved = 2, pending = 0)
+        starterTasks(live = 2)
         team("delivery", null, null)
 
         val response = service.getReadiness(projectId)
@@ -182,7 +186,7 @@ class SetupReadinessServiceTest {
     @Test
     fun `every role declaring a track is the cleared state`() {
         approvedCompetencies(4)
-        starterTasks(approved = 2, pending = 0)
+        starterTasks(live = 2)
         team("delivery", "engineering")
 
         val rung = rungOf(service.getReadiness(projectId), "tracks")
@@ -199,7 +203,7 @@ class SetupReadinessServiceTest {
     @Test
     fun `no role declaring a track states the default wording instead of warning`() {
         approvedCompetencies(4)
-        starterTasks(approved = 2, pending = 0)
+        starterTasks(live = 2)
         team(null, null)
 
         val response = service.getReadiness(projectId)
@@ -215,7 +219,7 @@ class SetupReadinessServiceTest {
     @Test
     fun `a project with nobody on it has no track gap to report`() {
         approvedCompetencies(4)
-        starterTasks(approved = 2, pending = 0)
+        starterTasks(live = 2)
 
         assertThat(rungOf(service.getReadiness(projectId), "tracks").state).isEqualTo(RungState.OK)
     }

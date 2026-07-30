@@ -143,7 +143,7 @@ class StarterWorkTaskProposalService(
 
     private fun loadActiveState(): ActiveState {
         val sourceIds = starterWorkTaskProposalRepository
-            .findAllByStatusIn(listOf(ProposalStatus.PROPOSED, ProposalStatus.APPROVED))
+            .findAllByStatusIn(listOf(ProposalStatus.LIVE, ProposalStatus.REJECTED))
             .map { it.sourceId }
         val competencyKeys = competencyRepository.findAll().map { it.key }
         return ActiveState(sourceIds, competencyKeys)
@@ -158,8 +158,11 @@ class StarterWorkTaskProposalService(
      * surface each skip as a `warning`.
      */
     private fun persistProposals(outcome: StarterWorkOutcome): PersistResult {
+        // REJECTED counts as already-pooled, which is what makes a rejection **sticky**: a task
+        // somebody turned down must not be mined back into existence on the next crawl, or they
+        // turn it down again, forever. The row survives precisely so this check can see it.
         val alreadyPooled = starterWorkTaskProposalRepository
-            .findAllByStatusIn(listOf(ProposalStatus.PROPOSED, ProposalStatus.APPROVED))
+            .findAllByStatusIn(listOf(ProposalStatus.LIVE, ProposalStatus.REJECTED))
             .map { it.sourceId }
             .toMutableSet()
         val skipped = mutableListOf<String>()
@@ -177,6 +180,9 @@ class StarterWorkTaskProposalService(
                     rationale = proposed.rationale.takeIf { it.isNotBlank() },
                     sourceUrl = proposed.citations.firstOrNull()?.sourceUrl,
                     competencyKeys = proposed.competencyKeys.toMutableList(),
+                    // Claimable immediately, and honest about nobody having looked yet. The
+                    // matcher demotes it until somebody does.
+                    reviewed = false,
                 ),
             )
             tasks++
@@ -196,7 +202,7 @@ class StarterWorkTaskProposalService(
     fun listProposed(): ProposedStarterWorkResponse =
         ProposedStarterWorkResponse(
             tasks = starterWorkTaskProposalRepository
-                .findAllByStatus(ProposalStatus.PROPOSED)
+                .findAllByStatusAndReviewedFalse(ProposalStatus.LIVE)
                 .map { it.toResponse() },
         )
 
@@ -210,22 +216,23 @@ class StarterWorkTaskProposalService(
     @Transactional(readOnly = true)
     fun listApproved(): List<StarterWorkTaskProposalResponse> =
         starterWorkTaskProposalRepository
-            .findAllByStatus(ProposalStatus.APPROVED)
+            .findAllByStatus(ProposalStatus.LIVE)
             .sortedBy { it.title }
             .map { it.toResponse() }
 
     /**
-     * Approves a proposed starter-work task, making it claimable.
+     * Records that a person has looked at this task and is happy with it.
      *
-     * Nothing is materialised alongside it any more: a goal points at this proposal, so approving
-     * is a status change and a timestamp.
+     * It was already claimable — reviewing does not admit it to the pool, it lifts the demotion
+     * `StarterWorkMatcher` applies while nobody has vouched for it. Idempotent: reviewing twice is
+     * the same statement made twice.
      *
-     * @throws ResponseStatusException 404 if no PROPOSED task proposal matches [id].
+     * @throws ResponseStatusException 404 if no task matches [id]; 409 if it was rejected.
      */
     @Transactional
     fun approve(id: UUID): StarterWorkTaskProposalResponse {
-        val proposal = findPendingProposal(id)
-        proposal.status = ProposalStatus.APPROVED
+        val proposal = findLiveProposal(id)
+        proposal.reviewed = true
         proposal.decidedAt = Instant.now()
         return proposal.toResponse()
     }
@@ -255,7 +262,10 @@ class StarterWorkTaskProposalService(
                 rationale = null,
                 sourceUrl = request.sourceUrl?.trim()?.takeIf { it.isNotBlank() },
                 competencyKeys = request.competencyKeys.toMutableList(),
-                status = ProposalStatus.APPROVED,
+                status = ProposalStatus.LIVE,
+                // Somebody wrote it, so it is reviewed by construction -- there is nothing to
+                // vouch for back to them.
+                reviewed = true,
                 decidedAt = Instant.now(),
                 onboardingTrackKey = request.onboardingTrackKey?.trim()?.takeIf { it.isNotBlank() },
             ),
@@ -264,13 +274,18 @@ class StarterWorkTaskProposalService(
     }
 
     /**
-     * Rejects a proposed starter-work task, archiving it without touching the live graph.
+     * Takes a task out of the pool, permanently.
      *
-     * @throws ResponseStatusException 404 if no PROPOSED task proposal matches [id].
+     * **Sticky**: the row is kept and mining consults it, so a task somebody turned down is never
+     * mined back into existence — otherwise they would turn it down again after every crawl. Same
+     * rule as a competency tombstone, expressed here as a status rather than a separate table
+     * because the row is already keyed by the `sourceId` mining deduplicates on.
+     *
+     * @throws ResponseStatusException 404 if no task matches [id]; 409 if it was already rejected.
      */
     @Transactional
     fun reject(id: UUID, reason: String?): StarterWorkTaskProposalResponse {
-        val proposal = findPendingProposal(id)
+        val proposal = findLiveProposal(id)
         proposal.status = ProposalStatus.REJECTED
         proposal.decidedAt = Instant.now()
         proposal.rejectionReason = reason
@@ -352,7 +367,7 @@ class StarterWorkTaskProposalService(
         val member = projectMembershipApi.getProjectMembers(projectId).firstOrNull { it.userId == userId }
         val trackKey = member?.let { trackService.forMember(it).key }
         return starterWorkTaskProposalRepository
-            .findAllByStatus(ProposalStatus.APPROVED)
+            .findAllByStatus(ProposalStatus.LIVE)
             .filter { it.onboardingTrackKey == null || it.onboardingTrackKey == trackKey }
     }
 
@@ -416,6 +431,7 @@ class StarterWorkTaskProposalService(
             taskType = TaskType.fromLabels(labels),
             labels = labels,
             repositoryFullName = repositoryOf(proposal.sourceId),
+            reviewed = proposal.reviewed,
         )
     }
 
@@ -445,14 +461,14 @@ class StarterWorkTaskProposalService(
         private const val HAND_AUTHORED_SOURCE_PREFIX = "authored:"
     }
 
-    private fun findPendingProposal(id: UUID): StarterWorkTaskProposal {
+    private fun findLiveProposal(id: UUID): StarterWorkTaskProposal {
         val proposal = starterWorkTaskProposalRepository.findById(id).orElseThrow {
-            ResponseStatusException(HttpStatus.NOT_FOUND, "No starter-work task proposal found with id: $id")
+            ResponseStatusException(HttpStatus.NOT_FOUND, "No starter-work task found with id: $id")
         }
-        if (proposal.status != ProposalStatus.PROPOSED) {
+        if (proposal.status != ProposalStatus.LIVE) {
             throw ResponseStatusException(
                 HttpStatus.CONFLICT,
-                "Starter-work task proposal $id is already ${proposal.status}",
+                "Starter-work task $id was rejected and is no longer in the pool",
             )
         }
         return proposal

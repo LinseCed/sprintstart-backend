@@ -39,6 +39,17 @@ object StarterWorkMatcher {
      */
     private const val NEWCOMER_SAFE_TYPE_BONUS = 8.0
 
+    /**
+     * A task nobody has looked at yet loses this much.
+     *
+     * Review stopped being a gate: a mined task is claimable the moment it is mined, so this is the
+     * only thing left expressing "somebody has vouched for this one". It is deliberately **smaller
+     * than the smallest positive signal** ([NEWCOMER_SAFE_TYPE_BONUS]) — an unreviewed task that
+     * fits a hire perfectly must still beat a reviewed one that does not, or the demotion has
+     * quietly reimplemented the approval requirement it replaced.
+     */
+    private const val UNREVIEWED_PENALTY = 5.0
+
     /** Repositories that answer slowly lose up to this much. Capped so it can demote, never bury. */
     private const val RESPONSIVENESS_MAX_PENALTY = 15.0
 
@@ -77,6 +88,8 @@ object StarterWorkMatcher {
         val taskType: TaskType,
         val labels: Set<String>,
         val repositoryFullName: String?,
+        /** Whether a person has looked at this task. Unreviewed is claimable, just ranked lower. */
+        val reviewed: Boolean = true,
     )
 
     /** A repository's answering behaviour, mirroring the ingestion module's `RepositoryResponsiveness`. */
@@ -132,10 +145,19 @@ object StarterWorkMatcher {
         }
 
         val penalty = responsivenessPenalty(responsiveness)
-        val total = reasons.sumOf { it.first } - penalty.first
+        // Every signal owes a sentence, demotions included -- a score a hire cannot read is a
+        // number standing in for a reason.
+        val unreviewed = if (task.reviewed) {
+            null
+        } else {
+            "note: nobody has reviewed this task yet"
+        }
+
+        val total = reasons.sumOf { it.first } - penalty.first - if (task.reviewed) 0.0 else UNREVIEWED_PENALTY
 
         val ordered = reasons.sortedByDescending { it.first }.map { it.second }.toMutableList()
         penalty.second?.let { ordered += it }
+        unreviewed?.let { ordered += it }
 
         return Score(score = total, matchedCompetencyKeys = matched, reasons = ordered)
     }
