@@ -17,6 +17,15 @@ data class GenerateCompetencyGraphRequest(
      * Same mechanic as `active_competencies`: show the model what exists rather than let it guess.
      */
     @SerialName("existing_areas") val existingAreas: List<String> = emptyList(),
+    /**
+     * Competencies somebody deliberately removed, so the generator does not bring them back.
+     *
+     * Sent as key **and** label: dedup matches on the key *and* on embedding similarity, and the
+     * thing a tombstone has to stop is a *rephrasing* — which the key check alone would miss. A
+     * tombstone the generator never sees is not a tombstone.
+     */
+    @SerialName("tombstoned_competencies")
+    val tombstonedCompetencies: List<TombstonedCompetencySchema> = emptyList(),
     @SerialName("last_fingerprint") val lastFingerprint: String? = null,
 )
 
@@ -29,6 +38,13 @@ data class ActiveCompetencySchema(
     /** What it is about, so the generator can see how the existing vocabulary is grouped. */
     val area: String? = null,
     @SerialName("repo_ref") val repoRef: String? = null,
+)
+
+/** A competency that was removed on purpose, and must not be proposed again. */
+@Serializable
+data class TombstonedCompetencySchema(
+    val key: String,
+    val label: String,
 )
 
 @Serializable
