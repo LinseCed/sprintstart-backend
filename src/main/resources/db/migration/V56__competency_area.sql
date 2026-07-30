@@ -1,0 +1,19 @@
+-- The competency vocabulary gets grouping, which is what replaced the graph.
+--
+-- S0 deleted `CompetencyEdge` and everything under it. The finding that justified deleting it is
+-- also what justifies this column: `EdgeKind.RELATED` was described to the generator as "part of,
+-- commonly used together, same area of the system" -- a *grouping* -- and then stored as an edge in
+-- a DAG that every consumer filtered out, because the only reader wanted prerequisites. The one
+-- question a learning area actually gets asked is "what else is about auth?", and an edge kind that
+-- nothing read was never going to answer it.
+--
+-- Free text, not an enum. A fixed taxonomy cannot fit a codebase nobody has seen, and any list we
+-- picked would be engineering-shaped -- the same reason the vocabulary is empty for a delivery lead
+-- today. Near-duplicates ("auth" / "Authentication" / "Auth & Identity") are held off at the write
+-- instead: `CompetencyAreaNormalizer` matches case- and whitespace-insensitively against the areas
+-- already in use and stores the spelling already in use. That matters more once generation runs on
+-- ingestion (S3) with nobody in the loop to tidy up after it.
+--
+-- NULL is a real state -- "not grouped yet" -- and is what every existing row reads as. Nothing
+-- populates this automatically until S3; until then it is set by hand in the studio.
+ALTER TABLE competencies ADD COLUMN IF NOT EXISTS area VARCHAR(255);

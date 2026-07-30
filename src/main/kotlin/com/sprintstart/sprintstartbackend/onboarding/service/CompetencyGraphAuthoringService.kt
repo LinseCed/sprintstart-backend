@@ -47,6 +47,7 @@ import org.springframework.web.server.ResponseStatusException
 @Service
 class CompetencyGraphAuthoringService(
     private val competencyRepository: CompetencyRepository,
+    private val areaNormalizer: CompetencyAreaNormalizer,
 ) {
     /**
      * Reads one competency, so an editor can show what it currently says.
@@ -91,6 +92,7 @@ class CompetencyGraphAuthoringService(
             label = request.label.trim(),
             description = request.description?.trim()?.takeIf(String::isNotBlank),
             kind = request.kind,
+            area = areaNormalizer.normalize(request.area),
             targetLevel = targetLevel,
             invariant = request.invariant,
         )
@@ -122,6 +124,8 @@ class CompetencyGraphAuthoringService(
         // A blank description is how a PM clears one, so it maps to null rather than being rejected.
         request.description?.let { competency.description = it.trim().takeIf(String::isNotBlank) }
         request.kind?.let { competency.kind = it }
+        // Blank clears the grouping, matching how a blank description clears one.
+        request.area?.let { competency.area = areaNormalizer.normalize(it) }
         request.invariant?.let { competency.invariant = it }
 
         competencyRepository.save(competency)
@@ -163,6 +167,7 @@ class CompetencyGraphAuthoringService(
             label = label,
             description = description,
             kind = kind,
+            area = area,
             targetLevel = targetLevel,
             invariant = invariant,
         )

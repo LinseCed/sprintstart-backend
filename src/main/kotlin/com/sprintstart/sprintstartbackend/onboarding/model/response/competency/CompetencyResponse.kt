@@ -12,6 +12,11 @@ data class CompetencyResponse(
     val key: String,
     val label: String,
     val description: String?,
+    /**
+     * What this competency is about, for grouping. Null is "not grouped yet" -- a real state, not a
+     * missing one: nothing populates it automatically until generation runs on ingestion (S3).
+     */
+    val area: String?,
     val kind: CompetencyKind,
     val targetLevel: Int,
     val invariant: Boolean,

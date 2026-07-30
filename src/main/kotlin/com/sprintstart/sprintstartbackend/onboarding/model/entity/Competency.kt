@@ -37,6 +37,25 @@ class Competency(
     // Optional pointer to the repository artifact this competency is grounded in (e.g. a path or module).
     @Column(nullable = true)
     var repoRef: String? = null,
+    /**
+     * What this competency is *about* — "Authentication", "Ingestion" — used to group the vocabulary.
+     *
+     * This is what replaced the graph. `RELATED` edges were already reaching for exactly this
+     * ("part of, commonly used together, same area of the system") and storing it as a DAG, where
+     * every consumer filtered them out. Grouping answers the question a learning area actually gets
+     * asked — *"what else is about auth?"* — which ordering never did.
+     *
+     * Free text rather than an enum: a fixed taxonomy cannot fit an unknown codebase, and any list
+     * we picked would be engineering-shaped, which is the gap that already leaves non-engineering
+     * roles with an empty vocabulary. Fragmentation is held off at the *write*
+     * ([CompetencyAreaNormalizer]) rather than by the type — an area that differs only in case or
+     * spacing from one already in use is stored as the one already in use.
+     *
+     * Null is a real state: "not grouped yet". Everything predating this reads that way, and nothing
+     * populates it automatically until generation runs on ingestion (S3).
+     */
+    @Column(nullable = true)
+    var area: String? = null,
     // Compliance/mandate-flagged competencies force any graph change that touches them to
     // classify as ChangeClassification.INVARIANT, pushing immediately regardless of shape.
     @Column(nullable = false)

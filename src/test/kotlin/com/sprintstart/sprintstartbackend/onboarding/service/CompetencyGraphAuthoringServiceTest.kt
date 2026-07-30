@@ -28,7 +28,10 @@ import kotlin.test.assertNull
 class CompetencyGraphAuthoringServiceTest {
     private val competencyRepository: CompetencyRepository = mockk(relaxed = true)
 
-    private val service = CompetencyGraphAuthoringService(competencyRepository)
+    private val service = CompetencyGraphAuthoringService(
+        competencyRepository,
+        CompetencyAreaNormalizer(competencyRepository),
+    )
 
     init {
         // A relaxed mock returns a bare Object from the generic save(S): S, which the checkcast
@@ -41,7 +44,8 @@ class CompetencyGraphAuthoringServiceTest {
         label: String = key,
         kind: CompetencyKind = CompetencyKind.SKILL,
         targetLevel: Int = Competency.DEFAULT_TARGET_LEVEL,
-    ) = Competency(key = key, label = label, kind = kind, targetLevel = targetLevel)
+        area: String? = null,
+    ) = Competency(key = key, label = label, kind = kind, targetLevel = targetLevel, area = area)
 
     @Nested
     inner class Reads {
@@ -240,6 +244,68 @@ class CompetencyGraphAuthoringServiceTest {
             val error = assertThrows<ResponseStatusException> { service.deleteCompetency("gone") }
 
             assertEquals(HttpStatus.NOT_FOUND, error.statusCode)
+        }
+    }
+
+    /**
+     * Grouping is what replaced the graph, so the property that matters is that it does not
+     * fragment: an area is only useful if two competencies about the same subject land in one group.
+     */
+    @Nested
+    inner class Area {
+        @Test
+        fun `reuses the spelling already in use rather than adding a synonym of it`() {
+            every { competencyRepository.findDistinctAreas() } returns listOf("Authentication")
+            every { competencyRepository.findByKey("session-store") } returns null
+
+            val response = service.createCompetency(
+                CreateCompetencyRequest(
+                    key = "session-store",
+                    label = "Session store",
+                    kind = CompetencyKind.SKILL,
+                    area = "  authentication ",
+                ),
+            )
+
+            assertEquals("Authentication", response.area)
+        }
+
+        @Test
+        fun `keeps an area nothing matches, so a new subject can still be named`() {
+            every { competencyRepository.findDistinctAreas() } returns listOf("Authentication")
+            every { competencyRepository.findByKey("chunking") } returns null
+
+            val response = service.createCompetency(
+                CreateCompetencyRequest(
+                    key = "chunking",
+                    label = "Chunking",
+                    kind = CompetencyKind.SKILL,
+                    area = " Ingestion ",
+                ),
+            )
+
+            assertEquals("Ingestion", response.area)
+        }
+
+        @Test
+        fun `a blank area clears the grouping instead of storing an empty one`() {
+            every { competencyRepository.findDistinctAreas() } returns listOf("Authentication")
+            val existing = competency("jwt", area = "Authentication")
+            every { competencyRepository.findByKey("jwt") } returns existing
+
+            val response = service.updateCompetency("jwt", UpdateCompetencyRequest(area = "  "))
+
+            assertNull(response.area)
+        }
+
+        @Test
+        fun `an omitted area leaves the grouping alone`() {
+            val existing = competency("jwt", area = "Authentication")
+            every { competencyRepository.findByKey("jwt") } returns existing
+
+            val response = service.updateCompetency("jwt", UpdateCompetencyRequest(label = "JWT"))
+
+            assertEquals("Authentication", response.area)
         }
     }
 }

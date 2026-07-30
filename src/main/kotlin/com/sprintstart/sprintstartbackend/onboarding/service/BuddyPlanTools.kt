@@ -118,7 +118,7 @@ class BuddyPlanTools(
                 appendLine("No gaps — they already meet everything this project teaches.")
             } else {
                 appendLine("Gaps:")
-                gaps.forEach { appendLine("- ${describeGap(it, ledger, moduleByKey)}") }
+                appendGaps(gaps, ledger, moduleByKey)
             }
 
             if (held.isNotEmpty()) {
@@ -126,9 +126,45 @@ class BuddyPlanTools(
             }
             appendLine(
                 "This is a shelf, not an order to follow. Bring one up when it would help with " +
-                    "what they are actually working on, and say why it is relevant then.",
+                    "what they are actually working on, and say why it is relevant then. The " +
+                    "headings group what each one is about, so if they are working in one area you " +
+                    "can offer its neighbours — they are related subjects, not steps in a sequence.",
             )
         }.trim()
+    }
+
+    /**
+     * The gaps, grouped by what they are *about*.
+     *
+     * Grouping is what replaced prerequisite structure, and it exists to answer the question the
+     * buddy actually gets asked — *"what else is about auth?"* — which ordering never did. It is
+     * presented as headings rather than a flat list so the model can offer a neighbour of what a
+     * hire is already touching, instead of reading a shelf out in alphabetical order.
+     *
+     * **Headings only appear once something is grouped.** Until generation populates `area` (S3) a
+     * hand-authored vocabulary is mostly ungrouped, and wrapping every gap in an "Ungrouped" heading
+     * would add a layer that carries no information. Ungrouped gaps are listed plainly, after the
+     * grouped ones — they are not a category, they are the ones nobody has said anything about yet.
+     */
+    private fun StringBuilder.appendGaps(
+        gaps: List<Competency>,
+        ledger: Map<String, Int>,
+        moduleByKey: Map<String, CompetencyModule>,
+    ) {
+        val (grouped, ungrouped) = gaps.partition { it.area != null }
+
+        grouped
+            .groupBy { it.area.orEmpty() }
+            .toSortedMap()
+            .forEach { (area, inArea) ->
+                appendLine("$area:")
+                inArea.forEach { appendLine("- ${describeGap(it, ledger, moduleByKey)}") }
+            }
+
+        if (ungrouped.isNotEmpty()) {
+            if (grouped.isNotEmpty()) appendLine("Not grouped into an area yet:")
+            ungrouped.forEach { appendLine("- ${describeGap(it, ledger, moduleByKey)}") }
+        }
     }
 
     /**

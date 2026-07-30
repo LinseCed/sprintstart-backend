@@ -59,6 +59,7 @@ class CompetencyGraphAuthoringControllerTest(
             label = "Kotlin Basics",
             description = null,
             kind = CompetencyKind.SKILL,
+            area = "Authentication",
             targetLevel = 3,
             invariant = false,
         )
