@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.entity
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContentProvenance
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
@@ -56,6 +57,23 @@ class Competency(
      */
     @Column(nullable = true)
     var area: String? = null,
+    /**
+     * Who last had a hand in this competency: the generator, or a person.
+     *
+     * Mirrors [com.sprintstart.sprintstartbackend.onboarding.model.entity.ModulePage]'s provenance,
+     * for the same reason and with the same rule: **any edit marks it `PM`**, and regeneration must
+     * leave a `PM` row alone. Without it, "generation runs on ingestion and an admin can correct it"
+     * silently means "generation overwrites the admin", and the correction is lost with no trace
+     * that it was ever made.
+     *
+     * Defaults to `PM`, which is both accurate — every writer today is a person, since generation
+     * has had no caller since the proposal queue went — and the safe direction to be wrong in. If
+     * the generator's persister (S3) ever forgets to mark what it wrote as `AI`, the failure is that
+     * a row never improves, rather than that somebody's correction is silently discarded.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    var provenance: ContentProvenance = ContentProvenance.PM,
     // Compliance/mandate-flagged competencies force any graph change that touches them to
     // classify as ChangeClassification.INVARIANT, pushing immediately regardless of shape.
     @Column(nullable = false)

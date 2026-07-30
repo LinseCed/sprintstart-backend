@@ -1,12 +1,16 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContentProvenance
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyTombstone
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.UpdateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyTombstoneRepository
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -28,8 +32,11 @@ import kotlin.test.assertNull
 class CompetencyGraphAuthoringServiceTest {
     private val competencyRepository: CompetencyRepository = mockk(relaxed = true)
 
+    private val tombstoneRepository: CompetencyTombstoneRepository = mockk(relaxed = true)
+
     private val service = CompetencyGraphAuthoringService(
         competencyRepository,
+        tombstoneRepository,
         CompetencyAreaNormalizer(competencyRepository),
     )
 
@@ -37,6 +44,7 @@ class CompetencyGraphAuthoringServiceTest {
         // A relaxed mock returns a bare Object from the generic save(S): S, which the checkcast
         // Kotlin inserts at the call site rejects -- echo the argument back instead.
         every { competencyRepository.save(any()) } answers { firstArg() }
+        every { tombstoneRepository.save(any()) } answers { firstArg() }
     }
 
     private fun competency(
@@ -306,6 +314,76 @@ class CompetencyGraphAuthoringServiceTest {
             val response = service.updateCompetency("jwt", UpdateCompetencyRequest(label = "JWT"))
 
             assertEquals("Authentication", response.area)
+        }
+    }
+
+    /**
+     * The two protections that must exist before generation runs on ingestion: without them,
+     * turning it on discards a PM's edits and re-proposes what they deleted, forever.
+     */
+    @Nested
+    inner class ProvenanceAndTombstones {
+        @Test
+        fun `a hand-authored competency is a person's row`() {
+            every { competencyRepository.findByKey("kotlin") } returns null
+
+            service.createCompetency(
+                CreateCompetencyRequest(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL),
+            )
+
+            val saved = slot<Competency>()
+            verify { competencyRepository.save(capture(saved)) }
+            assertEquals(ContentProvenance.PM, saved.captured.provenance)
+        }
+
+        @Test
+        fun `editing an AI-written competency makes it a person's row`() {
+            val existing = competency("kotlin").apply { provenance = ContentProvenance.AI }
+            every { competencyRepository.findByKey("kotlin") } returns existing
+
+            service.updateCompetency("kotlin", UpdateCompetencyRequest(label = "Kotlin 2"))
+
+            assertEquals(ContentProvenance.PM, existing.provenance)
+        }
+
+        @Test
+        fun `removing a competency remembers it, by name as well as key`() {
+            val existing = competency("kotlin", label = "Kotlin")
+            every { competencyRepository.findByKey("kotlin") } returns existing
+            every { tombstoneRepository.findByKey("kotlin") } returns null
+
+            service.deleteCompetency("kotlin")
+
+            val tombstone = slot<CompetencyTombstone>()
+            verify { tombstoneRepository.save(capture(tombstone)) }
+            assertEquals("kotlin", tombstone.captured.key)
+            // The label is what blocks a rephrasing; the key alone would not.
+            assertEquals("Kotlin", tombstone.captured.label)
+        }
+
+        @Test
+        fun `re-deleting a key that was added back refreshes the tombstone instead of failing`() {
+            val existing = competency("kotlin", label = "Kotlin again")
+            every { competencyRepository.findByKey("kotlin") } returns existing
+            val previous = CompetencyTombstone(key = "kotlin", label = "Kotlin")
+            every { tombstoneRepository.findByKey("kotlin") } returns previous
+
+            service.deleteCompetency("kotlin")
+
+            assertEquals("Kotlin again", previous.label)
+            verify(exactly = 0) { tombstoneRepository.save(any()) }
+        }
+
+        @Test
+        fun `hand-authoring a removed key again clears the tombstone`() {
+            every { competencyRepository.findByKey("kotlin") } returns null
+
+            service.createCompetency(
+                CreateCompetencyRequest(key = "kotlin", label = "Kotlin", kind = CompetencyKind.SKILL),
+            )
+
+            // The tombstone binds the generator, never the person who changed their mind.
+            verify(exactly = 1) { tombstoneRepository.deleteByKey("kotlin") }
         }
     }
 }

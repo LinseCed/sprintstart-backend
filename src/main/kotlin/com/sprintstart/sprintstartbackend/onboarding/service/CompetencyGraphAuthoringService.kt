@@ -1,16 +1,20 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContentProvenance
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyTombstone
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.CreateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.UpdateCompetencyRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyGraphResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.CompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.DeleteCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
+import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyTombstoneRepository
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import java.time.Instant
 
 /**
  * Authoring the competency vocabulary: reading it, adding a competency, editing one, removing one.
@@ -40,13 +44,21 @@ import org.springframework.web.server.ResponseStatusException
  *   stops appearing in the learning area until a competency with that key exists again, which
  *   re-adding it restores.
  *
- * A deleted key can currently be re-proposed by the next generation run. Making deletion **sticky**,
- * the way a dismissed board card binds the mentor, is S2 of the skill-map retirement — see
- * `forks/SKILL_MAP_RETIREMENT_DESIGN.md`.
+ * ### Deletion is sticky, and edits are protected
+ *
+ * Removing a competency writes a [CompetencyTombstone], and the generator is given those as
+ * exclusions: without it, a competency a PM removes returns on the next crawl under a rephrasing and
+ * they delete it forever. A person re-adding the same key clears the tombstone — it binds the
+ * generator, not somebody who changed their mind.
+ *
+ * Every write here also marks the row `PM`. Regeneration must leave those alone, or "generation runs
+ * and an admin can correct it" means "generation overwrites the admin". See
+ * `forks/SKILL_MAP_RETIREMENT_DESIGN.md`, D2.
  */
 @Service
 class CompetencyGraphAuthoringService(
     private val competencyRepository: CompetencyRepository,
+    private val tombstoneRepository: CompetencyTombstoneRepository,
     private val areaNormalizer: CompetencyAreaNormalizer,
 ) {
     /**
@@ -87,6 +99,10 @@ class CompetencyGraphAuthoringService(
             reject(HttpStatus.CONFLICT, "A competency with key $key already exists")
         }
 
+        // A person re-adding a key overrides their own deletion. The tombstone binds the
+        // generator, not the PM who changed their mind.
+        tombstoneRepository.deleteByKey(key)
+
         val competency = Competency(
             key = key,
             label = request.label.trim(),
@@ -94,6 +110,7 @@ class CompetencyGraphAuthoringService(
             kind = request.kind,
             area = areaNormalizer.normalize(request.area),
             targetLevel = targetLevel,
+            provenance = ContentProvenance.PM,
             invariant = request.invariant,
         )
         competencyRepository.save(competency)
@@ -127,6 +144,10 @@ class CompetencyGraphAuthoringService(
         // Blank clears the grouping, matching how a blank description clears one.
         request.area?.let { competency.area = areaNormalizer.normalize(it) }
         request.invariant?.let { competency.invariant = it }
+        // Any edit makes this a human's row, so regeneration must leave it alone from here on --
+        // the same rule a module page follows. Unconditional rather than per-field: a PM who
+        // re-typed a value to the same string still reviewed it and decided it was right.
+        competency.provenance = ContentProvenance.PM
 
         competencyRepository.save(competency)
         return competency.toAuthoringResponse()
@@ -142,7 +163,19 @@ class CompetencyGraphAuthoringService(
      */
     @Transactional
     fun deleteCompetency(key: String): DeleteCompetencyResponse {
-        competencyRepository.delete(findCompetency(key))
+        val competency = findCompetency(key)
+        competencyRepository.delete(competency)
+
+        // Remembered so the generator cannot bring it back under a rephrasing next crawl. Upsert
+        // rather than insert: re-adding and re-deleting a key must not fail on the unique index.
+        val tombstone = tombstoneRepository.findByKey(key)
+        if (tombstone == null) {
+            tombstoneRepository.save(CompetencyTombstone(key = key, label = competency.label))
+        } else {
+            tombstone.label = competency.label
+            tombstone.deletedAt = Instant.now()
+        }
+
         return DeleteCompetencyResponse(key = key)
     }
 
