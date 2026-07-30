@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.config.KeycloakRoleMapper
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginSource
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.external.events.UserCreatedEvent
@@ -12,6 +13,7 @@ import com.sprintstart.sprintstartbackend.user.model.request.user.UpdateUserEnab
 import com.sprintstart.sprintstartbackend.user.model.response.project.MyProjectResponse
 import com.sprintstart.sprintstartbackend.user.model.response.user.DeleteUserResponse
 import com.sprintstart.sprintstartbackend.user.model.response.user.GetUserResponse
+import com.sprintstart.sprintstartbackend.user.repository.ProjectRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
@@ -30,6 +32,7 @@ import java.util.UUID
 @Service
 class UserService(
     private val userRepository: UserRepository,
+    private val projectRepository: ProjectRepository,
     private val eventPublisher: ApplicationEventPublisher,
     private val keycloakAdminClient: KeycloakAdminClient,
     private val githubLoginService: GithubLoginService,
@@ -40,6 +43,7 @@ class UserService(
      * @return All users mapped to controller response DTOs.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving all users")
     fun getAllUsers(): List<GetUserResponse> =
         userRepository.findAll().map { it.toGetResponse() }
 
@@ -51,6 +55,7 @@ class UserService(
      * @return The matching user.
      */
     @Transactional
+    @Tracked("Retrieving authenticated user")
     fun getMe(jwt: Jwt): GetUserResponse {
         val tokenRoles = jwt.realmRoles()
 
@@ -92,6 +97,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given auth ID.
      */
     @Transactional
+    @Tracked("Updating authenticated user")
     fun patchMe(authId: String, request: PatchMeRequest): GetUserResponse {
         val user = findByAuthId(authId)
 
@@ -124,6 +130,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given auth ID.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving authenticated user's projects")
     fun getMyProjects(authId: String): List<MyProjectResponse> =
         findByAuthId(authId).projects.map { MyProjectResponse(id = it.id, name = it.name) }
 
@@ -141,6 +148,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given ID.
      */
     @Transactional
+    @Tracked("Updating user")
     fun patchAdminUserById(id: UUID, request: PatchUserRequest): GetUserResponse {
         val user = findById(id)
 
@@ -171,6 +179,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given ID.
      */
     @Transactional(readOnly = true)
+    @Tracked("Retrieving user by id")
     fun getUserById(id: UUID): GetUserResponse =
         findById(id).toGetResponse()
 
@@ -183,6 +192,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given ID.
      */
     @Transactional
+    @Tracked("Updating user enabled state")
     fun updateUserEnabledById(id: UUID, request: UpdateUserEnabledRequest): GetUserResponse {
         val user = findById(id)
         keycloakAdminClient.setUserEnabled(user.authId, request.enabled)
@@ -194,16 +204,22 @@ class UserService(
     /**
      * Deletes a user by UUID.
      *
+     * Projects managed by the user are left without a manager rather than being deleted. Clearing
+     * the manager foreign key first is required because the user row is removed with a native
+     * delete, which no cascade or `ON DELETE SET NULL` rule applies to.
+     *
      * @param id Identifier of the user to delete.
      * @throws ResponseStatusException When no user exists for the given ID.
      */
     @Transactional
+    @Tracked("Deleting user by id")
     fun deleteUserById(id: UUID) {
         val authId = userRepository
             .findAuthIdById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User with id: $id not found") }
 
         keycloakAdminClient.deleteUser(authId)
+        projectRepository.clearManagerForUser(id)
         userRepository.deleteRolesByUserId(id)
         userRepository.deleteProjectionById(id)
     }
@@ -219,6 +235,7 @@ class UserService(
      * @throws ResponseStatusException When no user exists for the given ID.
      */
     @Transactional
+    @Tracked("Deleting user by id")
     fun deleteAdminUserById(id: UUID): DeleteUserResponse {
         deleteUserById(id)
         // Todo: Remove return

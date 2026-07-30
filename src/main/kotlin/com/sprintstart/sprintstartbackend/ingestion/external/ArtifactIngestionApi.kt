@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.external
 
+import com.sprintstart.sprintstartbackend.ingestion.external.model.ArtifactDto
 import java.time.Instant
 import java.util.UUID
 
@@ -91,6 +92,14 @@ interface ArtifactIngestionApi {
      * @return One entry per repository that has at least one ingested pull request.
      */
     fun getRepositoryResponsiveness(projectId: UUID): List<RepositoryResponsiveness>
+
+    /**
+     * Finds and retrieves an artifact by its unique identifier.
+     *
+     * @param artifactId The unique identifier of the artifact to be retrieved.
+     * @return The artifact details wrapped in an [ArtifactDto] object.
+     */
+    fun findArtifactById(artifactId: UUID): ArtifactDto?
 }
 
 /**

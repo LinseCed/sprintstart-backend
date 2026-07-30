@@ -1,5 +1,10 @@
 package com.sprintstart.sprintstartbackend.upload.service
 
+import com.sprintstart.sprintstartbackend.AiConfig
+import com.sprintstart.sprintstartbackend.ApplicationConfig
+import com.sprintstart.sprintstartbackend.CryptoConfig
+import com.sprintstart.sprintstartbackend.GithubConfig
+import com.sprintstart.sprintstartbackend.UploadConfig
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -11,7 +16,15 @@ import org.springframework.mock.web.MockMultipartFile
 class UploadValidationServiceTest {
     private val service =
         UploadValidationService(
-            maxFileSizeBytes = 100,
+            applicationConfig = ApplicationConfig(
+                ai = AiConfig(baseUrl = "http://unused"),
+                github = GithubConfig(
+                    baseUrl = "https://api.github.com",
+                    cron = "0 0 * * *",
+                ),
+                crypto = CryptoConfig(masterKey = "unused", salt = "unused"),
+                upload = UploadConfig(directory = "/tmp/uploads", maxFileSizeBytes = 100),
+            ),
         )
 
     @Test

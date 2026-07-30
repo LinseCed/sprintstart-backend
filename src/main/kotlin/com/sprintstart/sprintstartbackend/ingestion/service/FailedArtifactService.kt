@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.ingestion.model.dto.command.ArtifactFa
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.FailedArtifact
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionRunNotFoundException
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import jakarta.transaction.Transactional
 import org.springframework.data.repository.findByIdOrNull
 import org.springframework.stereotype.Service
@@ -24,6 +25,7 @@ class FailedArtifactService(
      * @throws IngestionRunNotFoundException when the run id is unknown.
      */
     @Transactional
+    @Tracked("Adding failed artifact to ingestion run")
     fun addFailedArtifact(command: ArtifactFailedCommand) {
         val run = ingestionRunRepository
             .findByIdOrNull(command.transactionId)

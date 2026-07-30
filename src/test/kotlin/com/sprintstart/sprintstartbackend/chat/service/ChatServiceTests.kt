@@ -19,10 +19,10 @@ import com.sprintstart.sprintstartbackend.chat.models.responses.toChatResponse
 import com.sprintstart.sprintstartbackend.chat.repository.ChatMessageRepository
 import com.sprintstart.sprintstartbackend.chat.repository.ChatRepository
 import com.sprintstart.sprintstartbackend.chat.repository.CitationRepository
-import com.sprintstart.sprintstartbackend.connectors.overview.models.api.response.ConnectorDto
+import com.sprintstart.sprintstartbackend.connectors.overview.external.models.ConnectorDto
 import com.sprintstart.sprintstartbackend.connectors.overview.models.exceptions.ConnectorDisabledException
 import com.sprintstart.sprintstartbackend.connectors.overview.service.ConnectorConfigurationService
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -146,11 +146,46 @@ class ChatServiceTests {
     inner class GetChat {
         private val chat = Chat(UUID.randomUUID(), "Some test chat", userId, OffsetDateTime.now())
         private val chatMessages = listOf(
-            ChatMessage(UUID.randomUUID(), ChatRole.USER, chat, emptyList(), "First message", OffsetDateTime.now()),
-            ChatMessage(UUID.randomUUID(), ChatRole.USER, chat, emptyList(), "Second message", OffsetDateTime.now()),
-            ChatMessage(UUID.randomUUID(), ChatRole.USER, chat, emptyList(), "Third message", OffsetDateTime.now()),
-            ChatMessage(UUID.randomUUID(), ChatRole.USER, chat, emptyList(), "Fourth message", OffsetDateTime.now()),
-            ChatMessage(UUID.randomUUID(), ChatRole.USER, chat, emptyList(), "Fifth message", OffsetDateTime.now()),
+            ChatMessage(
+                UUID.randomUUID(),
+                ChatRole.USER,
+                chat,
+                mutableListOf(),
+                "First message",
+                OffsetDateTime.now(),
+            ),
+            ChatMessage(
+                UUID.randomUUID(),
+                ChatRole.USER,
+                chat,
+                mutableListOf(),
+                "Second message",
+                OffsetDateTime.now(),
+            ),
+            ChatMessage(
+                UUID.randomUUID(),
+                ChatRole.USER,
+                chat,
+                mutableListOf(),
+                "Third message",
+                OffsetDateTime.now(),
+            ),
+            ChatMessage(
+                UUID.randomUUID(),
+                ChatRole.USER,
+                chat,
+                mutableListOf(),
+                "Fourth message",
+                OffsetDateTime.now(),
+            ),
+            ChatMessage(
+                UUID.randomUUID(),
+                ChatRole.USER,
+                chat,
+                mutableListOf(),
+                "Fifth message",
+                OffsetDateTime.now(),
+            ),
         )
 
         @Test

@@ -19,6 +19,7 @@ data class ApplicationConfig(
     val github: GithubConfig,
     val keycloak: KeycloakConfig = KeycloakConfig(),
     val crypto: CryptoConfig,
+    val upload: UploadConfig,
 )
 
 /**
@@ -42,15 +43,12 @@ data class AiConfig(
  * sprintstart:
  *     github:
  *         base-url: ...
- *         repo-base-url: ...
  *         cron: ...
  * ´´´
  */
 data class GithubConfig(
     @get:JsonProperty("base-url")
     val baseUrl: String,
-    @get:JsonProperty("repo-base-url")
-    val repoBaseUrl: String,
     @get:JsonProperty("cron")
     val cron: String,
 )
@@ -88,4 +86,10 @@ data class CryptoConfig(
     val masterKey: String,
     @get:JsonProperty("salt")
     val salt: String,
+)
+
+data class UploadConfig(
+    val directory: String,
+    @get:JsonProperty("max-file-size-bytes")
+    val maxFileSizeBytes: Long,
 )

@@ -21,7 +21,7 @@ class AiPromptRequestTest {
             UUID.randomUUID(),
             ChatRole.USER,
             chat,
-            emptyList(),
+            mutableListOf(),
             "Some content",
             OffsetDateTime.now(),
         )

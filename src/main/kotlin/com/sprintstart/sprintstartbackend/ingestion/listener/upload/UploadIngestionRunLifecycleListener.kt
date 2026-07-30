@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.listener.upload
 
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
-import com.sprintstart.sprintstartbackend.ingestion.model.entity.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.service.IngestionRunLifeCycleService
 import com.sprintstart.sprintstartbackend.ingestion.service.UploadIngestionRunService
 import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.UploadBatchDeletionFinishedEvent
@@ -27,7 +27,7 @@ internal class UploadIngestionRunLifecycleListener(
         event: UploadStartedEvent,
     ) {
         ingestionRunLifeCycleService
-            .startRun(
+            .startOrUpdateRun(
                 transactionId = event.transactionId,
                 sourceSystem = SourceSystem.UPLOAD,
                 status = IngestionRunStatus.RUNNING,

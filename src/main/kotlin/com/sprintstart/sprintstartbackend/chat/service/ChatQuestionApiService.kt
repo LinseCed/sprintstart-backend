@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.chat.external.ChatQuestion
 import com.sprintstart.sprintstartbackend.chat.external.ChatQuestionApi
 import com.sprintstart.sprintstartbackend.chat.models.ChatRole
 import com.sprintstart.sprintstartbackend.chat.repository.ChatMessageRepository
+import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional
 internal class ChatQuestionApiService(
     private val messageRepository: ChatMessageRepository,
 ) : ChatQuestionApi {
+    @Tracked("Retrieving all user questions")
     @Transactional(readOnly = true)
     override fun getAllUserQuestions(): List<ChatQuestion> {
         return messageRepository

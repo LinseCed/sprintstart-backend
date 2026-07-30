@@ -9,7 +9,6 @@ import com.sprintstart.sprintstartbackend.ingestion.model.mapper.GithubArtifactF
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.GithubArtifactMapper
 import com.sprintstart.sprintstartbackend.ingestion.service.FailedArtifactService
 import com.sprintstart.sprintstartbackend.ingestion.service.GithubIngestionRunService
-import com.sprintstart.sprintstartbackend.ingestion.service.IngestionStatusService
 import com.sprintstart.sprintstartbackend.ingestion.service.provider.GithubArtifactProviderService
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
@@ -19,7 +18,6 @@ internal class GithubCommitListener(
     private val githubArtifactProviderService: GithubArtifactProviderService,
     private val githubArtifactMapper: GithubArtifactMapper,
     private val githubArtifactFailedMapper: GithubArtifactFailedMapper,
-    private val ingestionStatusService: IngestionStatusService,
     private val githubIngestionRunService: GithubIngestionRunService,
     private val failedArtifactService: FailedArtifactService,
 ) {

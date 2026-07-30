@@ -8,6 +8,7 @@ data class AdminProjectListResponse(
     val id: UUID,
     val name: String,
     val description: String?,
+    val manager: ProjectManagerResponse?,
     val sources: List<ProjectSourceResponse>,
     val users: List<ProjectUserSummaryResponse>,
 )
@@ -16,8 +17,30 @@ data class AdminProjectDetailResponse(
     val id: UUID,
     val name: String,
     val description: String?,
+    val manager: ProjectManagerResponse?,
     val sources: List<ProjectSourceResponse>,
     val users: List<ProjectUserResponse>,
+)
+
+/**
+ * The single project manager responsible for a project, or a candidate for that assignment.
+ */
+data class ProjectManagerResponse(
+    val id: UUID,
+    val username: String,
+    val email: String?,
+    val firstName: String,
+    val lastName: String,
+)
+
+/**
+ * Compact project representation for the projects a user is allowed to manage.
+ */
+data class ManagedProjectResponse(
+    val id: UUID,
+    val name: String,
+    val description: String?,
+    val memberCount: Int,
 )
 
 data class ProjectSourceResponse(
