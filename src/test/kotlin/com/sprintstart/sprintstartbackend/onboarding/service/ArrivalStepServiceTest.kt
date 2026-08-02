@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ArrivalDerivation
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStepState
@@ -120,15 +121,61 @@ class ArrivalStepServiceTest {
     }
 
     @Test
-    fun `a step the system observes cannot be ticked by the hire`() {
+    fun `a step the system checks cannot be ticked by the hire`() {
         every { arrivalStepRepository.findAllByProjectIdIsNullOrderByPositionAsc() } returns
-            listOf(step("github-account", settledBy = Rigor.OBSERVED))
+            listOf(step("github-account", settledBy = Rigor.OBSERVED, selfConfirmable = false))
 
         val error = assertThrows(ResponseStatusException::class.java) {
             service.confirm(hireId, "github-account")
         }
 
         assertEquals(HttpStatus.BAD_REQUEST, error.statusCode)
+    }
+
+    /**
+     * The both-ways case, and the one worth not breaking.
+     *
+     * "My machine builds" is observable but never refutable, and the observation arrives days after
+     * it mattered. So the hire's own word has to be accepted even though a derivation exists.
+     */
+    @Test
+    fun `a derived step that is still the hire's to claim can be confirmed`() {
+        every { arrivalStepRepository.findAllByProjectIdIsNullOrderByPositionAsc() } returns
+            listOf(step("environment-ready", settledBy = Rigor.OBSERVED, selfConfirmable = true))
+        val saved = slot<ArrivalStepState>()
+        every { arrivalStepStateRepository.save(capture(saved)) } answers { saved.captured }
+
+        val resolved = service.confirm(hireId, "environment-ready")
+
+        assertTrue(resolved.settled)
+        // Their word is recorded as their word, whatever the step could also have been settled by.
+        assertEquals(Rigor.DECLARED, saved.captured.rigor)
+    }
+
+    @Test
+    fun `creating a step the system knows how to check makes it a derived step`() {
+        every { arrivalStepRepository.existsByKeyAndProjectIdIsNull("github-account") } returns false
+        val saved = slot<ArrivalStep>()
+        every { arrivalStepRepository.save(capture(saved)) } answers { saved.captured }
+
+        // Asked for a plain self-declared step; the key says otherwise, and the key wins. A row
+        // that looks derived but is not -- or is tickable when the whole point is that it must not
+        // be -- would behave unlike its twin on another install, silently.
+        service.create("github-account", null, "Add your GitHub username", null, null, 0, Rigor.DECLARED)
+
+        assertEquals(Rigor.OBSERVED, saved.captured.settledBy)
+        assertFalse(saved.captured.selfConfirmable)
+    }
+
+    @Test
+    fun `the derivable catalog says which are already on the list`() {
+        every { arrivalStepRepository.findAllByProjectIdIsNullOrderByPositionAsc() } returns
+            listOf(step("github-account"))
+
+        val catalog = service.derivable().toMap()
+
+        assertEquals(true, catalog[ArrivalDerivation.GITHUB_ACCOUNT])
+        assertEquals(false, catalog[ArrivalDerivation.ENVIRONMENT_READY])
     }
 
     @Test
@@ -214,7 +261,14 @@ class ArrivalStepServiceTest {
         projectId: UUID? = null,
         title: String = key,
         settledBy: Rigor = Rigor.DECLARED,
-    ) = ArrivalStep(key = key, projectId = projectId, title = title, settledBy = settledBy)
+        selfConfirmable: Boolean = true,
+    ) = ArrivalStep(
+        key = key,
+        projectId = projectId,
+        title = title,
+        settledBy = settledBy,
+        selfConfirmable = selfConfirmable,
+    )
 
     private fun state(
         stepKey: String,

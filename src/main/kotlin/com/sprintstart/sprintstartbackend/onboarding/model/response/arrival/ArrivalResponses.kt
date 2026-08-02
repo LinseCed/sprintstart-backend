@@ -25,10 +25,31 @@ data class ArrivalStepResponse(
     val position: Int,
     @field:Schema(description = "How this step is settled: OBSERVED by the system, or DECLARED by the hire")
     val settledBy: Rigor,
+    @field:Schema(description = "Whether the hire may settle this themselves, or only the system can")
+    val selfConfirmable: Boolean,
     val settled: Boolean,
     val settledAt: Instant?,
     @field:Schema(description = "How this hire's step was actually established; null while unsettled")
     val rigor: Rigor?,
+)
+
+/**
+ * A step the system knows how to check for itself, offered to whoever authors the list.
+ *
+ * A derivation is code, so a derived step cannot be written freely — it can only be one of these,
+ * bound to its row by [key]. Offering them explicitly is what keeps that from being folklore about
+ * which magic keys happen to work.
+ */
+@Schema(description = "An arrival step the system can verify by itself")
+data class DerivableArrivalStepResponse(
+    val key: String,
+    @field:Schema(description = "Suggested wording; the author may change it after adding")
+    val suggestedTitle: String,
+    val suggestedDescription: String,
+    @field:Schema(description = "Whether the hire may also settle it themselves")
+    val selfConfirmable: Boolean,
+    @field:Schema(description = "Whether this step has already been added to the list")
+    val added: Boolean,
 )
 
 /**

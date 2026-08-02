@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.model.entity
 
 import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginSource
+import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginVerification
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import jakarta.persistence.CollectionTable
 import jakarta.persistence.Column
@@ -60,6 +61,15 @@ class User(
     @Enumerated(EnumType.STRING)
     @Column(name = "github_login_source", nullable = true)
     var githubLoginSource: GithubLoginSource? = null,
+    // Whether GitHub confirmed this account exists. Null means "not checked, or the check could not
+    // run" -- an outage or a rate limit never records NOT_FOUND, because a wrong "no such account"
+    // in front of somebody whose account is fine is worse than saying nothing. Cleared whenever the
+    // login changes, so a verdict never outlives the value it was about.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "github_login_verification", nullable = true)
+    var githubLoginVerification: GithubLoginVerification? = null,
+    @Column(name = "github_login_verified_at", nullable = true)
+    var githubLoginVerifiedAt: Instant? = null,
     // When the user opted in to having their existing work in the project's connected repositories
     // used to calibrate their skill assessment. Null means no consent -- the default, and what
     // revoking returns it to. Consent is the gate; the derived signal itself lives in

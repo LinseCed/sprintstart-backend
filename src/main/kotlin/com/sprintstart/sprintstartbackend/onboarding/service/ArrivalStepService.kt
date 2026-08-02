@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.ArrivalDerivation
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContentProvenance
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
@@ -143,14 +144,15 @@ class ArrivalStepService(
                     "No arrival step '$key' applies to this user",
                 )
 
-        // A step the system settles is not one a hire ticks. Allowing it would let somebody assert
-        // a fact the system is meant to observe -- and while the rigor recorded would still be
-        // DECLARED, the readout would then show a step as done that no derivation ever confirmed.
+        // Some derived steps are still the hire's to claim -- "my machine builds" is something the
+        // system can observe but never refute, so their word is the answer that lands on day one.
+        // Others are not: the GitHub check is definitive when it answers, and letting somebody tick
+        // it would let them declare away the fact their work being credited depends on.
         // Nothing is blocked by refusing: an unsettled step never stopped them working.
-        if (resolved.step.settledBy != Rigor.DECLARED) {
+        if (!resolved.step.selfConfirmable) {
             throw ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
-                "Arrival step '$key' is settled by ${resolved.step.settledBy}, not by you",
+                "Arrival step '$key' is one the system checks, not one you confirm",
             )
         }
 
@@ -169,6 +171,24 @@ class ArrivalStepService(
             )
 
         return resolved.copy(settledAt = state.settledAt, rigor = state.rigor)
+    }
+
+    /**
+     * The steps the system knows how to check, and whether each is already on the list.
+     *
+     * Offered explicitly so that adding a derived step is a choice rather than folklore about which
+     * keys happen to be magic. Nothing is seeded from this: an admin adds the ones their
+     * organisation wants, which is also what keeps a local-build step off the board of somebody who
+     * never builds anything.
+     */
+    @Transactional(readOnly = true)
+    fun derivable(): List<Pair<ArrivalDerivation, Boolean>> {
+        val present = arrivalStepRepository
+            .findAllByProjectIdIsNullOrderByPositionAsc()
+            .map { it.key }
+            .toSet()
+
+        return ArrivalDerivation.entries.map { it to (it.stepKey in present) }
     }
 
     /** Every authored step in a scope, for the authoring surface. */
@@ -204,6 +224,12 @@ class ArrivalStepService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "An arrival step needs a title")
         }
 
+        // A key the system knows how to check is always created as a derived step, whatever the
+        // caller asked for. The alternative is a row that looks derived and is not, or one that is
+        // self-confirmable when the whole point of the check is that it should not be -- both of
+        // which are silent, and both of which show up as a step behaving unlike its twin elsewhere.
+        val derivation = ArrivalDerivation.forStepKey(normalizedKey)
+
         return arrivalStepRepository.save(
             ArrivalStep(
                 key = normalizedKey,
@@ -212,7 +238,8 @@ class ArrivalStepService(
                 description = description?.trim()?.ifBlank { null },
                 href = href?.trim()?.ifBlank { null },
                 position = position,
-                settledBy = settledBy,
+                settledBy = if (derivation != null) Rigor.OBSERVED else settledBy,
+                selfConfirmable = derivation?.selfConfirmable ?: true,
                 provenance = ContentProvenance.PM,
             ),
         )
@@ -341,6 +368,9 @@ class ArrivalStepService(
         userApi
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
+
+    /** Every project this hire belongs to. Exposed for [ArrivalEvidenceService]'s derivations. */
+    fun projectsFor(userId: UUID): List<UUID> = projectIdsFor(userId)
 
     private fun projectIdsFor(userId: UUID): List<UUID> =
         userApi

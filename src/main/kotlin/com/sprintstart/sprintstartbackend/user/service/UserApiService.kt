@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
+import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginVerification
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.model.entity.Project
 import com.sprintstart.sprintstartbackend.user.model.entity.ProjectRole
@@ -193,6 +194,14 @@ class UserApiService(
     @Transactional
     override fun setGithubSeedingConsent(userId: UUID, consentedAt: Instant?) {
         userRepository.findById(userId).ifPresent { it.githubSeedingConsentAt = consentedAt }
+    }
+
+    @Transactional
+    override fun recordGithubLoginVerification(userId: UUID, verification: GithubLoginVerification) {
+        userRepository.findById(userId).ifPresent {
+            it.githubLoginVerification = verification
+            it.githubLoginVerifiedAt = Instant.now()
+        }
     }
 
     @Transactional(readOnly = true)
