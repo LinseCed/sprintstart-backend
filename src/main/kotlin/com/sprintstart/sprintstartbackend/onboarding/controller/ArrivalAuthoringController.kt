@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.arrival.Creat
 import com.sprintstart.sprintstartbackend.onboarding.model.request.arrival.ReorderArrivalStepsRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.arrival.UpdateArrivalStepRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.arrival.ArrivalStepResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.arrival.DerivableArrivalStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.ArrivalStepService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.responses.ApiResponse
@@ -67,6 +68,37 @@ class ArrivalAuthoringController(
     fun listArrivalSteps(
         @RequestParam(required = false) projectId: UUID?,
     ): List<ArrivalStepResponse> = arrivalStepService.listForAuthoring(projectId).map { it.toResponse() }
+
+    /**
+     * The steps the system can check for itself, and whether each is already on the list.
+     *
+     * @return The catalog; `added` says which are already authored.
+     */
+    @Operation(
+        summary = "List the arrival steps the system can verify",
+        description = "A derivation is code, so these are the only keys that can be checked " +
+            "automatically. Nothing is added by default -- an admin picks the ones that apply.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Catalog returned"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/derivable")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
+    fun listDerivableSteps(): List<DerivableArrivalStepResponse> =
+        arrivalStepService.derivable().map { (derivation, added) ->
+            DerivableArrivalStepResponse(
+                key = derivation.stepKey,
+                suggestedTitle = derivation.suggestedTitle,
+                suggestedDescription = derivation.suggestedDescription,
+                selfConfirmable = derivation.selfConfirmable,
+                added = added,
+            )
+        }
 
     /**
      * Creates a step.

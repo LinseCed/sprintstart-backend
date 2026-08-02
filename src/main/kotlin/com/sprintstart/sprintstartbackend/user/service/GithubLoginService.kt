@@ -35,6 +35,7 @@ class GithubLoginService(
         if (normalized.isEmpty()) {
             user.githubLogin = null
             user.githubLoginSource = null
+            clearVerification(user)
             return
         }
 
@@ -49,8 +50,21 @@ class GithubLoginService(
             )
         }
 
+        // A verdict is about a *value*. Leaving the old one in place after a correction would show
+        // "we could not find that account" against the login that replaced it, which is the same
+        // class of wrong answer this verification exists to prevent. Nothing verifies here: the
+        // check is an HTTP call and this runs inside the caller's transaction.
+        if (user.githubLogin != normalized) {
+            clearVerification(user)
+        }
+
         user.githubLogin = normalized
         user.githubLoginSource = source
+    }
+
+    private fun clearVerification(user: User) {
+        user.githubLoginVerification = null
+        user.githubLoginVerifiedAt = null
     }
 
     private companion object {

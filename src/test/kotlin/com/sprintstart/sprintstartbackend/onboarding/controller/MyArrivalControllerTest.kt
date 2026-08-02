@@ -4,6 +4,7 @@ import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
+import com.sprintstart.sprintstartbackend.onboarding.service.ArrivalEvidenceService
 import com.sprintstart.sprintstartbackend.onboarding.service.ArrivalStepService
 import com.sprintstart.sprintstartbackend.onboarding.service.ResolvedArrivalStep
 import io.mockk.every
@@ -33,6 +34,9 @@ class MyArrivalControllerTest(
 ) {
     @MockkBean
     private lateinit var arrivalStepService: ArrivalStepService
+
+    @MockkBean
+    private lateinit var arrivalEvidenceService: ArrivalEvidenceService
 
     @MockkBean
     private lateinit var jwtDecoder: JwtDecoder
@@ -170,8 +174,14 @@ class MyArrivalControllerTest(
         settledAt: Instant? = null,
         rigor: Rigor? = null,
         settledBy: Rigor = Rigor.DECLARED,
+        selfConfirmable: Boolean = true,
     ) = ResolvedArrivalStep(
-        step = ArrivalStep(key = key, title = key, settledBy = settledBy),
+        step = ArrivalStep(
+            key = key,
+            title = key,
+            settledBy = settledBy,
+            selfConfirmable = selfConfirmable,
+        ),
         settledAt = settledAt,
         rigor = rigor,
     )

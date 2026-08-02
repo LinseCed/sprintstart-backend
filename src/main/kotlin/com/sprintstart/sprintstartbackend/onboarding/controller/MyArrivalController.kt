@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toMyArrivalRes
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.arrival.ArrivalStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.arrival.MyArrivalResponse
+import com.sprintstart.sprintstartbackend.onboarding.service.ArrivalEvidenceService
 import com.sprintstart.sprintstartbackend.onboarding.service.ArrivalStepService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -38,6 +39,7 @@ import org.springframework.web.bind.annotation.RestController
 @Tag(name = "Onboarding - My Arrival", description = "The authenticated hire's own arrival steps")
 class MyArrivalController(
     private val arrivalStepService: ArrivalStepService,
+    private val arrivalEvidenceService: ArrivalEvidenceService,
 ) {
     /**
      * Returns the caller's arrival steps with their state, counted by how each was established.
@@ -67,6 +69,38 @@ class MyArrivalController(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
     ): MyArrivalResponse = arrivalStepService.forCaller(jwt.subject).toMyArrivalResponse()
+
+    /**
+     * Re-checks the steps the system can observe for the caller, and returns them as they stand.
+     *
+     * Separate from the board read on purpose: that read touches nothing but the database, because
+     * a board that waits on GitHub to open is a board nobody opens. The client calls this once
+     * after the card has rendered — the same split the diagram card makes.
+     *
+     * @param jwt Authenticated JWT used to resolve the current user.
+     * @return The caller's steps, including anything this call just settled.
+     */
+    @Operation(
+        summary = "Re-check the caller's observable arrival steps",
+        description = "Looks at what the system can verify for itself -- currently whether their " +
+            "declared GitHub account exists, and whether they have produced any work. Observation " +
+            "settles a step; failing to observe never unsettles one, and an outage records nothing.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Steps returned, refreshed"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "No user found for the authenticated subject"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/me/arrival/refresh")
+    @PreAuthorize("hasRole('USER')")
+    suspend fun refreshMyArrival(
+        @Parameter(hidden = true)
+        @AuthenticationPrincipal jwt: Jwt,
+    ): MyArrivalResponse = arrivalEvidenceService.refreshForCaller(jwt.subject).toMyArrivalResponse()
 
     /**
      * Records that the caller has done the step [key].

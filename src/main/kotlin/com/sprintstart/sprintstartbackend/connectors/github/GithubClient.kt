@@ -37,6 +37,10 @@ import tools.jackson.module.kotlin.jacksonObjectMapper
  * @param queryLoader Responsible for loading pre-defined GitHub GraphQL queries.
  */
 @Component
+// One function per GitHub resource this app reads, plus the paging helpers underneath them. Splitting
+// by resource would put two or three methods in each of four classes that all share the same
+// WebClient, base URL and error translation.
+@Suppress("TooManyFunctions")
 class GithubClient(
     private val webClient: WebClient,
     private val applicationConfig: ApplicationConfig,
@@ -68,6 +72,39 @@ class GithubClient(
             } else {
                 throw e // propagate unexpected errors
             }
+        }
+    }
+
+    /**
+     * Whether a GitHub account with this login exists — or `null` when GitHub would not say.
+     *
+     * Deliberately **three-valued, and deliberately unauthenticated.** Whether a public account
+     * exists is not privileged information, so no token is threaded through here: the alternative
+     * would be borrowing somebody's personal access token to answer a question about a third
+     * person, which couples this check to a connector being configured at all.
+     *
+     * The cost of that is GitHub's unauthenticated rate limit (60/hour per IP). It is affordable
+     * because the answer is *stored* against the user and only re-checked when their login changes
+     * or a previous check could not run — not because the limit is generous.
+     *
+     * ⚠️ **Only a 404 means "no such account".** A rate limit, a 5xx or a dropped connection all
+     * return null, never false. An outage is not evidence about the world, and telling somebody
+     * their perfectly good username does not exist is worse than telling them nothing.
+     *
+     * @param login The account to look for, already normalised.
+     * @return true when it exists, false when GitHub says it does not, null when GitHub would not
+     * answer.
+     */
+    suspend fun userExists(login: String): Boolean? {
+        return try {
+            webClient
+                .get()
+                .uri("${applicationConfig.github.baseUrl}/users/$login")
+                .sync()
+                .performRaw()
+            true
+        } catch (e: WebClientException) {
+            if (e.statusCode == 404) false else null
         }
     }
 

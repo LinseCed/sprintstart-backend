@@ -97,6 +97,23 @@ class ArrivalStep(
     @Column(name = "settled_by", nullable = false)
     var settledBy: Rigor = Rigor.DECLARED,
     /**
+     * Whether the hire may settle this step by saying so.
+     *
+     * Separate from [settledBy] because observation and self-confirmation are not alternatives for
+     * every step. "Your machine builds the project" is something the system can sometimes *observe*
+     * — they authored work, so it evidently did — but never *refute*: no contribution yet says
+     * nothing about whether the environment runs. So that step is derived **and** self-confirmable.
+     *
+     * "You have a GitHub account we can attribute work to" is the opposite: the check is definitive,
+     * so letting somebody assert it would let them declare away the one thing that has to be true
+     * for their work to be credited to them.
+     *
+     * **Defaults to true**, which is the safe direction: a step that nothing observes and nobody may
+     * tick can never be settled at all, which is a worse failure than one settled too easily.
+     */
+    @Column(name = "self_confirmable", nullable = false)
+    var selfConfirmable: Boolean = true,
+    /**
      * Who authored this step.
      *
      * Nothing generates arrival steps — account creation is a fact about a company, not something

@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.external
 
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
+import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginVerification
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import java.time.Instant
@@ -78,6 +79,17 @@ interface UserApi {
      * skill assessment. `null` withdraws it.
      */
     fun setGithubSeedingConsent(userId: UUID, consentedAt: Instant?)
+
+    /**
+     * Records what GitHub said about whether a user's declared login exists.
+     *
+     * Only ever called with a definitive answer. A rate limit or an outage must leave the previous
+     * verdict alone rather than recording "not found", because a wrong "that account does not
+     * exist" in front of somebody whose account is fine is worse than saying nothing at all.
+     *
+     * A no-op when the user does not exist.
+     */
+    fun recordGithubLoginVerification(userId: UUID, verification: GithubLoginVerification)
 }
 
 /**
