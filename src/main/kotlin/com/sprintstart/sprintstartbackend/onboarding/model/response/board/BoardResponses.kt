@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
+import com.sprintstart.sprintstartbackend.onboarding.model.response.arrival.ArrivalStepResponse
 import java.time.Instant
 import java.util.UUID
 
@@ -81,6 +82,7 @@ data class BoardCardResponse(
         value = PathToFirstContributionContent::class,
         name = "PATH_TO_FIRST_CONTRIBUTION",
     ),
+    JsonSubTypes.Type(value = ArrivalStepsContent::class, name = "ARRIVAL_STEPS"),
     JsonSubTypes.Type(value = OpenPullRequestsContent::class, name = "OPEN_PULL_REQUESTS"),
     JsonSubTypes.Type(value = CurrentTaskContent::class, name = "CURRENT_TASK"),
     JsonSubTypes.Type(value = SuggestedTasksContent::class, name = "SUGGESTED_TASKS"),
@@ -116,6 +118,29 @@ data class PathToFirstContributionContent(
      * only somebody else can fix.
      */
     val stalledReason: String?,
+) : BoardCardContent
+
+/**
+ * What still has to be true before this hire can work, and what they have already settled.
+ *
+ * ### There is no completion figure here, deliberately
+ *
+ * The counts are reported per rigor and there is no total to divide by. The onboarding model this
+ * replaces published a single `progressPercentage` that counted a ticked box exactly like a passed
+ * check, and that conflation is what made the number meaningless. A client says what is known —
+ * *"5 confirmed by the system · 2 you told us about · 2 outstanding"* — rather than a percentage
+ * that averages two different kinds of evidence.
+ *
+ * [observedCount] is always zero until A1 gives any step a derivation behind it. The distinction is
+ * carried anyway, because retrofitting it once a client already renders a single number means
+ * re-litigating this under time pressure.
+ */
+data class ArrivalStepsContent(
+    override val kind: BoardCardKind = BoardCardKind.ARRIVAL_STEPS,
+    val steps: List<ArrivalStepResponse>,
+    val observedCount: Int,
+    val declaredCount: Int,
+    val outstandingCount: Int,
 ) : BoardCardContent
 
 /**
