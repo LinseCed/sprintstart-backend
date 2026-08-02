@@ -10,12 +10,15 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKi
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Board
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTrack
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.ArrivalStepsContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardMomentKey
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardMomentResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.CompetencyProgressContent
@@ -66,6 +69,10 @@ class BoardServiceTest {
     private val myCompetencyService: MyCompetencyService = mockk()
     private val buddySessionRepository: BuddySessionRepository = mockk()
     private val boardDiagramRepository: BoardDiagramRepository = mockk()
+
+    // Relaxed, and empty by default: arrival steps are incidental to these tests, and an
+    // empty list means no arrival card is ensured, so every card assertion here is unaffected.
+    private val arrivalStepService: ArrivalStepService = mockk(relaxed = true)
     private val onboardingAiClient: OnboardingAiClient = mockk()
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
 
@@ -96,6 +103,7 @@ class BoardServiceTest {
         buddySessionRepository,
         boardDiagramRepository,
         boardDiagramService,
+        arrivalStepService,
     )
 
     private val engineering = OnboardingTrack(
@@ -217,6 +225,47 @@ class BoardServiceTest {
             listOf(BoardCardKind.PATH_TO_FIRST_CONTRIBUTION, BoardCardKind.OPEN_PULL_REQUESTS),
             kinds,
         )
+    }
+
+    @Test
+    fun `no arrival card is mounted while nobody has authored a step`() {
+        noBoardYet()
+        every { arrivalStepService.forHire(hireId) } returns emptyList()
+
+        val kinds = service.getBoard(hireId, projectId)?.cards?.map { it.kind }
+
+        // "Absent, never empty" — the rule the pull-request card already follows. A card that
+        // permanently reads "nothing to do" is worse than no card, and an installation where
+        // nobody has written an arrival list is the normal state until somebody does.
+        assertFalse(kinds!!.contains(BoardCardKind.ARRIVAL_STEPS))
+    }
+
+    @Test
+    fun `the arrival card is mounted once a step applies, and counts per rigor`() {
+        noBoardYet()
+        every { arrivalStepService.forHire(hireId) } returns listOf(
+            ResolvedArrivalStep(
+                step = ArrivalStep(key = "github-account", title = "Create a GitHub account"),
+                settledAt = now,
+                rigor = Rigor.DECLARED,
+            ),
+            ResolvedArrivalStep(
+                step = ArrivalStep(key = "vpn", title = "Request VPN access"),
+                settledAt = null,
+                rigor = null,
+            ),
+        )
+
+        val content = service
+            .getBoard(hireId, projectId)
+            ?.cards
+            ?.first { it.kind == BoardCardKind.ARRIVAL_STEPS }
+            ?.content as ArrivalStepsContent
+
+        assertEquals(2, content.steps.size)
+        assertEquals(1, content.declaredCount)
+        assertEquals(0, content.observedCount)
+        assertEquals(1, content.outstandingCount)
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Board
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCardPayload
@@ -13,10 +14,13 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.ChecklistPaylo
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.LinkPayload
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.NotePayload
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTrack
+import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.AuthoredCardRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.ChecklistCardRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.LinkCardRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.NoteCardRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.response.arrival.ArrivalStepResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.board.ArrivalStepsContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCardContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCardResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCompetencyResponse
@@ -88,6 +92,7 @@ class BoardService(
     private val buddySessionRepository: BuddySessionRepository,
     private val boardDiagramRepository: BoardDiagramRepository,
     private val boardDiagramService: BoardDiagramService,
+    private val arrivalStepService: ArrivalStepService,
 ) {
     /**
      * This hire's board on this project, cards hydrated.
@@ -104,7 +109,9 @@ class BoardService(
             ?: boardRepository.save(Board(userId = userId, projectId = projectId))
 
         val track = trackService.forMember(member)
-        val cards = ensureRelevantCards(board, track)
+        // Read once and reuse: it decides whether the card is ensured at all, and then fills it.
+        val arrivalSteps = arrivalStepService.forHire(userId)
+        val cards = ensureRelevantCards(board, track, arrivalSteps.isNotEmpty())
         val timeline = onboardingMetricsService.getHireTimeline(userId, projectId)
         // One query for every diagram on the board rather than one per card -- and the *kept*
         // picture, never a fresh one: assembling costs a generation, and a page that waits on a
@@ -125,7 +132,7 @@ class BoardService(
             cards = cards
                 .filter { it.state == BoardCardState.ACTIVE }
                 .sortedBy { it.position }
-                .map { it.toResponse(member, projectId, timeline, diagrams[it.id]) },
+                .map { it.toResponse(member, projectId, timeline, diagrams[it.id], arrivalSteps) },
         )
     }
 
@@ -272,7 +279,8 @@ class BoardService(
                 payload = json.encodeToString(payload),
             ),
         )
-        return card.toResponse(member, projectId, timeline = null)
+        val arrivalSteps = arrivalStepService.forHire(member.userId)
+        return card.toResponse(member, projectId, timeline = null, arrivalSteps = arrivalSteps)
     }
 
     /**
@@ -296,7 +304,8 @@ class BoardService(
 
         val member = memberOrNull(userId, board.projectId)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "You are not a member of that project")
-        return card.toResponse(member, board.projectId, timeline = null)
+        val arrivalSteps = arrivalStepService.forHire(member.userId)
+        return card.toResponse(member, board.projectId, timeline = null, arrivalSteps = arrivalSteps)
     }
 
     /**
@@ -343,10 +352,14 @@ class BoardService(
      *
      * @return Every card row on the board, including ones the hire has dismissed.
      */
-    private fun ensureRelevantCards(board: Board, track: OnboardingTrack): List<BoardCard> {
+    private fun ensureRelevantCards(
+        board: Board,
+        track: OnboardingTrack,
+        hasArrivalSteps: Boolean,
+    ): List<BoardCard> {
         val existing = boardCardRepository.findAllByBoardId(board.id)
         val present = existing.map { it.kind }.toSet()
-        val missing = relevantKinds(track).filterNot { it in present }
+        val missing = relevantKinds(track, hasArrivalSteps).filterNot { it in present }
         if (missing.isEmpty()) return existing
 
         // New cards go after everything already there, so ensuring a card exists never reshuffles a
@@ -373,9 +386,15 @@ class BoardService(
      * gated and for the same reason: a permanently empty "your open pull requests" card in front of
      * somebody who will never have one is the invisible-hire problem in card form.
      */
-    private fun relevantKinds(track: OnboardingTrack): List<BoardCardKind> =
+    private fun relevantKinds(track: OnboardingTrack, hasArrivalSteps: Boolean): List<BoardCardKind> =
         BoardCardKind.entries.filter {
-            it.placement == BoardCardKind.Placement.BASELINE && supports(track, it)
+            it.placement == BoardCardKind.Placement.BASELINE &&
+                supports(track, it) &&
+                // Not a track question, so deliberately not [supports]'s: an arrival card is
+                // meaningful for every role, it simply has nothing to say until somebody authors a
+                // step. Same "absent, never empty" outcome as the pull-request card, reached for a
+                // different reason — a card permanently reading "nothing to do" is worse than none.
+                (it != BoardCardKind.ARRIVAL_STEPS || hasArrivalSteps)
         }
 
     /**
@@ -396,8 +415,10 @@ class BoardService(
         projectId: UUID,
         timeline: HireTimelineResponse?,
         diagram: BoardDiagram?,
+        arrivalSteps: List<ResolvedArrivalStep>,
     ): BoardCardContent = when (card.kind) {
         BoardCardKind.PATH_TO_FIRST_CONTRIBUTION -> pathContent(member, timeline)
+        BoardCardKind.ARRIVAL_STEPS -> arrivalStepsContent(arrivalSteps)
         BoardCardKind.OPEN_PULL_REQUESTS -> openPullRequestsContent(member, projectId)
         BoardCardKind.CURRENT_TASK -> currentTaskContent(member.userId, projectId)
         BoardCardKind.SUGGESTED_TASKS -> suggestedTasksContent(member.userId, projectId)
@@ -407,6 +428,27 @@ class BoardService(
         // generation. [BoardDiagramService] owns whether that cache is still true.
         BoardCardKind.DIAGRAM -> boardDiagramService.contentFor(card.subject.orEmpty(), diagram)
         BoardCardKind.NOTE, BoardCardKind.LINK, BoardCardKind.CHECKLIST -> authoredContent(card.payload)
+    }
+
+    /**
+     * What is still outstanding before this hire can work, counted by how each step was settled.
+     *
+     * The same read the hire's own `GET /me/arrival` serves, so the card and that endpoint cannot
+     * disagree — the rule every other card here follows.
+     *
+     * Counted per rigor and never totalled. A step the system observed and a step somebody ticked
+     * are different facts, and the single blended figure that would go here is the
+     * `progressPercentage` defect that made the previous model's progress reporting meaningless.
+     */
+    private fun arrivalStepsContent(steps: List<ResolvedArrivalStep>): ArrivalStepsContent {
+        val responses: List<ArrivalStepResponse> = steps.map { it.toResponse() }
+
+        return ArrivalStepsContent(
+            steps = responses,
+            observedCount = responses.count { it.rigor == Rigor.OBSERVED },
+            declaredCount = responses.count { it.rigor == Rigor.DECLARED },
+            outstandingCount = responses.count { !it.settled },
+        )
     }
 
     /**
@@ -578,13 +620,14 @@ class BoardService(
         projectId: UUID,
         timeline: HireTimelineResponse?,
         diagram: BoardDiagram? = null,
+        arrivalSteps: List<ResolvedArrivalStep> = emptyList(),
     ) = BoardCardResponse(
         id = id,
         kind = kind,
         owner = owner,
         position = position,
         placedAt = placedAt,
-        content = hydrate(this, member, projectId, timeline, diagram),
+        content = hydrate(this, member, projectId, timeline, diagram, arrivalSteps),
     )
 
     /**

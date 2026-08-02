@@ -35,6 +35,25 @@ enum class BoardCardKind(
     PATH_TO_FIRST_CONTRIBUTION(Placement.BASELINE),
 
     /**
+     * What still has to be true before this hire can work: accounts, access, a machine that builds.
+     *
+     * Baseline rather than mentor-placed for the same reason the path card is: nobody should depend
+     * on a model noticing that somebody has been unable to clone the repository for a week. It is
+     * ensured on every board read and is the one card that is *most* useful on day one, when the
+     * board is otherwise thin.
+     *
+     * ⚠️ **It shows outstanding work; it does not withhold anything.** An unsettled step never
+     * stops a hire claiming a task, and nothing anywhere consults these rows before serving them.
+     * The card exists so somebody blocked by their employer can see what they are waiting on — not
+     * so the tool can wait on it too.
+     *
+     * Ensured only once at least one step actually applies to the hire, which keeps it out of the
+     * way on an installation where nobody has authored any: a permanently empty card is the same
+     * "absent, never empty" rule [OPEN_PULL_REQUESTS] follows.
+     */
+    ARRIVAL_STEPS(Placement.BASELINE),
+
+    /**
      * The hire's still-open pull requests, named, with how long each has waited.
      *
      * Genuinely pull-request-shaped rather than generically about work in flight: it lists numbers,

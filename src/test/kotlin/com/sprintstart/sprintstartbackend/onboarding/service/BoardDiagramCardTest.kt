@@ -51,6 +51,10 @@ class BoardDiagramCardTest {
     private val myCompetencyService: MyCompetencyService = mockk()
     private val buddySessionRepository: BuddySessionRepository = mockk()
     private val boardDiagramRepository: BoardDiagramRepository = mockk()
+
+    // Relaxed, and empty by default: arrival steps are incidental to these tests, and an
+    // empty list means no arrival card is ensured, so every card assertion here is unaffected.
+    private val arrivalStepService: ArrivalStepService = mockk(relaxed = true)
     private val onboardingAiClient: OnboardingAiClient = mockk()
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
 
@@ -76,6 +80,7 @@ class BoardDiagramCardTest {
             onboardingAiClient,
             transactionManager,
         ),
+        arrivalStepService,
     )
 
     @BeforeEach
