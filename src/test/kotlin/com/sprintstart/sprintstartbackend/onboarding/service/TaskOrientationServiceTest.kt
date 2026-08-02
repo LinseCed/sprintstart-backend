@@ -86,7 +86,7 @@ class TaskOrientationServiceTest {
         title = "Fix the stale cache header",
         summary = "The header is computed once at boot.",
         sourceUrl = "https://github.com/org/repo/issues/7",
-        status = ProposalStatus.APPROVED,
+        status = ProposalStatus.LIVE,
         taskZeroEligible = true,
     )
 

@@ -50,12 +50,24 @@ class StarterWorkTaskProposal(
     val competencyKeys: MutableList<String> = mutableListOf(),
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var status: ProposalStatus = ProposalStatus.PROPOSED,
+    var status: ProposalStatus = ProposalStatus.LIVE,
     /**
-     * Whether a PM has flagged this approved task as suitable for **Task 0** — the trivial first
+     * Whether a person has actually looked at this task.
+     *
+     * A mined task is claimable the moment it is mined — nobody has to work through a queue before
+     * a hire can be pointed at anything. What review buys is *confidence*, so it is expressed as
+     * rank rather than as a gate: `StarterWorkMatcher` demotes an unreviewed task, capped below any
+     * single positive signal, so one that fits a hire perfectly still beats a reviewed one that does
+     * not. Human attention improves the system instead of blocking it.
+     *
+     * Hand-authored tasks are reviewed by construction: somebody wrote them.
+     */
+    @Column(nullable = false)
+    var reviewed: Boolean = false,
+    /**
+     * Whether a PM has flagged this task as suitable for **Task 0** — the trivial first
      * task a new hire is auto-assigned once their environment is ready, to walk the
-     * branch → PR → review → merge loop once while the stakes are nil. Only meaningful on an
-     * `APPROVED` proposal; a task nobody wanted is not a contribution, so this is a deliberate PM
+     * branch → PR → review → merge loop once while the stakes are nil. A deliberate PM
      * choice, not a default.
      */
     @Column(name = "task_zero_eligible", nullable = false)

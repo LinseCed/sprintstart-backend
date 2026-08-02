@@ -1,0 +1,28 @@
+-- A mined starter task becomes claimable the moment it is mined. Review stops being a gate and
+-- becomes a ranking signal.
+--
+-- The old shape made a person's attention a *gate*: a mined task sat in PROPOSED and no hire could
+-- see it until somebody worked through a queue. So the pool was only ever as good as the last time
+-- a PM had an afternoon, and a project whose PM was busy offered a new hire nothing at all.
+--
+-- Now: `status` is LIVE or REJECTED, and `reviewed` says whether anybody has looked. Unreviewed
+-- tasks are claimable and `StarterWorkMatcher` demotes them by 5 points -- deliberately below the
+-- smallest positive signal (the 8-point newcomer nudge), so an unreviewed task that fits a hire
+-- perfectly still beats a reviewed one that does not. Set the demotion any heavier and it quietly
+-- becomes the approval requirement it replaced.
+--
+-- REJECTED is now STICKY. The row is kept and mining consults it, so a task somebody turned down is
+-- never mined back into existence -- otherwise they turn it down again after every crawl, which is
+-- the same leak `competency_tombstones` closes for competencies. It is a status here rather than a
+-- separate table because the row is already keyed by the `source_id` mining deduplicates on.
+--
+-- PROPOSED is gone. Everything that was PROPOSED was waiting on a review that is no longer required,
+-- so it becomes live-and-unreviewed; everything APPROVED was reviewed by definition. No data
+-- migration is written for either: this workspace is dev-only and the database is wiped on each
+-- schema change, so the mapping below is a record of what the values *mean* now, not a step to run.
+--
+--     PROPOSED -> status LIVE,     reviewed false
+--     APPROVED -> status LIVE,     reviewed true
+--     REJECTED -> status REJECTED, reviewed irrelevant (and now sticky)
+ALTER TABLE starter_work_task_proposals
+    ADD COLUMN IF NOT EXISTS reviewed BOOLEAN NOT NULL DEFAULT FALSE;

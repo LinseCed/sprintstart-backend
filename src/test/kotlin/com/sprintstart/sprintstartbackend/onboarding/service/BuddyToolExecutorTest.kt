@@ -161,7 +161,7 @@ class BuddyToolExecutorTest {
             rationale = null,
             sourceUrl = sourceUrl,
             competencyKeys = emptyList(),
-            status = ProposalStatus.APPROVED,
+            status = ProposalStatus.LIVE,
             taskZeroEligible = false,
         ),
         score = 1.0,

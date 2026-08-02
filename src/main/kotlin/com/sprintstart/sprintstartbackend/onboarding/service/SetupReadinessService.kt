@@ -81,35 +81,40 @@ class SetupReadinessService(
      * for everybody rather than for nobody.
      */
     private fun starterTasksRung(): SetupRungResponse {
-        val approvedTasks = starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.APPROVED)
-        val approved = approvedTasks.size
-        val pending = starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.PROPOSED).size
-        val uncovered = uncoveredTracks(approvedTasks)
+        val liveTasks = starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.LIVE)
+        val live = liveTasks.size
+        val unreviewed = liveTasks.count { !it.reviewed }
+        val uncovered = uncoveredTracks(liveTasks)
+
+        // Unreviewed tasks are *not* a chore this rung nags about. They are claimable; review only
+        // lifts the matcher's demotion. Saying "N waiting for your review" would put back the queue
+        // D1 removed, and a rung nobody can clear by doing something real is how a ladder stops
+        // being read.
+        val reviewNote = if (unreviewed > 0) {
+            " $unreviewed of them nobody has looked at yet — claimable, just ranked lower."
+        } else {
+            ""
+        }
+
         return when {
-            approved > 0 && uncovered.isNotEmpty() -> rung(
+            live > 0 && uncovered.isNotEmpty() -> rung(
                 STARTER_TASKS,
                 RungState.WARN,
-                approved,
-                "$approved starter ${taskWord(approved)} ready to claim, but nothing a hire on " +
-                    "${uncovered.joinToString(" or ")} could pick up.",
+                live,
+                "$live starter ${taskWord(live)} ready to claim, but nothing a hire on " +
+                    "${uncovered.joinToString(" or ")} could pick up.$reviewNote",
             )
-            approved > 0 -> rung(
+            live > 0 -> rung(
                 STARTER_TASKS,
                 RungState.OK,
-                approved,
-                "$approved starter ${taskWord(approved)} ready to claim.",
-            )
-            pending > 0 -> rung(
-                STARTER_TASKS,
-                RungState.WARN,
-                0,
-                "$pending mined ${taskWord(pending)} waiting for your review.",
+                live,
+                "$live starter ${taskWord(live)} ready to claim.$reviewNote",
             )
             else -> rung(
                 STARTER_TASKS,
                 RungState.WARN,
                 0,
-                "No starter tasks yet. Mine well-scoped first tasks from the corpus.",
+                "No starter tasks yet. They are mined from the corpus when a crawl finishes.",
             )
         }
     }

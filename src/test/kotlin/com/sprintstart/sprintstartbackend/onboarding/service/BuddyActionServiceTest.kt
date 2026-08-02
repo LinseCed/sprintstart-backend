@@ -95,7 +95,7 @@ class BuddyActionServiceTest {
                 rationale = null,
                 sourceUrl = null,
                 competencyKeys = emptyList(),
-                status = ProposalStatus.APPROVED,
+                status = ProposalStatus.LIVE,
                 taskZeroEligible = true,
             )
         },

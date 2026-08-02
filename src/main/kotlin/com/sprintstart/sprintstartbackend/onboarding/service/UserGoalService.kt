@@ -44,7 +44,7 @@ class UserGoalService(
         val proposal = starterWorkTaskProposalRepository.findById(proposalId).orElseThrow {
             ResponseStatusException(HttpStatus.NOT_FOUND, "No starter-work task found with id: $proposalId")
         }
-        if (proposal.status != ProposalStatus.APPROVED) {
+        if (proposal.status != ProposalStatus.LIVE) {
             throw ResponseStatusException(
                 HttpStatus.CONFLICT,
                 "Starter-work task $proposalId is ${proposal.status}; only an approved task can be claimed as a goal",
