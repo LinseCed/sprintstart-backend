@@ -18,6 +18,16 @@ enum class BuddyActionType(
     CLAIM_GOAL("claim_goal", "Work toward this task"),
     SUBMIT_VERIFICATION("submit_verification", "Submit this answer"),
     REQUEST_ATTESTATION("request_attestation", "Ask them to confirm this"),
+
+    /**
+     * Records the GitHub account the hire says their work comes from.
+     *
+     * ⚠️ **Not project-scoped, unlike every action above it.** A GitHub login is a fact about a
+     * *person* — the same reason `GET /me/arrival` is not project-scoped — so this one is offered
+     * and performed before the project gate. A hire on no project yet is exactly the hire most
+     * likely to be setting one.
+     */
+    SET_GITHUB_LOGIN("set_github_login", "Save this username"),
     ;
 
     companion object {

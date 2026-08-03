@@ -36,7 +36,16 @@ data class BuddyStreamEvent(
     @SerialName("task_id") val taskId: String? = null,
     @SerialName("module_id") val moduleId: String? = null,
     val answer: String? = null,
-    /** Attestation confirm payload: what work, and who the hire is asking to confirm it. */
+    /**
+     * Attestation confirm payload: what work, and who the hire is asking to confirm it.
+     *
+     * ⚠️ **Declared here and set by nothing.** `BuddyService` does not copy them out of the
+     * proposal, and the client neither parses nor echoes them — so a confirmed `request_attestation`
+     * arrives with no target. Found while adding [githubLogin]; left alone because fixing it spans
+     * four files across two repos for a different action, and carried as a loose end instead.
+     */
     val title: String? = null,
     @SerialName("attester_id") val attesterId: String? = null,
+    /** `set_github_login` confirm payload: the username the buddy offered to save. */
+    @SerialName("github_login") val githubLogin: String? = null,
 )

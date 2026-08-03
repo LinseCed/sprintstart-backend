@@ -306,6 +306,7 @@ class BuddyService(
                         taskId = proposal.taskId?.toString(),
                         moduleId = proposal.moduleId?.toString(),
                         answer = proposal.answer,
+                        githubLogin = proposal.githubLogin,
                     ),
                 )
             }

@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
+import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginSource
 import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginVerification
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import com.sprintstart.sprintstartbackend.user.model.entity.Project
@@ -20,8 +21,10 @@ import jakarta.persistence.criteria.Predicate
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.domain.Specification
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 import java.util.Optional
 import java.util.UUID
@@ -33,9 +36,14 @@ import java.util.UUID
  * controller DTOs or internal user service workflows.
  */
 @Service
+// Tracks [UserApi]'s surface one-for-one, so the count is the boundary's, not this class's. The
+// five GitHub-related members are a visible cluster and a plausible future split -- left alone
+// because there is one implementation, and an interface extracted from one is a guess.
+@Suppress("TooManyFunctions")
 class UserApiService(
     private val userRepository: UserRepository,
     private val projectRepository: ProjectRepository,
+    private val githubLoginService: GithubLoginService,
 ) : UserApi {
     /**
      * Checks whether a user with the given identifier exists.
@@ -194,6 +202,19 @@ class UserApiService(
     @Transactional
     override fun setGithubSeedingConsent(userId: UUID, consentedAt: Instant?) {
         userRepository.findById(userId).ifPresent { it.githubSeedingConsentAt = consentedAt }
+    }
+
+    @Transactional
+    override fun setGithubLogin(userId: UUID, githubLogin: String): String {
+        val user = userRepository.findById(userId).orElseThrow {
+            ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with id: $userId")
+        }
+        // Delegated rather than reimplemented: GithubLoginService owns normalisation, the syntax
+        // and uniqueness rules, and the A1 rule that changing the login discards the verification
+        // verdict about the old one. SELF_DECLARED because the hire said it themselves -- being
+        // told it in conversation is not a PM confirming it.
+        githubLoginService.apply(user, githubLogin, GithubLoginSource.SELF_DECLARED)
+        return userRepository.save(user).githubLogin.orEmpty()
     }
 
     @Transactional
