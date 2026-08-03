@@ -14,6 +14,7 @@ import java.util.UUID
  * Other modules should depend on this interface instead of calling user-module services
  * or repositories directly.
  */
+@Suppress("TooManyFunctions") // The size of the module boundary, not one class doing unrelated things.
 interface UserApi {
     /**
      * Checks whether a user projection exists for the given SprintStart user ID.
@@ -79,6 +80,21 @@ interface UserApi {
      * skill assessment. `null` withdraws it.
      */
     fun setGithubSeedingConsent(userId: UUID, consentedAt: Instant?)
+
+    /**
+     * Records the GitHub account a user says their work comes from, and returns it as stored.
+     *
+     * The value is normalised (trimmed, lower-cased) by the one service that owns this field, so
+     * the caller gets back what was actually written rather than what it passed in.
+     *
+     * Exposed on the module boundary because the buddy can now be told a username in conversation
+     * — a second *entry point*, never a second writer: the rules (syntax, uniqueness, and clearing
+     * a stale verification verdict when the value changes) stay in one place.
+     *
+     * @throws org.springframework.web.server.ResponseStatusException 400 when the value is not a
+     * possible GitHub username; 409 when another user already claims it; 404 when no such user.
+     */
+    fun setGithubLogin(userId: UUID, githubLogin: String): String
 
     /**
      * Records what GitHub said about whether a user's declared login exists.

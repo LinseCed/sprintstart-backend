@@ -118,7 +118,7 @@ class BuddyActionServiceTest {
     // -- specs / dispatch -------------------------------------------------------------------------
 
     @Test
-    fun `exposes exactly the six action tools`() {
+    fun `exposes exactly the seven action tools`() {
         assertThat(service.actionSpecs().map { it.name }).containsExactlyInAnyOrder(
             "flag_to_pm",
             "claim_task_zero",
@@ -126,6 +126,7 @@ class BuddyActionServiceTest {
             "claim_goal",
             "submit_verification",
             "request_attestation",
+            "set_github_login",
         )
     }
 
@@ -193,6 +194,84 @@ class BuddyActionServiceTest {
 
         assertThat(outcome.proposal).isNull()
         assertThat(outcome.toolResult).contains("more than one project")
+    }
+
+    /**
+     * ⚠️ The exemption that makes this action work at all. A GitHub login is a fact about a
+     * *person*, not a project — and a hire on day one, not yet added to anything, is exactly who is
+     * most likely to be setting one. Gating it would refuse them.
+     */
+    @Test
+    fun `offers to save a username even when the hire is on no project`() {
+        every { userApi.getUsersByIds(listOf(userId)) } returns listOf(userWith())
+
+        val outcome = service.propose(call("set_github_login", mapOf("login" to "octocat")), userId)
+
+        assertThat(outcome.proposal).isNotNull
+        assertThat(outcome.proposal?.githubLogin).isEqualTo("octocat")
+    }
+
+    @Test
+    fun `proposing a username changes nothing until it is confirmed`() {
+        every { userApi.getUsersByIds(listOf(userId)) } returns listOf(userWith())
+
+        service.propose(call("set_github_login", mapOf("login" to "octocat")), userId)
+
+        verify(exactly = 0) { userApi.setGithubLogin(any(), any()) }
+    }
+
+    @Test
+    fun `does not propose a username when none was given`() {
+        onOneProject()
+
+        val outcome = service.propose(call("set_github_login", mapOf("login" to "  ")), userId)
+
+        assertThat(outcome.proposal).isNull()
+        assertThat(outcome.toolResult).contains("Ask the hire for their GitHub username")
+    }
+
+    @Test
+    fun `confirming saves the username through the one writer and reports it back`() = runTest {
+        asHire()
+        every { userApi.setGithubLogin(userId, "OctoCat") } returns "octocat"
+
+        val result = service.perform(BuddyActionRequest(action = "set_github_login", githubLogin = "OctoCat"), jwt)
+
+        assertThat(result.ok).isTrue()
+        // Reported as stored, not as typed: GithubLoginService lower-cases it, and telling the hire
+        // something different from what was written is how the two drift in somebody's head.
+        assertThat(result.message).contains("@octocat")
+    }
+
+    /**
+     * A hire on no project must be able to confirm as well as be offered — the gate is skipped at
+     * both ends or the button is one that always fails.
+     */
+    @Test
+    fun `confirming a username needs no project`() = runTest {
+        asHire()
+        every { userApi.getUsersByIds(listOf(userId)) } returns listOf(userWith())
+        every { userApi.setGithubLogin(userId, "octocat") } returns "octocat"
+
+        val result = service.perform(BuddyActionRequest(action = "set_github_login", githubLogin = "octocat"), jwt)
+
+        assertThat(result.ok).isTrue()
+    }
+
+    /**
+     * The rules stay in GithubLoginService, and its sentence is what the hire reads — a 409 is
+     * something they can act on, not a failed confirm with no explanation.
+     */
+    @Test
+    fun `a username another hire already claims comes back as its own reason`() = runTest {
+        asHire()
+        every { userApi.setGithubLogin(userId, "octocat") } throws
+            ResponseStatusException(HttpStatus.CONFLICT, "GitHub account 'octocat' is already linked to another user")
+
+        val result = service.perform(BuddyActionRequest(action = "set_github_login", githubLogin = "octocat"), jwt)
+
+        assertThat(result.ok).isFalse()
+        assertThat(result.message).contains("already linked to another user")
     }
 
     @Test

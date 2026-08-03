@@ -21,4 +21,6 @@ data class BuddyActionRequest(
     val answer: String? = null,
     val title: String? = null,
     val attesterId: UUID? = null,
+    /** The GitHub account to record, for `set_github_login`. */
+    val githubLogin: String? = null,
 )

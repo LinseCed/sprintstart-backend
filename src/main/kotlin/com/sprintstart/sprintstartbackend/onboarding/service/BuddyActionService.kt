@@ -58,6 +58,7 @@ class BuddyActionService(
             CLAIM_GOAL_SPEC,
             REQUEST_ATTESTATION_SPEC,
             SUBMIT_VERIFICATION_SPEC,
+            SET_GITHUB_LOGIN_SPEC,
         )
 
     /** Whether [toolName] is an action tool (handled by [propose]) rather than a read-only tool. */
@@ -74,6 +75,14 @@ class BuddyActionService(
     fun propose(call: BuddyToolCallDto, userId: UUID): ProposeOutcome {
         val type = BuddyActionType.fromToolName(call.name)
             ?: return ProposeOutcome("Unknown action: ${call.name}.", null)
+
+        // ⚠️ Before the project gate, deliberately. A GitHub login is a fact about a *person*, not
+        // about a project -- the same reason `GET /me/arrival` is not project-scoped. Gating it
+        // would refuse exactly the hire most likely to be setting one: somebody on day one who has
+        // not been added to anything yet. A test pins that.
+        if (type == BuddyActionType.SET_GITHUB_LOGIN) {
+            return proposeGithubLogin(call, type)
+        }
 
         val project = when (val resolution = resolveProject(userId)) {
             is ProjectResolution.Resolved -> resolution
@@ -118,6 +127,68 @@ class BuddyActionService(
             BuddyActionType.REQUEST_ATTESTATION -> proposeAttestation(call, type, project.name)
             else -> proposed(type, project.name, question = null)
         }
+    }
+
+    /**
+     * Offers to record the GitHub account the hire named, without a project and without mutating.
+     *
+     * Only the *shape* is checked here — that a username was actually supplied. Whether it is a
+     * possible GitHub name, and whether somebody else already claims it, stay with
+     * [com.sprintstart.sprintstartbackend.user.service.GithubLoginService] at confirm time: it owns
+     * those rules for every other writer, and a second opinion here would be one more place for
+     * them to drift.
+     */
+    private fun proposeGithubLogin(call: BuddyToolCallDto, type: BuddyActionType): ProposeOutcome {
+        val login = call.stringArg("login").trim()
+        if (login.isBlank()) {
+            return ProposeOutcome(
+                "No username was provided. Ask the hire for their GitHub username before offering " +
+                    "to save it.",
+                null,
+            )
+        }
+        return ProposeOutcome(
+            toolResult = "Proposed to the hire: save “$login” as their GitHub username. They will " +
+                "see a confirm button; it is saved only if they click it. Offer it — do not claim " +
+                "it is done.",
+            proposal = BuddyActionProposal(
+                action = type.toolName,
+                label = type.label,
+                question = null,
+                githubLogin = login,
+            ),
+        )
+    }
+
+    /**
+     * Records the confirmed username through the one writer that owns it.
+     *
+     * ### Why this action exists
+     *
+     * A hire testing the buddy said *"my GitHub username is …"* and **nothing was recorded**, because
+     * no tool could. The model went looking through the corpus for how to store one. Meanwhile the
+     * login is what artifact verification compares a pull request's author against, so the failure
+     * is not cosmetic: work they really do goes on not being credited, and they read as calm rather
+     * than blocked.
+     *
+     * [com.sprintstart.sprintstartbackend.user.service.GithubLoginService] stays the single writer —
+     * the conversation is a second *entry point*, never a second source of truth. That is also what
+     * keeps the normalisation, the uniqueness check and the A1 rule that a changed login discards
+     * the old verification verdict true here without restating any of them.
+     */
+    private fun setGithubLogin(authId: String, login: String?): BuddyActionResponse {
+        if (login.isNullOrBlank()) {
+            return BuddyActionResponse(ok = false, message = "No username was proposed to save.")
+        }
+        val userId = userApi.getUserIdByAuthId(authId).orElse(null)
+            ?: return BuddyActionResponse(ok = false, message = "I couldn't find your account.")
+
+        val saved = userApi.setGithubLogin(userId, login)
+        return BuddyActionResponse(
+            ok = true,
+            message = "Saved — your work will be attributed to @$saved from now on. If that is not " +
+                "right, you can change it in Settings any time.",
+        )
     }
 
     /** Same shape as [proposeAttestation]: neither half of a submission may be missing. */
@@ -180,6 +251,18 @@ class BuddyActionService(
         val type = BuddyActionType.fromToolName(request.action)
             ?: return BuddyActionResponse(ok = false, message = "That action isn't recognised.")
 
+        // Same reason as in propose: not project-scoped, so not behind the project gate.
+        if (type == BuddyActionType.SET_GITHUB_LOGIN) {
+            return try {
+                withContext(Dispatchers.IO) { setGithubLogin(authId, request.githubLogin) }
+            } catch (ex: ResponseStatusException) {
+                // 400 for a syntactically impossible username, 409 when another hire already
+                // claims it. Both are things the hire can act on, so they come back as the
+                // sentence GithubLoginService wrote rather than as a failed confirm.
+                BuddyActionResponse(ok = false, message = ex.reason ?: "That username could not be saved.")
+            }
+        }
+
         val context = withContext(Dispatchers.IO) { resolveContext(authId) }
         val resolved = when (context) {
             is CallerContext.Resolved -> context
@@ -222,6 +305,9 @@ class BuddyActionService(
                         requestAttestation(resolved, request.title, request.attesterId)
                     BuddyActionType.OPEN_ORIENTATION,
                     BuddyActionType.SUBMIT_VERIFICATION,
+                    // Not project-scoped, so it returns before the project gate this dispatch
+                    // sits behind.
+                    BuddyActionType.SET_GITHUB_LOGIN,
                     -> error("handled above")
                 }
             }
@@ -367,6 +453,7 @@ class BuddyActionService(
         answer: String? = null,
         title: String? = null,
         attesterId: UUID? = null,
+        githubLogin: String? = null,
     ): ProposeOutcome =
         ProposeOutcome(
             toolResult = "Proposed to the hire on $projectName: “${type.label}”. They will see a confirm " +
@@ -380,6 +467,7 @@ class BuddyActionService(
                 answer = answer,
                 title = title,
                 attesterId = attesterId?.toString(),
+                githubLogin = githubLogin,
             ),
         )
 
@@ -428,6 +516,10 @@ class BuddyActionService(
             BuddyActionType.CLAIM_GOAL -> "claim a goal"
             BuddyActionType.REQUEST_ATTESTATION -> "ask somebody to confirm your work"
             BuddyActionType.SUBMIT_VERIFICATION -> "submit an answer"
+            // Unused in practice -- the gerund only appears in the no-project reason lines, which
+            // this action never reaches. Present because the enum is exhaustive, which is what
+            // made the compiler point at both of these when it was added.
+            BuddyActionType.SET_GITHUB_LOGIN -> "save a GitHub username"
         }
 
     /** The result of proposing an action: what to tell the AI, and the proposal to show the hire (if any). */
@@ -449,6 +541,7 @@ class BuddyActionService(
         val answer: String? = null,
         val title: String? = null,
         val attesterId: String? = null,
+        val githubLogin: String? = null,
     )
 
     private sealed interface ProjectResolution {
@@ -531,6 +624,26 @@ class BuddyActionService(
                     }
                 }
                 putJsonArray("required") { add("task_id") }
+            },
+        )
+
+        val SET_GITHUB_LOGIN_SPEC = BuddyToolSpecDto(
+            name = BuddyActionType.SET_GITHUB_LOGIN.toolName,
+            description = "Offer to save the hire's GitHub username. Use this the moment they tell " +
+                "you one -- 'my GitHub is octocat', 'I'm @octocat on GitHub' -- rather than sending " +
+                "them to Settings. It matters: this is the account their pull requests are matched " +
+                "against, so until it is set, work they really do is not credited to them and " +
+                "nothing says so. Pass exactly what they gave you, without the @. Proposing does " +
+                "not save it; they confirm.",
+            parameters = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("login") {
+                        put("type", "string")
+                        put("description", "The GitHub username the hire gave, without a leading @.")
+                    }
+                }
+                putJsonArray("required") { add("login") }
             },
         )
 
