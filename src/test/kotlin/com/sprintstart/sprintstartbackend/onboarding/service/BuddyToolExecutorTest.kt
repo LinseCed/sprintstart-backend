@@ -6,9 +6,11 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKi
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
@@ -39,6 +41,12 @@ class BuddyToolExecutorTest {
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
     private val projectMembershipApi: ProjectMembershipApi = mockk()
 
+    // Defaults to "nobody has authored an arrival list", which is what every test written before
+    // A2 assumed and what a fresh install actually looks like.
+    private val arrivalStepService: ArrivalStepService = mockk {
+        every { forHire(any()) } returns emptyList()
+    }
+
     // Defaults to the engineering track, so these tests describe the behaviour every existing hire
     // gets; the track-specific mounting is exercised in TrackServiceTest and its own cases below.
     private val trackService: TrackService = mockk {
@@ -58,6 +66,7 @@ class BuddyToolExecutorTest {
         OpenPullRequestReader(artifactIngestionApi),
         trackService,
         projectMembershipApi,
+        arrivalStepService,
     )
 
     private val userId = UUID.randomUUID()
@@ -66,6 +75,26 @@ class BuddyToolExecutorTest {
     private val competenciesCall = BuddyToolCallDto(id = "c0", name = "get_my_competencies")
     private val openPullRequestsCall = BuddyToolCallDto(id = "c0", name = "get_my_open_pull_requests")
     private val suggestedTasksCall = BuddyToolCallDto(id = "c0", name = "get_suggested_tasks")
+    private val arrivalCall = BuddyToolCallDto(id = "c0", name = "get_arrival_steps")
+
+    private fun resolvedStep(
+        key: String = "vpn",
+        title: String = "Request VPN access",
+        description: String? = null,
+        href: String? = null,
+        selfConfirmable: Boolean = true,
+        rigor: Rigor? = null,
+    ) = ResolvedArrivalStep(
+        step = ArrivalStep(
+            key = key,
+            title = title,
+            description = description,
+            href = href,
+            selfConfirmable = selfConfirmable,
+        ),
+        settledAt = rigor?.let { Instant.now() },
+        rigor = rigor,
+    )
 
     private fun openPullRequest(
         number: Int?,
@@ -182,6 +211,121 @@ class BuddyToolExecutorTest {
             "search_canonical_answers",
             "get_teammates",
         )
+    }
+
+    /**
+     * Absent, never empty — the same gate the board card uses, read from the same service. A tool
+     * that can only ever answer "nobody has written a list" invites the mentor to open with it.
+     */
+    @Test
+    fun `a hire with no arrival list is not offered the arrival tool`() {
+        every { buddyPlanTools.toolSpecs() } returns emptyList()
+
+        assertThat(executor.toolSpecs(userId).map { it.name }).doesNotContain("get_arrival_steps")
+    }
+
+    /**
+     * **First in the list, and that is the point of the slice.** The failure this initiative exists
+     * to fix is somebody who cannot clone the repository being handed a good first issue.
+     */
+    @Test
+    fun `arrival comes before every other hire-state tool`() {
+        every { buddyPlanTools.toolSpecs() } returns emptyList()
+        every { arrivalStepService.forHire(userId) } returns listOf(resolvedStep())
+
+        assertThat(executor.toolSpecs(userId).map { it.name }).startsWith("get_arrival_steps")
+    }
+
+    @Test
+    fun `lists what is outstanding and how each settled step was established`() {
+        every { arrivalStepService.forHire(userId) } returns listOf(
+            resolvedStep(key = "vpn", title = "Request VPN access"),
+            resolvedStep(key = "github-account", title = "Add your GitHub username", rigor = Rigor.OBSERVED),
+            resolvedStep(key = "laptop", title = "Collect a laptop", rigor = Rigor.DECLARED),
+        )
+
+        val result = executor.execute(arrivalCall, userId)
+
+        assertThat(result).contains("Request VPN access")
+        // Attribution, not a tick: what the system confirmed and what the hire asserted are
+        // different facts, and the model must be able to tell them apart in its own words.
+        assertThat(result).contains("Add your GitHub username (we confirmed this)")
+        assertThat(result).contains("Collect a laptop (they told us)")
+    }
+
+    /**
+     * ⚠️ The `progressPercentage` defect, relocated: a model handed "1 of 3 done" over a mix of
+     * observed and declared steps will repeat it, and the number means nothing.
+     */
+    @Test
+    fun `never gives the model a blended total to repeat`() {
+        every { arrivalStepService.forHire(userId) } returns listOf(
+            resolvedStep(key = "vpn", title = "Request VPN access"),
+            resolvedStep(key = "laptop", title = "Collect a laptop", rigor = Rigor.DECLARED),
+            resolvedStep(key = "badge", title = "Collect a badge", rigor = Rigor.OBSERVED),
+        )
+
+        val result = executor.execute(arrivalCall, userId)
+
+        assertThat(result).doesNotContainPattern("\\d+\\s*(of|/)\\s*\\d+")
+        assertThat(result).doesNotContain("%")
+    }
+
+    /**
+     * Nothing here gates anything, and the model's own words are the one place that could
+     * reintroduce the gate without any code saying so.
+     */
+    @Test
+    fun `says outright that an outstanding step does not stop them working`() {
+        every { arrivalStepService.forHire(userId) } returns listOf(resolvedStep())
+
+        assertThat(executor.execute(arrivalCall, userId))
+            .contains("none of this stops them working")
+    }
+
+    /**
+     * The backend refuses a confirmation on a step that is not self-confirmable, so a buddy that
+     * offered to tick one would produce an error the hire never caused.
+     */
+    @Test
+    fun `warns the mentor off offering to tick a step only the system settles`() {
+        every { arrivalStepService.forHire(userId) } returns listOf(
+            resolvedStep(key = "github-account", title = "Add your GitHub username", selfConfirmable = false),
+        )
+
+        assertThat(executor.execute(arrivalCall, userId)).contains("they cannot mark it done")
+    }
+
+    /**
+     * ⚠️ Order is the feature. A greeting grounded in progress before setup is exactly the failure
+     * this initiative exists to fix — and it reads as calm, because the stall detector watches
+     * contributions rather than access.
+     */
+    @Test
+    fun `the opening greeting is grounded in what is missing before anything else`() {
+        every { arrivalStepService.forHire(userId) } returns listOf(resolvedStep())
+        every { userApi.getUsersByIds(listOf(userId)) } returns listOf(userWith())
+        // No projects, so metrics and suggestions short-circuit; only the ledger is reached.
+        every { myCompetencyService.getCompetenciesForUser(userId) } returns emptyList()
+        every { userApi.getGithubLoginByUserId(userId) } returns null
+
+        val snapshot = executor.stateSnapshot(userId)
+
+        assertThat(snapshot).startsWith("Before they can work:")
+        assertThat(snapshot.indexOf("Before they can work:"))
+            .isLessThan(snapshot.indexOf("Progress:"))
+    }
+
+    @Test
+    fun `a hire with no arrival list gets no arrival section in the greeting`() {
+        every { userApi.getUsersByIds(listOf(userId)) } returns listOf(userWith())
+        // No projects, so metrics and suggestions short-circuit; only the ledger is reached.
+        every { myCompetencyService.getCompetenciesForUser(userId) } returns emptyList()
+        every { userApi.getGithubLoginByUserId(userId) } returns null
+
+        // Not an empty section: a greeting grounded in "arrival: nothing" finds something to say
+        // about it, which is the pull-request card's lesson applied here.
+        assertThat(executor.stateSnapshot(userId)).doesNotContain("Before they can work:")
     }
 
     @Test

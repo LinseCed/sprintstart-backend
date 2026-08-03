@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ContributionEvidenceKind
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
@@ -42,6 +43,7 @@ class BuddyToolExecutor(
     private val openPullRequestReader: OpenPullRequestReader,
     private val trackService: TrackService,
     private val projectMembershipApi: ProjectMembershipApi,
+    private val arrivalStepService: ArrivalStepService,
 ) {
     /**
      * The backend tools the AI reasoner is told it may call, for this hire.
@@ -56,6 +58,13 @@ class BuddyToolExecutor(
      * picks the right one.
      */
     fun toolSpecs(userId: UUID): List<BuddyToolSpecDto> = buildList {
+        // First, because what has to be true before somebody can work comes before how their work
+        // is going. Mounted only when a step actually applies to them: the same "absent, never
+        // empty" gate the board card uses, read from the same service, so the card and the tool
+        // cannot disagree about whether this hire has an arrival list at all.
+        if (arrivalStepService.forHire(userId).isNotEmpty()) {
+            add(GET_ARRIVAL_STEPS_SPEC)
+        }
         add(GET_MY_METRICS_SPEC)
         add(GET_MY_COMPETENCIES_SPEC)
         // Inserted in place rather than appended, so a hire whose track admits pull requests is
@@ -81,9 +90,18 @@ class BuddyToolExecutor(
      * A plain-text snapshot of the hire's own onboarding, for the buddy's opening greeting to
      * ground itself in. Reuses the exact reads the caller-scoped tools expose, so the opener and
      * the tools can never describe different states.
+     *
+     * ⚠️ **Arrival comes first, and the order is the feature.** The failure this initiative exists
+     * to fix is a hire who could not clone the repository being greeted with a good first issue —
+     * and reading as calm rather than blocked, because the stall detector watches contributions. A
+     * greeting grounded in progress before setup reproduces exactly that. Omitted entirely when no
+     * step applies, for the reason the pull-request section is: a greeting grounded in "arrival:
+     * nothing" will find something to say about it.
      */
     fun stateSnapshot(userId: UUID): String =
         listOfNotNull(
+            ("Before they can work:\n" + getArrivalSteps(userId))
+                .takeIf { arrivalStepService.forHire(userId).isNotEmpty() },
             "Progress:\n" + getMyMetrics(userId),
             // Omitted entirely for a track that cannot have pull requests, rather than included as
             // an empty section: a greeting grounded in "Open pull requests: none" will bring them
@@ -99,6 +117,7 @@ class BuddyToolExecutor(
             buddyPlanTools.handles(call.name) -> buddyPlanTools.execute(call, userId)
             buddyBoardTools.handles(call.name) -> buddyBoardTools.execute(call, userId)
             else -> when (call.name) {
+                GET_ARRIVAL_STEPS -> getArrivalSteps(userId)
                 GET_MY_METRICS -> getMyMetrics(userId)
                 GET_MY_COMPETENCIES -> getMyCompetencies(userId)
                 GET_MY_OPEN_PULL_REQUESTS -> getMyOpenPullRequests(userId)
@@ -136,6 +155,67 @@ class BuddyToolExecutor(
             (listOf("Project: ${project.name}") + lines).joinToString("\n")
         }
         return sections.joinToString("\n\n")
+    }
+
+    /**
+     * What has to be true before this hire can work, and what they have settled.
+     *
+     * The part a checklist cannot do is the reason this is a tool and not just a card: a hire can
+     * ask *why* a step exists, say they are stuck on one, and be told who to chase — none of which
+     * a row with a tick box answers. That is the tutor's *"mehr als eine reine ToDo-Liste"*.
+     *
+     * ### Two things this text refuses to say
+     *
+     * **No total and no fraction.** "2 of 5 done" over a mix of what the system observed and what
+     * the hire simply told us is the `progressPercentage` defect with a new table behind it, and a
+     * model handed such a number will repeat it. Outstanding and settled are listed, and settled
+     * steps say *how* — never summed together. `BuddyToolExecutorTest` asserts no blended figure.
+     *
+     * **Nothing is described as blocking.** An outstanding step never stopped anybody claiming work
+     * or asking a question; `ArrivalStepService` has no method that could answer "may they
+     * proceed". Saying otherwise here would reintroduce the gate in the one place nobody would
+     * think to look for it — the model's own words.
+     */
+    private fun getArrivalSteps(userId: UUID): String {
+        val steps = arrivalStepService.forHire(userId)
+        if (steps.isEmpty()) {
+            return "Nobody has written an arrival list for this hire, so there is nothing outstanding."
+        }
+
+        val (settled, outstanding) = steps.partition { it.settled }
+
+        return buildString {
+            if (outstanding.isEmpty()) {
+                appendLine("Nothing is outstanding — every arrival step is settled.")
+            } else {
+                appendLine("Still outstanding (none of this stops them working):")
+                outstanding.forEach { resolved ->
+                    append("- ${resolved.step.title}")
+                    resolved.step.description?.let { append(" — $it") }
+                    resolved.step.href?.let { append(" ($it)") }
+                    // Whether the hire can settle it themselves decides what the buddy may offer.
+                    // Offering to tick a step the backend refuses would end in an error the hire
+                    // never caused.
+                    if (!resolved.step.selfConfirmable) {
+                        append(" [we check this one ourselves; they cannot mark it done]")
+                    }
+                    appendLine()
+                }
+            }
+
+            if (settled.isNotEmpty()) {
+                appendLine()
+                appendLine("Already settled:")
+                settled.forEach { resolved ->
+                    val how = if (resolved.rigor == Rigor.OBSERVED) {
+                        "we confirmed this"
+                    } else {
+                        "they told us"
+                    }
+                    appendLine("- ${resolved.step.title} ($how)")
+                }
+            }
+        }.trim()
     }
 
     private fun getMyMetrics(userId: UUID): String {
@@ -296,6 +376,7 @@ class BuddyToolExecutor(
         (arguments[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
 
     private companion object {
+        const val GET_ARRIVAL_STEPS = "get_arrival_steps"
         const val GET_MY_METRICS = "get_my_metrics"
         const val GET_MY_COMPETENCIES = "get_my_competencies"
         const val GET_MY_OPEN_PULL_REQUESTS = "get_my_open_pull_requests"
@@ -310,6 +391,20 @@ class BuddyToolExecutor(
             put("type", "object")
             put("properties", buildJsonObject { })
         }
+
+        val GET_ARRIVAL_STEPS_SPEC = BuddyToolSpecDto(
+            name = GET_ARRIVAL_STEPS,
+            description = "What has to be true before this hire can work — accounts, access, a " +
+                "working setup — and which of it they have settled. Read this before " +
+                "suggesting a task: somebody still waiting on an access grant does not need a " +
+                "good first task, they need the access. Use it for 'what do I still need to do?', " +
+                "'how do I get set up?', or whenever they say they are stuck getting started. " +
+                "**None of it blocks them** — an outstanding step is a thing to chase, never a " +
+                "reason they may not claim work or ask you something. Never total the steps up or " +
+                "give a fraction: what the system confirmed and what they told us are different " +
+                "facts. Takes no arguments — it always reads the caller.",
+            parameters = noArgs(),
+        )
 
         val GET_MY_METRICS_SPEC = BuddyToolSpecDto(
             name = GET_MY_METRICS,
