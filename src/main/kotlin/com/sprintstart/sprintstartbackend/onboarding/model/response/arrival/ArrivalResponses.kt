@@ -18,6 +18,17 @@ data class ArrivalStepResponse(
     val key: String,
     @field:Schema(description = "Null for a company-wide step")
     val projectId: UUID?,
+    /**
+     * The project's name, for grouping the hire's list under a heading. Null for a company-wide
+     * step, and also null on the **authoring** read — that caller named the scope in its own
+     * request, so there is nothing to tell it that it did not already say.
+     *
+     * A hire's list is a union across every project they are on, so without this a person on two
+     * projects sees *"Request staging access"* twice with nothing to distinguish the two. An id
+     * cannot be a heading.
+     */
+    @field:Schema(description = "The project's name, for grouping; null for a company-wide step")
+    val projectName: String?,
     val title: String,
     val description: String?,
     @field:Schema(description = "Where to go to do it, when there is such a place")
