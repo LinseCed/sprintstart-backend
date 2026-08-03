@@ -57,6 +57,13 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+/**
+ * Tracks [BoardService]'s own surface, which is why it is long: card mounting, placement rules,
+ * dismissal, ordering, hydration and the mentor's refusals all belong to one service and one
+ * shared fixture. Splitting by concern would duplicate that fixture rather than separate anything,
+ * so the size is suppressed here for the same reason [BoardService] suppresses `TooManyFunctions`.
+ */
+@Suppress("LargeClass")
 class BoardServiceTest {
     private val boardRepository: BoardRepository = mockk()
     private val boardCardRepository: BoardCardRepository = mockk()
@@ -266,6 +273,49 @@ class BoardServiceTest {
         assertEquals(1, content.declaredCount)
         assertEquals(0, content.observedCount)
         assertEquals(1, content.outstandingCount)
+    }
+
+    /**
+     * Attention ordering: a hire who cannot clone the repository should not have to scroll to find
+     * out what to do about it. The arrival card is ensured *after* the others, so without this it
+     * lands last — the worst possible position for the most urgent thing.
+     */
+    @Test
+    fun `an outstanding arrival step puts its card first`() {
+        noBoardYet()
+        every { arrivalStepService.forHire(hireId) } returns listOf(
+            ResolvedArrivalStep(
+                step = ArrivalStep(key = "vpn", title = "Request VPN access"),
+                settledAt = null,
+                rigor = null,
+            ),
+        )
+
+        val kinds = service.getBoard(hireId, projectId)?.cards?.map { it.kind }
+
+        assertEquals(BoardCardKind.ARRIVAL_STEPS, kinds!!.first())
+    }
+
+    /**
+     * The override is narrow on purpose: it lasts exactly as long as something is outstanding. Once
+     * everything settles the card drops back to where the hire's own ordering put it — which is
+     * what makes overriding that ordering acceptable rather than destructive.
+     */
+    @Test
+    fun `a fully settled arrival card takes its ordinary place again`() {
+        noBoardYet()
+        every { arrivalStepService.forHire(hireId) } returns listOf(
+            ResolvedArrivalStep(
+                step = ArrivalStep(key = "vpn", title = "Request VPN access"),
+                settledAt = now,
+                rigor = Rigor.DECLARED,
+            ),
+        )
+
+        val kinds = service.getBoard(hireId, projectId)?.cards?.map { it.kind }
+
+        assertEquals(BoardCardKind.PATH_TO_FIRST_CONTRIBUTION, kinds!!.first())
+        assertTrue(kinds.contains(BoardCardKind.ARRIVAL_STEPS))
     }
 
     @Test

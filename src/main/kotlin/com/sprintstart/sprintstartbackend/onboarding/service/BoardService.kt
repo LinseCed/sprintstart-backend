@@ -131,9 +131,34 @@ class BoardService(
             ),
             cards = cards
                 .filter { it.state == BoardCardState.ACTIVE }
-                .sortedBy { it.position }
+                .sortedWith(attentionOrder(arrivalSteps))
                 .map { it.toResponse(member, projectId, timeline, diagrams[it.id], arrivalSteps) },
         )
+    }
+
+    /**
+     * The hire's own order, except that outstanding arrival steps come first.
+     *
+     * ### Why this overrides an arrangement the hire made
+     *
+     * Everywhere else on this board the hire's ordering is theirs and nothing reshuffles it — the
+     * mentor cannot, and ensuring a card exists deliberately appends rather than inserts. This is
+     * the one exception, and it is narrow: **only while something is outstanding, and only for the
+     * card about it.** A hire who cannot clone the repository should not have to scroll to find
+     * out what to do about it.
+     *
+     * ⚠️ **It is a sort applied on read, never a write to `position`.** Their arrangement is
+     * untouched underneath and comes back exactly as they left it the moment the last step settles
+     * — which is what makes overriding it acceptable rather than destructive. The escape hatch is
+     * the one the board already has: **dismissal is sticky**, so a hire who does not want this card
+     * at all removes it and it stays removed, arrival steps outstanding or not.
+     */
+    private fun attentionOrder(arrivalSteps: List<ResolvedArrivalStep>): Comparator<BoardCard> {
+        val anythingOutstanding = arrivalSteps.any { !it.settled }
+
+        return compareBy<BoardCard> {
+            if (anythingOutstanding && it.kind == BoardCardKind.ARRIVAL_STEPS) 0 else 1
+        }.thenBy { it.position }
     }
 
     /**
