@@ -191,6 +191,10 @@ class BuddyToolExecutor(
                 appendLine("Still outstanding (none of this stops them working):")
                 outstanding.forEach { resolved ->
                     append("- ${resolved.step.title}")
+                    // Which project's step this is, for the same reason the card needs a heading:
+                    // a hire on two projects can be told "get staging access" twice, and a mentor
+                    // that cannot say which one is asking them to guess.
+                    resolved.projectName?.let { append(" (on $it)") }
                     resolved.step.description?.let { append(" — $it") }
                     resolved.step.href?.let { append(" ($it)") }
                     // Whether the hire can settle it themselves decides what the buddy may offer.

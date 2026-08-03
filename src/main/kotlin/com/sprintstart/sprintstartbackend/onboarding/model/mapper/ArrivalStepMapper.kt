@@ -10,6 +10,7 @@ fun ResolvedArrivalStep.toResponse(): ArrivalStepResponse =
     ArrivalStepResponse(
         key = step.key,
         projectId = step.projectId,
+        projectName = projectName,
         title = step.title,
         description = step.description,
         href = step.href,
@@ -26,6 +27,9 @@ fun ArrivalStep.toResponse(): ArrivalStepResponse =
     ArrivalStepResponse(
         key = key,
         projectId = projectId,
+        // The authoring caller named the scope in its own request, so echoing it back tells it
+        // nothing. The name exists for the hire's list, which is a union it did not choose.
+        projectName = null,
         title = title,
         description = description,
         href = href,

@@ -79,6 +79,50 @@ class ArrivalStepServiceTest {
         verify(exactly = 0) { arrivalStepRepository.findAllByProjectIdInOrderByPositionAsc(any()) }
     }
 
+    /**
+     * A hire's list is a union across their projects, so an id is not enough: two projects can both
+     * add "Request staging access", and without the name the hire sees it twice with nothing to
+     * tell them apart. The client heads each block with this.
+     */
+    @Test
+    fun `a project step carries the name it will be grouped under`() {
+        onNamedProjects(projectId to "Apollo")
+        every { arrivalStepRepository.findAllByProjectIdIsNullOrderByPositionAsc() } returns
+            listOf(step("vpn"))
+        every { arrivalStepRepository.findAllByProjectIdInOrderByPositionAsc(any()) } returns
+            listOf(step("staging", projectId = projectId))
+
+        val steps = service.forHire(hireId).associateBy { it.step.key }
+
+        assertEquals("Apollo", steps["staging"]?.projectName)
+        // Company-wide is the absence of a project, on the wire as much as in the model.
+        assertNull(steps["vpn"]?.projectName)
+    }
+
+    /**
+     * ⚠️ Ordered by scope, never by position across scopes — decided with the user for A3.
+     * Positions are assigned *within* a scope, so sorting the union by them would rank a company
+     * step against a project one on numbers that were never comparable.
+     */
+    @Test
+    fun `company steps come first, then each project in name order`() {
+        val orion = UUID.randomUUID()
+        onNamedProjects(orion to "Orion", projectId to "Apollo")
+        every { arrivalStepRepository.findAllByProjectIdIsNullOrderByPositionAsc() } returns
+            listOf(step("vpn", position = 9))
+        every { arrivalStepRepository.findAllByProjectIdInOrderByPositionAsc(any()) } returns
+            listOf(
+                step("runbook", projectId = orion, position = 0),
+                step("staging", projectId = projectId, position = 0),
+            )
+
+        val keys = service.forHire(hireId).map { it.step.key }
+
+        // The company step sorts first despite the highest position of the three, and Apollo
+        // precedes Orion by name rather than by whichever id came back first.
+        assertEquals(listOf("vpn", "staging", "runbook"), keys)
+    }
+
     @Test
     fun `an unsettled step is not an error, it is just unsettled`() {
         every { arrivalStepRepository.findAllByProjectIdIsNullOrderByPositionAsc() } returns
@@ -238,8 +282,12 @@ class ArrivalStepServiceTest {
         verify(exactly = 0) { arrivalStepStateRepository.deleteAll(any()) }
     }
 
-    private fun onProjects(vararg ids: UUID) {
-        val projects = ids.map { ProjectDto(projectId = it, name = "P", description = null) }.toSet()
+    private fun onProjects(vararg ids: UUID) = onNamedProjects(*ids.map { it to "P" }.toTypedArray())
+
+    private fun onNamedProjects(vararg named: Pair<UUID, String>) {
+        val projects = named
+            .map { (id, name) -> ProjectDto(projectId = id, name = name, description = null) }
+            .toSet()
         every { userApi.getUsersByIds(listOf(hireId)) } returns
             listOf(
                 UserDto(
@@ -262,12 +310,14 @@ class ArrivalStepServiceTest {
         title: String = key,
         settledBy: Rigor = Rigor.DECLARED,
         selfConfirmable: Boolean = true,
+        position: Int = 0,
     ) = ArrivalStep(
         key = key,
         projectId = projectId,
         title = title,
         settledBy = settledBy,
         selfConfirmable = selfConfirmable,
+        position = position,
     )
 
     private fun state(

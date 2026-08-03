@@ -26,6 +26,15 @@ data class ResolvedArrivalStep(
     val step: ArrivalStep,
     val settledAt: Instant?,
     val rigor: Rigor?,
+    /**
+     * The name of the project this step is scoped to; null for a company-wide step.
+     *
+     * Resolved here rather than left to the client because a hire's list is a *union across their
+     * projects*, and once two projects both add a step the id alone is unreadable: "Request staging
+     * access" appearing twice with nothing to tell the two apart is worse than either one alone.
+     * The client groups under this name, so it has to be a name.
+     */
+    val projectName: String? = null,
 ) {
     val settled: Boolean get() = settledAt != null
 }
@@ -98,27 +107,45 @@ class ArrivalStepService(
      */
     @Transactional(readOnly = true)
     fun forHire(userId: UUID): List<ResolvedArrivalStep> {
-        val projectIds = projectIdsFor(userId)
+        val projectNames = projectNamesFor(userId)
 
         val companySteps = arrivalStepRepository.findAllByProjectIdIsNullOrderByPositionAsc()
         val projectSteps =
-            if (projectIds.isEmpty()) {
+            if (projectNames.isEmpty()) {
                 emptyList()
             } else {
-                arrivalStepRepository.findAllByProjectIdInOrderByPositionAsc(projectIds)
+                arrivalStepRepository.findAllByProjectIdInOrderByPositionAsc(projectNames.keys.toList())
             }
 
-        // A project-scoped definition wins the key. Ordering *across* the two scopes is not
-        // decided yet -- company steps simply come first -- and A3 owns that question when it
-        // makes per-project authoring real.
+        // A project-scoped definition wins the key.
         val projectKeys = projectSteps.map { it.key }.toSet()
-        val steps = companySteps.filterNot { it.key in projectKeys } + projectSteps
+
+        // ⚠️ Ordered by scope, not by position across scopes -- decided with the user for A3.
+        // Positions are assigned *within* a scope, so sorting the union by position would rank a
+        // company step against a project one on numbers that were never comparable, and two PMs
+        // authoring different projects could not coordinate the result. Grouping instead lets the
+        // client head each block with whose steps these are, which is the thing a hire on two
+        // projects actually needs: "get staging access" is unreadable twice over without it.
+        //
+        // Within a scope, position still decides. Across scopes: company first, then projects by
+        // name, so the order is stable rather than dependent on however the ids came back.
+        val ordered =
+            companySteps.filterNot { it.key in projectKeys } +
+                projectSteps.sortedWith(
+                    compareBy<ArrivalStep> { projectNames[it.projectId].orEmpty() }
+                        .thenBy { it.position },
+                )
 
         val statesByKey = arrivalStepStateRepository.findAllByUserId(userId).associateBy { it.stepKey }
 
-        return steps.map { step ->
+        return ordered.map { step ->
             val state = statesByKey[step.key]
-            ResolvedArrivalStep(step = step, settledAt = state?.settledAt, rigor = state?.rigor)
+            ResolvedArrivalStep(
+                step = step,
+                settledAt = state?.settledAt,
+                rigor = state?.rigor,
+                projectName = step.projectId?.let { projectNames[it] },
+            )
         }
     }
 
@@ -372,13 +399,16 @@ class ArrivalStepService(
     /** Every project this hire belongs to. Exposed for [ArrivalEvidenceService]'s derivations. */
     fun projectsFor(userId: UUID): List<UUID> = projectIdsFor(userId)
 
-    private fun projectIdsFor(userId: UUID): List<UUID> =
+    private fun projectIdsFor(userId: UUID): List<UUID> = projectNamesFor(userId).keys.toList()
+
+    /** This hire's projects by id, with the names their steps are grouped under. */
+    private fun projectNamesFor(userId: UUID): Map<UUID, String> =
         userApi
             .getUsersByIds(listOf(userId))
             .firstOrNull()
             ?.projects
             .orEmpty()
-            .map { it.projectId }
+            .associate { it.projectId to it.name }
 
     private companion object {
         val KEY = Regex("^[a-z\\d][a-z\\d_-]{0,63}$")
