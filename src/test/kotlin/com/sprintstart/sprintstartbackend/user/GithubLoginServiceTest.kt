@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.user
 
 import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginSource
+import com.sprintstart.sprintstartbackend.user.external.enums.GithubLoginVerification
 import com.sprintstart.sprintstartbackend.user.model.entity.User
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import com.sprintstart.sprintstartbackend.user.service.GithubLoginService
@@ -9,6 +10,7 @@ import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.web.server.ResponseStatusException
+import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
@@ -75,6 +77,51 @@ class GithubLoginServiceTest {
                 service.apply(user, invalid, GithubLoginSource.SELF_DECLARED)
             }.also { assertEquals(400, it.statusCode.value()) }
         }
+    }
+
+    /**
+     * A verdict is about a *value*, and it is now shown on the profile — so a stale one would put
+     * "we could not find that account" next to the login that replaced it, which is the same class
+     * of wrong answer the verification exists to prevent.
+     */
+    @Test
+    fun `correcting the login discards the verdict about the old one`() {
+        val user = user()
+        noConflict()
+        service.apply(user, "octocat", GithubLoginSource.SELF_DECLARED)
+        user.githubLoginVerification = GithubLoginVerification.NOT_FOUND
+        user.githubLoginVerifiedAt = Instant.now()
+
+        service.apply(user, "octocatt", GithubLoginSource.SELF_DECLARED)
+
+        assertNull(user.githubLoginVerification)
+        assertNull(user.githubLoginVerifiedAt)
+    }
+
+    @Test
+    fun `re-saving the same login keeps the verdict already reached`() {
+        val user = user()
+        noConflict()
+        service.apply(user, "octocat", GithubLoginSource.SELF_DECLARED)
+        user.githubLoginVerification = GithubLoginVerification.VERIFIED
+
+        // Saving the rest of the profile must not cost a verification that already succeeded --
+        // re-checking is 60 unauthenticated calls an hour shared by everybody.
+        service.apply(user, "OctoCat", GithubLoginSource.PM_CONFIRMED)
+
+        assertEquals(GithubLoginVerification.VERIFIED, user.githubLoginVerification)
+    }
+
+    @Test
+    fun `clearing the login discards the verdict with it`() {
+        val user = user()
+        noConflict()
+        service.apply(user, "octocat", GithubLoginSource.SELF_DECLARED)
+        user.githubLoginVerification = GithubLoginVerification.VERIFIED
+
+        service.apply(user, "", GithubLoginSource.SELF_DECLARED)
+
+        assertNull(user.githubLoginVerification)
     }
 
     @Test

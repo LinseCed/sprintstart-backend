@@ -21,6 +21,8 @@ fun User.toGetResponse(): GetUserResponse =
         profileIcon = this.profileIcon,
         githubLogin = this.githubLogin,
         githubLoginSource = this.githubLoginSource,
+        githubLoginVerification = this.githubLoginVerification,
+        githubLoginVerifiedAt = this.githubLoginVerifiedAt,
     )
 
 fun User.effectivePermissionGroup(): Role {
