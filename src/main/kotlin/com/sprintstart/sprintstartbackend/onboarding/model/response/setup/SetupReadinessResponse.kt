@@ -25,15 +25,30 @@ data class SetupRungResponse(
     /** Stable key the client renders off: `skill-map`, `starter-tasks`, `tracks`. */
     val key: String,
     val state: RungState,
-    /** The positive quantity for this rung (approved competencies, baseline entries, ...) -- never a pending count. */
+    /** The positive quantity for this rung (competencies, live starter tasks, ...) -- never a pending count. */
     val count: Int,
-    /** One sentence a PM can act on: what is missing, or what is waiting on them. */
+    /** One sentence describing what is there, or what could not be built and why. */
     val detail: String,
 )
 
 /**
- * [OK] nothing to do here. [WARN] something is missing or waiting on the PM, but they can proceed.
- * [BLOCKED] this rung cannot be acted on until an earlier one is done -- a baseline has nothing to
- * select from until competencies are approved. No state gates onboarding.
+ * Whether a stage is in the state a ready project has.
+ *
+ * ### There is no third value, and there must not be one
+ *
+ * `BLOCKED` existed here and was **written by nothing**, in either state — no rung ever produced
+ * it. It described a dependency that stopped being real when the baseline was retired ("nothing to
+ * select from until competencies are approved"), and it rendered as a padlock on the one surface
+ * whose entire point is that **nothing here gates anything**.
+ *
+ * That is the same reason `NodeState.LOCKED` was deleted from its enum rather than left unused, and
+ * the same reason `ProposalStatus.PROPOSED` was deleted rather than aliased: a value lying around
+ * is an invitation, and the gate this initiative removed is one convenient assignment away from
+ * coming back. Deleting it is what makes "no state gates onboarding" enforceable rather than a
+ * comment.
+ *
+ * @property OK This stage is in the state a ready project has.
+ * @property WARN It is not, yet. Never a lock and never a chore — most of what lands here follows
+ * from the corpus rather than from anything a person has failed to do.
  */
-enum class RungState { OK, WARN, BLOCKED }
+enum class RungState { OK, WARN }
