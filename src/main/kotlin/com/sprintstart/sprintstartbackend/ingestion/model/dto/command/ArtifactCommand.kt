@@ -87,6 +87,15 @@ data class JiraArtifactCommand(
      */
     fun toState(): String = if (statusCategory.equals(DONE_CATEGORY, ignoreCase = true)) "CLOSED" else "OPEN"
 
+    /**
+     * Whether somebody is already on this issue.
+     *
+     * Definite in both directions here, unlike GitHub's, because Jira's assignee field is ingested:
+     * an unassigned issue is genuinely `false`, not unknown. That is what lets starter-work mining
+     * withhold taken work without withholding everything it cannot see.
+     */
+    fun toHasAssignee(): Boolean = assignee != null
+
     private companion object {
         const val DONE_CATEGORY = "Done"
     }
