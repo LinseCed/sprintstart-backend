@@ -88,8 +88,25 @@ class BuddyService(
         val session = getOrCreateSession(userId)
 
         val all = buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
-        val recent = all
-            .drop(session.summarizedCount)
+        val unspoken = all.drop(session.summarizedCount)
+
+        // ⚠️ Opening twice without the hire saying anything is the same visit, not a new one.
+        //
+        // A refresh, or a navigation away and back, used to generate a second greeting: the window
+        // sent for folding was the *previous greeting*, which the memory prompt is explicitly told
+        // to drop, and the reply was persisted as another opening message. So each reload paid for
+        // a model call to compress something it then discarded, and left one more greeting in the
+        // transcript for the next reload to fold.
+        //
+        // A visit ends when the hire speaks. Until then the greeting already sitting there is this
+        // visit's greeting, and returning it costs nothing.
+        val hireHasSpoken = unspoken.any { it.role == BuddyMessageRole.USER }
+        val greetingAlreadyThere = if (hireHasSpoken) null else unspoken.lastOrNull()
+        if (greetingAlreadyThere != null) {
+            return BuddyOpeningResponse(greeting = greetingAlreadyThere.content)
+        }
+
+        val recent = unspoken
             .map { BuddyAgentMessageDto(role = it.role.toHistoryRole(), content = it.content) }
         val state = buddyToolExecutor.stateSnapshot(userId)
 
