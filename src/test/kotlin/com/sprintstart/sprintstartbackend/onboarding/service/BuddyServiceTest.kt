@@ -200,6 +200,61 @@ class BuddyServiceTest {
             assertThat(result.action?.question).isEqualTo("What should I work on next?")
         }
 
+        /**
+         * ⚠️ A refresh is the same visit, not a new one.
+         *
+         * Opening twice with nothing said in between used to generate a second greeting. The
+         * window sent for folding was the previous *greeting* -- which the memory prompt is
+         * explicitly told to drop -- so each reload paid for a model call to compress something it
+         * then discarded, and left one more greeting behind for the next reload to fold.
+         */
+        @Test
+        fun `re-opening without the hire saying anything reuses the greeting already there`() = runTest {
+            val session = BuddySession(userId = userId, summary = "keep me", summarizedCount = 0)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
+                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Hi again!"),
+            )
+
+            val result = service.openForMe(authId)
+
+            assertThat(result.greeting).isEqualTo("Hi again!")
+            coVerify(exactly = 0) { onboardingAiClient.buddyOpen(any()) }
+            verify(exactly = 0) { buddyMessageRepository.save(any()) }
+            assertThat(session.summary).isEqualTo("keep me")
+            assertThat(session.summarizedCount).isEqualTo(0)
+        }
+
+        /**
+         * The visit ends when the hire speaks: once they have, the next open is genuinely new and
+         * folds what was said into memory. Without this the greeting would freeze permanently.
+         */
+        @Test
+        fun `opening again after the hire has spoken generates a fresh greeting`() = runTest {
+            val session = BuddySession(userId = userId, summarizedCount = 0)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
+                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Hi!"),
+                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "where do I start?"),
+                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Here."),
+            )
+            every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
+            coEvery { onboardingAiClient.buddyOpen(any()) } returns
+                com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenResponse(
+                    memory = "folded",
+                    greeting = "Welcome back!",
+                )
+            every { buddySessionRepository.save(any()) } answers { firstArg() }
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+
+            val result = service.openForMe(authId)
+
+            assertThat(result.greeting).isEqualTo("Welcome back!")
+            assertThat(session.summary).isEqualTo("folded")
+        }
+
         @Test
         fun `degrades to a plain greeting and leaves memory untouched when the AI is unavailable`() = runTest {
             val session = BuddySession(userId = userId, summary = "keep me", summarizedCount = 0)
