@@ -1,10 +1,12 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
+import com.sprintstart.sprintstartbackend.ingestion.external.AssignedIssue
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMetadataJsonMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -17,7 +19,11 @@ import java.util.UUID
 class ArtifactIngestionApiServiceTest {
     private val artifactRepository = mockk<ArtifactRepository>()
     private val artifactMetadataJsonMapper = ArtifactMetadataJsonMapper(ObjectMapper())
-    private val service = ArtifactIngestionApiService(artifactRepository, artifactMetadataJsonMapper)
+    private val service = ArtifactIngestionApiService(
+        artifactRepository,
+        artifactMetadataJsonMapper,
+        AssignedIssueReader(artifactMetadataJsonMapper),
+    )
 
     private val artifactId = UUID.randomUUID()
 
@@ -50,5 +56,20 @@ class ArtifactIngestionApiServiceTest {
         every { artifactRepository.findById(artifactId) } returns Optional.of(artifact)
 
         assertEquals("content-hash", service.getHash(artifactId))
+    }
+
+    /**
+     * ⚠️ A blank assignee name must match nobody, and the guard belongs here rather than in the
+     * reader: a Jira account whose display name is blank is not impossible, and crediting one hire
+     * with every such issue in a project is the loudest possible version of a wrong answer. It also
+     * saves loading a project's whole issue set to filter it all away.
+     */
+    @Test
+    fun `getAssignedIssues matches nobody for a blank name and reads nothing`() {
+        assertEquals(emptyList<AssignedIssue>(), service.getAssignedIssues(UUID.randomUUID(), "   "))
+
+        verify(exactly = 0) {
+            artifactRepository.findAllByProjectIdAndSourceSystemAndArtifactType(any(), any(), any())
+        }
     }
 }

@@ -70,6 +70,30 @@ class User(
     var githubLoginVerification: GithubLoginVerification? = null,
     @Column(name = "github_login_verified_at", nullable = true)
     var githubLoginVerifiedAt: Instant? = null,
+    /**
+     * The name this user appears under in Jira, exactly as Jira renders it.
+     *
+     * The Jira equivalent of [githubLogin], and the reason a non-developer's work can be *observed*
+     * rather than attested: an issue assigned to this name and moved to Done by somebody else is
+     * evidence nobody had to vouch for.
+     *
+     * ⚠️ **A display name is a weaker key than a GitHub login, and knowingly so.** It is the only
+     * identity the ingested Jira data carries — the connector's `JiraAuthor` parses `displayName`,
+     * `active`, `created` and `updated`, and drops Jira's `accountId` at parse time. Two consequences
+     * follow, and only the first is defended here:
+     *
+     * - **Two SprintStart users cannot claim the same name.** Enforced by `JiraDisplayNameService`
+     *   and by this column's uniqueness, exactly as for [githubLogin].
+     * - ⚠️ **A namesake inside Jira itself is undetectable.** If two Jira accounts genuinely share a
+     *   display name, nothing ingested tells them apart, so their work would merge into one person's
+     *   record. Parsing `accountId` in the connector is the fix, and it is deliberately not done
+     *   here: it edits upstream-owned code for a case nobody has hit.
+     *
+     * Stored as typed, not lower-cased — unlike a GitHub login, this is a human name that is
+     * displayed back, and case-folding "de Vries" is how a name stops being somebody's.
+     */
+    @Column(name = "jira_display_name", nullable = true, unique = true)
+    var jiraDisplayName: String? = null,
     // When the user opted in to having their existing work in the project's connected repositories
     // used to calibrate their skill assessment. Null means no consent -- the default, and what
     // revoking returns it to. Consent is the gate; the derived signal itself lives in

@@ -36,6 +36,7 @@ internal class ProjectMembershipApiService(
                 githubLogin = user.githubLogin,
                 joinedAt = assignment.assignedAt,
                 onboardingTrackKey = trackKeyFor(assignment),
+                jiraDisplayName = user.jiraDisplayName,
             )
         }
     }

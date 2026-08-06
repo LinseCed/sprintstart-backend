@@ -69,6 +69,24 @@ interface ArtifactIngestionApi {
     fun getAuthoredPullRequests(projectId: UUID, authorLogin: String): List<AuthoredPullRequest>
 
     /**
+     * The tracked issues assigned to one person in a project, with the timestamps onboarding
+     * measures against.
+     *
+     * The non-code counterpart of [getAuthoredPullRequests], and the reason a role that never opens
+     * a pull request can still be *observed* rather than vouched for. Reads only issues already
+     * ingested — no call to the tracker.
+     *
+     * ⚠️ **Attribution is by display name**, because that is the only identity the ingested Jira
+     * data carries. A blank or unmatched name yields nothing, which callers already read as "no
+     * attribution possible" rather than "did no work".
+     *
+     * @param projectId The project whose ingested issues to look at.
+     * @param assigneeDisplayName The name the person appears under in the tracker, as stored.
+     * @return One entry per issue currently assigned to that name; empty when there are none.
+     */
+    fun getAssignedIssues(projectId: UUID, assigneeDisplayName: String): List<AssignedIssue>
+
+    /**
      * The ingested artifact one starter-work task was mined from, by its source id.
      *
      * Exists so task-scoped orientation can be assembled from what the issue *actually says* — its
@@ -173,6 +191,43 @@ data class AuthoredPullRequest(
     val isOpen: Boolean
         get() = mergedAt == null && !"CLOSED".equals(state, ignoreCase = true)
 }
+
+/**
+ * One tracked issue assigned to a person, reduced to the four moments onboarding measures.
+ *
+ * Deliberately the same four as [AuthoredPullRequest] — opened, first answered, accepted, sent back
+ * — because that is the whole claim of the contribution stream: a draft plan returned for changes
+ * and a pull request with changes requested are the same event, so neither needs its own metrics.
+ *
+ * ### What "accepted" means here, and what it refuses to mean
+ *
+ * ⚠️ **[acceptedAt] is null when the person moved their own issue to Done.** Closing your own
+ * ticket is a claim, not an observation, and the whole reason this source exists is to produce
+ * evidence nobody had to vouch for. Such an issue stays in flight rather than being downgraded to a
+ * weaker acceptance: absent evidence stays "no evidence".
+ */
+data class AssignedIssue(
+    val artifactId: UUID,
+    /** When the issue became this person's — the assignment, falling back to when it was created. */
+    val openedAt: Instant?,
+    /** The first comment by anybody other than the assignee. */
+    val firstResponseAt: Instant?,
+    /** When somebody else moved it to a done status, or null — see the note above. */
+    val acceptedAt: Instant?,
+    /**
+     * How many times somebody else moved the issue out of a status the assignee had put it in.
+     *
+     * The tracker equivalent of a review asking for changes, and derived from the changelog rather
+     * than guessed: "done with no rework" is half the operational definition of autonomy, so
+     * reporting a flat zero here would quietly hand every tracked issue an autonomy signal it had
+     * not earned.
+     */
+    val returnedCount: Int = 0,
+    /** The issue key (e.g. `ONB-42`), so a hire can be told *which* issue. */
+    val key: String? = null,
+    val title: String? = null,
+    val sourceUrl: String? = null,
+)
 
 /**
  * One artifact a person authored, reduced to what a prior can be built from.

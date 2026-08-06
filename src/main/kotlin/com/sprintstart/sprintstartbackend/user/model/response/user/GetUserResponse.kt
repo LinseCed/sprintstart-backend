@@ -35,6 +35,14 @@ data class GetUserResponse(
     val githubLoginVerification: GithubLoginVerification? = null,
     /** When that verdict was reached. Null exactly when [githubLoginVerification] is. */
     val githubLoginVerifiedAt: Instant? = null,
+    /**
+     * The name this user appears under in Jira, as stored.
+     *
+     * No verification field beside it, deliberately: there is nothing to ask. GitHub can be asked
+     * whether an account exists; Jira renders whatever name a person set, so "does this name exist"
+     * has no answer worth showing. What it does have is a namesake risk no check would catch.
+     */
+    val jiraDisplayName: String? = null,
 )
 
 data class ProjectRoleSummary(

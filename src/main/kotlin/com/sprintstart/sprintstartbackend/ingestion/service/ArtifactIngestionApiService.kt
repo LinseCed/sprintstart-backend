@@ -1,11 +1,13 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
+import com.sprintstart.sprintstartbackend.ingestion.external.AssignedIssue
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredArtifact
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.ingestion.external.RepositoryResponsiveness
 import com.sprintstart.sprintstartbackend.ingestion.external.TaskSourceArtifact
 import com.sprintstart.sprintstartbackend.ingestion.external.model.ArtifactDto
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.external.model.toDto
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
@@ -28,7 +30,23 @@ import java.util.UUID
 internal class ArtifactIngestionApiService(
     private val artifactRepository: ArtifactRepository,
     private val artifactMetadataJsonMapper: ArtifactMetadataJsonMapper,
+    private val assignedIssueReader: AssignedIssueReader,
 ) : ArtifactIngestionApi {
+    @Transactional(readOnly = true)
+    @Tracked("Retrieving tracked issues assigned to a person")
+    override fun getAssignedIssues(projectId: UUID, assigneeDisplayName: String): List<AssignedIssue> {
+        // A blank name matches nobody rather than everybody. Without this an empty display name
+        // would fall through to the reader, where `null == ""` is false but a Jira account with a
+        // blank name is not -- and crediting somebody with every unassigned issue in a project is
+        // the loudest possible version of the wrong answer.
+        if (assigneeDisplayName.isBlank()) {
+            return emptyList()
+        }
+        return artifactRepository
+            .findAllByProjectIdAndSourceSystemAndArtifactType(projectId, SourceSystem.JIRA, ArtifactType.ISSUE)
+            .mapNotNull { assignedIssueReader.read(it, assigneeDisplayName) }
+    }
+
     @Transactional(readOnly = true)
     @Tracked("Retrieving first ingestion time of component")
     override fun getFirstIngestedAt(component: String): Instant? {
