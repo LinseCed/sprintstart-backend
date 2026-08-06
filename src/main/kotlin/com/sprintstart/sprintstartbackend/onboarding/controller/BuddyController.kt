@@ -6,8 +6,10 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.SendBud
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyOpeningResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddySuggestionResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyService
+import com.sprintstart.sprintstartbackend.onboarding.service.BuddySuggestionService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
@@ -39,6 +41,7 @@ import org.springframework.web.bind.annotation.RestController
 class BuddyController(
     private val buddyService: BuddyService,
     private val buddyActionService: BuddyActionService,
+    private val buddySuggestionService: BuddySuggestionService,
 ) {
     @Operation(
         summary = "Get the current user's buddy conversation",
@@ -58,6 +61,28 @@ class BuddyController(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
     ): List<BuddyMessageResponse> = buddyService.getMessagesForMe(jwt.subject)
+
+    @Operation(
+        summary = "Things this hire could usefully ask",
+        description = "Chips for the composer: short questions drawn from the tools actually mounted for this " +
+            "hire, so a chip is never offered for something their buddy cannot answer. Each one is put in the " +
+            "composer for the hire to send — the client must not send it for them. Calls no model, so a surface " +
+            "can show them before a greeting has arrived.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Suggestions returned successfully"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role to access this conversation"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/suggestions")
+    @PreAuthorize("hasRole('USER')")
+    fun getSuggestionsForMe(
+        @Parameter(hidden = true)
+        @AuthenticationPrincipal jwt: Jwt,
+    ): List<BuddySuggestionResponse> = buddySuggestionService.forMe(jwt.subject)
 
     @Operation(
         summary = "Open a buddy visit",

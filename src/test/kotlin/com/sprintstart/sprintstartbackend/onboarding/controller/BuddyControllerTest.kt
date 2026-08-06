@@ -9,8 +9,10 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyAc
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.SendBuddyMessageRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddySuggestionResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyService
+import com.sprintstart.sprintstartbackend.onboarding.service.BuddySuggestionService
 import io.mockk.coEvery
 import io.mockk.every
 import kotlinx.coroutines.flow.flowOf
@@ -49,6 +51,9 @@ class BuddyControllerTest(
     private lateinit var buddyActionService: BuddyActionService
 
     @MockkBean
+    private lateinit var buddySuggestionService: BuddySuggestionService
+
+    @MockkBean
     private lateinit var jwtDecoder: JwtDecoder
 
     private val objectMapper = jacksonObjectMapper()
@@ -81,6 +86,30 @@ class BuddyControllerTest(
         mockMvc
             .perform(get("/api/v1/onboarding/me/buddy/messages"))
             .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `getSuggestionsForMe should return 200 with the hire's chips`() {
+        every { buddySuggestionService.forMe(authId) } returns listOf(
+            BuddySuggestionResponse(label = "What should I work on?", question = "What should I work on next?"),
+        )
+
+        mockMvc
+            .perform(get("/api/v1/onboarding/me/buddy/suggestions").with(userJwt))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$[0].label").value("What should I work on?"))
+            .andExpect(jsonPath("$[0].question").value("What should I work on next?"))
+    }
+
+    /**
+     * A plain (non-suspend) handler, so a single-step expectation is enough here — unlike the
+     * suspend endpoints below, where a naive `andExpect(status())` silently passes a role denial.
+     */
+    @Test
+    fun `getSuggestionsForMe should return 403 for a non-USER role`() {
+        mockMvc
+            .perform(get("/api/v1/onboarding/me/buddy/suggestions").with(noUserRoleJwt))
+            .andExpect(status().isForbidden)
     }
 
     @Test
