@@ -16,8 +16,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyOpeningActionResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyOpeningResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -67,7 +65,7 @@ class BuddyService(
      *
      * Only the window after [BuddySession.summarizedCount] — everything older has been folded into
      * the mentor's memory and is intentionally not replayed. A visit opens fresh with a greeting
-     * ([openForMe]); the durable memory, not a transcript, is what carries continuity across visits.
+     * ([streamOpenForMe]); the durable memory, not a transcript, carries continuity across visits.
      */
     fun getMessagesForMe(authId: String): List<BuddyMessageResponse> {
         val userId = resolveUserId(authId)
@@ -76,37 +74,6 @@ class BuddyService(
             .findAllBySessionIdOrderByCreatedAtAsc(session.id)
             .drop(session.summarizedCount)
             .map { it.toResponse() }
-    }
-
-    /**
-     * Opens a visit: folds the previous visit into the mentor's memory and returns a proactive,
-     * mentor-written greeting grounded in the hire's current state — no transcript replay.
-     *
-     * The prior active window (everything after the memory cursor) is what the AI folds into the
-     * durable memory; on success the memory is replaced, the cursor advances past that window, and
-     * the greeting is persisted as the visit's opening message (so the rest of the visit has it as
-     * context). The AI already degrades to the prior memory and a plain welcome on its own failures;
-     * a transport-level failure here is caught too, leaving memory and cursor untouched so nothing
-     * the buddy has not yet remembered is ever dropped.
-     *
-     * @throws ResponseStatusException 404 if the authenticated user doesn't exist.
-     */
-    suspend fun openForMe(authId: String): BuddyOpeningResponse {
-        var greeting = StringBuilder()
-        var action: BuddyOpeningActionResponse? = null
-        streamOpenForMe(authId).collect { event ->
-            when (event.type) {
-                TOKEN -> greeting.append(event.content.orEmpty())
-                OPENING_ACTION -> action = BuddyOpeningActionResponse(
-                    event.label.orEmpty(),
-                    event.question.orEmpty(),
-                )
-            }
-        }
-        return BuddyOpeningResponse(
-            greeting = greeting.toString().takeIf { it.isNotBlank() } ?: FALLBACK_OPENING,
-            action = action,
-        )
     }
 
     /**

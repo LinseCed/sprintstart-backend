@@ -11,7 +11,6 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTu
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.DiagramOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GenerateCompetencyGraphRequest
@@ -348,38 +347,13 @@ class OnboardingAiClient(
         }
 
     /**
-     * Opens a buddy visit: folds the previous visit into the mentor's memory and returns a
-     * proactive greeting.
+     * Opens a buddy visit: the greeting arrives as it is written.
      *
-     * Stateless: [BuddyOpenRequest.memory] is the durable memory the backend holds, [recent] the
-     * messages to fold into it, [state] a snapshot of the hire's own onboarding for the greeting to
-     * ground itself in. The AI degrades to the prior memory and a plain welcome rather than erroring,
-     * but a transport-level non-2xx is still wrapped in an [OnboardingAiException].
-     *
-     * @param request The prior memory, the messages to fold, and the state snapshot.
-     * @return The refreshed memory, the greeting to show, and an optional suggested action.
-     */
-    suspend fun buddyOpen(request: BuddyOpenRequest): BuddyOpenResponse =
-        try {
-            webClient
-                .post()
-                .uri(uri("/api/v1/onboarding/buddy/open"))
-                .body(request)
-                .sync()
-                .perform<BuddyOpenResponse>()
-        } catch (@Suppress("SwallowedException") e: WebClientException) {
-            val msg = "Failed to open buddy visit (HTTP ${e.statusCode}): ${e.body}"
-            throw OnboardingAiException(e.statusCode, e.body, msg)
-        }
-
-    /**
-     * The streaming twin of [buddyOpen]: the greeting arrives as it is written.
-     *
-     * Same single model call and the same stored result — what changes is the order the AI service
-     * asks for. ⚠️ [buddyOpen] receives strict JSON whose **first** field is the memory note the
-     * hire never sees, so the greeting could not begin until up to 200 invisible words had been
-     * generated. This one puts the greeting first and streams it, then carries the memory and any
-     * action on the terminal `done`.
+     * ⚠️ **The AI service also has a non-streaming open, and this backend deliberately does not use
+     * it.** That one returns strict JSON whose **first** field is the memory note the hire never
+     * sees, so the greeting could not begin until up to 200 invisible words had been generated.
+     * This puts the greeting first and streams it, then carries the memory and any action on the
+     * terminal `done` — the same single model call either way.
      *
      * A malformed chunk is skipped rather than killing the stream, matching [streamProgress]. The
      * AI service degrades to a plain welcome on its own failures, so an `error` chunk is not
