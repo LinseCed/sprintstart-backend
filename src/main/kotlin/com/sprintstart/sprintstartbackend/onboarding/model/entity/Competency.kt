@@ -72,10 +72,6 @@ class Competency(
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var provenance: ContentProvenance = ContentProvenance.PM,
-    // Marks a competency as compliance- or mandate-driven. ⚠️ Authored and exposed, but nothing
-    // branches on it -- it carries no behaviour today.
-    @Column(nullable = false)
-    var invariant: Boolean = false,
     /**
      * The proficiency rank (1..4) a user must reach for this node to count as met.
      *

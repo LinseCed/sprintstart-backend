@@ -115,7 +115,7 @@ class CompetencyGraphAuthoringController(
      */
     @Operation(
         summary = "Edit a live competency",
-        description = "Updates a live competency's label, description, kind, target level or invariant flag",
+        description = "Updates a live competency's label, description, kind or target level",
     )
     @ApiResponses(
         value = [

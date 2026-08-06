@@ -61,7 +61,6 @@ class CompetencyGraphAuthoringControllerTest(
             kind = CompetencyKind.SKILL,
             area = "Authentication",
             targetLevel = 3,
-            invariant = false,
         )
 
     @Test

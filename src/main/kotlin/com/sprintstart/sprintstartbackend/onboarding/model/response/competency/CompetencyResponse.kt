@@ -19,7 +19,6 @@ data class CompetencyResponse(
     val area: String?,
     val kind: CompetencyKind,
     val targetLevel: Int,
-    val invariant: Boolean,
 )
 
 /**
