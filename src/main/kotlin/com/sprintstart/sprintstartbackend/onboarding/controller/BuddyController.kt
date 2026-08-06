@@ -5,7 +5,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyAc
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.SendBuddyMessageRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyOpeningResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddySuggestionResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyService
@@ -84,34 +83,16 @@ class BuddyController(
         @AuthenticationPrincipal jwt: Jwt,
     ): List<BuddySuggestionResponse> = buddySuggestionService.forMe(jwt.subject)
 
-    @Operation(
-        summary = "Open a buddy visit",
-        description = "Opens the buddy: folds the previous visit into the mentor's durable memory and returns a " +
-            "proactive, mentor-written greeting grounded in the hire's current state, plus an optional suggested " +
-            "next step. The past transcript is not replayed — a visit starts fresh with this greeting.",
-    )
-    @ApiResponses(
-        value = [
-            ApiResponse(responseCode = "200", description = "Greeting returned successfully"),
-            ApiResponse(responseCode = "401", description = "Authentication required"),
-            ApiResponse(responseCode = "403", description = "Insufficient role to access this conversation"),
-        ],
-    )
-    @ResponseStatus(HttpStatus.OK)
-    @PostMapping("/open")
-    @PreAuthorize("hasRole('USER')")
-    suspend fun openForMe(
-        @Parameter(hidden = true)
-        @AuthenticationPrincipal jwt: Jwt,
-    ): BuddyOpeningResponse = buddyService.openForMe(jwt.subject)
-
     /**
-     * The streaming twin of [openForMe], and the one a page should use.
+     * Opens a buddy visit, streaming the greeting as the mentor writes it.
      *
      * ⚠️ **Opening cost about thirty seconds, and the cause was ordering rather than model speed.**
      * The AI wrote a private memory note of up to 200 words *before* the greeting, so the hire waited
      * on output they never see. The greeting is written first now and streamed as it arrives — same
      * single model call, same stored result, first word in about a second.
+     *
+     * There is deliberately no non-streaming twin. One existed while the client was being switched
+     * over; keeping it afterwards would have been a second way to open a visit that nothing called.
      */
     @Operation(
         summary = "Open a buddy visit (streaming)",

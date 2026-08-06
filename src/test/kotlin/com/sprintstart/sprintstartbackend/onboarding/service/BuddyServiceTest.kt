@@ -146,158 +146,6 @@ class BuddyServiceTest {
     }
 
     @Nested
-    inner class OpenForMe {
-        @Test
-        fun `folds the previous window into memory, advances the cursor, and persists the greeting`() = runTest {
-            val session = BuddySession(userId = userId)
-            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { buddySessionRepository.findByUserId(userId) } returns session
-            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
-                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "how do I build?"),
-                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "use ./gradlew"),
-            )
-            every { buddyToolExecutor.stateSnapshot(userId) } returns "2 closed PRs"
-            every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
-                BuddyOpenStreamEvent(type = "token", content = "Welcome back, Sam!"),
-                BuddyOpenStreamEvent(
-                    type = "done",
-                    greeting = "Welcome back, Sam!",
-                    memory = "Sam asked how to build; taught ./gradlew.",
-                ),
-            )
-            every { buddySessionRepository.save(any()) } answers { firstArg() }
-            every { buddyMessageRepository.save(any()) } answers { firstArg() }
-
-            val result = service.openForMe(authId)
-
-            assertThat(result.greeting).isEqualTo("Welcome back, Sam!")
-            assertThat(session.summary).isEqualTo("Sam asked how to build; taught ./gradlew.")
-            assertThat(session.summarizedCount).isEqualTo(2)
-            verify { buddySessionRepository.save(session) }
-            verify {
-                buddyMessageRepository.save(
-                    match { it.role == BuddyMessageRole.ASSISTANT && it.content == "Welcome back, Sam!" },
-                )
-            }
-        }
-
-        @Test
-        fun `returns the suggested action when the AI provides one`() = runTest {
-            val session = BuddySession(userId = userId)
-            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { buddySessionRepository.findByUserId(userId) } returns session
-            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
-            every { buddyToolExecutor.stateSnapshot(userId) } returns "no PRs yet"
-            every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
-                BuddyOpenStreamEvent(type = "token", content = "Hi!"),
-                BuddyOpenStreamEvent(
-                    type = "done",
-                    greeting = "Hi!",
-                    memory = "m",
-                    action = BuddyOpenActionDto(
-                        label = "Find me a task",
-                        question = "What should I work on next?",
-                    ),
-                ),
-            )
-            every { buddySessionRepository.save(any()) } answers { firstArg() }
-            every { buddyMessageRepository.save(any()) } answers { firstArg() }
-
-            val result = service.openForMe(authId)
-
-            assertThat(result.action?.label).isEqualTo("Find me a task")
-            assertThat(result.action?.question).isEqualTo("What should I work on next?")
-        }
-
-        /**
-         * ⚠️ A refresh is the same visit, not a new one.
-         *
-         * Opening twice with nothing said in between used to generate a second greeting. The
-         * window sent for folding was the previous *greeting* -- which the memory prompt is
-         * explicitly told to drop -- so each reload paid for a model call to compress something it
-         * then discarded, and left one more greeting behind for the next reload to fold.
-         */
-        @Test
-        fun `re-opening without the hire saying anything reuses the greeting already there`() = runTest {
-            val session = BuddySession(userId = userId, summary = "keep me", summarizedCount = 0)
-            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { buddySessionRepository.findByUserId(userId) } returns session
-            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
-                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Hi again!"),
-            )
-
-            val result = service.openForMe(authId)
-
-            assertThat(result.greeting).isEqualTo("Hi again!")
-            verify(exactly = 0) { onboardingAiClient.streamBuddyOpen(any()) }
-            verify(exactly = 0) { buddyMessageRepository.save(any()) }
-            assertThat(session.summary).isEqualTo("keep me")
-            assertThat(session.summarizedCount).isEqualTo(0)
-        }
-
-        /**
-         * The visit ends when the hire speaks: once they have, the next open is genuinely new and
-         * folds what was said into memory. Without this the greeting would freeze permanently.
-         */
-        @Test
-        fun `opening again after the hire has spoken generates a fresh greeting`() = runTest {
-            val session = BuddySession(userId = userId, summarizedCount = 0)
-            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { buddySessionRepository.findByUserId(userId) } returns session
-            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
-                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Hi!"),
-                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "where do I start?"),
-                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Here."),
-            )
-            every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
-            every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
-                BuddyOpenStreamEvent(type = "token", content = "Welcome back!"),
-                BuddyOpenStreamEvent(type = "done", greeting = "Welcome back!", memory = "folded"),
-            )
-            every { buddySessionRepository.save(any()) } answers { firstArg() }
-            every { buddyMessageRepository.save(any()) } answers { firstArg() }
-
-            val result = service.openForMe(authId)
-
-            assertThat(result.greeting).isEqualTo("Welcome back!")
-            assertThat(session.summary).isEqualTo("folded")
-        }
-
-        @Test
-        fun `degrades to a plain greeting and leaves memory untouched when the AI is unavailable`() = runTest {
-            val session = BuddySession(userId = userId, summary = "keep me", summarizedCount = 0)
-            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-            every { buddySessionRepository.findByUserId(userId) } returns session
-            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
-                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "hi"),
-            )
-            every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
-            every { onboardingAiClient.streamBuddyOpen(any()) } throws
-                OnboardingAiException(503, "", "AI is down")
-
-            val result = service.openForMe(authId)
-
-            assertThat(result.greeting).isNotBlank()
-            assertThat(result.action).isNull()
-            // Memory and cursor are untouched, and nothing is persisted, so the unremembered window
-            // is folded on a later successful open.
-            assertThat(session.summary).isEqualTo("keep me")
-            assertThat(session.summarizedCount).isEqualTo(0)
-            verify(exactly = 0) { buddySessionRepository.save(any()) }
-            verify(exactly = 0) { buddyMessageRepository.save(any()) }
-        }
-
-        @Test
-        fun `throws 404 when the authenticated user does not exist`() = runTest {
-            every { userApi.getUserIdByAuthId(authId) } returns Optional.empty()
-
-            assertThrows<ResponseStatusException> {
-                service.openForMe(authId)
-            }.also { assertThat(it.statusCode.value()).isEqualTo(404) }
-        }
-    }
-
-    @Nested
     inner class StreamOpenForMe {
         /**
          * The whole point of the change: the greeting reaches the hire in pieces, as it is written,
@@ -417,9 +265,84 @@ class BuddyServiceTest {
             verify(exactly = 0) { buddySessionRepository.save(any()) }
         }
 
+        @Test
+        fun `folds the previous window into memory, advances the cursor, and persists the greeting`() = runTest {
+            val session = BuddySession(userId = userId)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
+                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "how do I build?"),
+                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "use ./gradlew"),
+            )
+            every { buddyToolExecutor.stateSnapshot(userId) } returns "2 closed PRs"
+            every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
+                BuddyOpenStreamEvent(type = "token", content = "Welcome back, Sam!"),
+                BuddyOpenStreamEvent(
+                    type = "done",
+                    greeting = "Welcome back, Sam!",
+                    memory = "Sam asked how to build; taught ./gradlew.",
+                ),
+            )
+            every { buddySessionRepository.save(any()) } answers { firstArg() }
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+
+            service.streamOpenForMe(authId).toList()
+
+            assertThat(session.summary).isEqualTo("Sam asked how to build; taught ./gradlew.")
+            assertThat(session.summarizedCount).isEqualTo(2)
+            verify { buddySessionRepository.save(session) }
+            verify {
+                buddyMessageRepository.save(
+                    match { it.role == BuddyMessageRole.ASSISTANT && it.content == "Welcome back, Sam!" },
+                )
+            }
+        }
+
+        /**
+         * The visit ends when the hire speaks: once they have, the next open is genuinely new and
+         * folds what was said into memory. Without this the greeting would freeze permanently.
+         */
+        @Test
+        fun `opening again after the hire has spoken generates a fresh greeting`() = runTest {
+            val session = BuddySession(userId = userId, summarizedCount = 0)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
+                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Hi!"),
+                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "where do I start?"),
+                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Here."),
+            )
+            every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
+            every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
+                BuddyOpenStreamEvent(type = "token", content = "Welcome back!"),
+                BuddyOpenStreamEvent(type = "done", greeting = "Welcome back!", memory = "folded"),
+            )
+            every { buddySessionRepository.save(any()) } answers { firstArg() }
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+
+            val events = service.streamOpenForMe(authId).toList()
+
+            assertThat(events.single { it.type == "token" }.content).isEqualTo("Welcome back!")
+            assertThat(session.summary).isEqualTo("folded")
+        }
+
+        @Test
+        fun `throws 404 when the authenticated user does not exist`() = runTest {
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.empty()
+
+            assertThrows<ResponseStatusException> {
+                service.streamOpenForMe(authId)
+            }.also { assertThat(it.statusCode.value()).isEqualTo(404) }
+        }
+
         /**
          * A greeting already written has nothing left to wait for, so it arrives whole. Typing it
          * out again would be theatre, and it must not cost a model call either.
+         *
+         * ⚠️ This is what makes a refresh the same visit rather than a new one. Opening twice with
+         * nothing said in between used to generate a second greeting -- and the window sent for
+         * folding was the previous *greeting*, which the memory prompt is explicitly told to drop,
+         * so each reload paid for a model call to compress something it then discarded.
          */
         @Test
         fun `replays an existing greeting in one piece without calling the model`() = runTest {
