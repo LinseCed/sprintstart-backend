@@ -62,8 +62,9 @@ class AssessmentService(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    // Mirrors BlueprintService: the AI call is a long-running suspend operation and must not run
-    // inside a transaction, so DB reads/writes bracket it in their own explicit transactions.
+    // ⚠️ The AI call is a long-running suspend operation and must not run inside a transaction --
+    // it would pin a DB connection for its whole duration. DB reads/writes bracket it in their own
+    // explicit transactions, the standard read-tx -> AI -> write-tx shape in this module.
     private val txTemplate = TransactionTemplate(transactionManager)
     private val readTxTemplate =
         TransactionTemplate(transactionManager).apply { isReadOnly = true }
