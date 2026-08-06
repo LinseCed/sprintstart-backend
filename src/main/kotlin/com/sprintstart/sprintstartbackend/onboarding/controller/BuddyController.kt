@@ -105,6 +105,53 @@ class BuddyController(
         @AuthenticationPrincipal jwt: Jwt,
     ): BuddyOpeningResponse = buddyService.openForMe(jwt.subject)
 
+    /**
+     * The streaming twin of [openForMe], and the one a page should use.
+     *
+     * ⚠️ **Opening cost about thirty seconds, and the cause was ordering rather than model speed.**
+     * The AI wrote a private memory note of up to 200 words *before* the greeting, so the hire waited
+     * on output they never see. The greeting is written first now and streamed as it arrives — same
+     * single model call, same stored result, first word in about a second.
+     */
+    @Operation(
+        summary = "Open a buddy visit (streaming)",
+        description = "The same visit as `POST /open` — the previous visit folded into the mentor's durable " +
+            "memory, a proactive greeting grounded in the hire's state, no transcript replay — with the greeting " +
+            "streamed as it is written instead of arriving whole. Opening twice without the hire saying anything " +
+            "is the same visit: the greeting already there is replayed and no model is called. A visit whose " +
+            "stream breaks keeps whatever the hire already read.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Stream started successfully, the greeting will now arrive token by token",
+                content = [
+                    Content(
+                        mediaType = MediaType.TEXT_EVENT_STREAM_VALUE,
+                        schema = Schema(
+                            examples = [
+                                "data: {\"type\": \"token\", \"content\": \"Welcome back, Sam!\"}",
+                                "data: {\"type\": \"opening_action\", \"label\": \"Find me a task\", " +
+                                    "\"question\": \"What should I work on?\"}",
+                                "data: {\"type\": \"done\"}",
+                            ],
+                        ),
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role to access this conversation"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/open/stream", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    @PreAuthorize("hasRole('USER')")
+    suspend fun streamOpenForMe(
+        @Parameter(hidden = true)
+        @AuthenticationPrincipal jwt: Jwt,
+    ): Flow<BuddyStreamEvent> = buddyService.streamOpenForMe(jwt.subject)
+
     @Operation(
         summary = "Send a message to the buddy",
         description = "Adds the message to the user's ongoing buddy session and streams a grounded reply.",

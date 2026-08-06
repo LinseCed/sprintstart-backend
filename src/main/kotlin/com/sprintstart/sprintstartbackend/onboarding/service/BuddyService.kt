@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMe
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCitationDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
@@ -23,6 +24,8 @@ import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
@@ -40,6 +43,9 @@ import java.util.UUID
  * the hire's own onboarding are answered by [BuddyToolExecutor].
  */
 @Service
+// One method per thing a visit can do -- open it, stream it open, read it, speak into it -- plus the
+// agent loop's helpers. The count tracks the conversation's surface, not a class doing two jobs.
+@Suppress("TooManyFunctions")
 class BuddyService(
     private val buddySessionRepository: BuddySessionRepository,
     private val buddyMessageRepository: BuddyMessageRepository,
@@ -49,6 +55,8 @@ class BuddyService(
     private val userApi: UserApi,
     private val trackService: TrackService,
 ) {
+    private val logger = LoggerFactory.getLogger(javaClass)
+
     /** Finds or creates a user's one ongoing buddy session. */
     fun getOrCreateSession(userId: UUID): BuddySession =
         buddySessionRepository.findByUserId(userId)
@@ -84,6 +92,46 @@ class BuddyService(
      * @throws ResponseStatusException 404 if the authenticated user doesn't exist.
      */
     suspend fun openForMe(authId: String): BuddyOpeningResponse {
+        var greeting = StringBuilder()
+        var action: BuddyOpeningActionResponse? = null
+        streamOpenForMe(authId).collect { event ->
+            when (event.type) {
+                TOKEN -> greeting.append(event.content.orEmpty())
+                OPENING_ACTION -> action = BuddyOpeningActionResponse(
+                    event.label.orEmpty(),
+                    event.question.orEmpty(),
+                )
+            }
+        }
+        return BuddyOpeningResponse(
+            greeting = greeting.toString().takeIf { it.isNotBlank() } ?: FALLBACK_OPENING,
+            action = action,
+        )
+    }
+
+    /**
+     * Opens a visit, streaming the greeting as the mentor writes it.
+     *
+     * ⚠️ **The wait this removes was ordering, not model speed.** The AI service's non-streaming
+     * open returns strict JSON whose *first* field is the memory note — up to 200 words the hire
+     * never sees — with the 2–4 sentence greeting after it, so opening cost roughly 260 invisible
+     * tokens before the first word addressed to the hire was even generated. The streaming call
+     * writes the greeting first, for the same single model call.
+     *
+     * Everything else about a visit is unchanged: the prior active window is folded into the durable
+     * memory, the cursor advances past it, and the greeting is persisted as the visit's opening
+     * message. No transcript is replayed.
+     *
+     * **What happens when the stream breaks matters, and it is not one rule but two:**
+     * - **Nothing arrived** — the fallback greeting is emitted and **nothing is persisted**, so a
+     *   reload tries the model again rather than burning the visit's greeting on an outage.
+     * - **Some of it arrived** — what the hire has already read is persisted as the opening message,
+     *   so a reload shows them the same words rather than a different greeting. Memory and cursor
+     *   are left untouched either way, so nothing the buddy has not yet remembered is dropped.
+     *
+     * @throws ResponseStatusException 404 if the authenticated user doesn't exist.
+     */
+    suspend fun streamOpenForMe(authId: String): Flow<BuddyStreamEvent> {
         val userId = resolveUserId(authId)
         val session = getOrCreateSession(userId)
 
@@ -99,44 +147,85 @@ class BuddyService(
         // transcript for the next reload to fold.
         //
         // A visit ends when the hire speaks. Until then the greeting already sitting there is this
-        // visit's greeting, and returning it costs nothing.
+        // visit's greeting, and replaying it costs nothing. It arrives whole rather than a word at a
+        // time -- there is nothing to wait for, and pretending to type it out would be theatre.
         val hireHasSpoken = unspoken.any { it.role == BuddyMessageRole.USER }
         val greetingAlreadyThere = if (hireHasSpoken) null else unspoken.lastOrNull()
         if (greetingAlreadyThere != null) {
-            return BuddyOpeningResponse(greeting = greetingAlreadyThere.content)
+            return flowOf(
+                BuddyStreamEvent(type = TOKEN, content = greetingAlreadyThere.content),
+                BuddyStreamEvent(type = DONE),
+            )
         }
 
         val recent = unspoken
             .map { BuddyAgentMessageDto(role = it.role.toHistoryRole(), content = it.content) }
         val state = buddyToolExecutor.stateSnapshot(userId)
 
-        val opening = try {
-            onboardingAiClient.buddyOpen(
-                BuddyOpenRequest(memory = session.summary, recent = recent, state = state),
-            )
-        } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
-            // Opening the buddy must never fail the page. Leave memory and cursor as they are so the
-            // unremembered window is folded on a later, successful open.
-            null
+        return flow {
+            val streamed = StringBuilder()
+            var opening: BuddyOpenStreamEvent? = null
+            try {
+                onboardingAiClient
+                    .streamBuddyOpen(
+                        BuddyOpenRequest(memory = session.summary, recent = recent, state = state),
+                    ).collect { event ->
+                        when (event.type) {
+                            BuddyOpenStreamEvent.TOKEN -> event.content?.let {
+                                streamed.append(it)
+                                emit(BuddyStreamEvent(type = TOKEN, content = it))
+                            }
+
+                            BuddyOpenStreamEvent.DONE -> opening = event
+                        }
+                    }
+            } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
+                // Opening the buddy must never fail the page.
+                logger.warn("Buddy open stream failed: {}", e.message)
+            }
+
+            finishOpen(session, all, streamed.toString(), opening)
+        }
+    }
+
+    /**
+     * Persists what the open produced and emits the terminal events.
+     *
+     * Split out because the three outcomes differ in what they may write, and running them together
+     * hid that: a complete open folds the memory *and* stores the greeting, a broken one stores only
+     * the words the hire already saw, and one that produced nothing writes nothing at all.
+     */
+    private suspend fun FlowCollector<BuddyStreamEvent>.finishOpen(
+        session: BuddySession,
+        all: List<BuddyMessage>,
+        streamed: String,
+        opening: BuddyOpenStreamEvent?,
+    ) {
+        val greeting = opening?.greeting?.takeIf { it.isNotBlank() } ?: streamed
+
+        if (greeting.isBlank()) {
+            // Nothing reached the hire, so nothing is theirs to keep. Persisting the fallback would
+            // make an outage the permanent greeting for this visit.
+            emit(BuddyStreamEvent(type = TOKEN, content = FALLBACK_OPENING))
+            emit(BuddyStreamEvent(type = DONE))
+            return
         }
 
-        if (opening == null) {
-            return BuddyOpeningResponse(greeting = FALLBACK_OPENING)
+        if (opening != null) {
+            // Advance the cursor past everything folded *before* persisting the greeting, so the
+            // greeting lands in the fresh active window and the just-folded window drops out of it.
+            session.summary = opening.memory ?: session.summary
+            session.summarizedCount = all.size
+            buddySessionRepository.save(session)
         }
-
-        // Advance the cursor past everything folded *before* persisting the greeting, so the greeting
-        // lands in the fresh active window and the just-folded window drops out of it.
-        session.summary = opening.memory
-        session.summarizedCount = all.size
-        buddySessionRepository.save(session)
         buddyMessageRepository.save(
-            BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = opening.greeting),
+            BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = greeting),
         )
 
-        return BuddyOpeningResponse(
-            greeting = opening.greeting,
-            action = opening.action?.let { BuddyOpeningActionResponse(it.label, it.question) },
-        )
+        opening?.action?.let {
+            emit(BuddyStreamEvent(type = OPENING_ACTION, label = it.label, question = it.question))
+        }
+        emit(BuddyStreamEvent(type = DONE))
     }
 
     /**
@@ -369,6 +458,14 @@ class BuddyService(
         // works and the hire can start talking.
         const val FALLBACK_OPENING =
             "Welcome back! How can I help with your onboarding today?"
+
+        // The stream vocabulary the client already switches on, plus one for the opening's suggested
+        // next step. ⚠️ It is deliberately NOT `action_proposal`: that type means the buddy is
+        // offering to *do* something and is gated on the hire confirming. This only fills the
+        // composer with a question, which is why it needs a name of its own.
+        const val TOKEN = "token"
+        const val DONE = "done"
+        const val OPENING_ACTION = "opening_action"
 
         // Split after each space, keeping the space on the preceding chunk, so concatenating every
         // emitted token reproduces the answer exactly (newlines and punctuation preserved).
