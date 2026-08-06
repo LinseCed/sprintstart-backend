@@ -463,17 +463,17 @@ class BuddyActionServiceTest {
     }
 
     @Test
-    fun `claiming a goal relays why an unapproved task cannot be claimed`() = runTest {
+    fun `claiming a goal relays why a rejected task cannot be claimed`() = runTest {
         asHire()
         onOneProject()
         val taskId = UUID.randomUUID()
         every { userGoalService.claimForMe(authId, projectId, taskId) } throws
-            ResponseStatusException(HttpStatus.CONFLICT, "only an approved task can be claimed as a goal")
+            ResponseStatusException(HttpStatus.CONFLICT, "only a live task can be claimed as a goal")
 
         val result = service.perform(BuddyActionRequest(action = "claim_goal", taskId = taskId), jwt)
 
         assertThat(result.ok).isFalse()
-        assertThat(result.message).contains("approved")
+        assertThat(result.message).contains("live")
     }
 
     @Test

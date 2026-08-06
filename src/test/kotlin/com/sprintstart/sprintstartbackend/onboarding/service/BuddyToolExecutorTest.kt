@@ -555,7 +555,7 @@ class BuddyToolExecutorTest {
 
         val result = executor.execute(suggestedTasksCall, userId)
 
-        assertThat(result).contains("no approved starter-work tasks")
+        assertThat(result).contains("no starter-work tasks")
     }
 
     @Test

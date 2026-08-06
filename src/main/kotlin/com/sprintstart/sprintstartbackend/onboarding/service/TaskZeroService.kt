@@ -25,8 +25,8 @@ import java.util.UUID
  * something" — and undoable. Deliberately **not** gated on any environment-readiness signal:
  * getting the project running is *part of* Task 0, not a wall in front of it, and gating the first
  * task behind a setup check we can't reliably detect only strands a fresh hire (it also runs against
- * the initiative's "retire the gates" decision). The task comes from the same mined-and-approved
- * pool as every other, flagged as Task-0-suitable by a PM, because a task nobody wanted is not a
+ * the "no gates" rule). The task comes from the same live pool as every other,
+ * flagged as Task-0-suitable by a PM, because a task nobody wanted is not a
  * contribution and hires can tell.
  *
  * Completing it proves the loop and nothing else: there is **no** `UserCompetencyState` write
@@ -42,10 +42,10 @@ class TaskZeroService(
     private val clock: Clock = Clock.systemUTC(),
 ) {
     /**
-     * Sets whether an approved starter-work task is a Task 0 candidate.
+     * Sets whether a live starter-work task is a Task 0 candidate.
      *
-     * @throws ResponseStatusException 404 when no such proposal exists; 409 when it is not APPROVED
-     * (Task-0 candidacy is a property of the approved pool, not of a proposal still under review).
+     * @throws ResponseStatusException 404 when no such proposal exists; 409 when it is not `LIVE`
+     * (Task-0 candidacy is a property of the pool, not of something somebody removed).
      */
     @Transactional
     fun setEligibility(proposalId: UUID, eligible: Boolean): StarterWorkTaskProposalResponse {
@@ -55,7 +55,7 @@ class TaskZeroService(
         if (proposal.status != ProposalStatus.LIVE) {
             throw ResponseStatusException(
                 HttpStatus.CONFLICT,
-                "Only an approved task can be flagged for Task 0",
+                "Only a live task can be flagged for Task 0",
             )
         }
         proposal.taskZeroEligible = eligible

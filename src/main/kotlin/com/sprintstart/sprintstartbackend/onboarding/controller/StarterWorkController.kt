@@ -50,14 +50,14 @@ class StarterWorkController(
 //  ========================== Endpoints for admins ==========================
 
     /**
-     * Triggers AI starter-work mining over the ingested corpus's open GitHub issues.
+     * Triggers AI starter-work mining over the ingested corpus's open tracker issues.
      *
-     * Mined tasks are stored as PROPOSED, one row per issue, awaiting individual PM review -- the
-     * live competency graph is left untouched until a proposal is explicitly approved.
+     * Mined tasks are stored `LIVE`, one row per issue, and are claimable immediately. ⚠️ Nothing
+     * waits on a person here; reviewing one only lifts the fit-ranking demotion it carries.
      */
     @Operation(
         summary = "Mine starter-work task proposals",
-        description = "Triggers AI starter-work mining over the ingested corpus's open GitHub issues",
+        description = "Triggers AI starter-work mining over the ingested corpus's open tracker issues",
     )
     @ApiResponses(
         value = [
@@ -100,14 +100,13 @@ class StarterWorkController(
     /**
      * Creates a hand-authored starter-work task, with no AI mining in the loop.
      *
-     * The origination counterpart to [approve]: mining fills the pool from ingested issues, this
-     * adds a task the corpus never surfaced. Born APPROVED -- a PM authoring a task is the review --
-     * and its CONTRIBUTION node lands in the graph immediately.
+     * The origination counterpart to mining: mining fills the pool from ingested issues, this adds
+     * a task the corpus never surfaced. Born reviewed and claimable immediately -- writing a task
+     * is vouching for it, so it never joins the unreviewed list.
      */
     @Operation(
         summary = "Create a starter-work task by hand",
-        description = "Hand-authors an approved starter-work task and its CONTRIBUTION node, with no AI mining — " +
-            "AI help is optional",
+        description = "Hand-authors a live starter-work task, with no AI mining — AI help is optional",
     )
     @ApiResponses(
         value = [
@@ -127,10 +126,9 @@ class StarterWorkController(
     /**
      * Lists the live starter-work tasks nobody has vouched for yet.
      *
-     * ⚠️ **Not a queue anything waits in.** These tasks are already claimable — S3b made mining
-     * live-on-arrival — so this is the set a PM has not looked at, not the set held back from
-     * hires. The route said `/proposed` and this method `listProposed` long after `PROPOSED` was
-     * deleted from `ProposalStatus`.
+     * ⚠️ **Not a queue anything waits in.** These tasks are already claimable — mining lands them
+     * live — so this is the set a PM has not looked at, not the set held back from
+     * hires.
      */
     @Operation(
         summary = "List starter-work tasks nobody has reviewed yet",
@@ -173,8 +171,8 @@ class StarterWorkController(
      * Records that somebody has looked at a starter-work task and is happy with it.
      *
      * ⚠️ **This admits nothing.** It was claimable before and it is claimable after; what changes
-     * is that `StarterWorkMatcher` stops demoting it for being unvouched. The route was
-     * `/{id}/approve`, which is the gate S3b deliberately removed.
+     * is that `StarterWorkMatcher` stops demoting it for being unvouched. ⚠️ It is deliberately
+     * not called "approve" -- that would name a gate this pool does not have.
      */
     @Operation(
         summary = "Mark a starter-work task reviewed",
@@ -230,13 +228,13 @@ class StarterWorkController(
 //  ========================== Endpoints for users (/me/...) ==========================
 
     /**
-     * Ranks the approved starter-work pool by fit against the authenticated user's competencies.
+     * Ranks the live starter-work pool by fit against the authenticated user's competencies.
      *
      * @param jwt Authenticated JWT used to resolve the current user.
      */
     @Operation(
         summary = "Get current user's starter-work matches",
-        description = "Ranks the approved starter-work pool by fit for the authenticated user on a " +
+        description = "Ranks the live starter-work pool by fit for the authenticated user on a " +
             "project. Deterministic and local — no AI call: competency overlap is one input among " +
             "task type, prior involvement and label familiarity, and a repository that answers " +
             "pull requests slowly demotes its tasks without ever hiding them. Every task carries " +
@@ -261,7 +259,7 @@ class StarterWorkController(
     ): List<RankedStarterWorkTaskResponse> = starterWorkTaskProposalService.matchForUser(jwt.subject, projectId)
 
     /**
-     * Claims an approved starter-work task as the authenticated hire's goal for a project.
+     * Claims a live starter-work task as the authenticated hire's goal for a project.
      *
      * The hire chooses their own destination from the ranked matches above; a PM still controls
      * which tasks exist by approving proposals, so this is a choice within a curated set.
