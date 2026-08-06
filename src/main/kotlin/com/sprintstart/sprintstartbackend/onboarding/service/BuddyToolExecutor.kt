@@ -379,7 +379,14 @@ class BuddyToolExecutor(
     private fun BuddyToolCallDto.stringArg(name: String): String =
         (arguments[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
 
-    private companion object {
+    /**
+     * Not private, because the tool *names* are what [BuddySuggestionService] binds its chips to.
+     * A chip is only offered when the tool behind it is mounted for that hire, and binding to these
+     * constants rather than to copied strings is what makes that impossible to get wrong: rename a
+     * tool and the chip catalog stops compiling, instead of quietly offering a hire something the
+     * mentor cannot answer.
+     */
+    companion object {
         const val GET_ARRIVAL_STEPS = "get_arrival_steps"
         const val GET_MY_METRICS = "get_my_metrics"
         const val GET_MY_COMPETENCIES = "get_my_competencies"

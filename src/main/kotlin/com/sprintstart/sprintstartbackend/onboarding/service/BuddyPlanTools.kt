@@ -253,7 +253,8 @@ class BuddyPlanTools(
     private fun BuddyToolCallDto.stringArg(name: String): String =
         (arguments[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
 
-    private companion object {
+    /** Not private for the reason `BuddyToolExecutor`'s is not: the suggestion chips bind to these. */
+    companion object {
         const val GET_LEARNING_PLAN = "get_learning_plan"
         const val GET_MODULE = "get_module"
 
