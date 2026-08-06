@@ -125,7 +125,7 @@ class AssessmentService(
                 txTemplate.execute { completeWithNothingToAssess(reserved.sessionId) }!!
             }
         }
-        val candidateSignal = withContext(Dispatchers.IO) { loadCandidateSignal(userId) }
+        val candidateSignal = withContext(Dispatchers.IO) { readTxTemplate.execute { loadCandidateSignal(userId) }!! }
         val aiResponse = runAssessTurn(
             AssessmentTurnRequest(
                 candidateCompetencies = candidates,
@@ -276,7 +276,9 @@ class AssessmentService(
         val aiResponse = runAssessTurn(
             AssessmentTurnRequest(
                 candidateCompetencies = turnState.candidates,
-                candidateSignal = withContext(Dispatchers.IO) { loadCandidateSignal(userId) },
+                candidateSignal = withContext(Dispatchers.IO) {
+                    readTxTemplate.execute { loadCandidateSignal(userId) }!!
+                },
                 history = turnState.history,
                 targets = turnState.targets,
                 turn = turnState.nextTurnIndex,
@@ -343,6 +345,11 @@ class AssessmentService(
      * request each time -- omitting it after turn 0 would silently change how later turns are
      * calibrated. Consent is re-checked on each read, so withdrawing it takes effect immediately,
      * mid-interview included.
+     *
+     * ⚠️ **Must be called inside a transaction.** `signals` is a lazy `@ElementCollection`, so
+     * reading it on a detached prior throws `LazyInitializationException` — which is exactly what
+     * `POST /me/assessment/start` returned as a 500 for every hire who actually had a prior. Both
+     * call sites wrap it in [readTxTemplate], and those two are the only ones.
      */
     private fun loadCandidateSignal(userId: UUID): CandidateSignalSchema {
         val prior = githubHistoryPriorService.getPrior(userId) ?: return CandidateSignalSchema()

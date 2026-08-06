@@ -255,6 +255,56 @@ class AssessmentServiceTest {
             coVerify(exactly = 0) { onboardingAiClient.assessTurn(any()) }
         }
 
+        /**
+         * ⚠️ Regression: this threw a 500 on the hire's own landing page, for months.
+         *
+         * `GithubHistoryPrior.signals` is a lazy `@ElementCollection`, and the prior was read
+         * *outside* any transaction — so the moment a hire actually had a consented prior, reading
+         * it threw `LazyInitializationException` and `POST /me/assessment/start` returned 500.
+         *
+         * ⚠️ **The suite missed it because the default fixture returns `null`**, which short-circuits
+         * before `signals` is ever touched, and the one test that supplies a prior supplies a plain
+         * in-memory map that cannot fail to initialise. The feature was broken for exactly the
+         * hires it was built for, and every test passed.
+         *
+         * So this asserts the *structural* property a mock cannot fake: the read happens while a
+         * transaction is open.
+         */
+        @Test
+        fun `reads the consented prior inside a transaction`() = runTest {
+            setUpUser()
+            var inTransaction = false
+            var readInsideTransaction: Boolean? = null
+            every { transactionManager.getTransaction(any()) } answers {
+                inTransaction = true
+                mockk(relaxed = true)
+            }
+            every { transactionManager.commit(any()) } answers { inTransaction = false }
+            every { transactionManager.rollback(any()) } answers { inTransaction = false }
+            every { githubHistoryPriorService.getPrior(userId) } answers {
+                readInsideTransaction = inTransaction
+                GithubHistoryPrior(userId = userId, signals = mutableMapOf("repo:owner/api" to 9))
+            }
+            every {
+                skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
+                    userId,
+                    projectId,
+                    SkillAssessmentSessionStatus.IN_PROGRESS,
+                )
+            } returns null
+            setUpCandidates(kotlinCompetency)
+            coEvery { onboardingAiClient.assessTurn(any()) } returns
+                AssessmentTurnResponse(done = false, question = "q")
+            val savedSlot = slot<SkillAssessmentSession>()
+            every { skillAssessmentSessionRepository.save(capture(savedSlot)) } answers { savedSlot.captured }
+            every { skillAssessmentSessionRepository.findById(any()) } answers { Optional.of(savedSlot.captured) }
+
+            service.startAssessment(authId, projectId)
+
+            // Its signals are a lazy @ElementCollection: read detached, this is a 500.
+            assertEquals(true, readInsideTransaction, "the prior must be read inside a transaction")
+        }
+
         @Test
         fun `sends the consented involvement prior to the interviewer`() = runTest {
             setUpUser()
