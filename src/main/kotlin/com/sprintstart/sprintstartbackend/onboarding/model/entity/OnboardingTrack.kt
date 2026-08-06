@@ -16,17 +16,15 @@ import java.util.UUID
 /**
  * What onboarding means for one kind of role — the manifest a hire's onboarding is assembled from.
  *
- * ### Why a track is not a job title
+ * ### A track is not a job title
  *
- * Onboarding was built around a merged pull request, which made "this hire writes code" part of the
- * definition of progress. A track states, per role, the two things that actually differ between a
- * developer and a Scrum Master: **what counts as their work** ([evidenceKinds]) and **what to call
- * it** ([contributionNoun] and friends). Everything else — the ramp, the metrics, the ledger, the
- * competency graph — is shared, because none of it was ever really about git.
+ * A track states, per role, the only two things that differ between a developer and a Scrum Master:
+ * **what counts as their work** ([evidenceKinds]) and **what to call it** ([contributionNoun] and
+ * friends). The ramp, the metrics and the ledger are shared, because none of them is about git.
  *
- * A track is therefore a *bundle*, not a cage. It sets defaults and vocabulary; it does not stop a
- * PM who ships code or an engineer who runs the retro from having contributions of both kinds,
- * because contributions are counted from one stream regardless of which source produced them.
+ * ⚠️ A track is a *bundle of defaults*, not a cage. It does not stop a PM who ships code or an
+ * engineer who runs the retro from having contributions of both kinds — contributions are counted
+ * from one stream regardless of which source produced them.
  *
  * ### Vocabulary is structured, never prose
  *
@@ -38,9 +36,9 @@ import java.util.UUID
  * ### Evidence kinds decide what mounts
  *
  * [evidenceKinds] is the single switch behind both "which contributions can this hire even have"
- * and "which buddy tools are worth offering them". A track that cannot have a pull request has no
- * business being offered a tool that lists pull requests — that is what made the buddy open a
- * Scrum Master's first conversation by discussing their pull requests.
+ * and "which buddy tools are worth offering them". ⚠️ A track that cannot have a pull request must
+ * not be offered a tool that lists pull requests, or the buddy opens a Scrum Master's first
+ * conversation by discussing their pull requests.
  *
  * An **empty** [evidenceKinds] is a real and honest state, not a misconfiguration: it means nothing
  * this role does is observable yet, so their work cannot be measured until a source for it exists.

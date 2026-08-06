@@ -184,7 +184,7 @@ class OnboardingMetricsServiceTest {
             // can see whose work cannot be measured, without calling the hire stuck.
             //
             // This holds only while the hire's track has no other way to be seen; the test below
-            // is the case that used to be swept in here with it.
+            // covers a track that does.
             every { projectMembershipApi.getProjectMembers(projectId) } returns listOf(member(login = null))
             every { userGoalRepository.findByUserIdAndProjectId(any(), projectId) } returns null
 

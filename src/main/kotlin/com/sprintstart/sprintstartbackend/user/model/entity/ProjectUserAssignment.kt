@@ -32,10 +32,8 @@ class ProjectUserAssignment(
     /**
      * The roles this person holds **on this project** — the only place roles live.
      *
-     * They used to live on the user with no project dimension, which meant "developer" was a fact
-     * about a person rather than about a person on a project. This set is now the single source;
-     * [User.projectRoles] is derived from it as the union across somebody's assignments, for the
-     * surfaces whose question really is global.
+     * This set is the single source; [User.projectRoles] is derived from it as the union across
+     * somebody's assignments, for the surfaces whose question really is global.
      *
      * Empty is a real state and means "on this project, no role set yet" — not "no roles anywhere".
      * The setup ladder's `tracks` rung reports it, which is the point: an unroled member is

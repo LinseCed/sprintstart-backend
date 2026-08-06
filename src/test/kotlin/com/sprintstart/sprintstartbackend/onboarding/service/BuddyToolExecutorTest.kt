@@ -41,8 +41,8 @@ class BuddyToolExecutorTest {
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
     private val projectMembershipApi: ProjectMembershipApi = mockk()
 
-    // Defaults to "nobody has authored an arrival list", which is what every test written before
-    // A2 assumed and what a fresh install actually looks like.
+    // Defaults to "nobody has authored an arrival list", which is what a fresh install looks
+    // like.
     private val arrivalStepService: ArrivalStepService = mockk {
         every { forHire(any()) } returns emptyList()
     }

@@ -44,9 +44,8 @@ fun ArrivalStep.toResponse(): ArrivalStepResponse =
 /**
  * Counts the caller's steps by how each was established.
  *
- * Counting per rigor rather than totalling is the point: an observed step and a self-declared one
- * are different facts, and the single blended number that used to sit here is the defect that made
- * the old onboarding's progress reporting meaningless.
+ * ⚠️ Counting per rigor rather than totalling is the point: an observed step and a self-declared
+ * one are different facts, and blending them into one number is what makes it meaningless.
  */
 fun List<ResolvedArrivalStep>.toMyArrivalResponse(): MyArrivalResponse =
     MyArrivalResponse(

@@ -17,11 +17,8 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * One ordered page of a [CompetencyModule] — a real row, which is the point.
- *
- * Pages used to be *derived on read* from a step's shape (`OnboardingStepMapper.derivePages`): at
- * most one lesson from a single content blob, one task marker, one verify marker. Nothing an
- * author could add, reorder, or edit, because pages were not stored. They are now.
+ * One ordered page of a [CompetencyModule] — a real row, which is the point: a page an author can
+ * add, reorder and edit has to be stored, not derived on read from the shape of something else.
  */
 @Entity
 @Table(name = "module_pages")

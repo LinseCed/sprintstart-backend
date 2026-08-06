@@ -14,13 +14,11 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * An AI-mined starter-work task (a GitHub issue) awaiting PM review.
+ * An AI-mined starter-work task (a GitHub issue).
  *
- * Approving one
- * ([com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkTaskProposalService.approve])
- * used to mint a `CONTRIBUTION` [Competency] with `PREREQUISITE` edges from each of
- * [competencyKeys], so the task became a graph node a hire could reach. There is no graph now, and
- * a hire's goal points at this row directly -- so approving makes it claimable and creates nothing.
+ * A hire's goal points at this row directly, so reviewing one creates nothing -- it only lifts the
+ * demotion [com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkMatcher] applies while
+ * nobody has looked.
  */
 @Entity
 @Table(name = "starter_work_task_proposals")

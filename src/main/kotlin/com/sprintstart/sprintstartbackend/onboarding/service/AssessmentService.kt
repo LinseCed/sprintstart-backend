@@ -101,10 +101,10 @@ class AssessmentService(
     suspend fun startAssessment(authId: String, projectId: UUID): StartAssessmentResponse {
         val userId = resolveUserId(authId)
 
-        // Reserve the session *before* the slow AI call. Resuming used to be checked against state
-        // that only existed after it, so a second start issued while the first was still generating
-        // saw nothing to resume and created its own -- four sessions for one assessment, three of
-        // them stranded IN_PROGRESS with a question nobody ever saw.
+        // ⚠️ Reserve the session *before* the slow AI call. Check resumption against state that
+        // only exists after it and a second start issued while the first is still generating sees
+        // nothing to resume, creating its own -- four sessions for one assessment, three stranded
+        // IN_PROGRESS with a question nobody ever saw.
         val reserved = withContext(Dispatchers.IO) {
             txTemplate.execute { reserveSession(userId, projectId) }!!
         }

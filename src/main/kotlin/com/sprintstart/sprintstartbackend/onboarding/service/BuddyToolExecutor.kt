@@ -162,13 +162,13 @@ class BuddyToolExecutor(
      *
      * The part a checklist cannot do is the reason this is a tool and not just a card: a hire can
      * ask *why* a step exists, say they are stuck on one, and be told who to chase — none of which
-     * a row with a tick box answers. That is the tutor's *"mehr als eine reine ToDo-Liste"*.
+     * a row with a tick box answers.
      *
      * ### Two things this text refuses to say
      *
-     * **No total and no fraction.** "2 of 5 done" over a mix of what the system observed and what
-     * the hire simply told us is the `progressPercentage` defect with a new table behind it, and a
-     * model handed such a number will repeat it. Outstanding and settled are listed, and settled
+     * ⚠️ **No total and no fraction.** "2 of 5 done" over a mix of what the system observed and
+     * what the hire simply told us is meaningless, and a model handed such a number will repeat
+     * it. Outstanding and settled are listed, and settled
      * steps say *how* — never summed together. `BuddyToolExecutorTest` asserts no blended figure.
      *
      * **Nothing is described as blocking.** An outstanding step never stopped anybody claiming work

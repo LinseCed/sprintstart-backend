@@ -47,14 +47,14 @@ import java.util.UUID
 /**
  * Authoring and lifecycle for [CompetencyModule] — the shared content a competency teaches.
  *
- * Proposal-only, the same invariant blueprints and graph proposals hold: authoring never changes
- * what a hire sees. A module is written as a [ModuleStatus.DRAFT], offered for review as
+ * ⚠️ Proposal-only: authoring never changes what a hire sees until it is approved. A module is
+ * written as a [ModuleStatus.DRAFT], offered for review as
  * [ModuleStatus.PROPOSED], and only [approve] makes one live — archiving whatever was live before,
  * so exactly one version per `(competency, project)` is ever [ModuleStatus.ACTIVE].
  *
  * Editing a live module means creating a new version from it, not mutating it: a hire halfway
- * through a module should not have the ground move under them, and the previous version stays as
- * the record of what earlier hires were actually taught.
+ * through a module should not have the ground move under them, and the superseded version stays
+ * as the record of what earlier hires were actually taught.
  */
 @Suppress("TooManyFunctions")
 @Service

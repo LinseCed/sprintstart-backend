@@ -30,7 +30,6 @@ import java.util.UUID
  * Authoring for arrival steps — the list of things that have to be true before somebody can work.
  *
  * Scope is chosen by the optional `projectId` parameter: **omitted means company-wide**, which is
- * the only scope A0 supports in practice, since per-project authoring is A3. Company-wide is also
  * the common case by design — account creation and paperwork do not differ per project, and making
  * each PM re-author them is the effort this model exists to avoid.
  *

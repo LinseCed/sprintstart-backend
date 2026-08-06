@@ -8,17 +8,10 @@ import java.util.UUID
 /**
  * One source of evidence that a hire completed real work.
  *
- * ### Why this interface exists now and not earlier
- *
- * P0 deliberately shipped `ContributionService` with a single hardcoded source and no abstraction,
- * on the grounds that an interface shaped around one example is reliably the wrong interface. This
- * is the slice with a second implementation, so the shape can be taken from what actually differs
- * between them rather than from a guess.
- *
- * What differed turned out to be less than expected: both answer "what has this person completed
- * here", both key off the resolved [ProjectMember] rather than a bare id, and both return the same
- * four moments. What differs is only *where they look* and *how strong the result is* — which is
- * why [kind] is the only thing an implementation declares beyond the read itself.
+ * Every implementation answers "what has this person completed here", keys off the resolved
+ * [ProjectMember] rather than a bare id, and returns the same four moments. All that differs is
+ * *where it looks* and *how strong the result is*, which is why [kind] is the only thing an
+ * implementation declares beyond the read itself.
  *
  * ### Every provider runs for every hire
  *

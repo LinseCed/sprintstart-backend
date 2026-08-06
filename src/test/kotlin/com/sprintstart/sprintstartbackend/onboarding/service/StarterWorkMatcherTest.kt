@@ -197,8 +197,8 @@ class StarterWorkMatcherTest {
         }
 
         /**
-         * The property that keeps the demotion a nudge rather than the approval gate it replaced:
-         * set it any heavier and an unreviewed task never surfaces, which is D1 undone.
+         * The property that keeps the demotion a nudge rather than an approval gate: set it any
+         * heavier and an unreviewed task never surfaces.
          */
         @Test
         fun `an unreviewed task that fits still beats a reviewed one that does not`() {

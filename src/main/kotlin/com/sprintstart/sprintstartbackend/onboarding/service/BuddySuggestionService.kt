@@ -21,8 +21,8 @@ import java.util.UUID
  * in a new place, and **louder than the tool version, because a chip is something the hire sees**.
  * Deriving rather than listing is what makes the two incapable of disagreeing.
  *
- * Order follows the spec list, so arrival comes first for the reason A2 put it first: what has to
- * be true before somebody can work comes before how their work is going.
+ * Order follows the spec list, so arrival comes first: what has to be true before somebody can
+ * work comes before how their work is going.
  *
  * ### What is deliberately not here
  *
@@ -63,9 +63,8 @@ class BuddySuggestionService(
          * ⚠️ **Wording may only assume what the chip's own gate guarantees.** The pull-request chip
          * may say "pull request" because it is mounted only for a track that admits them; every
          * other chip is mounted for everybody and must therefore be true of a designer, a Scrum
-         * Master and a developer alike. The same trap as A2's persona clause, which first said
-         * *"somebody who cannot clone the repository"* to every role — and `BuddySuggestionServiceTest`
-         * greps for the same developer vocabulary here.
+         * Master and a developer alike — no "clone", "repository", "commit" or "pull request" in a
+         * chip everybody sees. `BuddySuggestionServiceTest` greps for exactly that vocabulary.
          *
          * The label is what the chip says; the question is what lands in the composer. They differ
          * only in length — a chip is a doorway, and one that promised something other than the

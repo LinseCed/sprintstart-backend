@@ -19,22 +19,14 @@ import java.time.Instant
 /**
  * Authoring the competency vocabulary: reading it, adding a competency, editing one, removing one.
  *
- * ### It is a list now, not a graph
+ * ### A list, not a graph
  *
- * Prerequisite and related edges are gone, and with them traversal, versioning, pins, soft removal
- * and the whole change-replay visibility model. Those existed to serve a DAG that **gated** a hire's
- * progression and that a hire could *see*; the gates were retired, the hire-facing map was retired,
- * and what remained was read by exactly one sentence in the buddy's learning plan — a sentence that
- * could report a `RELATED` edge as a prerequisite, because the edge kind was dropped on the way out.
+ * A competency is a plain, durable name for something somebody can be proficient in. The ledger
+ * keys off it, a module teaches it, and the matcher counts it. ⚠️ **Nothing orders it** — there are
+ * no edges, and a structure that claims one thing "usually comes after" another is a claim nothing
+ * here can support.
  *
- * So a competency is now a plain, durable name for something somebody can be proficient in. The
- * ledger keys off it, a module teaches it, and the matcher counts it. Nothing orders it.
- *
- * ### Removal is a real delete now
- *
- * Soft removal existed because visibility was replayed from change rows: deleting a row would have
- * made a hire's earned progress unresolvable. Without that model there is nothing to replay, so
- * removal deletes the row.
+ * ### Removal is a real delete
  *
  * Two things deliberately survive it, both keyed by the competency *key* rather than by a foreign
  * key, which is what makes this safe:
@@ -51,9 +43,8 @@ import java.time.Instant
  * they delete it forever. A person re-adding the same key clears the tombstone — it binds the
  * generator, not somebody who changed their mind.
  *
- * Every write here also marks the row `PM`. Regeneration must leave those alone, or "generation runs
- * and an admin can correct it" means "generation overwrites the admin". See
- * `forks/SKILL_MAP_RETIREMENT_DESIGN.md`, D2.
+ * ⚠️ Every write here also marks the row `PM`, and regeneration must leave those alone — otherwise
+ * "generation runs and an admin can correct it" means "generation overwrites the admin".
  */
 @Service
 class CompetencyGraphAuthoringService(

@@ -141,9 +141,9 @@ class BuddyPlanTools(
      * presented as headings rather than a flat list so the model can offer a neighbour of what a
      * hire is already touching, instead of reading a shelf out in alphabetical order.
      *
-     * **Headings only appear once something is grouped.** Until generation populates `area` (S3) a
-     * hand-authored vocabulary is mostly ungrouped, and wrapping every gap in an "Ungrouped" heading
-     * would add a layer that carries no information. Ungrouped gaps are listed plainly, after the
+     * **Headings only appear once something is grouped.** A hand-authored vocabulary is mostly
+     * ungrouped, and wrapping every gap in an "Ungrouped" heading would add a layer that carries no
+     * information. Ungrouped gaps are listed plainly, after the
      * grouped ones — they are not a category, they are the ones nobody has said anything about yet.
      */
     private fun StringBuilder.appendGaps(

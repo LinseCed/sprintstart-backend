@@ -48,9 +48,9 @@ enum class ArrivalDerivation(
     /**
      * The hire has produced work on a project, which means their environment evidently runs.
      *
-     * The evidence half of what `EnvironmentReadiness` used to do, without the second record of it:
-     * a contribution already proves the environment worked, so storing readiness separately would
-     * be a second copy of a fact that lives somewhere durable — the copy that goes stale.
+     * ⚠️ Derived, never stored separately: a contribution already proves the environment worked, so
+     * a readiness record beside it would be a second copy of a durable fact — the copy that goes
+     * stale.
      *
      * ⚠️ **Self-confirmable, and that is the important half.** This evidence arrives *late* — by the
      * time somebody has opened a pull request, getting set up is days behind them. So the hire

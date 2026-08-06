@@ -15,11 +15,10 @@ import java.util.UUID
  *
  * ### The row's existence is the state
  *
- * There is no status column. A row means settled; no row means not settled yet. The design of
- * record named a `status` field, and this is a **deliberate deviation**: the only value it could
- * have held in A0 is `SETTLED`, and a single-valued enum is the dead wiring this codebase has
- * shipped often enough to have a rule against. A future "not applicable to me" is a real state
- * worth adding *when something reads it* — adding it now would be a column nobody queries.
+ * There is no status column. A row means settled; no row means not settled yet. ⚠️ The only value
+ * such a column could hold is `SETTLED`, and a single-valued enum is dead wiring. A future
+ * "not applicable to me" is a real state worth adding *when something reads it* — adding it now
+ * would be a column nobody queries.
  *
  * Absence therefore means "not settled yet", never an error, and a hire with no rows at all is a
  * hire who has just arrived — which is the normal case, not a missing-data case.
@@ -43,10 +42,9 @@ import java.util.UUID
  * ### Rigor lives here, not on the definition
  *
  * [ArrivalStep.settledBy] says how a step is *meant* to be settled; [rigor] records how it actually
- * was for this hire. They can differ, and the distinction has to survive to the readout: a step the
- * system observed and a step somebody ticked are different facts, and blending them into one
- * completion number is precisely the `progressPercentage` bug that the old onboarding model died
- * of. Nothing may render them as one figure.
+ * was for this hire. They can differ, and the distinction has to survive to the readout: a step
+ * the system observed and a step somebody ticked are different facts. ⚠️ Nothing may render them
+ * as one figure.
  */
 @Entity
 @Table(name = "arrival_step_states")

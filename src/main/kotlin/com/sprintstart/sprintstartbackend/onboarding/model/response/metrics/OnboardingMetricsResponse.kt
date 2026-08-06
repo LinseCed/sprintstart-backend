@@ -10,12 +10,11 @@ import java.util.UUID
  * normal state of a hire mid-onboarding and is a different thing from zero. A dashboard that
  * renders an unreached milestone as `0 days` reports success where there is none.
  *
- * ⚠️ **The fields say "contribution", and they used to say "pull request".** The numbers behind
- * them have been composed from [com.sprintstart.sprintstartbackend.onboarding.service.Contribution]
- * since P0 — a merged pull request, a colleague's attestation and a tracked issue somebody else
- * accepted all land here — so the old names described one source of several and quietly told a PM
- * their Scrum Master had opened no pull requests. The names now match what is counted, in
- * `Contribution`'s own vocabulary: opened, first answered, accepted, returned.
+ * ⚠️ **The fields say "contribution", never "pull request".** They are composed from
+ * [com.sprintstart.sprintstartbackend.onboarding.service.Contribution] — a merged pull request, a
+ * colleague's attestation and a tracked issue somebody else accepted all land here — so naming
+ * them after one source would quietly tell a PM their Scrum Master had opened nothing. The
+ * vocabulary is `Contribution`'s: opened, first answered, accepted, returned.
  */
 data class HireTimelineResponse(
     val userId: UUID,

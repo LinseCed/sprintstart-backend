@@ -38,14 +38,10 @@ import java.util.UUID
 /**
  * Orchestrates AI-mined starter-work task proposals, PM review, and hire-fit matching.
  *
- * Approving a proposal used to mint a `CONTRIBUTION` competency with `PREREQUISITE` edges from
- * every tagged key, so the task became a graph node a hire could reach once they had the skills.
- * With the graph retired, approving marks the row approved and nothing else: a goal points at the
- * task itself.
+ * Reviewing a proposal marks the row and nothing else -- a goal points at the task itself.
  *
- * [StarterWorkTaskProposal.competencyKeys] still matters, as one of the four signals
- * [StarterWorkMatcher] ranks a task by. It says what the work exercises; it no longer gates who
- * may claim it.
+ * [StarterWorkTaskProposal.competencyKeys] is one of the four signals [StarterWorkMatcher] ranks a
+ * task by. ⚠️ It says what the work exercises; it does not gate who may claim it.
  */
 @Service
 @Suppress("TooManyFunctions")

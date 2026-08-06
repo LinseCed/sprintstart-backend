@@ -72,13 +72,11 @@ class OnboardingAiClient(
      * object on this side to carry it, unlike blueprint generation. A non-2xx response is wrapped
      * in an [OnboardingAiException] carrying the upstream status/body.
      *
-     * The result is a flat vocabulary: it states no ordering. The relationship pass that used to
-     * follow the node pass went with the graph it described.
+     * The result is a flat vocabulary: it states no ordering.
      *
-     * **Nothing calls this or [streamCompetencyGraph] right now.** The PM proposal queue that did
-     * was retired with the graph, and the replacement — generation kicked off when a crawl
-     * finishes, so that "set up onboarding" collapses into "connect a repo" — is S3 of
-     * `forks/SKILL_MAP_RETIREMENT_DESIGN.md`.
+     * ⚠️ **Nothing calls this or [streamCompetencyGraph].** Generation is kicked off when a crawl
+     * finishes, so that "set up onboarding" collapses into "connect a repo"; there is no PM
+     * proposal queue in front of it.
      *
      * @param activeCompetencies The backend's current live competencies, which drive dedup.
      * @param existingAreas The grouping areas in use, so a proposal joins one rather than coining a

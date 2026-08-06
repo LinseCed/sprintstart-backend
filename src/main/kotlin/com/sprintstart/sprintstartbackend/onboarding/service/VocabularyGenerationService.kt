@@ -29,7 +29,7 @@ import java.time.Instant
  *
  * ### The two things it must not destroy
  *
- * Auto-generation is only safe because the protections landed first (S2):
+ * Auto-generation is only safe because of two protections:
  * - **A `PM` row is never touched.** Somebody corrected it, and regeneration overwriting that would
  *   mean the correction quietly never happened.
  * - **A tombstoned key is never resurrected.** The generator is told about them, but being told is

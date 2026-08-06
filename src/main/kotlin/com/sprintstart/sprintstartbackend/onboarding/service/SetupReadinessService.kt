@@ -13,20 +13,16 @@ import java.util.UUID
 
 /**
  * "Is this project ready to onboard someone?" answered as a ladder of the three setup stages the
- * onboarding module owns: an approved skill map, a stocked pool of starter tasks, and roles that say
- * which track their people onboard on. (The corpus stage lives in the ingestion module; see
+ * onboarding module owns: a vocabulary, a stocked pool of starter tasks, and roles that say which
+ * track their people onboard on. (The corpus stage lives in the ingestion module; see
  * [SetupReadinessResponse].)
  *
- * Two rungs have gone since it was written, both because the work behind them stopped existing. A
- * buddy for every hire went with the human-buddy loop — the AI buddy needs no assignment. A chosen
- * baseline went when the path started deriving its targets from the hire's claimed goal: the rung
- * was asking a PM to make a selection nothing read, which is a worse failure than a missing rung
- * because it looks like progress.
+ * Every number is composed on read from the same rows each stage's own page reads, so this can
+ * never disagree with those pages.
  *
- * Every number is composed on read from the same rows each stage's own page reads, so this can never
- * disagree with those pages -- and the bug that motivated it (proposals generated but never approved,
- * so a page read "empty") shows up here as an explicit "waiting for your review" instead of a silent
- * contradiction between two surfaces.
+ * ⚠️ A rung reports an outcome, never a chore. Nothing here is waiting on the PM -- adding a rung
+ * that asks somebody for something nothing reads makes the ladder look like progress while they
+ * do it.
  */
 @Service
 class SetupReadinessService(
@@ -86,10 +82,10 @@ class SetupReadinessService(
         val unreviewed = liveTasks.count { !it.reviewed }
         val uncovered = uncoveredTracks(liveTasks)
 
-        // Unreviewed tasks are *not* a chore this rung nags about. They are claimable; review only
-        // lifts the matcher's demotion. Saying "N waiting for your review" would put back the queue
-        // D1 removed, and a rung nobody can clear by doing something real is how a ladder stops
-        // being read.
+        // ⚠️ Unreviewed tasks are *not* a chore this rung nags about. They are claimable; review
+        // only lifts the matcher's demotion. Saying "N waiting for your review" makes this a queue
+        // again, and a rung nobody can clear by doing something real is how a ladder stops being
+        // read.
         val reviewNote = if (unreviewed > 0) {
             " $unreviewed of them nobody has looked at yet — claimable, just ranked lower."
         } else {

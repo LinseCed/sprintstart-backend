@@ -28,7 +28,7 @@ import kotlin.test.assertEquals
 /**
  * Generation writes to the vocabulary with nobody reviewing it, so what it must **not** do is the
  * part worth pinning: it may not overwrite a person's row, and it may not resurrect what somebody
- * removed. Those two protections are the reason S2 had to ship before this.
+ * removed.
  */
 class VocabularyGenerationServiceTest {
     private val competencyRepository: CompetencyRepository = mockk(relaxed = true)

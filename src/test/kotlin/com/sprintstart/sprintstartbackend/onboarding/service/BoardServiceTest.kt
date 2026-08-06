@@ -319,9 +319,8 @@ class BoardServiceTest {
     }
 
     /**
-     * The tutor's second half of the crowding note: *"wie eindeutig es am Ende für den User bleibt,
-     * an welchem Task jetzt als Nächstes gearbeitet werden soll"*. The task somebody is on had no
-     * primacy over any other card, so on a board of any size it was findable only by looking.
+     * Without a pin, the task somebody is on has no primacy over any other card, so on a board of
+     * any size it is findable only by looking.
      */
     @Test
     fun `the task the hire is on comes first`() {
@@ -376,8 +375,8 @@ class BoardServiceTest {
     }
 
     /**
-     * ⚠️ **Arrival outranks the current task**, for the reason A2 put arrival first everywhere:
-     * what has to be true before somebody can work comes before what they are working on. Somebody
+     * ⚠️ **Arrival outranks the current task**: what has to be true before somebody can work
+     * comes before what they are working on. Somebody
      * still waiting on access does not need their task moved up, they need the access — and this is
      * the one case where the two pins compete.
      */
