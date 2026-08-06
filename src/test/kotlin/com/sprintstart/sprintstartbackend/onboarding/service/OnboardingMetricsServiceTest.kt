@@ -126,8 +126,8 @@ class OnboardingMetricsServiceTest {
 
             val hire = service.getProjectMetrics(projectId).hires.single()
 
-            assertEquals(7 * 24, hire.hoursToFirstMergedPullRequest?.toInt())
-            assertEquals(1, hire.mergedPullRequestCount)
+            assertEquals(7 * 24, hire.hoursToFirstAcceptedContribution?.toInt())
+            assertEquals(1, hire.acceptedContributionCount)
         }
 
         @Test
@@ -136,8 +136,8 @@ class OnboardingMetricsServiceTest {
 
             val hire = service.getProjectMetrics(projectId).hires.single()
 
-            assertNull(hire.hoursToFirstMergedPullRequest)
-            assertNull(hire.firstPullRequestMergedAt)
+            assertNull(hire.hoursToFirstAcceptedContribution)
+            assertNull(hire.firstContributionAcceptedAt)
             assertNull(hire.hoursToFirstResponse)
         }
 
@@ -169,9 +169,9 @@ class OnboardingMetricsServiceTest {
             val hire = service.getProjectMetrics(projectId).hires.single()
 
             assertNull(hire.joinedAt)
-            assertNull(hire.hoursToFirstMergedPullRequest)
+            assertNull(hire.hoursToFirstAcceptedContribution)
             // The merge itself is still real and still reported.
-            assertEquals(1, hire.mergedPullRequestCount)
+            assertEquals(1, hire.acceptedContributionCount)
         }
     }
 
@@ -261,7 +261,7 @@ class OnboardingMetricsServiceTest {
 
             val hire = service.getProjectMetrics(projectId).hires.single()
 
-            assertEquals(0, hire.openPullRequestCount)
+            assertEquals(0, hire.openContributionCount)
             assertFalse(hire.stalled)
             assertNull(hire.longestOpenWaitHours)
         }
@@ -338,8 +338,8 @@ class OnboardingMetricsServiceTest {
             val metrics = service.getProjectMetrics(projectId)
 
             // Joined 10 days ago; merges at 1, 2 and 9 days in. The mean would be 4 days.
-            assertEquals(2 * 24, metrics.medianHoursToFirstMergedPullRequest?.toInt())
-            assertEquals(3, metrics.hiresWithMergedPullRequest)
+            assertEquals(2 * 24, metrics.medianHoursToFirstAcceptedContribution?.toInt())
+            assertEquals(3, metrics.hiresWithAcceptedContribution)
         }
 
         @Test
@@ -349,7 +349,7 @@ class OnboardingMetricsServiceTest {
             val metrics = service.getProjectMetrics(projectId)
 
             assertEquals(0, metrics.memberCount)
-            assertNull(metrics.medianHoursToFirstMergedPullRequest)
+            assertNull(metrics.medianHoursToFirstAcceptedContribution)
             assertNull(metrics.p90HoursToFirstResponse)
         }
     }

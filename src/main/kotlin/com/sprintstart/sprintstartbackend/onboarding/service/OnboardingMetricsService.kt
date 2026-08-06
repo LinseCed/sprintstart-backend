@@ -58,15 +58,15 @@ class OnboardingMetricsService(
         val members = projectMembershipApi.getProjectMembers(projectId)
         val hires = members.map { timelineFor(it, projectId) }
 
-        val timesToMerge = hires.mapNotNull { it.hoursToFirstMergedPullRequest }
+        val timesToMerge = hires.mapNotNull { it.hoursToFirstAcceptedContribution }
         val timesToResponse = hires.mapNotNull { it.hoursToFirstResponse }
 
         return ProjectOnboardingMetricsResponse(
             projectId = projectId,
             memberCount = members.size,
             unattributableMemberCount = members.count { it.githubLogin.isNullOrBlank() },
-            hiresWithMergedPullRequest = hires.count { it.mergedPullRequestCount > 0 },
-            medianHoursToFirstMergedPullRequest = median(timesToMerge),
+            hiresWithAcceptedContribution = hires.count { it.acceptedContributionCount > 0 },
+            medianHoursToFirstAcceptedContribution = median(timesToMerge),
             medianHoursToFirstResponse = median(timesToResponse),
             p90HoursToFirstResponse = percentile(timesToResponse, P90),
             stalledCount = hires.count { it.stalled },
@@ -122,15 +122,15 @@ class OnboardingMetricsService(
             joinedAt = member.joinedAt,
             taskZeroAssignedAt = taskZeroService.assignedAtFor(member.userId, projectId),
             firstTaskClaimedAt = goalClaimedAt,
-            firstPullRequestOpenedAt = opened,
+            firstContributionOpenedAt = opened,
             firstResponseAt = firstContribution?.firstResponseAt,
-            firstPullRequestMergedAt = accepted,
-            hoursToFirstMergedPullRequest = hoursBetween(member.joinedAt, accepted),
+            firstContributionAcceptedAt = accepted,
+            hoursToFirstAcceptedContribution = hoursBetween(member.joinedAt, accepted),
             hoursToFirstResponse = hoursBetween(firstContribution?.openedAt, firstContribution?.firstResponseAt),
-            mergedPullRequestCount = contributions.count { it.isAccepted },
+            acceptedContributionCount = contributions.count { it.isAccepted },
             // In flight, not merely unaccepted: a contribution closed without acceptance is neither
             // in flight nor accepted and must not inflate the open count.
-            openPullRequestCount = contributions.count { it.isInFlight },
+            openContributionCount = contributions.count { it.isInFlight },
             longestOpenWaitHours = longestOpenWait,
             stalled = stalledReason != null,
             stalledReason = stalledReason,
@@ -145,7 +145,7 @@ class OnboardingMetricsService(
                 contributionNounPlural = track.contributionNounPlural,
                 contributionVerbPast = track.contributionVerbPast,
             ),
-            reworkedPullRequestCount = contributions.count { it.returnedCount > 0 },
+            returnedContributionCount = contributions.count { it.returnedCount > 0 },
         )
     }
 

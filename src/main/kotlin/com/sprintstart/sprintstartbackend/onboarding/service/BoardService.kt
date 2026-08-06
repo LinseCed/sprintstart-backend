@@ -639,11 +639,11 @@ class BoardService(
             // The timeline's field names still say "pull request"; the values behind them are
             // composed from contributions of any kind, which is why the card can name them
             // generally.
-            BoardMomentResponse(BoardMomentKey.WORK_SUBMITTED, timeline?.firstPullRequestOpenedAt),
+            BoardMomentResponse(BoardMomentKey.WORK_SUBMITTED, timeline?.firstContributionOpenedAt),
             BoardMomentResponse(BoardMomentKey.FIRST_RESPONSE, timeline?.firstResponseAt),
-            BoardMomentResponse(BoardMomentKey.WORK_ACCEPTED, timeline?.firstPullRequestMergedAt),
+            BoardMomentResponse(BoardMomentKey.WORK_ACCEPTED, timeline?.firstContributionAcceptedAt),
         ),
-        acceptedCount = timeline?.mergedPullRequestCount ?: 0,
+        acceptedCount = timeline?.acceptedContributionCount ?: 0,
         autonomyReachedAt = timeline?.autonomyReachedAt,
         stalledReason = timeline?.stalledReason,
     )

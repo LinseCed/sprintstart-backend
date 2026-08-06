@@ -6,9 +6,9 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.C
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.goal.GoalView
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.GenerateStarterWorkResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.ProposedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.UnreviewedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkTaskProposalService
 import com.sprintstart.sprintstartbackend.onboarding.service.UserGoalService
 import io.swagger.v3.oas.annotations.Operation
@@ -125,91 +125,104 @@ class StarterWorkController(
     ): StarterWorkTaskProposalResponse = starterWorkTaskProposalService.createTask(request)
 
     /**
-     * Lists the starter-work tasks currently awaiting PM review.
+     * Lists the live starter-work tasks nobody has vouched for yet.
+     *
+     * ⚠️ **Not a queue anything waits in.** These tasks are already claimable — S3b made mining
+     * live-on-arrival — so this is the set a PM has not looked at, not the set held back from
+     * hires. The route said `/proposed` and this method `listProposed` long after `PROPOSED` was
+     * deleted from `ProposalStatus`.
      */
     @Operation(
-        summary = "List proposed starter-work tasks",
-        description = "Returns starter-work tasks in PROPOSED state",
+        summary = "List starter-work tasks nobody has reviewed yet",
+        description = "Returns live starter-work tasks no PM has vouched for. They are already claimable — " +
+            "reviewing one lifts the fit-ranking demotion it carries, it does not admit it to the pool.",
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "Proposed tasks returned"),
+            ApiResponse(responseCode = "200", description = "Unreviewed tasks returned"),
             ApiResponse(responseCode = "401", description = "Authentication required"),
             ApiResponse(responseCode = "403", description = "Insufficient role"),
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/proposed")
+    @GetMapping("/unreviewed")
     @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
-    fun listProposed(): ProposedStarterWorkResponse = starterWorkTaskProposalService.listProposed()
+    fun listUnreviewed(): UnreviewedStarterWorkResponse = starterWorkTaskProposalService.listUnreviewed()
 
     /**
-     * Lists the approved starter-work tasks, for a PM choosing one to author orientation for.
+     * Lists the whole live starter-work pool, for a PM choosing one to author orientation for.
      */
     @Operation(
-        summary = "List approved starter-work tasks",
-        description = "Returns starter-work tasks in APPROVED state — the pool a PM can author task " +
-            "orientation for",
+        summary = "List the live starter-work pool",
+        description = "Returns every live starter-work task — reviewed or not — which is the pool a PM can " +
+            "author task orientation for and the pool hires are ranked against.",
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "Approved tasks returned"),
+            ApiResponse(responseCode = "200", description = "Pool returned"),
             ApiResponse(responseCode = "401", description = "Authentication required"),
             ApiResponse(responseCode = "403", description = "Insufficient role"),
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @GetMapping("/approved")
+    @GetMapping("/pool")
     @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
-    fun listApproved(): List<StarterWorkTaskProposalResponse> = starterWorkTaskProposalService.listApproved()
+    fun listPool(): List<StarterWorkTaskProposalResponse> = starterWorkTaskProposalService.listPool()
 
     /**
-     * Approves a proposed starter-work task, creating it as a real `CONTRIBUTION` node in the
-     * live graph.
+     * Records that somebody has looked at a starter-work task and is happy with it.
+     *
+     * ⚠️ **This admits nothing.** It was claimable before and it is claimable after; what changes
+     * is that `StarterWorkMatcher` stops demoting it for being unvouched. The route was
+     * `/{id}/approve`, which is the gate S3b deliberately removed.
      */
     @Operation(
-        summary = "Approve a proposed starter-work task",
-        description = "Approves a proposed task, creating a CONTRIBUTION node (and its prerequisite edges) " +
-            "in the live graph",
+        summary = "Mark a starter-work task reviewed",
+        description = "Records that a PM has looked at the task and is happy with it. It was already " +
+            "claimable — this lifts the fit-ranking demotion an unreviewed task carries. Idempotent.",
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "Task approved and created"),
+            ApiResponse(responseCode = "200", description = "Task marked reviewed"),
             ApiResponse(responseCode = "401", description = "Authentication required"),
             ApiResponse(responseCode = "403", description = "Insufficient role"),
-            ApiResponse(responseCode = "404", description = "No proposed task found with the given id"),
-            ApiResponse(responseCode = "409", description = "Proposal is no longer PROPOSED"),
+            ApiResponse(responseCode = "404", description = "No task found with the given id"),
+            ApiResponse(responseCode = "409", description = "The task was removed from the pool"),
         ],
     )
     @ResponseStatus(HttpStatus.OK)
-    @PostMapping("/{id}/approve")
+    @PostMapping("/{id}/review")
     @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
-    fun approve(
-        @Parameter(description = "UUID of the starter-work task proposal to approve")
+    fun markReviewed(
+        @Parameter(description = "UUID of the starter-work task to mark reviewed")
         @PathVariable id: UUID,
-    ): StarterWorkTaskProposalResponse = starterWorkTaskProposalService.approve(id)
+    ): StarterWorkTaskProposalResponse = starterWorkTaskProposalService.markReviewed(id)
 
     /**
-     * Rejects a proposed starter-work task without touching the live graph.
+     * Takes a starter-work task out of the pool for good.
+     *
+     * The one irreversible action here, and **not the opposite of reviewing**: reviewing changes a
+     * ranking, this removes work from the pool. Sticky, so mining never brings it back.
      */
     @Operation(
-        summary = "Reject a proposed starter-work task",
-        description = "Rejects a proposed task; the live graph is left untouched",
+        summary = "Remove a starter-work task from the pool",
+        description = "Takes the task out of the pool for good. Sticky: mining never re-proposes a task " +
+            "somebody removed, or they would remove it again after every crawl.",
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "Task rejected"),
+            ApiResponse(responseCode = "200", description = "Task removed"),
             ApiResponse(responseCode = "401", description = "Authentication required"),
             ApiResponse(responseCode = "403", description = "Insufficient role"),
-            ApiResponse(responseCode = "404", description = "No proposed task found with the given id"),
-            ApiResponse(responseCode = "409", description = "Proposal is no longer PROPOSED"),
+            ApiResponse(responseCode = "404", description = "No task found with the given id"),
+            ApiResponse(responseCode = "409", description = "The task was already removed from the pool"),
         ],
     )
     @ResponseStatus(HttpStatus.OK)
     @PostMapping("/{id}/reject")
     @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
     fun reject(
-        @Parameter(description = "UUID of the starter-work task proposal to reject")
+        @Parameter(description = "UUID of the starter-work task to remove")
         @PathVariable id: UUID,
         @RequestBody(required = false) request: RejectProposalRequest?,
     ): StarterWorkTaskProposalResponse = starterWorkTaskProposalService.reject(id, request?.reason)

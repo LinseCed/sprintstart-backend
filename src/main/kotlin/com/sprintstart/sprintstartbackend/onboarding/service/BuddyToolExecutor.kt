@@ -243,8 +243,8 @@ class BuddyToolExecutor(
 
     private fun describe(projectName: String, timeline: HireTimelineResponse): String = buildString {
         appendLine("Project: $projectName")
-        appendLine("- Open pull requests: ${timeline.openPullRequestCount}")
-        appendLine("- Merged pull requests: ${timeline.mergedPullRequestCount}")
+        appendLine("- Open pull requests: ${timeline.openContributionCount}")
+        appendLine("- Merged pull requests: ${timeline.acceptedContributionCount}")
         timeline.longestOpenWaitHours?.let {
             appendLine("- Longest pull request currently waiting on a review: $it hours")
         }
@@ -257,7 +257,7 @@ class BuddyToolExecutor(
             "no"
         }
         appendLine("- Stalled: $stall")
-        appendLine("- Pull requests sent back for changes: ${timeline.reworkedPullRequestCount}")
+        appendLine("- Pull requests sent back for changes: ${timeline.returnedContributionCount}")
         timeline.autonomyReachedAt?.let { appendLine("- Reached autonomy at: $it") }
     }.trim()
 

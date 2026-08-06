@@ -143,13 +143,13 @@ class BuddyToolExecutorTest {
         joinedAt = null,
         taskZeroAssignedAt = null,
         firstTaskClaimedAt = null,
-        firstPullRequestOpenedAt = null,
+        firstContributionOpenedAt = null,
         firstResponseAt = null,
-        firstPullRequestMergedAt = null,
-        hoursToFirstMergedPullRequest = null,
+        firstContributionAcceptedAt = null,
+        hoursToFirstAcceptedContribution = null,
         hoursToFirstResponse = null,
-        mergedPullRequestCount = 0,
-        openPullRequestCount = openPrs,
+        acceptedContributionCount = 0,
+        openContributionCount = openPrs,
         longestOpenWaitHours = longestOpenWaitHours,
         stalled = stalled,
         stalledReason = stalledReason,
@@ -160,7 +160,7 @@ class BuddyToolExecutorTest {
             contributionNounPlural = "changes",
             contributionVerbPast = "merged",
         ),
-        reworkedPullRequestCount = 0,
+        returnedContributionCount = 0,
     )
 
     private fun competency(

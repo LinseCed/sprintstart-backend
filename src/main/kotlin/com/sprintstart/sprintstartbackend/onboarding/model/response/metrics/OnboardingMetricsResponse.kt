@@ -9,11 +9,18 @@ import java.util.UUID
  * Every timestamp is nullable and every gap is nullable, because "has not happened yet" is the
  * normal state of a hire mid-onboarding and is a different thing from zero. A dashboard that
  * renders an unreached milestone as `0 days` reports success where there is none.
+ *
+ * ⚠️ **The fields say "contribution", and they used to say "pull request".** The numbers behind
+ * them have been composed from [com.sprintstart.sprintstartbackend.onboarding.service.Contribution]
+ * since P0 — a merged pull request, a colleague's attestation and a tracked issue somebody else
+ * accepted all land here — so the old names described one source of several and quietly told a PM
+ * their Scrum Master had opened no pull requests. The names now match what is counted, in
+ * `Contribution`'s own vocabulary: opened, first answered, accepted, returned.
  */
 data class HireTimelineResponse(
     val userId: UUID,
     val displayName: String,
-    /** Null when this person has declared no GitHub login, so none of their work can be attributed. */
+    /** Null when this person has declared no GitHub login, so none of their pull requests can be attributed. */
     val githubLogin: String?,
     /** Null for assignments made before joining was recorded — "clock unknown", not "joined now". */
     val joinedAt: Instant?,
@@ -24,20 +31,23 @@ data class HireTimelineResponse(
      */
     val taskZeroAssignedAt: Instant?,
     val firstTaskClaimedAt: Instant?,
-    val firstPullRequestOpenedAt: Instant?,
+    /** When they first put work up for somebody else to look at, whatever kind of work it is. */
+    val firstContributionOpenedAt: Instant?,
     val firstResponseAt: Instant?,
-    val firstPullRequestMergedAt: Instant?,
-    /** Joined → first merged pull request. The north star, per hire. */
-    val hoursToFirstMergedPullRequest: Long?,
-    /** Opened → first response on their first pull request. */
+    /** When their first piece of work was accepted through the team's normal quality bar. */
+    val firstContributionAcceptedAt: Instant?,
+    /** Joined → first accepted contribution. The north star, per hire. */
+    val hoursToFirstAcceptedContribution: Long?,
+    /** Opened → first response on their first contribution. */
     val hoursToFirstResponse: Long?,
-    val mergedPullRequestCount: Int,
-    val openPullRequestCount: Int,
+    val acceptedContributionCount: Int,
+    /** Submitted and still waiting on somebody else. */
+    val openContributionCount: Int,
     /**
-     * Their longest pull request currently waiting on anyone, in hours.
+     * Their longest contribution currently waiting on anyone, in hours.
      *
-     * Measured against now, not against a close that never came: a pull request nobody has answered
-     * for three weeks should read as three weeks, and it only stops growing when somebody replies.
+     * Measured against now, not against a close that never came: work nobody has answered for three
+     * weeks should read as three weeks, and it only stops growing when somebody replies.
      */
     val longestOpenWaitHours: Long?,
     val stalled: Boolean,
@@ -52,20 +62,19 @@ data class HireTimelineResponse(
      */
     val autonomyReachedAt: Instant?,
     /**
-     * How many of this hire's pull requests were sent back for changes.
+     * How much of this hire's work was sent back for changes.
      *
-     * The counterpart to the merge count: shipping five changes that each needed three rounds is a
-     * different story from shipping five clean ones, and only one of those two numbers was visible
-     * before.
+     * The counterpart to the accepted count: shipping five things that each needed three rounds is
+     * a different story from shipping five clean ones, and only one of those two numbers was
+     * visible before.
      */
-    val reworkedPullRequestCount: Int,
+    val returnedContributionCount: Int,
     /**
      * How this hire's work is named, from their track.
      *
-     * Every field above still says "pull request", because the numbers behind them are composed
-     * from contributions of any kind and renaming a wire contract is a separate, breaking job. This
-     * is what lets a PM surface *say* the right word anyway: "2 ceremonies facilitated" over the
-     * same number that would read "2 changes merged" for an engineer.
+     * The fields above are deliberately *neutral* rather than named per track — a wire contract
+     * cannot rename itself per reader — so this is what lets a PM surface say the right word over
+     * the same number: "2 ceremonies facilitated" where an engineer's reads "2 changes merged".
      *
      * Structured nouns rather than prose, for the reason the board gives: a track fills fixed slots
      * in a sentence the app owns, it never gets to write the sentence.
@@ -93,16 +102,26 @@ data class HireVocabularyResponse(
 /**
  * A project's onboarding health.
  *
- * Medians rather than means throughout: one hire who took four months to their first merge should
- * not be able to make the cohort look slow, and one who merged on day one should not hide the rest.
+ * Medians rather than means throughout: one hire who took four months to their first accepted piece
+ * of work should not be able to make the cohort look slow, and one who finished on day one should
+ * not hide the rest.
  */
 data class ProjectOnboardingMetricsResponse(
     val projectId: UUID,
     val memberCount: Int,
-    /** Members with no declared GitHub login — their timelines are necessarily incomplete. */
+    /**
+     * Members with no declared GitHub login — their pull requests cannot be attributed, so their
+     * timelines are necessarily incomplete.
+     *
+     * ⚠️ **Still counted on the GitHub login alone**, deliberately, and this is now narrower than
+     * the name suggests: a hire who declared a tracker name but no GitHub login has attributable
+     * work and is counted here anyway. Widening it is a behaviour change, not a rename, so it is
+     * left for whoever decides what "attributable" should mean once a project can have two
+     * identities per person.
+     */
     val unattributableMemberCount: Int,
-    val hiresWithMergedPullRequest: Int,
-    val medianHoursToFirstMergedPullRequest: Long?,
+    val hiresWithAcceptedContribution: Int,
+    val medianHoursToFirstAcceptedContribution: Long?,
     val medianHoursToFirstResponse: Long?,
     /** The slow tail of review latency, where the barrier actually bites. */
     val p90HoursToFirstResponse: Long?,

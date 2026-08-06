@@ -242,7 +242,7 @@ class StarterWorkTaskProposalServiceTest {
             every { starterWorkTaskProposalRepository.findAllByStatusAndReviewedFalse(ProposalStatus.LIVE) } returns
                 listOf(StarterWorkTaskProposal(sourceId = "s1", title = "t1"))
 
-            val result = service.listProposed()
+            val result = service.listUnreviewed()
 
             assertEquals(1, result.tasks.size)
         }
@@ -255,7 +255,7 @@ class StarterWorkTaskProposalServiceTest {
             val id = UUID.randomUUID()
             every { starterWorkTaskProposalRepository.findById(id) } returns Optional.empty()
 
-            val ex = assertThrows<ResponseStatusException> { service.approve(id) }
+            val ex = assertThrows<ResponseStatusException> { service.markReviewed(id) }
 
             assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
         }
@@ -265,7 +265,7 @@ class StarterWorkTaskProposalServiceTest {
             val proposal = StarterWorkTaskProposal(sourceId = "s1", title = "t1", status = ProposalStatus.REJECTED)
             every { starterWorkTaskProposalRepository.findById(proposal.id) } returns Optional.of(proposal)
 
-            val ex = assertThrows<ResponseStatusException> { service.approve(proposal.id) }
+            val ex = assertThrows<ResponseStatusException> { service.markReviewed(proposal.id) }
 
             assertEquals(HttpStatus.CONFLICT, ex.statusCode)
         }
