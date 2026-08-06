@@ -4,12 +4,14 @@ import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionAp
 import com.sprintstart.sprintstartbackend.ingestion.external.AssignedIssue
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredArtifact
 import com.sprintstart.sprintstartbackend.ingestion.external.AuthoredPullRequest
+import com.sprintstart.sprintstartbackend.ingestion.external.IngestedIssue
 import com.sprintstart.sprintstartbackend.ingestion.external.RepositoryResponsiveness
 import com.sprintstart.sprintstartbackend.ingestion.external.TaskSourceArtifact
 import com.sprintstart.sprintstartbackend.ingestion.external.model.ArtifactDto
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.external.model.toDto
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.GithubArtifactMetadata
+import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMetadataJsonMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
@@ -27,6 +29,7 @@ import java.util.UUID
  * path or expose internal ingestion entities.
  */
 @Service
+@Suppress("TooManyFunctions")
 internal class ArtifactIngestionApiService(
     private val artifactRepository: ArtifactRepository,
     private val artifactMetadataJsonMapper: ArtifactMetadataJsonMapper,
@@ -144,6 +147,39 @@ internal class ArtifactIngestionApiService(
     }
 
     @Transactional(readOnly = true)
+    @Tracked("Listing a project's open tracker issues")
+    override fun getOpenIssues(projectId: UUID): List<IngestedIssue> {
+        return artifactRepository
+            .findAllByProjectIdAndArtifactType(projectId, ArtifactType.ISSUE)
+            // Only a definite "OPEN" qualifies. A row whose state was never captured is unknown,
+            // and offering an issue that may already be finished costs a hire more than not
+            // offering one that is fine -- the same direction mining chooses.
+            .filter { OPEN_STATE.equals(it.state, ignoreCase = true) }
+            .map { it.toIngestedIssue() }
+    }
+
+    @Transactional(readOnly = true)
+    @Tracked("Retrieving one ingested issue by source id")
+    override fun getIssue(sourceId: String): IngestedIssue? {
+        val artifact = artifactRepository.findBySourceId(sourceId) ?: return null
+        if (artifact.artifactType != ArtifactType.ISSUE) return null
+        return artifact.toIngestedIssue()
+    }
+
+    private fun Artifact.toIngestedIssue(): IngestedIssue =
+        IngestedIssue(
+            sourceId = sourceId,
+            tracker = sourceSystem.name,
+            title = title,
+            body = content,
+            labels = labels.toList(),
+            sourceUrl = sourceUrl,
+            state = state,
+            hasAssignee = hasAssignee,
+            updatedAtSource = updatedAtSource,
+        )
+
+    @Transactional(readOnly = true)
     override fun getTaskSource(sourceId: String): TaskSourceArtifact? {
         val artifact = artifactRepository.findBySourceId(sourceId) ?: return null
         return TaskSourceArtifact(
@@ -160,6 +196,9 @@ internal class ArtifactIngestionApiService(
         return artifactRepository.findById(artifactId).map { it.toDto() }.orElse(null)
     }
 }
+
+/** How the mappers spell "still open at the source", for both GitHub and Jira. */
+private const val OPEN_STATE = "OPEN"
 
 private fun hoursBetween(from: Instant?, to: Instant?): Long? {
     if (from == null || to == null) return null

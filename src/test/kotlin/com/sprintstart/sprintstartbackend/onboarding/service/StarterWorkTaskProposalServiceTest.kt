@@ -1,9 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
+import com.sprintstart.sprintstartbackend.ingestion.external.IngestedIssue
 import com.sprintstart.sprintstartbackend.ingestion.external.RepositoryResponsiveness
 import com.sprintstart.sprintstartbackend.ingestion.external.TaskSourceArtifact
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.CandidatePoolState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
@@ -15,6 +17,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.GithubHistoryP
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.PromoteStarterWorkCandidateRequest
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
@@ -37,6 +40,7 @@ import org.junit.jupiter.api.assertThrows
 import org.springframework.http.HttpStatus
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.web.server.ResponseStatusException
+import java.time.Instant
 import java.util.Optional
 import java.util.UUID
 import kotlin.test.assertContains
@@ -285,6 +289,233 @@ class StarterWorkTaskProposalServiceTest {
     }
 
     @Nested
+    inner class ListCandidates {
+        private val projectId = UUID.randomUUID()
+
+        @Test
+        fun `marks each issue with where it stands in the pool`() {
+            every { starterWorkTaskProposalRepository.findAllByStatusIn(any()) } returns listOf(
+                StarterWorkTaskProposal(sourceId = "i:2", title = "pooled", status = ProposalStatus.LIVE),
+                StarterWorkTaskProposal(sourceId = "i:3", title = "gone", status = ProposalStatus.REJECTED),
+            )
+            every { artifactIngestionApi.getOpenIssues(projectId) } returns listOf(
+                ingestedIssue("i:1"),
+                ingestedIssue("i:2"),
+                ingestedIssue("i:3"),
+            )
+
+            val byId = service.listCandidates(projectId).associateBy { it.sourceId }
+
+            assertEquals(CandidatePoolState.AVAILABLE, byId.getValue("i:1").poolState)
+            assertEquals(CandidatePoolState.IN_POOL, byId.getValue("i:2").poolState)
+            assertEquals(CandidatePoolState.REMOVED, byId.getValue("i:3").poolState)
+        }
+
+        /**
+         * ⚠️ Nothing is dropped for being taken, pooled or removed. A person browsing has to be
+         * able to tell "somebody has this" from "not ingested", and an issue that is simply absent
+         * from the list says neither.
+         */
+        @Test
+        fun `keeps assigned issues in the list, carrying the three-valued flag`() {
+            every { starterWorkTaskProposalRepository.findAllByStatusIn(any()) } returns emptyList()
+            every { artifactIngestionApi.getOpenIssues(projectId) } returns listOf(
+                ingestedIssue("i:1", hasAssignee = true),
+                ingestedIssue("i:2", hasAssignee = false),
+                ingestedIssue("i:3", hasAssignee = null),
+            )
+
+            val result = service.listCandidates(projectId).associate { it.sourceId to it.hasAssignee }
+
+            assertEquals(mapOf("i:1" to true, "i:2" to false, "i:3" to null), result)
+        }
+
+        @Test
+        fun `says when it cut a long body, and does not when it did not`() {
+            every { starterWorkTaskProposalRepository.findAllByStatusIn(any()) } returns emptyList()
+            every { artifactIngestionApi.getOpenIssues(projectId) } returns listOf(
+                ingestedIssue("i:1", body = "x".repeat(2000)),
+                ingestedIssue("i:2", body = "short"),
+            )
+
+            val byId = service.listCandidates(projectId).associateBy { it.sourceId }
+
+            assertTrue(byId.getValue("i:1").excerptTruncated)
+            assertEquals(600, byId.getValue("i:1").excerpt?.length)
+            assertEquals(false, byId.getValue("i:2").excerptTruncated)
+            assertEquals("short", byId.getValue("i:2").excerpt)
+        }
+
+        @Test
+        fun `orders newest-changed first, breaking ties on source id`() {
+            every { starterWorkTaskProposalRepository.findAllByStatusIn(any()) } returns emptyList()
+            every { artifactIngestionApi.getOpenIssues(projectId) } returns listOf(
+                ingestedIssue("i:b", updatedAt = Instant.parse("2026-08-01T00:00:00Z")),
+                ingestedIssue("i:c", updatedAt = Instant.parse("2026-08-05T00:00:00Z")),
+                ingestedIssue("i:a", updatedAt = Instant.parse("2026-08-01T00:00:00Z")),
+            )
+
+            assertEquals(
+                listOf("i:c", "i:a", "i:b"),
+                service.listCandidates(projectId).map { it.sourceId },
+            )
+        }
+
+        @Test
+        fun `drops an issue with no title, since there is nothing to pick from`() {
+            every { starterWorkTaskProposalRepository.findAllByStatusIn(any()) } returns emptyList()
+            every { artifactIngestionApi.getOpenIssues(projectId) } returns listOf(
+                ingestedIssue("i:1", title = null),
+                ingestedIssue("i:2", title = "   "),
+                ingestedIssue("i:3"),
+            )
+
+            assertEquals(listOf("i:3"), service.listCandidates(projectId).map { it.sourceId })
+        }
+    }
+
+    @Nested
+    inner class PromoteCandidate {
+        @Test
+        fun `lands live and reviewed, taking its title and link from the ingested issue`() {
+            every { artifactIngestionApi.getIssue("i:1") } returns ingestedIssue("i:1", title = "Fix the typo")
+            every { starterWorkTaskProposalRepository.findBySourceId("i:1") } returns null
+            val saved = slot<StarterWorkTaskProposal>()
+            every { starterWorkTaskProposalRepository.save(capture(saved)) } answers { saved.captured }
+
+            val result = service.promoteCandidate(
+                PromoteStarterWorkCandidateRequest(sourceId = "i:1", competencyKeys = listOf("docs")),
+            )
+
+            assertEquals("Fix the typo", saved.captured.title)
+            assertEquals("https://example.test/i:1", saved.captured.sourceUrl)
+            assertEquals(ProposalStatus.LIVE, saved.captured.status)
+            assertTrue(saved.captured.reviewed)
+            assertEquals(listOf("docs"), saved.captured.competencyKeys)
+            assertEquals("i:1", result.sourceId)
+        }
+
+        /**
+         * ⚠️ The issue's own body is deliberately not copied into `summary`: orientation reads that
+         * text live from the corpus, so a copy taken at promotion time is a second version of it
+         * that quietly goes stale.
+         */
+        @Test
+        fun `carries only the promoter's own note, never the issue body`() {
+            every { artifactIngestionApi.getIssue("i:1") } returns ingestedIssue("i:1", body = "the issue body")
+            every { starterWorkTaskProposalRepository.findBySourceId("i:1") } returns null
+            val saved = slot<StarterWorkTaskProposal>()
+            every { starterWorkTaskProposalRepository.save(capture(saved)) } answers { saved.captured }
+
+            service.promoteCandidate(PromoteStarterWorkCandidateRequest(sourceId = "i:1"))
+
+            assertNull(saved.captured.summary)
+            assertNull(saved.captured.rationale)
+        }
+
+        /**
+         * ⚠️ Mining skips assigned issues because it cannot ask anybody. Somebody promoting one has
+         * seen who holds it, and that override is why the browser shows them at all.
+         */
+        @Test
+        fun `accepts an issue somebody else is assigned`() {
+            every { artifactIngestionApi.getIssue("i:1") } returns ingestedIssue("i:1", hasAssignee = true)
+            every { starterWorkTaskProposalRepository.findBySourceId("i:1") } returns null
+            every { starterWorkTaskProposalRepository.save(any()) } answers { firstArg() }
+
+            val result = service.promoteCandidate(PromoteStarterWorkCandidateRequest("i:1"))
+
+            assertEquals(ProposalStatus.LIVE, result.status)
+        }
+
+        @Test
+        fun `404s when nothing with that source id is ingested`() {
+            every { artifactIngestionApi.getIssue("i:404") } returns null
+
+            val ex = assertThrows<ResponseStatusException> {
+                service.promoteCandidate(PromoteStarterWorkCandidateRequest("i:404"))
+            }
+
+            assertEquals(HttpStatus.NOT_FOUND, ex.statusCode)
+            verify(exactly = 0) { starterWorkTaskProposalRepository.save(any()) }
+        }
+
+        @Test
+        fun `409s rather than writing a second row for an issue already in the pool`() {
+            every { artifactIngestionApi.getIssue("i:1") } returns ingestedIssue("i:1")
+            every { starterWorkTaskProposalRepository.findBySourceId("i:1") } returns
+                StarterWorkTaskProposal(sourceId = "i:1", title = "already here", status = ProposalStatus.LIVE)
+
+            val ex = assertThrows<ResponseStatusException> {
+                service.promoteCandidate(PromoteStarterWorkCandidateRequest("i:1"))
+            }
+
+            assertEquals(HttpStatus.CONFLICT, ex.statusCode)
+            assertContains(ex.reason.orEmpty(), "already in the starter-work pool")
+            verify(exactly = 0) { starterWorkTaskProposalRepository.save(any()) }
+        }
+
+        /**
+         * ⚠️ Rejection is sticky on purpose — a task somebody removed is never mined back, or they
+         * would remove it again after every crawl. Promotion must not become the accidental way
+         * round that.
+         */
+        @Test
+        fun `refuses to revive an issue somebody removed from the pool`() {
+            every { artifactIngestionApi.getIssue("i:1") } returns ingestedIssue("i:1")
+            every { starterWorkTaskProposalRepository.findBySourceId("i:1") } returns
+                StarterWorkTaskProposal(sourceId = "i:1", title = "removed", status = ProposalStatus.REJECTED)
+
+            val ex = assertThrows<ResponseStatusException> {
+                service.promoteCandidate(PromoteStarterWorkCandidateRequest("i:1"))
+            }
+
+            assertEquals(HttpStatus.CONFLICT, ex.statusCode)
+            assertContains(ex.reason.orEmpty(), "not re-addable")
+            verify(exactly = 0) { starterWorkTaskProposalRepository.save(any()) }
+        }
+
+        @Test
+        fun `refuses an issue that is closed at its source`() {
+            every { artifactIngestionApi.getIssue("i:1") } returns ingestedIssue("i:1", state = "CLOSED")
+
+            val ex = assertThrows<ResponseStatusException> {
+                service.promoteCandidate(PromoteStarterWorkCandidateRequest("i:1"))
+            }
+
+            assertEquals(HttpStatus.CONFLICT, ex.statusCode)
+            verify(exactly = 0) { starterWorkTaskProposalRepository.save(any()) }
+        }
+
+        /**
+         * An unknown state is not a closed one. Refusing on null would make an un-promotable issue
+         * out of every row ingested before state was captured.
+         */
+        @Test
+        fun `accepts an issue whose state was never captured`() {
+            every { artifactIngestionApi.getIssue("i:1") } returns ingestedIssue("i:1", state = null)
+            every { starterWorkTaskProposalRepository.findBySourceId("i:1") } returns null
+            every { starterWorkTaskProposalRepository.save(any()) } answers { firstArg() }
+
+            val result = service.promoteCandidate(PromoteStarterWorkCandidateRequest("i:1"))
+
+            assertEquals(ProposalStatus.LIVE, result.status)
+        }
+
+        @Test
+        fun `400s when the ingested issue has no title`() {
+            every { artifactIngestionApi.getIssue("i:1") } returns ingestedIssue("i:1", title = null)
+
+            val ex = assertThrows<ResponseStatusException> {
+                service.promoteCandidate(PromoteStarterWorkCandidateRequest("i:1"))
+            }
+
+            assertEquals(HttpStatus.BAD_REQUEST, ex.statusCode)
+            verify(exactly = 0) { starterWorkTaskProposalRepository.save(any()) }
+        }
+    }
+
+    @Nested
     inner class Reject {
         @Test
         fun `marks the proposal REJECTED without touching the graph`() {
@@ -309,6 +540,25 @@ class StarterWorkTaskProposalServiceTest {
             assertNull(proposal.rejectionReason)
         }
     }
+
+    private fun ingestedIssue(
+        sourceId: String,
+        title: String? = "An issue",
+        body: String? = null,
+        state: String? = "OPEN",
+        hasAssignee: Boolean? = null,
+        updatedAt: Instant? = Instant.parse("2026-08-01T00:00:00Z"),
+    ) = IngestedIssue(
+        sourceId = sourceId,
+        tracker = "GITHUB",
+        title = title,
+        body = body,
+        labels = listOf("good first issue"),
+        sourceUrl = "https://example.test/$sourceId",
+        state = state,
+        hasAssignee = hasAssignee,
+        updatedAtSource = updatedAt,
+    )
 
     @Nested
     inner class MatchForUser {

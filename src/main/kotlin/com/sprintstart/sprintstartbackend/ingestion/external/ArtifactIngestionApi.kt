@@ -10,7 +10,11 @@ import java.util.UUID
  * Exposes read-only ingestion metadata about a component without leaking the ingestion module's
  * internal entities. Other modules should depend on this interface instead of querying the
  * ingestion repositories directly.
+ *
+ * One method per distinct question another module asks of the corpus; the count tracks how many
+ * things ingestion is asked, not an interface doing too many jobs.
  */
+@Suppress("TooManyFunctions")
 interface ArtifactIngestionApi {
     /**
      * Returns when a component (`owner/repo`) was first ingested, or null when it has no ingested
@@ -99,6 +103,33 @@ interface ArtifactIngestionApi {
     fun getTaskSource(sourceId: String): TaskSourceArtifact?
 
     /**
+     * Every open tracker issue in a project, whoever it belongs to.
+     *
+     * The corpus can already answer "which issues could a newcomer take?" without a model call —
+     * that filter is deterministic — so this exists to let a person browse the same material mining
+     * reads. ⚠️ **Assigned issues are returned too, marked**, unlike mining's candidate list: mining
+     * must skip them, because proposing somebody else's work is a wrong answer a hire cannot detect,
+     * but a person browsing can see who holds one and decide anyway. Filtering here would turn that
+     * exclusion into an absence nobody can account for.
+     *
+     * Reads only artifacts already ingested; no call to GitHub or the tracker.
+     *
+     * @param projectId The project whose ingested issues to list.
+     * @return One entry per open issue; empty when the project has none ingested.
+     */
+    fun getOpenIssues(projectId: UUID): List<IngestedIssue>
+
+    /**
+     * One ingested issue by its source id, open or not.
+     *
+     * The single-row counterpart of [getOpenIssues], for acting on an issue somebody browsed.
+     * Returns null for a source id that is not ingested **or belongs to something that is not an
+     * issue** — a pull request is not work to hand a newcomer, and silently accepting one would put
+     * it in the pool under an issue's name.
+     */
+    fun getIssue(sourceId: String): IngestedIssue?
+
+    /**
      * How responsive each of a project's repositories is to pull requests.
      *
      * A property of the *repository*, not of any one author: it is derived from every ingested pull
@@ -135,6 +166,34 @@ data class RepositoryResponsiveness(
     val medianHoursToFirstResponse: Long?,
     val answeredCount: Int,
     val unansweredCount: Int,
+)
+
+/**
+ * One ingested tracker issue, with everything a person needs to judge it as starter work.
+ *
+ * Carries the issue's own text and labels like [TaskSourceArtifact], plus the two fields a
+ * *selection* turns on and orientation does not: [state] and [hasAssignee].
+ *
+ * ⚠️ **[hasAssignee] is three-valued and null means *we do not know*, never "nobody".** GitHub
+ * issues have assignees this system does not ingest, so a null here is an absence of information
+ * about the issue, not information that it is free. A caller rendering it must say so; a caller
+ * filtering on it must treat only a definite `true` as "somebody has this".
+ *
+ * [state] is `"OPEN"` / `"CLOSED"` as the tracker reports it, folded to those two by the mappers,
+ * and null on rows ingested before state was captured — unknown, again, rather than open.
+ */
+data class IngestedIssue(
+    val sourceId: String,
+    /** Which system it came from, as a `SourceSystem` name — `GITHUB`, `JIRA`. */
+    val tracker: String,
+    val title: String?,
+    val body: String?,
+    val labels: List<String>,
+    val sourceUrl: String?,
+    val state: String?,
+    val hasAssignee: Boolean?,
+    /** When the issue last changed at its source; null when the source never said. */
+    val updatedAtSource: Instant?,
 )
 
 /**

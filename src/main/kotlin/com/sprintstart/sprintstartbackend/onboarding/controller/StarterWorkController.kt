@@ -4,9 +4,11 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEv
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.RejectProposalRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.ClaimGoalRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.PromoteStarterWorkCandidateRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.goal.GoalView
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.GenerateStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkCandidateResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.UnreviewedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkTaskProposalService
@@ -43,6 +45,9 @@ import java.util.UUID
     name = "Onboarding - Starter Work",
     description = "Review AI-mined starter-work task proposals and rank them by hire fit",
 )
+// One method per endpoint; the pool is reached three ways (mined, hand-written, picked from the
+// corpus) and read by two audiences, which is what the count reflects.
+@Suppress("TooManyFunctions")
 class StarterWorkController(
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val userGoalService: UserGoalService,
@@ -122,6 +127,70 @@ class StarterWorkController(
     fun create(
         @RequestBody request: CreateStarterWorkTaskRequest,
     ): StarterWorkTaskProposalResponse = starterWorkTaskProposalService.createTask(request)
+
+    /**
+     * Lists the open issues a project's corpus already holds, for somebody picking starter work.
+     *
+     * ⚠️ **Not a queue and not a shortlist.** Nothing here has been judged and nothing is waiting on
+     * a decision — these are simply the project's open issues, shown so a person can put one in the
+     * pool themselves. Mining keeps filling the pool live regardless.
+     *
+     * Costs a query and no model call: the candidate filter is deterministic.
+     */
+    @Operation(
+        summary = "Browse a project's open corpus issues",
+        description = "Lists the open tracker issues already ingested for a project, each marked with " +
+            "whether it is already in the starter-work pool or was removed from it. Nothing is ranked " +
+            "or filtered — issues somebody else is assigned are included and marked, because an issue " +
+            "missing from the list gives a reader no way to tell 'taken' from 'not ingested'. No AI.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Candidate issues returned"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @GetMapping("/candidates")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM', 'HR')")
+    fun listCandidates(
+        @Parameter(description = "Project whose ingested issues to browse")
+        @RequestParam projectId: UUID,
+    ): List<StarterWorkCandidateResponse> = starterWorkTaskProposalService.listCandidates(projectId)
+
+    /**
+     * Puts one browsed issue into the starter-work pool, live and reviewed.
+     *
+     * The hand-authored path with a source id instead of typed text — so it lands exactly where a
+     * task written in the blank form lands. ⚠️ **This adds a way in; it gates nothing.**
+     */
+    @Operation(
+        summary = "Put a browsed issue into the starter-work pool",
+        description = "Promotes one ingested open issue into the pool. It lands live and reviewed, the " +
+            "same as a hand-authored task, because somebody looked at it — this is a second way to add " +
+            "work, not an approval step in front of mining. An issue already pooled or previously " +
+            "removed is refused rather than duplicated or quietly revived.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "Issue added to the pool"),
+            ApiResponse(responseCode = "400", description = "The ingested issue has no title"),
+            ApiResponse(responseCode = "401", description = "Authentication required"),
+            ApiResponse(responseCode = "403", description = "Insufficient role"),
+            ApiResponse(responseCode = "404", description = "No ingested issue with that source id"),
+            ApiResponse(
+                responseCode = "409",
+                description = "The issue is already in the pool, was removed from it, or is closed at its source",
+            ),
+        ],
+    )
+    @ResponseStatus(HttpStatus.OK)
+    @PostMapping("/candidates/promote")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
+    fun promoteCandidate(
+        @RequestBody request: PromoteStarterWorkCandidateRequest,
+    ): StarterWorkTaskProposalResponse = starterWorkTaskProposalService.promoteCandidate(request)
 
     /**
      * Lists the live starter-work tasks nobody has vouched for yet.
