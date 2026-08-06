@@ -74,6 +74,23 @@ data class JiraArtifactCommand(
     val statusCategory: String,
     val projectIds: Set<UUID> = emptySet(),
 ) : ArtifactCommand {
+    /**
+     * The issue's open/closed state in the vocabulary `Artifact.state` uses.
+     *
+     * Jira has no open/closed flag — a board's statuses are whatever a team typed — but every
+     * status belongs to one of Jira's own three *categories*, and `Done` is the only one that means
+     * finished. Folding on the category rather than the name is what makes this work for a board
+     * whose done column is called "Shipped" or "Akzeptiert".
+     *
+     * ⚠️ This is what makes a Jira issue visible to starter-work mining at all: the miner's
+     * candidate filter is `state == "OPEN"`, so an issue with no state was skipped in silence.
+     */
+    fun toState(): String = if (statusCategory.equals(DONE_CATEGORY, ignoreCase = true)) "CLOSED" else "OPEN"
+
+    private companion object {
+        const val DONE_CATEGORY = "Done"
+    }
+
     fun toMetadata(): JiraArtifactMetadataWrapper = JiraArtifactMetadataWrapper(
         issueType = issueType,
         issueKey = issueKey,

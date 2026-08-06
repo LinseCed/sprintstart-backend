@@ -50,6 +50,10 @@ class JiraArtifactProviderService(
             }
             existing.title = command.summary
             existing.content = command.description
+            // Refreshed unconditionally, like GitHub's: a ticket moving to Done shifts no text, so
+            // gating this on the content check above would leave finished work in the starter-work
+            // pool until somebody happened to edit its description.
+            existing.state = command.toState()
             existing.addProjectIds(command.projectIds)
             existing.metadata = artifactMetadataJsonMapper.toJson(command.toMetadata())
             val ingestionRun = ingestionRunRepository.findByIdForUpdate(runId).orElseThrow {
@@ -71,6 +75,7 @@ class JiraArtifactProviderService(
             content = command.description,
             mime = null,
             language = null,
+            state = command.toState(),
             projectIdsInternal = command.projectIds.toMutableSet(),
             ingestionRun = ingestionRun,
             createdAtSource = command.createdAt,
