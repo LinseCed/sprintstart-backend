@@ -47,6 +47,21 @@ class Artifact(
      * `JiraArtifactMapper` folds it: `Done` is closed, everything else is open.
      */
     var state: String? = null,
+    /**
+     * Whether somebody at the source is already assigned to this issue — **three-valued on
+     * purpose**, and null means *we do not know*.
+     *
+     * Starter work is work a hire can take, and an issue somebody else is already on is not
+     * available however open it is. Only a definite `true` withholds it.
+     *
+     * ⚠️ **Null is not "nobody".** GitHub issues have assignees too; this system simply does not
+     * ingest them, and recording that absence as "free" would be the same defect as reading an
+     * absent GitHub history as "beginner". A two-valued flag would have had to guess for every
+     * GitHub issue in the corpus, so engineering behaviour is left byte-identical by leaving it
+     * unknown.
+     */
+    @Column(name = "has_assignee")
+    var hasAssignee: Boolean? = null,
     // `var` because Jira re-ingestion refreshes an issue's metadata in place.
     @Column(nullable = false, columnDefinition = "TEXT")
     var metadata: String = "{}",

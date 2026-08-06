@@ -44,7 +44,11 @@ class JiraArtifactProviderServiceTest {
 
     private fun author() = JiraAuthor(displayName = "Grace Hopper", active = true, createdAt = now, updatedAt = now)
 
-    private fun command(statusCategory: String, statusName: String = statusCategory) = JiraArtifactCommand(
+    private fun command(
+        statusCategory: String,
+        statusName: String = statusCategory,
+        assignee: JiraAuthor? = null,
+    ) = JiraArtifactCommand(
         ingestionRunId = runId,
         sourceSystem = SourceSystem.JIRA,
         sourceId = "instance-1",
@@ -57,7 +61,7 @@ class JiraArtifactProviderServiceTest {
         description = "Facilitate it and write the notes up.",
         createdBy = author(),
         reportedBy = author(),
-        assignee = null,
+        assignee = assignee,
         createdAt = now,
         updatedAt = now,
         project = JiraProject(key = "ONB", name = "Onboarding", projectTypeKey = "software"),
@@ -71,13 +75,17 @@ class JiraArtifactProviderServiceTest {
 
     private fun run() = mockk<IngestionRun>(relaxed = true)
 
-    private fun newIssue(statusCategory: String, statusName: String = statusCategory): Artifact {
+    private fun newIssue(
+        statusCategory: String,
+        statusName: String = statusCategory,
+        assignee: JiraAuthor? = null,
+    ): Artifact {
         val saved = slot<Artifact>()
         every { artifactRepository.findBySourceId(issueId) } returns null
         every { ingestionRunRepository.findByIdForUpdate(runId) } returns Optional.of(run())
         every { artifactRepository.save(capture(saved)) } answers { saved.captured }
 
-        service.persistArtifact(command(statusCategory, statusName))
+        service.persistArtifact(command(statusCategory, statusName, assignee))
 
         return saved.captured
     }
@@ -100,6 +108,27 @@ class JiraArtifactProviderServiceTest {
     @Test
     fun `a done column called something else is still closed`() {
         assertThat(newIssue(statusCategory = "Done", statusName = "Akzeptiert").state).isEqualTo("CLOSED")
+    }
+
+    /**
+     * Starter work is work a hire can *take*. A Jira board assigns its in-progress tickets, so
+     * without this the pool offered new hires work other people were already doing — and the
+     * proposal read exactly like any other, so nobody could tell.
+     */
+    @Test
+    fun `an issue somebody is on is ingested as taken`() {
+        assertThat(newIssue("In Progress", assignee = author()).hasAssignee).isTrue()
+    }
+
+    /**
+     * ⚠️ **A definite `false`, not null.** Jira's assignee field *is* ingested, so an unassigned
+     * issue is genuinely free rather than merely unknown — which is what lets mining withhold taken
+     * work without withholding everything it cannot see. A GitHub issue stays null, because its
+     * assignees are not ingested at all and "we did not look" must never read as "nobody".
+     */
+    @Test
+    fun `an unassigned issue is ingested as free, not as unknown`() {
+        assertThat(newIssue("To Do").hasAssignee).isFalse()
     }
 
     /**
@@ -127,8 +156,11 @@ class JiraArtifactProviderServiceTest {
         every { artifactRepository.findBySourceId(issueId) } returns existing
         every { ingestionRunRepository.findByIdForUpdate(runId) } returns Optional.of(run())
 
-        service.persistArtifact(command("Done"))
+        service.persistArtifact(command("Done", assignee = author()))
 
         assertThat(existing.state).isEqualTo("CLOSED")
+        // Same reason, same unconditional refresh: work somebody has since picked up must stop
+        // being offered, and being picked up moves no text either.
+        assertThat(existing.hasAssignee).isTrue()
     }
 }
