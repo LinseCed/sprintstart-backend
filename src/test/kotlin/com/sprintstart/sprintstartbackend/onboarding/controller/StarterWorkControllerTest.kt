@@ -7,9 +7,9 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStat
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.GenerateStarterWorkResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.ProposedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.UnreviewedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkTaskProposalService
 import com.sprintstart.sprintstartbackend.onboarding.service.UserGoalService
 import io.mockk.coEvery
@@ -79,43 +79,43 @@ class StarterWorkControllerTest(
         )
 
     @Test
-    fun `listProposed should return 401 when not authenticated`() {
+    fun `listUnreviewed should return 401 when not authenticated`() {
         mockMvc
-            .perform(get("/api/v1/onboarding/starter-work/proposed"))
+            .perform(get("/api/v1/onboarding/starter-work/unreviewed"))
             .andExpect(status().isUnauthorized)
     }
 
     @Test
-    fun `listProposed should return 200 for a PM`() {
-        every { starterWorkTaskProposalService.listProposed() } returns
-            ProposedStarterWorkResponse(tasks = emptyList())
+    fun `listUnreviewed should return 200 for a PM`() {
+        every { starterWorkTaskProposalService.listUnreviewed() } returns
+            UnreviewedStarterWorkResponse(tasks = emptyList())
 
         mockMvc
-            .perform(get("/api/v1/onboarding/starter-work/proposed").with(pmJwt))
+            .perform(get("/api/v1/onboarding/starter-work/unreviewed").with(pmJwt))
             .andExpect(status().isOk)
     }
 
     @Test
-    fun `listProposed should return 403 for a plain USER`() {
+    fun `listUnreviewed should return 403 for a plain USER`() {
         mockMvc
-            .perform(get("/api/v1/onboarding/starter-work/proposed").with(userJwt))
+            .perform(get("/api/v1/onboarding/starter-work/unreviewed").with(userJwt))
             .andExpect(status().isForbidden)
     }
 
     @Test
-    fun `listApproved should return 200 for a PM`() {
-        every { starterWorkTaskProposalService.listApproved() } returns listOf(taskResponse())
+    fun `listPool should return 200 for a PM`() {
+        every { starterWorkTaskProposalService.listPool() } returns listOf(taskResponse())
 
         mockMvc
-            .perform(get("/api/v1/onboarding/starter-work/approved").with(pmJwt))
+            .perform(get("/api/v1/onboarding/starter-work/pool").with(pmJwt))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$[0].status").value("LIVE"))
     }
 
     @Test
-    fun `listApproved should return 403 for a plain USER`() {
+    fun `listPool should return 403 for a plain USER`() {
         mockMvc
-            .perform(get("/api/v1/onboarding/starter-work/approved").with(userJwt))
+            .perform(get("/api/v1/onboarding/starter-work/pool").with(userJwt))
             .andExpect(status().isForbidden)
     }
 
@@ -145,18 +145,18 @@ class StarterWorkControllerTest(
     }
 
     @Test
-    fun `approve should return 200 for a PM`() {
-        every { starterWorkTaskProposalService.approve(taskId) } returns taskResponse()
+    fun `review should return 200 for a PM`() {
+        every { starterWorkTaskProposalService.markReviewed(taskId) } returns taskResponse()
 
         mockMvc
-            .perform(post("/api/v1/onboarding/starter-work/$taskId/approve").with(pmJwt))
+            .perform(post("/api/v1/onboarding/starter-work/$taskId/review").with(pmJwt))
             .andExpect(status().isOk)
     }
 
     @Test
-    fun `approve should return 403 for a plain USER`() {
+    fun `review should return 403 for a plain USER`() {
         mockMvc
-            .perform(post("/api/v1/onboarding/starter-work/$taskId/approve").with(userJwt))
+            .perform(post("/api/v1/onboarding/starter-work/$taskId/review").with(userJwt))
             .andExpect(status().isForbidden)
     }
 

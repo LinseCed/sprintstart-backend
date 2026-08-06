@@ -10,9 +10,9 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTas
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.GenerateStarterWorkResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.ProposedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.UnreviewedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
@@ -199,8 +199,8 @@ class StarterWorkTaskProposalService(
      * Returns the starter-work tasks currently awaiting PM review.
      */
     @Transactional(readOnly = true)
-    fun listProposed(): ProposedStarterWorkResponse =
-        ProposedStarterWorkResponse(
+    fun listUnreviewed(): UnreviewedStarterWorkResponse =
+        UnreviewedStarterWorkResponse(
             tasks = starterWorkTaskProposalRepository
                 .findAllByStatusAndReviewedFalse(ProposalStatus.LIVE)
                 .map { it.toResponse() },
@@ -214,7 +214,7 @@ class StarterWorkTaskProposalService(
      * corpus a packet is grounded in is per-project.
      */
     @Transactional(readOnly = true)
-    fun listApproved(): List<StarterWorkTaskProposalResponse> =
+    fun listPool(): List<StarterWorkTaskProposalResponse> =
         starterWorkTaskProposalRepository
             .findAllByStatus(ProposalStatus.LIVE)
             .sortedBy { it.title }
@@ -230,7 +230,7 @@ class StarterWorkTaskProposalService(
      * @throws ResponseStatusException 404 if no task matches [id]; 409 if it was rejected.
      */
     @Transactional
-    fun approve(id: UUID): StarterWorkTaskProposalResponse {
+    fun markReviewed(id: UUID): StarterWorkTaskProposalResponse {
         val proposal = findLiveProposal(id)
         proposal.reviewed = true
         proposal.decidedAt = Instant.now()

@@ -175,13 +175,13 @@ class BoardServiceTest {
         joinedAt = now.minusSeconds(86_400),
         taskZeroAssignedAt = null,
         firstTaskClaimedAt = firstTaskClaimedAt,
-        firstPullRequestOpenedAt = firstOpenedAt,
+        firstContributionOpenedAt = firstOpenedAt,
         firstResponseAt = firstResponseAt,
-        firstPullRequestMergedAt = acceptedAt,
-        hoursToFirstMergedPullRequest = null,
+        firstContributionAcceptedAt = acceptedAt,
+        hoursToFirstAcceptedContribution = null,
         hoursToFirstResponse = null,
-        mergedPullRequestCount = acceptedCount,
-        openPullRequestCount = 0,
+        acceptedContributionCount = acceptedCount,
+        openContributionCount = 0,
         longestOpenWaitHours = null,
         stalled = stalledReason != null,
         stalledReason = stalledReason,
@@ -192,7 +192,7 @@ class BoardServiceTest {
             contributionNounPlural = "changes",
             contributionVerbPast = "merged",
         ),
-        reworkedPullRequestCount = 0,
+        returnedContributionCount = 0,
     )
 
     private fun existingBoard(): Board {

@@ -424,7 +424,7 @@ class BuddyServiceTest {
                 paused,
                 finalReply("Your PR has waited 52 hours — that's on the reviewer."),
             )
-            every { buddyToolExecutor.execute(toolCall, userId) } returns "openPullRequestCount=1"
+            every { buddyToolExecutor.execute(toolCall, userId) } returns "openContributionCount=1"
 
             val events = service.sendMessageForMe(authId, "is my PR stuck?").toList()
 
@@ -432,7 +432,7 @@ class BuddyServiceTest {
             coVerify(exactly = 1) { buddyToolExecutor.execute(toolCall, userId) }
             // ...its result is appended to the conversation carried into the resume call...
             assertThat(requests[1].messages).contains(
-                BuddyAgentMessageDto(role = "tool", content = "openPullRequestCount=1", toolCallId = "call_0"),
+                BuddyAgentMessageDto(role = "tool", content = "openContributionCount=1", toolCallId = "call_0"),
             )
             // ...the hire sees the tool run, and the final answer streams out in chunks whose
             // concatenation is the whole answer.
@@ -673,7 +673,7 @@ class BuddyServiceTest {
                 ),
                 finalReply("Your PR is waiting on a review."),
             )
-            every { buddyToolExecutor.execute(toolCall, userId) } returns "openPullRequestCount=1"
+            every { buddyToolExecutor.execute(toolCall, userId) } returns "openContributionCount=1"
 
             service.sendMessageForMe(authId, "m26").toList()
 

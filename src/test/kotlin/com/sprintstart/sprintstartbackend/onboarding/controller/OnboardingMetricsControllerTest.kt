@@ -68,13 +68,13 @@ class OnboardingMetricsControllerTest(
             joinedAt = null,
             taskZeroAssignedAt = null,
             firstTaskClaimedAt = null,
-            firstPullRequestOpenedAt = null,
+            firstContributionOpenedAt = null,
             firstResponseAt = null,
-            firstPullRequestMergedAt = null,
-            hoursToFirstMergedPullRequest = null,
+            firstContributionAcceptedAt = null,
+            hoursToFirstAcceptedContribution = null,
             hoursToFirstResponse = null,
-            mergedPullRequestCount = 0,
-            openPullRequestCount = 1,
+            acceptedContributionCount = 0,
+            openContributionCount = 1,
             longestOpenWaitHours = 72,
             stalled = true,
             stalledReason = "Waiting on a review for 3 days",
@@ -85,7 +85,7 @@ class OnboardingMetricsControllerTest(
                 contributionNounPlural = "changes",
                 contributionVerbPast = "merged",
             ),
-            reworkedPullRequestCount = 0,
+            returnedContributionCount = 0,
         )
 
     @Test

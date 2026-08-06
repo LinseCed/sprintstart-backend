@@ -20,9 +20,14 @@ data class StarterWorkTaskProposalResponse(
 )
 
 /**
- * The starter-work tasks currently awaiting PM review (status PROPOSED).
+ * The live starter-work tasks nobody has vouched for yet.
+ *
+ * ⚠️ **"Unreviewed" is not "awaiting review".** These tasks are claimable right now — S3b made
+ * mining live-on-arrival, and reviewing one lifts a fit-ranking demotion rather than admitting it.
+ * The type was called `ProposedStarterWorkResponse` and its doc named a `PROPOSED` status that
+ * `ProposalStatus` no longer has.
  */
-data class ProposedStarterWorkResponse(
+data class UnreviewedStarterWorkResponse(
     val tasks: List<StarterWorkTaskProposalResponse>,
 )
 
