@@ -159,6 +159,57 @@ class AssessmentServiceTest {
             assertNull(savedSlot.captured.turns[0].answer)
         }
 
+        /**
+         * ⚠️ The bug this exists to stop: one hire, two interviews running at once.
+         *
+         * Two starts arrive together -- `<React.StrictMode>` double-invokes the effect that calls
+         * start, so this is the normal case in development, not a rare race. Both read no
+         * in-progress session and, unserialized, both insert one.
+         *
+         * A short write transaction does not prevent it: under `READ COMMITTED` each sees the
+         * state from before the other committed.
+         */
+        @Test
+        fun `two starts arriving together create one session, not two`() {
+            setUpUser()
+            setUpCandidates(kotlinCompetency)
+            coEvery { onboardingAiClient.assessTurn(any()) } returns
+                AssessmentTurnResponse(done = false, question = "Walk me through a Kotlin null-safety pitfall.")
+
+            // The repository behaves like the database: a reader sees whatever has been saved so
+            // far, and `save` records it. Serialization has to come from the service.
+            val stored = java.util.concurrent.CopyOnWriteArrayList<SkillAssessmentSession>()
+            every {
+                skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
+                    userId,
+                    projectId,
+                    SkillAssessmentSessionStatus.IN_PROGRESS,
+                )
+            } answers { stored.lastOrNull() }
+            every { skillAssessmentSessionRepository.save(any()) } answers {
+                val session = firstArg<SkillAssessmentSession>()
+                if (stored.none { it.id == session.id }) stored.add(session)
+                session
+            }
+            every { skillAssessmentSessionRepository.findById(any()) } answers {
+                Optional.ofNullable(stored.firstOrNull { it.id == firstArg<UUID>() })
+            }
+
+            val barrier = java.util.concurrent.CyclicBarrier(2)
+            val results = java.util.concurrent.CopyOnWriteArrayList<UUID>()
+            val threads = (1..2).map {
+                Thread {
+                    barrier.await()
+                    runBlocking { results.add(service.startAssessment(authId, projectId).sessionId) }
+                }
+            }
+            threads.forEach { it.start() }
+            threads.forEach { it.join() }
+
+            assertEquals(1, stored.size, "one hire on one project has exactly one session")
+            assertEquals(1, results.toSet().size, "both starts land on the same session")
+        }
+
         @Test
         fun `reuses the in-progress session instead of creating a second one`() = runTest {
             setUpUser()

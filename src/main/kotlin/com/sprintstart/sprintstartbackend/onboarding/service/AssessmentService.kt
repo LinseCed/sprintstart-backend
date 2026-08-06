@@ -107,7 +107,7 @@ class AssessmentService(
         // nothing to resume, creating its own -- four sessions for one assessment, three stranded
         // IN_PROGRESS with a question nobody ever saw.
         val reserved = withContext(Dispatchers.IO) {
-            txTemplate.execute { reserveSession(userId, projectId) }!!
+            reserveSessionSerially(userId, projectId)
         }
         reserved.openQuestion?.let {
             return StartAssessmentResponse(sessionId = reserved.sessionId, question = it)
@@ -150,12 +150,39 @@ class AssessmentService(
     )
 
     /**
+     * Reserves the hire's single in-progress session, serializing concurrent starts.
+     *
+     * ⚠️ **A short transaction is not a serialization point.** Under `READ COMMITTED` two starts
+     * both read no in-progress session and both insert one, which is how one hire ended up with
+     * two interviews running at once. The client makes this easy to hit rather than rare:
+     * `<React.StrictMode>` double-invokes the effect that calls start, so the two requests are
+     * genuinely simultaneous.
+     *
+     * The lock is what actually serializes them. It is **striped** rather than one per hire so the
+     * map cannot grow without bound; two unrelated hires occasionally sharing a stripe costs a
+     * moment of contention on a call that does no I/O beyond one read and one insert.
+     *
+     * ⚠️ **A unique index would be the better guard and is not available here.** It would have to
+     * be partial (`WHERE status = 'IN_PROGRESS'`, since a hire may be re-assessed later and every
+     * completed session keeps its row), Hibernate cannot express a partial index, and this service
+     * builds its schema from the entities -- see [reserveSession].
+     */
+    private fun reserveSessionSerially(userId: UUID, projectId: UUID): ReservedSession {
+        val stripe = RESERVATION_LOCKS[
+            Math.floorMod(java.util.Objects.hash(userId, projectId), RESERVATION_LOCKS.size),
+        ]
+        return synchronized(stripe) {
+            txTemplate.execute { reserveSession(userId, projectId) }!!
+        }
+    }
+
+    /**
      * Returns the user's single in-progress session for [projectId], creating an empty one if they
      * have none.
      *
-     * Runs in its own short write transaction so it is the serialization point for concurrent
-     * starts: whoever gets there first creates the row, everyone else finds it. A session reserved
-     * this way has no turn yet -- [openFirstTurn] fills that in once the interviewer answers.
+     * ⚠️ **Not safe to call concurrently** -- the read and the insert are not atomic together.
+     * [reserveSessionSerially] is the only caller for that reason. A session reserved this way has
+     * no turn yet -- [openFirstTurn] fills that in once the interviewer answers.
      */
     private fun reserveSession(userId: UUID, projectId: UUID): ReservedSession {
         val existing = skillAssessmentSessionRepository.findFirstByUserIdAndProjectIdAndStatusOrderByCreatedAtDesc(
@@ -449,6 +476,12 @@ class AssessmentService(
 
     private companion object {
         const val MAX_TURNS = 6
+
+        /**
+         * Stripes guarding session reservation. Fixed-size so the set of locks is bounded no
+         * matter how many hires and projects exist; see [reserveSessionSerially].
+         */
+        val RESERVATION_LOCKS: List<Any> = List(32) { Any() }
 
         // Below this, a placement records 0 rather than the level it guessed. The interviewer uses
         // low confidence precisely to mean "no evidence either way".
