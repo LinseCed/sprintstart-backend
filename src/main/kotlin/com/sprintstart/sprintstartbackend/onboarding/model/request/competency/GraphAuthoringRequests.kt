@@ -26,8 +26,6 @@ data class UpdateCompetencyRequest(
     val kind: CompetencyKind? = null,
     /** The proficiency rank (1..4) a hire must reach for this node to count as met. */
     val targetLevel: Int? = null,
-    /** Compliance-flagged: any change touching this node pushes to hires immediately. */
-    val invariant: Boolean? = null,
 )
 
 /**
@@ -57,6 +55,4 @@ data class CreateCompetencyRequest(
      * takes the same intermediate default a proposed node gets (`Competency.DEFAULT_TARGET_LEVEL`).
      */
     val targetLevel: Int? = null,
-    /** Compliance-flagged: any change touching this node pushes to hires immediately. */
-    val invariant: Boolean = false,
 )

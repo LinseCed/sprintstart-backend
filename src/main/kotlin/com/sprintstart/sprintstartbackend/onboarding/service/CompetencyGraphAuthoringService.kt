@@ -102,7 +102,6 @@ class CompetencyGraphAuthoringService(
             area = areaNormalizer.normalize(request.area),
             targetLevel = targetLevel,
             provenance = ContentProvenance.PM,
-            invariant = request.invariant,
         )
         competencyRepository.save(competency)
         return competency.toAuthoringResponse()
@@ -134,7 +133,6 @@ class CompetencyGraphAuthoringService(
         request.kind?.let { competency.kind = it }
         // Blank clears the grouping, matching how a blank description clears one.
         request.area?.let { competency.area = areaNormalizer.normalize(it) }
-        request.invariant?.let { competency.invariant = it }
         // Any edit makes this a human's row, so regeneration must leave it alone from here on --
         // the same rule a module page follows. Unconditional rather than per-field: a PM who
         // re-typed a value to the same string still reviewed it and decided it was right.
@@ -193,7 +191,6 @@ class CompetencyGraphAuthoringService(
             kind = kind,
             area = area,
             targetLevel = targetLevel,
-            invariant = invariant,
         )
 
     private companion object {
