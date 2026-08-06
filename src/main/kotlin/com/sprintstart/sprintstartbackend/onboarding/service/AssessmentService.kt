@@ -427,10 +427,14 @@ class AssessmentService(
     /**
      * The rank a placement is allowed to record.
      *
-     * A level the interviewer is not confident about is recorded as `0` -- "we asked, and saw no
-     * competence" -- rather than as the level it guessed. The interviewer is explicitly instructed
-     * to answer `beginner` with low confidence when a candidate says "I don't know", so without
-     * this floor a hire who told us they know nothing is credited with the competency.
+     * Two different things both record `0`, and they are not interchangeable:
+     *
+     * - **`none`** -- the hire *told* the interviewer they have never used it. A clear answer, and
+     *   usually a confident one, so ⚠️ **the confidence floor below would never have caught it**:
+     *   the more plainly somebody says they know nothing, the surer the interviewer is, and the
+     *   more certainly a `beginner` placement would have credited them with the competency.
+     * - **low confidence** -- the interviewer could not tell. "We asked, and saw no competence",
+     *   rather than the level it guessed.
      *
      * `0` is a real state elsewhere in the ledger (known-but-unplaced, filtered out of matching),
      * so this records that the assessment happened without claiming a skill.
@@ -488,11 +492,20 @@ class AssessmentService(
         const val MIN_PLACEMENT_CONFIDENCE = 0.4
 
         // Aligned 1:1 with the AI SKILL_LEVELS (beginner..expert -> 1..4); unknown -> 0.
+        //
+        // ⚠️ "none" is the interviewer saying the hire told them they have not used this, and is
+        // deliberately listed rather than left to fall through to the same 0: a reader checking
+        // what happens to a disclaimer should find the answer here, not have to know that the
+        // lookup's default happens to be right.
         val LEVEL_RANKS = mapOf(
+            NO_EXPERIENCE to 0,
             "beginner" to 1,
             "intermediate" to 2,
             "advanced" to 3,
             "expert" to 4,
         )
+
+        /** What the interviewer sends when a hire says they have never used something. */
+        const val NO_EXPERIENCE = "none"
     }
 }

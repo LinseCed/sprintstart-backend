@@ -569,6 +569,46 @@ class AssessmentServiceTest {
             assertEquals(0, saved.captured.level)
         }
 
+        /**
+         * ⚠️ The bug this exists to stop: a hire who says they have never used something being
+         * recorded as having it.
+         *
+         * The confidence floor above does not catch this, and cannot. "I have never used Next.js"
+         * is a *clear* answer, so the interviewer reports it with **high** confidence -- the
+         * plainer the disclaimer, the surer the model, and the further it is from the floor. A
+         * hire really did end up with `nextjs` at level 1, and the buddy then told them they had
+         * "already shown Next.js at level 1".
+         *
+         * `none` is what makes the placement honest at the value instead of relying on a
+         * downstream floor to rescue it.
+         */
+        @Test
+        fun `records level 0 when the hire says they have never used it`() = runTest {
+            setUpUser()
+            val session = sessionWithOpenTurn()
+            every { skillAssessmentSessionRepository.findById(session.id) } returns Optional.of(session)
+            setUpCandidates(kotlinCompetency)
+            coEvery { onboardingAiClient.assessTurn(any()) } returns
+                AssessmentTurnResponse(
+                    done = true,
+                    assessments = listOf(
+                        AssessmentResultSchema(
+                            key = "kotlin",
+                            level = "none",
+                            confidence = 0.95,
+                            evidence = "Candidate says they have never used it.",
+                        ),
+                    ),
+                )
+            every { userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, "kotlin") } returns null
+            val saved = slot<UserCompetencyState>()
+            every { userCompetencyStateRepository.save(capture(saved)) } answers { saved.captured }
+
+            service.answerAssessment(authId, session.id, "i have never used kotlin")
+
+            assertEquals(0, saved.captured.level)
+        }
+
         @Test
         fun `never overwrites a VERIFIED ledger entry with a placement result`() = runTest {
             setUpUser()
