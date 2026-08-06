@@ -74,9 +74,9 @@ class OnboardingAiClient(
      *
      * The result is a flat vocabulary: it states no ordering.
      *
-     * ⚠️ **Nothing calls this or [streamCompetencyGraph].** Generation is kicked off when a crawl
-     * finishes, so that "set up onboarding" collapses into "connect a repo"; there is no PM
-     * proposal queue in front of it.
+     * Called by `VocabularyGenerationService` when a crawl's AI sync first reaches `SUCCEEDED`, so
+     * that "set up onboarding" collapses into "connect a repo"; there is no PM proposal queue in
+     * front of it, and no surface that triggers this by hand.
      *
      * @param activeCompetencies The backend's current live competencies, which drive dedup.
      * @param existingAreas The grouping areas in use, so a proposal joins one rather than coining a
@@ -457,25 +457,6 @@ class OnboardingAiClient(
                 competencyLabel = competencyLabel,
                 competencyDescription = competencyDescription,
                 level = level,
-                lastFingerprint = lastFingerprint,
-            ),
-        )
-
-    /**
-     * Streams the AI service proposing competencies.
-     *
-     * The streaming twin of [proposeCompetencyGraph]: the AI emits a `stage` per phase, an `item`
-     * per grounded competency, and a terminal `done` carrying the whole outcome the backend
-     * persists. The vocabulary literally builds, one competency at a time.
-     */
-    fun streamCompetencyGraph(
-        activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
-        lastFingerprint: String? = null,
-    ): Flow<AiProgressEvent> =
-        streamProgress(
-            "/api/v1/onboarding/competency-graph/propose/stream",
-            GenerateCompetencyGraphRequest(
-                activeCompetencies = activeCompetencies,
                 lastFingerprint = lastFingerprint,
             ),
         )
