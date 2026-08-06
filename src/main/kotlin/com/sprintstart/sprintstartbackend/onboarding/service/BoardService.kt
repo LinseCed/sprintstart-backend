@@ -112,6 +112,11 @@ class BoardService(
         // Read once and reuse: it decides whether the card is ensured at all, and then fills it.
         val arrivalSteps = arrivalStepService.forHire(userId)
         val cards = ensureRelevantCards(board, track, arrivalSteps.isNotEmpty())
+        // Whether the hire is on a task at all, for the pin. Read through the same [CurrentTaskReader]
+        // the card's own content comes from -- that component exists so "which task is this person
+        // on" has exactly one answer, and a card pinned to the top while reading "nothing claimed
+        // yet" would be that question answered two ways in one glance.
+        val onATask = currentTaskReader.currentTaskFor(userId, projectId) != null
         val timeline = onboardingMetricsService.getHireTimeline(userId, projectId)
         // One query for every diagram on the board rather than one per card -- and the *kept*
         // picture, never a fresh one: assembling costs a generation, and a page that waits on a
@@ -131,33 +136,56 @@ class BoardService(
             ),
             cards = cards
                 .filter { it.state == BoardCardState.ACTIVE }
-                .sortedWith(attentionOrder(arrivalSteps))
+                .sortedWith(attentionOrder(arrivalSteps, onATask))
                 .map { it.toResponse(member, projectId, timeline, diagrams[it.id], arrivalSteps) },
         )
     }
 
     /**
-     * The hire's own order, except that outstanding arrival steps come first.
+     * The hire's own order, except that what needs them now comes first: outstanding arrival steps,
+     * then the task they are on.
      *
      * ### Why this overrides an arrangement the hire made
      *
      * Everywhere else on this board the hire's ordering is theirs and nothing reshuffles it — the
-     * mentor cannot, and ensuring a card exists deliberately appends rather than inserts. This is
-     * the one exception, and it is narrow: **only while something is outstanding, and only for the
-     * card about it.** A hire who cannot clone the repository should not have to scroll to find
-     * out what to do about it.
+     * mentor cannot, and ensuring a card exists deliberately appends rather than inserts. These are
+     * the only exceptions, and both are narrow: **only while the thing is actually true, and only
+     * for the card about it.** A hire who cannot clone the repository should not have to scroll to
+     * find out what to do about it, and neither should one who wants to know what they are meant to
+     * be working on — the tutor's *"wie eindeutig es am Ende für den User bleibt, an welchem Task
+     * jetzt als Nächstes gearbeitet werden soll"*.
+     *
+     * **Arrival outranks the current task**, for A2's reason: what has to be true before somebody
+     * can work comes before what they are working on. Somebody still waiting on repository access
+     * does not need their task moved up, they need the access.
      *
      * ⚠️ **It is a sort applied on read, never a write to `position`.** Their arrangement is
      * untouched underneath and comes back exactly as they left it the moment the last step settles
-     * — which is what makes overriding it acceptable rather than destructive. The escape hatch is
-     * the one the board already has: **dismissal is sticky**, so a hire who does not want this card
-     * at all removes it and it stays removed, arrival steps outstanding or not.
+     * or the task is done — which is what makes overriding it acceptable rather than destructive.
+     * The escape hatch is the one the board already has: **dismissal is sticky**, so a hire who does
+     * not want either card at all removes it and it stays removed, pin or no pin.
+     *
+     * ⚠️ **Nothing here is about crowding**, and that is deliberate. A board getting busy is
+     * predicted, not observed, and every auto-tidy that *removes* a card breaks the rule that
+     * dismissal is the hire's — which rules out caps and archiving outright, not merely for now.
+     * Pinning what is live is the whole answer: it costs nobody a card.
+     *
+     * @param onATask Whether the hire actually has a task. A `CURRENT_TASK` card reading "nothing
+     *   claimed yet" is a real and honest state, but pinning it to the top would give the best
+     *   place on the board to the one card with nothing on it.
      */
-    private fun attentionOrder(arrivalSteps: List<ResolvedArrivalStep>): Comparator<BoardCard> {
+    private fun attentionOrder(
+        arrivalSteps: List<ResolvedArrivalStep>,
+        onATask: Boolean,
+    ): Comparator<BoardCard> {
         val anythingOutstanding = arrivalSteps.any { !it.settled }
 
         return compareBy<BoardCard> {
-            if (anythingOutstanding && it.kind == BoardCardKind.ARRIVAL_STEPS) 0 else 1
+            when {
+                anythingOutstanding && it.kind == BoardCardKind.ARRIVAL_STEPS -> 0
+                onATask && it.kind == BoardCardKind.CURRENT_TASK -> 1
+                else -> 2
+            }
         }.thenBy { it.position }
     }
 

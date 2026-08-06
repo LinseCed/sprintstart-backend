@@ -318,6 +318,127 @@ class BoardServiceTest {
         assertTrue(kinds.contains(BoardCardKind.ARRIVAL_STEPS))
     }
 
+    /**
+     * The tutor's second half of the crowding note: *"wie eindeutig es am Ende für den User bleibt,
+     * an welchem Task jetzt als Nächstes gearbeitet werden soll"*. The task somebody is on had no
+     * primacy over any other card, so on a board of any size it was findable only by looking.
+     */
+    @Test
+    fun `the task the hire is on comes first`() {
+        val board = existingBoard()
+        every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(
+            card(board, BoardCardKind.PATH_TO_FIRST_CONTRIBUTION, position = 0),
+            card(board, BoardCardKind.OPEN_PULL_REQUESTS, position = 1),
+            card(board, BoardCardKind.CURRENT_TASK, position = 2),
+        )
+        every { currentTaskReader.currentTaskFor(hireId, projectId) } returns StarterWorkTaskProposal(
+            sourceId = "github:org/repo:ISSUE:7",
+            title = "Fix the flaky login test",
+        )
+
+        val kinds = service.getBoard(hireId, projectId)?.cards?.map { it.kind }
+
+        assertEquals(BoardCardKind.CURRENT_TASK, kinds!!.first())
+        // Underneath, their own arrangement is untouched -- the pin is a sort on read, never a
+        // write to `position`, which is what makes overriding it acceptable rather than destructive.
+        assertEquals(
+            listOf(BoardCardKind.PATH_TO_FIRST_CONTRIBUTION, BoardCardKind.OPEN_PULL_REQUESTS),
+            kinds.drop(1),
+        )
+    }
+
+    /**
+     * The pin lasts exactly as long as the thing it is about is true. A hire between tasks gets
+     * their own order back, which is the same narrowness the arrival pin has.
+     */
+    @Test
+    fun `a hire on no task gets their own order back`() {
+        val board = existingBoard()
+        every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(
+            card(board, BoardCardKind.PATH_TO_FIRST_CONTRIBUTION, position = 0),
+            card(board, BoardCardKind.OPEN_PULL_REQUESTS, position = 1),
+            card(board, BoardCardKind.CURRENT_TASK, position = 2),
+        )
+
+        val kinds = service.getBoard(hireId, projectId)?.cards?.map { it.kind }
+
+        // ⚠️ The card is still there and still honest -- "nothing claimed yet" is a real state, and
+        // a card that vanished would read as the board losing things. It simply does not get the
+        // best place on the board for having nothing on it.
+        assertEquals(
+            listOf(
+                BoardCardKind.PATH_TO_FIRST_CONTRIBUTION,
+                BoardCardKind.OPEN_PULL_REQUESTS,
+                BoardCardKind.CURRENT_TASK,
+            ),
+            kinds,
+        )
+    }
+
+    /**
+     * ⚠️ **Arrival outranks the current task**, for the reason A2 put arrival first everywhere:
+     * what has to be true before somebody can work comes before what they are working on. Somebody
+     * still waiting on access does not need their task moved up, they need the access — and this is
+     * the one case where the two pins compete.
+     */
+    @Test
+    fun `an outstanding arrival step outranks the task the hire is on`() {
+        val board = existingBoard()
+        every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(
+            card(board, BoardCardKind.CURRENT_TASK, position = 0),
+            card(board, BoardCardKind.ARRIVAL_STEPS, position = 1),
+        )
+        every { arrivalStepService.forHire(hireId) } returns listOf(
+            ResolvedArrivalStep(
+                step = ArrivalStep(key = "vpn", title = "Request VPN access"),
+                settledAt = null,
+                rigor = null,
+            ),
+        )
+        every { currentTaskReader.currentTaskFor(hireId, projectId) } returns StarterWorkTaskProposal(
+            sourceId = "github:org/repo:ISSUE:7",
+            title = "Fix the flaky login test",
+        )
+
+        val kinds = service.getBoard(hireId, projectId)?.cards?.map { it.kind }
+
+        // Only the two pinned places are asserted: the baseline cards this hire's track ensures
+        // follow underneath in their own order, which is not what this test is about.
+        assertEquals(
+            listOf(BoardCardKind.ARRIVAL_STEPS, BoardCardKind.CURRENT_TASK),
+            kinds!!.take(2),
+        )
+    }
+
+    /**
+     * ⚠️ **Crowding gets nothing, and this pins that.** Every auto-tidy that *removes* a card breaks
+     * the rule that dismissal is the hire's and is sticky — which rules out caps and archiving
+     * outright, not merely for now. A board of many cards returns every one of them.
+     */
+    @Test
+    fun `a busy board loses nothing to the ordering`() {
+        val board = existingBoard()
+        val kindsOnBoard = listOf(
+            BoardCardKind.PATH_TO_FIRST_CONTRIBUTION,
+            BoardCardKind.OPEN_PULL_REQUESTS,
+            BoardCardKind.CURRENT_TASK,
+            BoardCardKind.SUGGESTED_TASKS,
+            BoardCardKind.COMPETENCY_PROGRESS,
+            BoardCardKind.MEMORY_RECAP,
+        )
+        every { boardCardRepository.findAllByBoardId(board.id) } returns kindsOnBoard
+            .mapIndexed { index, kind -> card(board, kind, position = index) }
+        every { currentTaskReader.currentTaskFor(hireId, projectId) } returns StarterWorkTaskProposal(
+            sourceId = "github:org/repo:ISSUE:7",
+            title = "Fix the flaky login test",
+        )
+
+        val kinds = service.getBoard(hireId, projectId)?.cards?.map { it.kind }
+
+        assertEquals(kindsOnBoard.size, kinds!!.size)
+        assertEquals(kindsOnBoard.toSet(), kinds.toSet())
+    }
+
     @Test
     fun `a track that cannot have pull requests is not given a pull request card`() {
         noBoardYet()
