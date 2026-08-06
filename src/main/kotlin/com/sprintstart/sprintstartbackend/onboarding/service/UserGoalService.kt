@@ -16,10 +16,9 @@ import java.util.UUID
 /**
  * A hire claiming, reading and dropping the contribution their path aims at.
  *
- * The hire chooses, not a PM and not a scoring function: `GET /me/matches` already ranks the
- * approved starter-work pool by fit, and this turns one of those into a commitment. A PM still
- * controls *which* tasks exist -- only an APPROVED proposal can be claimed -- so this is a choice
- * within a curated set, not an open field.
+ * The hire chooses, not a PM and not a scoring function: `GET /me/matches` already ranks the live
+ * starter-work pool by fit, and this turns one of those into a commitment. A rejected task cannot
+ * be claimed, so this is a choice within a curated set, not an open field.
  *
  * "No goal yet" is a real, nameable state rather than an error or a silent fallback to the whole
  * graph: the path is simply the project's baseline until a hire picks a destination, and the
@@ -32,11 +31,11 @@ class UserGoalService(
     private val userApi: UserApi,
 ) {
     /**
-     * Claims an approved starter-work task as this hire's goal for [projectId], replacing any
-     * goal they had claimed there before.
+     * Claims a live starter-work task as this hire's goal for [projectId], replacing any goal they
+     * had claimed there before.
      *
-     * @throws ResponseStatusException 404 if the proposal doesn't exist; 409 if it has not been
-     * approved (a PROPOSED or REJECTED task is not something a hire may commit to).
+     * @throws ResponseStatusException 404 if the proposal doesn't exist; 409 if it is not `LIVE`
+     * (a rejected task is not something a hire may commit to).
      */
     @Transactional
     fun claimForMe(authId: String, projectId: UUID, proposalId: UUID): GoalView {
@@ -47,7 +46,7 @@ class UserGoalService(
         if (proposal.status != ProposalStatus.LIVE) {
             throw ResponseStatusException(
                 HttpStatus.CONFLICT,
-                "Starter-work task $proposalId is ${proposal.status}; only an approved task can be claimed as a goal",
+                "Starter-work task $proposalId is ${proposal.status}; only a live task can be claimed as a goal",
             )
         }
 

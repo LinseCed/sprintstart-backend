@@ -362,7 +362,7 @@ class BuddyToolExecutor(
         }
         return sections
             .ifEmpty {
-                listOf("There are no approved starter-work tasks to suggest yet.")
+                listOf("There are no starter-work tasks to suggest yet.")
             }.joinToString("\n\n")
     }
 

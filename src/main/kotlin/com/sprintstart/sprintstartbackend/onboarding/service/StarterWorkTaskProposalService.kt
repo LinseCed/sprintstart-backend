@@ -65,10 +65,10 @@ class StarterWorkTaskProposalService(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
-     * Triggers AI starter-work mining and persists the results as PROPOSED.
+     * Triggers AI starter-work mining and persists the results as `LIVE`.
      *
-     * Issues already in the pool (PROPOSED or APPROVED -- not REJECTED, so a PM's rejection
-     * doesn't permanently block re-mining if circumstances change) and the current live
+     * Issues already in the pool (`LIVE` -- not `REJECTED`, so a rejection doesn't permanently
+     * block re-mining if circumstances change) and the current live
      * competency keys are sent to the stateless AI service so it can dedupe and ground competency
      * tags. The AI call runs outside any transaction.
      *
@@ -146,12 +146,11 @@ class StarterWorkTaskProposalService(
     }
 
     /**
-     * Persists the outcome's tasks as PROPOSED rows, re-applying the backend's own gate: a task
-     * whose issue is already in the pool (PROPOSED or APPROVED) is not re-proposed. The AI dedupes
-     * against the active pool the caller sends, but this is the authoritative check at write time —
-     * and it closes the window where a second mining run before a PM decides could double-pool an
-     * issue. Returns how many landed and a human note per skipped task, so the streaming path can
-     * surface each skip as a `warning`.
+     * Persists the outcome's tasks as `LIVE` rows, re-applying the backend's own dedup: a task
+     * whose issue is already in the pool is not mined again. The AI dedupes against the active pool
+     * the caller sends, but this is the authoritative check at write time -- and it closes the
+     * window where two mining runs could double-pool an issue. Returns how many landed and a human
+     * note per skipped task, so the streaming path can surface each skip as a `warning`.
      */
     private fun persistProposals(outcome: StarterWorkOutcome): PersistResult {
         // REJECTED counts as already-pooled, which is what makes a rejection **sticky**: a task
@@ -203,9 +202,9 @@ class StarterWorkTaskProposalService(
         )
 
     /**
-     * Returns the approved starter-work pool, for a PM choosing a task to author orientation for.
+     * Returns the live starter-work pool, for a PM choosing a task to author orientation for.
      *
-     * The whole approved set, ordered by title, not scoped to a project: approved tasks are a global
+     * The whole live set, ordered by title, not scoped to a project: tasks are a global
      * pool (the entity has no `projectId`), and orientation is per-`(task, project)` only because the
      * corpus a packet is grounded in is per-project.
      */
@@ -236,8 +235,8 @@ class StarterWorkTaskProposalService(
     /**
      * Creates a hand-authored starter-work task, with no AI mining in the loop.
      *
-     * Born `APPROVED` and materialised straight away: a PM authoring a task is the review, so there
-     * is nothing to approve back to them (the same reasoning as direct baseline authoring). The task
+     * Born reviewed and materialised straight away: writing a task is vouching for it, so it never
+     * joins the unreviewed queue. The task
      * has no ingested source, so a stable synthetic [sourceId] is minted -- unique per task, and by
      * design not a `github:owner/name:...` id, so fit-ranking's repository-responsiveness and
      * ingested-label lookups simply find nothing for it rather than misattributing it, both of which
@@ -289,7 +288,7 @@ class StarterWorkTaskProposalService(
     }
 
     /**
-     * Ranks the current (APPROVED) starter-work pool by fit for the authenticated user on a project.
+     * Ranks the current `LIVE` starter-work pool by fit for the authenticated user on a project.
      *
      * A hire must be told in one line why a task was suggested, and an embedding distance cannot
      * say. The ranking is deterministic, local and self-explaining (see [StarterWorkMatcher]) —
@@ -309,7 +308,7 @@ class StarterWorkTaskProposalService(
     }
 
     /**
-     * Ranks the current (APPROVED) starter-work pool by fit for an already-resolved user on a
+     * Ranks the current `LIVE` starter-work pool by fit for an already-resolved user on a
      * project.
      *
      * The user-id counterpart of [matchForUser], for callers that hold a user id rather than an auth

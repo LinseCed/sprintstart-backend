@@ -29,7 +29,7 @@ import java.util.UUID
 /**
  * Task 0: the trivial first task a hire is auto-assigned once their environment is ready.
  *
- * A PM flags which approved starter-work tasks are suitable; a hire reads (and, on first read, is
+ * A PM flags which live starter-work tasks are suitable; a hire reads (and, on first read, is
  * assigned) their own, and may undo it. Assignment is deliberately a hire-side read side effect
  * rather than a background job, so it covers derived readiness too — a PM viewing the metrics never
  * assigns anything.
@@ -46,7 +46,7 @@ class TaskZeroController(
 ) {
     @Operation(
         summary = "Flag an approved task as suitable for Task 0",
-        description = "A PM's decision that this approved starter-work task is small and safe enough " +
+        description = "A PM's decision that this live starter-work task is small and safe enough " +
             "to be a hire's first task. Only valid on an approved proposal.",
     )
     @ApiResponses(
