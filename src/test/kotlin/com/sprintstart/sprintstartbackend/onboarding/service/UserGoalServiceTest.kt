@@ -23,10 +23,8 @@ import kotlin.test.assertNull
 /**
  * Unit tests for claiming a starter task as a goal.
  *
- * A goal used to point at a `CONTRIBUTION` competency minted on approval, and half of this file used
- * to guard that indirection: resolving through a derived key rather than a label, and 404ing when
- * the node and the proposal table disagreed. The goal points at the proposal now, so the indirection
- * — and the failure mode it needed guarding against — is gone.
+ * A goal points straight at the proposal, so there is no derived key to resolve through and no
+ * second table to disagree with.
  */
 class UserGoalServiceTest {
     private val userGoalRepository: UserGoalRepository = mockk(relaxed = true)

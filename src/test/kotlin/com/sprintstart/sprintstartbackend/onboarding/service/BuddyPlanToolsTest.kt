@@ -321,8 +321,8 @@ class BuddyPlanToolsTest {
     }
 
     /**
-     * Until generation populates `area` (S3) most of a hand-authored vocabulary has none, and an
-     * "Ungrouped" heading over every single gap is a layer that carries no information.
+     * Most of a hand-authored vocabulary has no `area`, and an "Ungrouped" heading over every
+     * single gap is a layer that carries no information.
      */
     @Test
     fun `adds no heading when nothing is grouped yet`() {

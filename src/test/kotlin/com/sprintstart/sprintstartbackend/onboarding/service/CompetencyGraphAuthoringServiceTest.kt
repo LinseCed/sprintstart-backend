@@ -23,11 +23,9 @@ import kotlin.test.assertNull
 /**
  * Unit tests for authoring the competency vocabulary.
  *
- * Most of what this file used to assert went with the graph it guarded: change-log recording,
- * version bumps, replayed visibility, cycle rejection, soft removal, edges. What survives is a flat
- * list of durable names, and the two properties that still matter about it — **the key is identity**
- * (the ledger points at it, so it is slugified on the way in and is never editable), and **removing
- * a competency must not remove what anybody earned**.
+ * The vocabulary is a flat list of durable names, and two properties matter about it — **the key
+ * is identity** (the ledger points at it, so it is slugified on the way in and is never editable),
+ * and **removing a competency must not remove what anybody earned**.
  */
 class CompetencyGraphAuthoringServiceTest {
     private val competencyRepository: CompetencyRepository = mockk(relaxed = true)

@@ -14,9 +14,9 @@ import java.util.UUID
  * ### Why this exists
  *
  * The buddy conversation opens fresh every visit: the previous window is folded into the mentor's
- * private memory and never replayed. That was a deliberate choice, and it leaves a hole — anything
- * durable the mentor shows you (where you stand, which pull request is stuck, what to do next)
- * scrolls away and is gone by the next visit. The board is where those things live instead.
+ * private memory and never replayed. That is deliberate, and it leaves a hole — anything durable
+ * the mentor shows you (where you stand, which pull request is stuck, what to do next) scrolls
+ * away and is gone by the next visit. The board is where those things live instead.
  *
  * Chat is the conversation. The board is the whiteboard beside it: the shared surface the mentor
  * curates and the hire owns.

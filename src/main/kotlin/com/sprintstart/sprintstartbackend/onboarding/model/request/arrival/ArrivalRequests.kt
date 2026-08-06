@@ -23,7 +23,7 @@ data class CreateArrivalStepRequest(
     val description: String? = null,
     val href: String? = null,
     val position: Int = 0,
-    @field:Schema(description = "Defaults to DECLARED; OBSERVED has no derivation behind it until A1")
+    @field:Schema(description = "Defaults to DECLARED; OBSERVED requires a derivation behind the key")
     val settledBy: Rigor = Rigor.DECLARED,
 )
 

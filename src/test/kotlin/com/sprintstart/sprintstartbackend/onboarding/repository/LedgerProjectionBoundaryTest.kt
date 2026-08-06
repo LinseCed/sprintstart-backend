@@ -30,8 +30,7 @@ import java.util.UUID
  * the audit trail behind it. This test proves that throwing content away never reaches either, the
  * risk being an accidental JPA relationship or a shared cascade.
  *
- * It replaces the same guard written against the per-user path tree, which was retired in #53. A
- * local [BytesEncryptor] is supplied because the onboarding entity model registers an encrypted
+ * A local [BytesEncryptor] is supplied because the onboarding entity model registers an encrypted
  * attribute converter the JPA slice would otherwise fail to construct.
  */
 @DataJpaTest

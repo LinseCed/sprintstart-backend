@@ -62,10 +62,9 @@ class BuddySuggestionServiceTest {
     }
 
     /**
-     * ⚠️ A fixed chip is out of reach of the track vocabulary, exactly as A2's persona clause was —
-     * its first draft said *"somebody who cannot clone the repository"* to every role. So every chip
-     * a non-developer can see must be true of a designer and a Scrum Master too. Only the chip whose
-     * own gate is the pull-request evidence kind may speak that language.
+     * ⚠️ A fixed chip is out of reach of the track vocabulary, so every chip a non-developer can
+     * see must be true of a designer and a Scrum Master too. Only the chip whose own gate is the
+     * pull-request evidence kind may speak that language.
      */
     @Test
     fun `no chip a non-developer sees mentions developer work`() {
@@ -91,8 +90,8 @@ class BuddySuggestionServiceTest {
 
     /**
      * Arrival is first in the spec list because what has to be true before somebody can work comes
-     * before how their work is going (A2). Chips inherit that ordering rather than having an opinion
-     * of their own — two orderings would eventually disagree.
+     * before how their work is going. Chips inherit that ordering rather than having an opinion of
+     * their own — two orderings would eventually disagree.
      */
     @Test
     fun `keeps the order the tools are mounted in`() {

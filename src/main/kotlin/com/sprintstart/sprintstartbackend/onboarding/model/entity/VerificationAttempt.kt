@@ -12,14 +12,9 @@ import java.util.UUID
 /**
  * One graded attempt at a [Verification] — the audit trail behind a pass/fail.
  *
- * Attempts point at a *verification*, never at whatever owns it, which is why this table has
- * survived every rework: modules replaced steps, and the graph's structure was retired, without a
- * single attempt row being repointed or lost.
- *
- * It used to also stamp the competency-graph version current at submission time, so an attempt could
- * be read against the graph it was made under. There are no graph versions now, so the column was
- * recording nothing. Dropping a version stamp is not the same as touching the history: every
- * attempt, its answer, its grade and its date are untouched.
+ * ⚠️ Attempts point at a *verification*, never at whatever owns it. That is what has let the
+ * structures above them be replaced repeatedly without a single attempt row being repointed or
+ * lost, and it is worth preserving.
  */
 @Entity
 @Table(name = "verification_attempts")

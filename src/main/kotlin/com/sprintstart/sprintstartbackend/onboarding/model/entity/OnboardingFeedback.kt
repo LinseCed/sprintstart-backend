@@ -12,10 +12,10 @@ import java.util.UUID
 /**
  * A hire's reaction to a piece of onboarding content.
  *
- * Attached to a [ModulePage], which is what makes the content-quality loop mean anything: the page
- * is shared, so "this didn't help" is a signal about the material everybody reads, not about one
- * person's private copy of it. Feedback used to hang off a per-user `OnboardingStep`, where three
- * hires disliking the same lesson produced three unrelated counts of one.
+ * ⚠️ Attached to a [ModulePage], which is what makes the content-quality loop mean anything: the
+ * page is shared, so "this didn't help" is a signal about the material everybody reads. Hung off
+ * anything per-user, three hires disliking the same lesson would produce three unrelated counts
+ * of one.
  */
 @Entity
 @Table(name = "onboarding_feedback")

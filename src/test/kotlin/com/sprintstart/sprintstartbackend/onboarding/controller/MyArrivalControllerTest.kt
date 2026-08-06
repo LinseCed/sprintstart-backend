@@ -80,10 +80,9 @@ class MyArrivalControllerTest(
     /**
      * The wire shape must not offer a single blended completion figure.
      *
-     * The onboarding model this replaces reported a `progressPercentage` that counted a ticked box
-     * exactly like a passed check, and that conflation is what made the number meaningless. Counts
-     * are per rigor and there is deliberately no total to divide by; this test is what stops one
-     * being added back as a convenience.
+     * A percentage would count a ticked box exactly like a passed check, and that conflation is
+     * what makes such a number meaningless. Counts are per rigor with deliberately no total to
+     * divide by; this test is what stops one being added as a convenience.
      */
     @Test
     fun `getMyArrival must not expose a blended completion figure`() {

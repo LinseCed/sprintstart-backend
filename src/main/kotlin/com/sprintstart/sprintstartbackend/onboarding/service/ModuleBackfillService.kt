@@ -29,9 +29,8 @@ import java.util.UUID
  *
  * ### What it refuses to touch
  *
- * **A module anybody has edited.** If the live version has a single `PM` page, this leaves the whole
- * module alone — regenerating over it would discard the edit, which is the exact failure S2 exists
- * to prevent, one level up from competencies.
+ * **A module anybody has edited.** If the live version has a single `PM` page, this leaves the
+ * whole module alone — regenerating over it would discard the edit.
  *
  * ### Why it is capped
  *

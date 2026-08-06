@@ -36,16 +36,10 @@ data class SetupRungResponse(
  *
  * ### There is no third value, and there must not be one
  *
- * `BLOCKED` existed here and was **written by nothing**, in either state — no rung ever produced
- * it. It described a dependency that stopped being real when the baseline was retired ("nothing to
- * select from until competencies are approved"), and it rendered as a padlock on the one surface
- * whose entire point is that **nothing here gates anything**.
- *
- * That is the same reason `NodeState.LOCKED` was deleted from its enum rather than left unused, and
- * the same reason `ProposalStatus.PROPOSED` was deleted rather than aliased: a value lying around
- * is an invitation, and the gate this initiative removed is one convenient assignment away from
- * coming back. Deleting it is what makes "no state gates onboarding" enforceable rather than a
- * comment.
+ * ⚠️ A `BLOCKED` state would render as a padlock on the one surface whose entire point is that
+ * **nothing here gates anything**. Keeping it out of the enum rather than merely unused is what
+ * makes "no state gates onboarding" enforceable instead of a comment — a value lying around is an
+ * invitation, and a gate is one convenient assignment away.
  *
  * @property OK This stage is in the state a ready project has.
  * @property WARN It is not, yet. Never a lock and never a chore — most of what lands here follows

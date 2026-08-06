@@ -3,10 +3,10 @@ package com.sprintstart.sprintstartbackend.onboarding.external.enums
 /**
  * How strong the evidence behind a completed contribution is.
  *
- * Onboarding's terminal event used to be a merged pull request, which is evidence a hire could not
- * have faked: ingestion observed it. Roles that do not write code — a Scrum Master facilitating a
- * retro, a PM publishing a plan — can rarely be observed that way, and the honest answer is to
- * record *how* something was established rather than to pretend the two are the same measurement.
+ * A merged pull request is evidence a hire could not have faked: ingestion observed it. Roles that
+ * do not write code — a Scrum Master facilitating a retro, a PM publishing a plan — can rarely be
+ * observed that way, so what is recorded is *how* something was established. ⚠️ The two are never
+ * blended in a readout: that would pretend they are the same measurement.
  *
  * This is the same discipline [CompetencySource] already applies to the ledger
  * ([CompetencySource.VERIFIED] outranks [CompetencySource.ASSESSED]) and [VerificationType] applies

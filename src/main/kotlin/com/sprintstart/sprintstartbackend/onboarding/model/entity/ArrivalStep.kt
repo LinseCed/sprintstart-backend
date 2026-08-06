@@ -17,17 +17,14 @@ import java.util.UUID
  *
  * ### What this is not
  *
- * It is **not** a gate. Nothing in the system refuses to serve a hire because an arrival step is
- * outstanding: "not settled" is a value in a response body, never a 403. The onboarding rework
- * removed `NodeState.LOCKED` *from its enum* precisely so a gate could not be reintroduced by
- * accident, and this entity does not reintroduce one. "Mandatory" here means somebody is expected
- * to do this and it is tracked — being blocked by your employer must not also mean being blocked by
- * the tool.
+ * ⚠️ It is **not** a gate. Nothing in the system refuses to serve a hire because an arrival step
+ * is outstanding: "not settled" is a value in a response body, never a 403. "Mandatory" here means
+ * somebody is expected to do this and it is tracked — being blocked by your employer must not also
+ * mean being blocked by the tool.
  *
- * It is also **not** the per-user step tree that C4 deleted. That tree hung content off a per-user
- * `OnboardingPath`, so there was no "the step for X", only N private copies nobody could maintain.
- * This is the shape that replaced it: **one shared definition, and per-hire state beside it**
- * ([ArrivalStepState]).
+ * ⚠️ It is also **not** per-hire content. **One shared definition, and per-hire state beside it**
+ * ([ArrivalStepState]) — a per-user copy would mean there was no "the step for X", only N private
+ * copies nobody could maintain.
  *
  * ### Scope
  *
@@ -45,7 +42,7 @@ import java.util.UUID
  *
  * A [key] must be unique within its scope, but **`NULL` does not conflict with `NULL` in Postgres**
  * — so a single unique index on `(key, project_id)` would constrain project-scoped rows and
- * silently permit unlimited duplicate company-wide ones, which is every row A0 creates. The
+ * silently permit unlimited duplicate company-wide ones. The
  * migration therefore declares **two partial unique indexes**, and because Hibernate cannot express
  * a partial index at all — and the test suite builds its schema from these entities, never from the
  * migrations — [com.sprintstart.sprintstartbackend.onboarding.service.ArrivalStepService] enforces
@@ -90,8 +87,6 @@ class ArrivalStep(
      * [Rigor.ATTESTED] exists as a slot without being built — role tracks already has a real
      * `Attestation` (a named colleague, never the hire, enforced in the service *and* a DB check),
      * so if "IT granted access" ever wants a genuine confirmer the mechanism is there.
-     *
-     * A0 only creates [Rigor.DECLARED] steps; derivation for [Rigor.OBSERVED] arrives in A1.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "settled_by", nullable = false)
@@ -117,9 +112,9 @@ class ArrivalStep(
      * Who authored this step.
      *
      * Nothing generates arrival steps — account creation is a fact about a company, not something
-     * derivable from a corpus — so every row is `PM` today. The field mirrors [Competency] and
+     * derivable from a corpus — so every row is `PM` today. ⚠️ The field mirrors [Competency] and
      * `ModulePage` so that if generation ever arrives it cannot silently overwrite somebody's
-     * wording, which is the failure S2 exists to prevent.
+     * wording.
      */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

@@ -120,7 +120,7 @@ class ArrivalStepService(
         // A project-scoped definition wins the key.
         val projectKeys = projectSteps.map { it.key }.toSet()
 
-        // ⚠️ Ordered by scope, not by position across scopes -- decided with the user for A3.
+        // ⚠️ Ordered by scope, not by position across scopes.
         // Positions are assigned *within* a scope, so sorting the union by position would rank a
         // company step against a project one on numbers that were never comparable, and two PMs
         // authoring different projects could not coordinate the result. Grouping instead lets the

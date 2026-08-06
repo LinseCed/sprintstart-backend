@@ -52,8 +52,7 @@ class Competency(
      * ([CompetencyAreaNormalizer]) rather than by the type — an area that differs only in case or
      * spacing from one already in use is stored as the one already in use.
      *
-     * Null is a real state: "not grouped yet". Everything predating this reads that way, and nothing
-     * populates it automatically until generation runs on ingestion (S3).
+     * Null is a real state: "not grouped yet".
      */
     @Column(nullable = true)
     var area: String? = null,
@@ -66,16 +65,15 @@ class Competency(
      * silently means "generation overwrites the admin", and the correction is lost with no trace
      * that it was ever made.
      *
-     * Defaults to `PM`, which is both accurate — every writer today is a person, since generation
-     * has had no caller since the proposal queue went — and the safe direction to be wrong in. If
-     * the generator's persister (S3) ever forgets to mark what it wrote as `AI`, the failure is that
-     * a row never improves, rather than that somebody's correction is silently discarded.
+     * ⚠️ Defaults to `PM`, which is the safe direction to be wrong in: if a persister forgets to
+     * mark what it wrote as `AI`, the failure is that a row never improves, rather than that
+     * somebody's correction is silently discarded.
      */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     var provenance: ContentProvenance = ContentProvenance.PM,
-    // Compliance/mandate-flagged competencies force any graph change that touches them to
-    // classify as ChangeClassification.INVARIANT, pushing immediately regardless of shape.
+    // Marks a competency as compliance- or mandate-driven. ⚠️ Authored and exposed, but nothing
+    // branches on it -- it carries no behaviour today.
     @Column(nullable = false)
     var invariant: Boolean = false,
     /**

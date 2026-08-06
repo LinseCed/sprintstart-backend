@@ -122,11 +122,9 @@ class User(
     /**
      * Every role this person holds, across every project they are on.
      *
-     * **Derived, not stored.** Roles used to live here directly, in a `user_project_roles` table
-     * with no project dimension at all — so "developer" was a fact about a person rather than about
-     * a person *on a project*, and somebody who ships code on one project and runs delivery on
-     * another could not be described. Roles now hang off the assignment, and this is the honest
-     * global answer: the union across their projects.
+     * **Derived, not stored.** Roles hang off the assignment, because "developer" is a fact about a
+     * person *on a project* — somebody who ships code on one and runs delivery on another holds a
+     * different role on each. This is the union across their projects.
      *
      * Use this only where the question really is global (a user list, a profile, a search filter).
      * Anywhere a project is in hand, read [ProjectUserAssignment.projectRoles] instead — collapsing

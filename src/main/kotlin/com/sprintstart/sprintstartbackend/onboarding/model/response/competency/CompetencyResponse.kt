@@ -13,8 +13,8 @@ data class CompetencyResponse(
     val label: String,
     val description: String?,
     /**
-     * What this competency is about, for grouping. Null is "not grouped yet" -- a real state, not a
-     * missing one: nothing populates it automatically until generation runs on ingestion (S3).
+     * What this competency is about, for grouping. Null is "not grouped yet" -- a real state, not
+     * a missing one.
      */
     val area: String?,
     val kind: CompetencyKind,
@@ -25,9 +25,9 @@ data class CompetencyResponse(
 /**
  * The whole competency vocabulary, for a PM authoring it.
  *
- * Carries no per-user state: nothing here is met or unmet, because that is a property of a person
- * rather than of the vocabulary. It is a flat list — prerequisite structure was retired with the
- * graph, so there is no ordering to convey and no version to resolve at.
+ * ⚠️ Carries no per-user state: nothing here is met or unmet, because that is a property of a
+ * person rather than of the vocabulary. A flat list, with no ordering to convey and no version to
+ * resolve at.
  */
 data class CompetencyGraphResponse(
     val competencies: List<CompetencyResponse>,

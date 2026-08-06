@@ -210,7 +210,7 @@ class UserApiService(
             ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with id: $userId")
         }
         // Delegated rather than reimplemented: GithubLoginService owns normalisation, the syntax
-        // and uniqueness rules, and the A1 rule that changing the login discards the verification
+        // and uniqueness rules, and the rule that changing the login discards the verification
         // verdict about the old one. SELF_DECLARED because the hire said it themselves -- being
         // told it in conversation is not a PM confirming it.
         githubLoginService.apply(user, githubLogin, GithubLoginSource.SELF_DECLARED)

@@ -17,13 +17,11 @@ import java.util.UUID
 /**
  * The buddy's board tool: putting something where the hire will still find it tomorrow.
  *
- * ### Why this is not an action tool
+ * ### Not an action tool
  *
- * Every tool in `BuddyActionService` proposes and waits for a button, because every one of them
- * changes the hire's onboarding — a goal claimed, an answer graded, a colleague asked to vouch for
- * somebody. Placing a card changes nothing about the onboarding; it changes what is on a page. The
- * cost of a wrong one is a dismissal, and asking permission to point at something is not how anyone
- * helps. So this applies immediately, and the card is attributed and dismissible.
+ * Every tool in `BuddyActionService` proposes and waits for a button because each changes the
+ * hire's onboarding. Placing a card changes what is on a page, not the onboarding, and the cost of
+ * a wrong one is a dismissal — so this applies immediately, attributed and dismissible.
  *
  * ### Why it cannot invent anything
  *
@@ -32,18 +30,18 @@ import java.util.UUID
  * buddy's read tools use — so the mentor decides *that* something is worth keeping, never *what it
  * says*. That is the constraint the whole board rests on.
  *
- * ### The one extension, and the direction it goes in
+ * ### The one extension
  *
- * `DIAGRAM` needs a **subject**, because a diagram is *of* something and only the conversation knows
- * whether the mentor has just been explaining authentication or the ingestion pipeline. That is a
- * real extension of the rule above, so it is named rather than left implied:
+ * `DIAGRAM` takes a **subject**, because a diagram is *of* something and only the conversation
+ * knows whether the mentor has been explaining authentication or the ingestion pipeline. The rule
+ * it extends, stated rather than implied:
  *
  * > The model may choose the question. It never writes the answer.
  *
- * The subject aims retrieval and is asserted nowhere. Every box in the resulting picture comes back
- * derived from the project's corpus with the citation proving it, and a box that cannot be grounded
- * is dropped — so a subject the model invented cannot become a claim the model invented. It is the
- * only argument any card kind takes beyond its kind, and it is not a foothold for a second one.
+ * ⚠️ The subject aims retrieval and is asserted nowhere. Every box comes back derived from the
+ * project's corpus with the citation proving it, and an ungrounded box is dropped — so a subject
+ * the model invented cannot become a claim the model invented. It is the only argument any card
+ * kind takes beyond its kind, and not a foothold for a second one.
  */
 @Component
 class BuddyBoardTools(

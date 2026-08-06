@@ -34,11 +34,8 @@ import java.util.UUID
  *
  * ### One stream, many sources
  *
- * P0 shipped this with a single hardcoded source and no abstraction, because an interface shaped
- * around one example is reliably the wrong interface. With attestations there are two, so the shape
- * could be taken from what actually differs: see [EvidenceProvider]. This service is now only the
- * composition rule — every provider runs, and their contributions become one time-ordered stream
- * that the ramp and the metrics read.
+ * This service is only the composition rule: every [EvidenceProvider] runs, and their
+ * contributions become one time-ordered stream that the ramp and the metrics read.
  */
 @Service
 class ContributionService(

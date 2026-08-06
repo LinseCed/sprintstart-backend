@@ -17,9 +17,8 @@ import java.util.UUID
  *
  * Everything the ramp reads is composed on read from facts that already live somewhere durable — a
  * pull request, an assignment, a claimed goal. An attestation is the first piece of evidence that
- * exists nowhere else: nobody records "the retro was well run" until somebody is asked. That makes
- * it the honest moment to introduce a table, the same reasoning `BuddyContact` was given, and it is
- * why P0 could stay migration-free while this cannot.
+ * exists nowhere else: nobody records "the retro was well run" until somebody is asked. That is
+ * what earns it a table rather than a derivation.
  *
  * ### The one rule that makes it evidence rather than a formality
  *

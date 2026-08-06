@@ -67,9 +67,7 @@ import java.util.UUID
  *
  * The ensure step runs on every load rather than only at creation because relevance changes: a role
  * moved onto a track that admits pull requests should get the open-work card, and a board seeded
- * once at first read never would. It is the same rule the design states for on-open placement —
- * ensure the state-relevant set exists and is current, never re-add a dismissed card — applied
- * where the board is actually read.
+ * once at first read never would.
  *
  * ### Hydration reuses the buddy's reads
  *
@@ -152,12 +150,11 @@ class BoardService(
      * the only exceptions, and both are narrow: **only while the thing is actually true, and only
      * for the card about it.** A hire who cannot clone the repository should not have to scroll to
      * find out what to do about it, and neither should one who wants to know what they are meant to
-     * be working on — the tutor's *"wie eindeutig es am Ende für den User bleibt, an welchem Task
-     * jetzt als Nächstes gearbeitet werden soll"*.
+     * be working on.
      *
-     * **Arrival outranks the current task**, for A2's reason: what has to be true before somebody
-     * can work comes before what they are working on. Somebody still waiting on repository access
-     * does not need their task moved up, they need the access.
+     * **Arrival outranks the current task**: what has to be true before somebody can work comes
+     * before what they are working on. Somebody still waiting on repository access does not need
+     * their task moved up, they need the access.
      *
      * ⚠️ **It is a sort applied on read, never a write to `position`.** Their arrangement is
      * untouched underneath and comes back exactly as they left it the moment the last step settles
@@ -489,9 +486,8 @@ class BoardService(
      * The same read the hire's own `GET /me/arrival` serves, so the card and that endpoint cannot
      * disagree — the rule every other card here follows.
      *
-     * Counted per rigor and never totalled. A step the system observed and a step somebody ticked
-     * are different facts, and the single blended figure that would go here is the
-     * `progressPercentage` defect that made the previous model's progress reporting meaningless.
+     * ⚠️ Counted per rigor and never totalled. A step the system observed and a step somebody
+     * ticked are different facts, and a single blended figure here would be meaningless.
      */
     private fun arrivalStepsContent(steps: List<ResolvedArrivalStep>): ArrivalStepsContent {
         val responses: List<ArrivalStepResponse> = steps.map { it.toResponse() }

@@ -16,9 +16,7 @@ import org.springframework.stereotype.Component
  * key, so repeated restarts and partial prior seeds converge without duplicates, and an existing row
  * is never overwritten — a hand-edited label survives a restart.
  *
- * Seeds no relationships, because there are none: prerequisite and related edges were retired with
- * the graph's structure. It also no longer seeds a `POLICY` node — that kind is gone, along with
- * `CONTRIBUTION`, `CONNECTION`, `CULTURE` and `CHECKPOINT`, none of which anything ever created.
+ * Seeds no relationships, because competencies have none.
  *
  * Intended for development/local setup only; gated behind `sprintstart.dev-competency-graph.enabled`.
  *

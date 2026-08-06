@@ -77,9 +77,6 @@ data class DerivableArrivalStepResponse(
  * outstanding, and no total to divide by. A client that wants to say something honest says
  * *"5 confirmed by the system · 2 you told us about · 2 outstanding"*. `ArrivalControllerTest`
  * asserts that no field here is a blended completion figure.
- *
- * In A0 nothing is derived, so [observedCount] is always zero. The distinction is built anyway:
- * A1 populates it, and retrofitting it later means re-deciding this under time pressure.
  */
 @Schema(description = "The caller's arrival steps, counted by how each was established")
 data class MyArrivalResponse(

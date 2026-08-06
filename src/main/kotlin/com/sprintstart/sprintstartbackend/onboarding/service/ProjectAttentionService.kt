@@ -20,9 +20,8 @@ import java.util.UUID
  * judgment of the hire. A pull request kept waiting is somebody else's move (BLOCKED), and the
  * reason says so — attention pointed at the one person who cannot fix it is attention wasted.
  *
- * The human-buddy arms this list used to carry (a cadence gone quiet, an unassigned hire) are
- * gone with the buddy loop itself: escalation to a person now runs through flag-to-PM and the
- * PM's knowledge-request inbox, not through an assigned peer.
+ * Escalation to a person runs through flag-to-PM and the PM's knowledge-request inbox; there is
+ * no assigned peer to route it to.
  */
 @Service
 class ProjectAttentionService(

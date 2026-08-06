@@ -173,7 +173,7 @@ class BuddyActionService(
      *
      * [com.sprintstart.sprintstartbackend.user.service.GithubLoginService] stays the single writer —
      * the conversation is a second *entry point*, never a second source of truth. That is also what
-     * keeps the normalisation, the uniqueness check and the A1 rule that a changed login discards
+     * keeps the normalisation, the uniqueness check and the rule that a changed login discards
      * the old verification verdict true here without restating any of them.
      */
     private fun setGithubLogin(authId: String, login: String?): BuddyActionResponse {

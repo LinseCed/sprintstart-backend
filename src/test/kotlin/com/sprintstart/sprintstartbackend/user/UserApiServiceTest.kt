@@ -30,7 +30,7 @@ class UserApiServiceTest {
     /**
      * The buddy is a second *entry point* for a GitHub login, never a second writer. If this ever
      * stopped delegating, the conversation path would quietly lose normalisation, the uniqueness
-     * check, and the A1 rule that changing a login discards the verdict about the old one.
+     * check, and the rule that changing a login discards the verdict about the old one.
      */
     @Test
     fun `setGithubLogin stores what GithubLoginService normalises, not what was passed`() {

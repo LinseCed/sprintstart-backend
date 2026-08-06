@@ -13,12 +13,9 @@ import org.springframework.stereotype.Component
  * already in use only by case or surrounding whitespace **is** that area, and is stored with the
  * spelling already in use.
  *
- * First writer wins the spelling, deliberately. The alternative — letting a later write restyle every
- * existing row — would mean one generation run silently renaming a PM's chosen wording, which is the
- * class of thing S2's provenance exists to prevent.
- *
- * This matters most once generation runs on ingestion (S3): today a human types an area and can see
- * the others, but after S3 a model proposes them with nobody in the loop to tidy up.
+ * ⚠️ First writer wins the spelling, deliberately. Letting a later write restyle every existing row
+ * would mean one generation run silently renaming a PM's chosen wording. It matters because
+ * generation runs on ingestion, proposing areas with nobody in the loop to tidy up.
  */
 @Component
 class CompetencyAreaNormalizer(

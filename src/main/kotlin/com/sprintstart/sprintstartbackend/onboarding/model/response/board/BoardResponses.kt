@@ -125,15 +125,10 @@ data class PathToFirstContributionContent(
  *
  * ### There is no completion figure here, deliberately
  *
- * The counts are reported per rigor and there is no total to divide by. The onboarding model this
- * replaces published a single `progressPercentage` that counted a ticked box exactly like a passed
- * check, and that conflation is what made the number meaningless. A client says what is known —
- * *"5 confirmed by the system · 2 you told us about · 2 outstanding"* — rather than a percentage
- * that averages two different kinds of evidence.
- *
- * [observedCount] is always zero until A1 gives any step a derivation behind it. The distinction is
- * carried anyway, because retrofitting it once a client already renders a single number means
- * re-litigating this under time pressure.
+ * The counts are reported per rigor and there is no total to divide by. ⚠️ A single completion
+ * percentage counts a ticked box exactly like a passed check, and that conflation is what makes
+ * such a number meaningless. A client says what is known — *"5 confirmed by the system · 2 you
+ * told us about · 2 outstanding"* — rather than a percentage averaging two kinds of evidence.
  */
 data class ArrivalStepsContent(
     override val kind: BoardCardKind = BoardCardKind.ARRIVAL_STEPS,

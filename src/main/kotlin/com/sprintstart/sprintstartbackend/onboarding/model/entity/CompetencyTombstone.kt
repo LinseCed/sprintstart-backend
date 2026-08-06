@@ -19,13 +19,12 @@ import java.util.UUID
  *
  * ### Why a table rather than a flag on `Competency`
  *
- * The design of record says a deleted competency "keeps its row, marked deleted". That needs **every
- * existing reader** to remember to filter the flag out — there are eight, across the studio, the
- * dashboard, module authoring, verification, the ramp and starter-work matching — and any reader
- * added later that forgets creates a competency that is deleted but still visible. That is exactly
- * the ghost-row failure the graph-visibility replay already has, and it is not worth re-creating for
- * a property that a separate table gives for free: **no reader can forget a table it does not
- * query.** Removal stays the real delete S0 made it; this remembers that it happened.
+ * ⚠️ Marking a deleted competency with a flag on its own row needs **every existing reader** to
+ * remember to filter it out — there are eight, across the studio, the dashboard, module authoring,
+ * verification, the ramp and starter-work matching — and any reader added later that forgets
+ * creates a competency that is deleted but still visible. A separate table gives that for free:
+ * **no reader can forget a table it does not query.** Removal is a real delete; this remembers
+ * that it happened.
  *
  * ### What it carries, and why that much
  *

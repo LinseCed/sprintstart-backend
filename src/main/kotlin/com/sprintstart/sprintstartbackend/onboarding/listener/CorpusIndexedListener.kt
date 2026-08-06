@@ -14,9 +14,9 @@ import org.springframework.transaction.event.TransactionalEventListener
 /**
  * Turns "somebody connected a repository" into "the project has a vocabulary and material".
  *
- * The whole point of the slice: onboarding setup stops being a checklist a PM works through and
- * becomes a consequence of the corpus existing. Nothing here is approved by anyone — the gate is
- * grounding, applied inside the generator.
+ * Onboarding setup is a consequence of the corpus existing rather than a checklist a PM works
+ * through. Nothing here is approved by anyone — the gate is grounding, applied inside the
+ * generator.
  *
  * ### Fire and forget, deliberately
  *
@@ -33,13 +33,9 @@ import org.springframework.transaction.event.TransactionalEventListener
  * is independent after that: one failing does not cancel the others, because a project with tasks
  * and no modules is more useful than a project with neither.
  *
- * ### Vocabulary first, then modules
- *
- * A module hangs off a competency, so generating modules before the competencies exist would cover
- * only what the last run happened to leave behind. The two passes are guarded differently and that
- * is intentional: the vocabulary is fingerprint-guarded and does nothing when the corpus has not
- * moved, while the module pass is guarded by "this competency has no module" and keeps chipping at
- * the backlog on every run.
+ * ⚠️ The two passes are guarded differently, on purpose: the vocabulary is fingerprint-guarded and
+ * does nothing when the corpus has not moved, while the module pass is guarded by "this competency
+ * has no module" and keeps chipping at the backlog on every run.
  */
 @Component
 class CorpusIndexedListener(
