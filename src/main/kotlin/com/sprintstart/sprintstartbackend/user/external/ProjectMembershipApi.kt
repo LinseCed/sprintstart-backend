@@ -57,4 +57,13 @@ data class ProjectMember(
      * track is the onboarding module's business, not this one's.
      */
     val onboardingTrackKey: String? = null,
+    /**
+     * The name this member appears under in a connected issue tracker, if they declared one.
+     *
+     * ⚠️ **Not the same thing as [displayName], and never a substitute for it.** [displayName] is
+     * whatever SprintStart renders from their first and last name; this is what *Jira* renders,
+     * which is a different string as often as not. Falling back to one for the other would attribute
+     * somebody's issues by a coincidence of spelling — silently right often enough to look fine.
+     */
+    val jiraDisplayName: String? = null,
 )

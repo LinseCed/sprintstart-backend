@@ -36,6 +36,7 @@ class UserService(
     private val eventPublisher: ApplicationEventPublisher,
     private val keycloakAdminClient: KeycloakAdminClient,
     private val githubLoginService: GithubLoginService,
+    private val jiraDisplayNameService: JiraDisplayNameService,
 ) {
     /**
      * Returns all persisted users.
@@ -114,6 +115,7 @@ class UserService(
         request.lastName?.let { user.lastname = it }
         request.profileIcon?.let { user.profileIcon = it }
         request.githubLogin?.let { githubLoginService.apply(user, it, GithubLoginSource.SELF_DECLARED) }
+        request.jiraDisplayName?.let { jiraDisplayNameService.apply(user, it) }
 
         return userRepository.save(user).toGetResponse()
     }
@@ -165,6 +167,7 @@ class UserService(
         request.firstName?.let { user.firstname = it }
         request.lastName?.let { user.lastname = it }
         request.githubLogin?.let { githubLoginService.apply(user, it, GithubLoginSource.PM_CONFIRMED) }
+        request.jiraDisplayName?.let { jiraDisplayNameService.apply(user, it) }
 
         // Todo: map this to PatchResponse
         val response = userRepository.save(user).toGetResponse()

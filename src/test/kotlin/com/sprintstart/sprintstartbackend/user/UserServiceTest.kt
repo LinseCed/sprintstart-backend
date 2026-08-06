@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.user.model.request.user.UpdateUserEnab
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRepository
 import com.sprintstart.sprintstartbackend.user.repository.UserRepository
 import com.sprintstart.sprintstartbackend.user.service.GithubLoginService
+import com.sprintstart.sprintstartbackend.user.service.JiraDisplayNameService
 import com.sprintstart.sprintstartbackend.user.service.KeycloakAdminClient
 import com.sprintstart.sprintstartbackend.user.service.UserService
 import io.mockk.every
@@ -37,12 +38,14 @@ class UserServiceTest {
     private val eventPublisher: ApplicationEventPublisher = mockk()
     private val keycloakAdminClient: KeycloakAdminClient = mockk()
     private val githubLoginService = GithubLoginService(userRepository)
+    private val jiraDisplayNameService = JiraDisplayNameService(userRepository)
     private val userService = UserService(
         userRepository,
         projectRepository,
         eventPublisher,
         keycloakAdminClient,
         githubLoginService,
+        jiraDisplayNameService,
     )
 
     @Test

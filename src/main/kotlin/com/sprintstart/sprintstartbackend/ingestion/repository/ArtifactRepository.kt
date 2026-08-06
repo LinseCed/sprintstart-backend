@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.ingestion.repository
 
+import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactAiSyncState
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
@@ -86,6 +87,30 @@ interface ArtifactRepository : JpaRepository<Artifact, UUID> {
     )
     fun findAllByProjectIdAndArtifactType(
         @Param("projectId") projectId: UUID,
+        @Param("artifactType") artifactType: ArtifactType,
+    ): List<Artifact>
+
+    /**
+     * Returns every artifact of one type from one source system within a project.
+     *
+     * Exists because a tracked issue carries no `authorLogin` — the column is GitHub-only, and a
+     * Jira issue's assignee lives inside its metadata JSON. Attribution therefore has to filter in
+     * Kotlin, so the query narrows to the smallest honest set first: this project's issues from
+     * this tracker, rather than every artifact it has.
+     */
+    @Query(
+        """
+            SELECT DISTINCT a
+            FROM Artifact a
+            JOIN a.projectIdsInternal p
+            WHERE p = :projectId
+                AND a.sourceSystem = :sourceSystem
+                AND a.artifactType = :artifactType
+        """,
+    )
+    fun findAllByProjectIdAndSourceSystemAndArtifactType(
+        @Param("projectId") projectId: UUID,
+        @Param("sourceSystem") sourceSystem: SourceSystem,
         @Param("artifactType") artifactType: ArtifactType,
     ): List<Artifact>
 

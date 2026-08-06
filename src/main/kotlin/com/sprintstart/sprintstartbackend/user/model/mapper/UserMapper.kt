@@ -23,6 +23,7 @@ fun User.toGetResponse(): GetUserResponse =
         githubLoginSource = this.githubLoginSource,
         githubLoginVerification = this.githubLoginVerification,
         githubLoginVerifiedAt = this.githubLoginVerifiedAt,
+        jiraDisplayName = this.jiraDisplayName,
     )
 
 fun User.effectivePermissionGroup(): Role {
