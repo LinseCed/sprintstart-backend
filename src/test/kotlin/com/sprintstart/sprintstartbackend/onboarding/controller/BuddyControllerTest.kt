@@ -113,6 +113,56 @@ class BuddyControllerTest(
     }
 
     @Test
+    fun `streamOpenForMe should stream the greeting and its suggested next step`() {
+        val events = listOf(
+            BuddyStreamEvent(type = "token", content = "Welcome "),
+            BuddyStreamEvent(type = "token", content = "back, Sam!"),
+            BuddyStreamEvent(type = "opening_action", label = "Find me a task", question = "What next?"),
+            BuddyStreamEvent(type = "done"),
+        )
+        coEvery { buddyService.streamOpenForMe(authId) } returns flowOf(*events.toTypedArray())
+
+        val asyncResult = mockMvc
+            .perform(post("/api/v1/onboarding/me/buddy/open/stream").with(userJwt))
+            .andExpect(request().asyncStarted())
+            .andReturn()
+
+        val mvcResult = mockMvc
+            .perform(asyncDispatch(asyncResult))
+            .andExpect(status().isOk)
+            .andReturn()
+
+        val actual = mvcResult.response.contentAsString
+            .replace("data:", "")
+            .replace("\n", "")
+        assertEquals(events.joinToString("") { Json.encodeToString(it) }, actual)
+    }
+
+    /**
+     * ⚠️ A naive single-step `.andExpect(status()...)` passes through role denials on a suspend
+     * handler, because Spring dispatches it asynchronously. The two-step form is what actually
+     * asserts the 403.
+     */
+    @Test
+    fun `streamOpenForMe should return 403 for a non-USER role`() {
+        val asyncResult = mockMvc
+            .perform(post("/api/v1/onboarding/me/buddy/open/stream").with(noUserRoleJwt))
+            .andExpect(request().asyncStarted())
+            .andReturn()
+
+        mockMvc
+            .perform(asyncDispatch(asyncResult))
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `streamOpenForMe should return 401 when not authenticated`() {
+        mockMvc
+            .perform(post("/api/v1/onboarding/me/buddy/open/stream"))
+            .andExpect(status().isUnauthorized)
+    }
+
+    @Test
     fun `sendMessageForMe should stream tokens and done`() {
         val events = listOf(
             BuddyStreamEvent(type = "token", content = "No question "),

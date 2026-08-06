@@ -122,6 +122,34 @@ data class BuddyOpenResponse(
     val action: BuddyOpenActionDto? = null,
 )
 
+/**
+ * One chunk of the AI service's streamed buddy open.
+ *
+ * ⚠️ **The greeting is streamed and the memory note is not**, and that asymmetry is the entire
+ * point. The note is up to 200 words the hire never sees, and while it was generated *first* — as
+ * the leading field of a strict-JSON reply — opening the buddy meant waiting for it before the
+ * first word addressed to the hire even existed. Greeting-first plus streaming removes that wait
+ * without a second model call.
+ *
+ * A `token` carries [content]; the terminal `done` carries [greeting], [memory] and any [action],
+ * which is what the backend persists. [greeting] is byte-identical to the concatenated tokens, so
+ * the message a hire watches arrive is the one stored for them to reload.
+ */
+@Serializable
+data class BuddyOpenStreamEvent(
+    val type: String,
+    val content: String? = null,
+    val greeting: String? = null,
+    val memory: String? = null,
+    val action: BuddyOpenActionDto? = null,
+    val message: String? = null,
+) {
+    companion object {
+        const val TOKEN = "token"
+        const val DONE = "done"
+    }
+}
+
 @Serializable
 data class BuddyAgentResponse(
     // True when [text] is the answer; false when [pendingToolCalls] must be run first.

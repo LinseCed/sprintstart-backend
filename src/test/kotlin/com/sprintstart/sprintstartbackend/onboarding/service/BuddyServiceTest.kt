@@ -5,6 +5,8 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenActionDto
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
@@ -21,6 +23,8 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
@@ -153,12 +157,14 @@ class BuddyServiceTest {
                 BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "use ./gradlew"),
             )
             every { buddyToolExecutor.stateSnapshot(userId) } returns "2 closed PRs"
-            coEvery { onboardingAiClient.buddyOpen(any()) } returns
-                com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenResponse(
-                    memory = "Sam asked how to build; taught ./gradlew.",
+            every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
+                BuddyOpenStreamEvent(type = "token", content = "Welcome back, Sam!"),
+                BuddyOpenStreamEvent(
+                    type = "done",
                     greeting = "Welcome back, Sam!",
-                    action = null,
-                )
+                    memory = "Sam asked how to build; taught ./gradlew.",
+                ),
+            )
             every { buddySessionRepository.save(any()) } answers { firstArg() }
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
 
@@ -182,15 +188,18 @@ class BuddyServiceTest {
             every { buddySessionRepository.findByUserId(userId) } returns session
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
             every { buddyToolExecutor.stateSnapshot(userId) } returns "no PRs yet"
-            coEvery { onboardingAiClient.buddyOpen(any()) } returns
-                com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenResponse(
-                    memory = "m",
+            every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
+                BuddyOpenStreamEvent(type = "token", content = "Hi!"),
+                BuddyOpenStreamEvent(
+                    type = "done",
                     greeting = "Hi!",
-                    action = com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenActionDto(
+                    memory = "m",
+                    action = BuddyOpenActionDto(
                         label = "Find me a task",
                         question = "What should I work on next?",
                     ),
-                )
+                ),
+            )
             every { buddySessionRepository.save(any()) } answers { firstArg() }
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
 
@@ -220,7 +229,7 @@ class BuddyServiceTest {
             val result = service.openForMe(authId)
 
             assertThat(result.greeting).isEqualTo("Hi again!")
-            coVerify(exactly = 0) { onboardingAiClient.buddyOpen(any()) }
+            verify(exactly = 0) { onboardingAiClient.streamBuddyOpen(any()) }
             verify(exactly = 0) { buddyMessageRepository.save(any()) }
             assertThat(session.summary).isEqualTo("keep me")
             assertThat(session.summarizedCount).isEqualTo(0)
@@ -241,11 +250,10 @@ class BuddyServiceTest {
                 BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Here."),
             )
             every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
-            coEvery { onboardingAiClient.buddyOpen(any()) } returns
-                com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenResponse(
-                    memory = "folded",
-                    greeting = "Welcome back!",
-                )
+            every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
+                BuddyOpenStreamEvent(type = "token", content = "Welcome back!"),
+                BuddyOpenStreamEvent(type = "done", greeting = "Welcome back!", memory = "folded"),
+            )
             every { buddySessionRepository.save(any()) } answers { firstArg() }
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
 
@@ -264,7 +272,7 @@ class BuddyServiceTest {
                 BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "hi"),
             )
             every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
-            coEvery { onboardingAiClient.buddyOpen(any()) } throws
+            every { onboardingAiClient.streamBuddyOpen(any()) } throws
                 OnboardingAiException(503, "", "AI is down")
 
             val result = service.openForMe(authId)
@@ -286,6 +294,148 @@ class BuddyServiceTest {
             assertThrows<ResponseStatusException> {
                 service.openForMe(authId)
             }.also { assertThat(it.statusCode.value()).isEqualTo(404) }
+        }
+    }
+
+    @Nested
+    inner class StreamOpenForMe {
+        /**
+         * The whole point of the change: the greeting reaches the hire in pieces, as it is written,
+         * instead of after the model has finished a memory note they never see.
+         */
+        @Test
+        fun `emits the greeting token by token as the AI writes it`() = runTest {
+            val session = BuddySession(userId = userId)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
+            every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
+            every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
+                BuddyOpenStreamEvent(type = "token", content = "Welcome "),
+                BuddyOpenStreamEvent(type = "token", content = "back!"),
+                BuddyOpenStreamEvent(type = "done", greeting = "Welcome back!", memory = "m"),
+            )
+            every { buddySessionRepository.save(any()) } answers { firstArg() }
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+
+            val events = service.streamOpenForMe(authId).toList()
+
+            assertThat(events.filter { it.type == "token" }.map { it.content })
+                .containsExactly("Welcome ", "back!")
+            assertThat(events.last().type).isEqualTo("done")
+        }
+
+        /**
+         * Deliberately not `action_proposal`. That type means the buddy is offering to *do*
+         * something and is gated on the hire confirming; this only fills the composer.
+         */
+        @Test
+        fun `carries the suggested next step as its own event, not an action proposal`() = runTest {
+            val session = BuddySession(userId = userId)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
+            every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
+            every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
+                BuddyOpenStreamEvent(type = "token", content = "Hi!"),
+                BuddyOpenStreamEvent(
+                    type = "done",
+                    greeting = "Hi!",
+                    memory = "m",
+                    action = BuddyOpenActionDto(label = "Find me a task", question = "What next?"),
+                ),
+            )
+            every { buddySessionRepository.save(any()) } answers { firstArg() }
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+
+            val events = service.streamOpenForMe(authId).toList()
+
+            val action = events.single { it.type == "opening_action" }
+            assertThat(action.label).isEqualTo("Find me a task")
+            assertThat(action.question).isEqualTo("What next?")
+            assertThat(events.none { it.type == "action_proposal" }).isTrue()
+        }
+
+        /**
+         * A stream that breaks part-way has already put words on the hire's screen. Discarding them
+         * would mean a reload showed a *different* greeting than the one they just read, so what
+         * arrived is kept -- while memory and cursor stay untouched, since nothing was folded.
+         */
+        @Test
+        fun `keeps what the hire already read when the stream breaks part-way`() = runTest {
+            val session = BuddySession(userId = userId, summary = "keep me", summarizedCount = 0)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
+                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "hi"),
+            )
+            every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
+            every { onboardingAiClient.streamBuddyOpen(any()) } returns flow {
+                emit(BuddyOpenStreamEvent(type = "token", content = "Welcome ba"))
+                throw OnboardingAiException(503, "", "AI went away")
+            }
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+
+            val events = service.streamOpenForMe(authId).toList()
+
+            assertThat(events.filter { it.type == "token" }.map { it.content })
+                .containsExactly("Welcome ba")
+            assertThat(events.last().type).isEqualTo("done")
+            verify {
+                buddyMessageRepository.save(
+                    match { it.role == BuddyMessageRole.ASSISTANT && it.content == "Welcome ba" },
+                )
+            }
+            // Nothing was folded, so nothing the buddy has not yet remembered is dropped.
+            assertThat(session.summary).isEqualTo("keep me")
+            assertThat(session.summarizedCount).isEqualTo(0)
+            verify(exactly = 0) { buddySessionRepository.save(any()) }
+        }
+
+        /**
+         * The opposite case, and it must not persist: an outage before the first token would
+         * otherwise make the fallback this visit's permanent greeting, since re-opening replays
+         * whatever greeting is already there.
+         */
+        @Test
+        fun `persists nothing when the stream breaks before a single token`() = runTest {
+            val session = BuddySession(userId = userId, summary = "keep me")
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
+                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "hi"),
+            )
+            every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
+            every { onboardingAiClient.streamBuddyOpen(any()) } throws
+                OnboardingAiException(503, "", "AI is down")
+
+            val events = service.streamOpenForMe(authId).toList()
+
+            // A plain welcome, so the page still works and the hire can start talking.
+            assertThat(events.single { it.type == "token" }.content).isNotBlank()
+            verify(exactly = 0) { buddyMessageRepository.save(any()) }
+            verify(exactly = 0) { buddySessionRepository.save(any()) }
+        }
+
+        /**
+         * A greeting already written has nothing left to wait for, so it arrives whole. Typing it
+         * out again would be theatre, and it must not cost a model call either.
+         */
+        @Test
+        fun `replays an existing greeting in one piece without calling the model`() = runTest {
+            val session = BuddySession(userId = userId, summary = "keep me")
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
+                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Hi again!"),
+            )
+
+            val events = service.streamOpenForMe(authId).toList()
+
+            assertThat(events.filter { it.type == "token" }.map { it.content })
+                .containsExactly("Hi again!")
+            verify(exactly = 0) { onboardingAiClient.streamBuddyOpen(any()) }
+            verify(exactly = 0) { buddyMessageRepository.save(any()) }
         }
     }
 
