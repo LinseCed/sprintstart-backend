@@ -28,8 +28,8 @@ import java.util.UUID
  * [Competency] itself stays global — so "earn once, transfers across projects" is preserved: the
  * ledger records the competency, not the module a hire happened to learn it from.
  *
- * Proposal-only, like blueprints and graph proposals: at most one [ModuleStatus.ACTIVE] version
- * per `(competencyKey, projectId)`, and only an explicit PM approval puts one there.
+ * ⚠️ Proposal-only: at most one [ModuleStatus.ACTIVE] version per `(competencyKey, projectId)`,
+ * and only an explicit PM approval puts one there. Nothing a hire sees changes on authoring alone.
  */
 @Entity
 @Table(
@@ -70,8 +70,8 @@ class CompetencyModule(
     var summary: String? = null,
     /**
      * Corpus fingerprint this module's AI-authored content was synthesized from. Lets a
-     * re-synthesis pass skip an unchanged corpus, the same idempotency mechanism blueprint
-     * generation and lesson synthesis already use.
+     * re-synthesis pass skip an unchanged corpus, the same idempotency mechanism vocabulary
+     * generation uses.
      */
     @Column(name = "corpus_fingerprint", nullable = true)
     var corpusFingerprint: String? = null,

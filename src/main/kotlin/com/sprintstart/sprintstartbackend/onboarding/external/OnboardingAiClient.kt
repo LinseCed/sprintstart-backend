@@ -68,9 +68,9 @@ class OnboardingAiClient(
      * Runs the AI service's batch competency proposal job over the ingested corpus.
      *
      * The AI service is stateless: [activeCompetencies] (the backend's current live vocabulary)
-     * drives dedup, and [lastFingerprint] drives idempotency -- there is no "active proposal"
-     * object on this side to carry it, unlike blueprint generation. A non-2xx response is wrapped
-     * in an [OnboardingAiException] carrying the upstream status/body.
+     * drives dedup, and [lastFingerprint] drives idempotency -- both are re-sent on every call
+     * because nothing is held on the AI side. A non-2xx response is wrapped in an
+     * [OnboardingAiException] carrying the upstream status/body.
      *
      * The result is a flat vocabulary: it states no ordering.
      *

@@ -21,8 +21,8 @@ import java.util.UUID
  * A module has at most one [Verification] (enforced by the unique constraint), referenced by a
  * plain FK rather than a bidirectional JPA relationship, so this entity can be created/edited
  * independently without touching the module's cascade footprint.
- * [competencyKey] ties this check to a [Competency] by its stable key (not a FK, matching the same
- * loosely-coupled convention `CompetencyEdge`/`BlueprintCompetency` already use), and [level] is the
+ * [competencyKey] ties this check to a [Competency] by its stable key rather than a FK, so
+ * deleting a competency cannot take a check's history with it, and [level] is the
  * target proficiency level being verified, aligned with the AI service's `beginner..expert` ladder
  * (see `AssessmentService.LEVEL_RANKS` for the same scale used elsewhere in this module).
  *
