@@ -34,9 +34,18 @@ class Artifact(
     var content: String?,
     val mime: String?,
     val language: String?,
-    // GitHub issue state (e.g. "OPEN"/"CLOSED"); null for non-issue artifact types. Refreshed
-    // unconditionally on every re-fetch by GithubArtifactProviderService, independent of the
-    // content hash, since a state change alone doesn't move title/body.
+    /**
+     * Whether an issue is still open at its source: `"OPEN"` / `"CLOSED"`, null for anything that
+     * is not an issue. Refreshed unconditionally on every re-fetch, independent of the content
+     * hash, since a state change alone doesn't move title/body.
+     *
+     * ⚠️ **Tracker-neutral, and it had to become so.** It was GitHub's issue state and nothing set
+     * it for Jira — which made every ingested Jira issue invisible to starter-work mining, since
+     * the miner's candidate filter is `state == "OPEN"`. It failed *silently*: a project whose
+     * tracker is Jira mined an empty pool, which reads as "no good first issues here" rather than
+     * "we cannot see your tracker at all". Jira's own vocabulary is a status *category*, so
+     * `JiraArtifactMapper` folds it: `Done` is closed, everything else is open.
+     */
     var state: String? = null,
     // `var` because Jira re-ingestion refreshes an issue's metadata in place.
     @Column(nullable = false, columnDefinition = "TEXT")
