@@ -306,6 +306,13 @@ class BuddyService(
                         taskId = proposal.taskId?.toString(),
                         moduleId = proposal.moduleId?.toString(),
                         answer = proposal.answer,
+                        // ⚠️ Every confirm payload the proposal carries, without exception. title
+                        // and attesterId were missing here, and the omission was invisible: the
+                        // confirm handles them being null by returning a polite refusal, so
+                        // request_attestation failed the same way every time and read like a
+                        // precondition the hire had not met rather than a wire that drops fields.
+                        title = proposal.title,
+                        attesterId = proposal.attesterId,
                         githubLogin = proposal.githubLogin,
                     ),
                 )

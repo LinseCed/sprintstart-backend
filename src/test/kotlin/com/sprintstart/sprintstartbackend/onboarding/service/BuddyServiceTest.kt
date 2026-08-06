@@ -492,6 +492,58 @@ class BuddyServiceTest {
             verify(exactly = 0) { buddyToolExecutor.execute(any(), any()) }
         }
 
+        /**
+         * ⚠️ Regression. Every confirm payload a proposal carries has to reach the stream, and
+         * `title`/`attesterId` did not — so `request_attestation` arrived at the confirm endpoint
+         * with nothing to act on and came back as "I need to know what work to confirm and who to
+         * ask", **every single time**. The action could not succeed at all.
+         *
+         * It hid because that message reads like a precondition the hire failed rather than a wire
+         * that drops fields, and because the payload was declared on the event all along.
+         */
+        @Test
+        fun `an attestation proposal carries what to confirm and who to ask`() =
+            runTest {
+                val session = BuddySession(userId = userId)
+                every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+                every { buddySessionRepository.findByUserId(userId) } returns session
+                every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
+                every { buddyMessageRepository.save(any()) } answers { firstArg() }
+                every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
+
+                val attesterId = UUID.randomUUID()
+                val actionCall = BuddyToolCallDto(id = "call_0", name = "request_attestation")
+                val paused = BuddyAgentResponse(
+                    final = false,
+                    messages = listOf(
+                        BuddyAgentMessageDto(role = "assistant", content = "", toolCalls = listOf(actionCall)),
+                    ),
+                    pendingToolCalls = listOf(actionCall),
+                )
+                coEvery { onboardingAiClient.buddyAgentTurn(any()) } returnsMany listOf(
+                    paused,
+                    finalReply("I can ask them to confirm it — confirm below."),
+                )
+                every { buddyActionService.isAction("request_attestation") } returns true
+                every { buddyActionService.propose(actionCall, userId) } returns
+                    BuddyActionService.ProposeOutcome(
+                        toolResult = "Proposed to the hire; awaiting confirmation.",
+                        proposal = BuddyActionService.BuddyActionProposal(
+                            action = "request_attestation",
+                            label = "Ask them to confirm this",
+                            question = null,
+                            title = "Facilitated the sprint retro",
+                            attesterId = attesterId.toString(),
+                        ),
+                    )
+
+                val events = service.sendMessageForMe(authId, "can Ana confirm my retro?").toList()
+
+                val proposal = events.first { it.type == "action_proposal" }
+                assertThat(proposal.title).isEqualTo("Facilitated the sprint retro")
+                assertThat(proposal.attesterId).isEqualTo(attesterId.toString())
+            }
+
         @Test
         fun `does not persist an assistant message when the agent turn fails`() = runTest {
             val session = BuddySession(userId = userId)
