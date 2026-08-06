@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySo
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ModuleStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ArtifactEvidenceDto
+import com.sprintstart.sprintstartbackend.onboarding.external.model.FileDiffDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Verification
@@ -467,6 +468,16 @@ class VerificationService(
                     filesChanged = evidence.filesChanged,
                     checksPassed = evidence.checksPassed,
                     commitMessages = evidence.commitMessages,
+                    fileDiffs = evidence.fileDiffs.map {
+                        FileDiffDto(
+                            path = it.path,
+                            additions = it.additions,
+                            deletions = it.deletions,
+                            patch = it.patch,
+                            truncated = it.truncated,
+                        )
+                    },
+                    omittedFileCount = evidence.omittedFileCount,
                 ),
             )
         } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
