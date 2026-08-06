@@ -1,7 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
+import com.sprintstart.sprintstartbackend.ingestion.external.IngestedIssue
 import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.CandidatePoolState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
@@ -9,8 +11,10 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkO
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
+import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.PromoteStarterWorkCandidateRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.GenerateStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
+import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkCandidateResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.UnreviewedStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
@@ -269,6 +273,152 @@ class StarterWorkTaskProposalService(
     }
 
     /**
+     * The open issues in a project's corpus, each marked with where it stands in the pool.
+     *
+     * Deterministic and LLM-free: this is the same material mining reads, shown to a person
+     * instead. Nothing is scored, because the judgement being made here is the reader's.
+     *
+     * ⚠️ **Assigned issues are returned, marked, and so are issues already pooled or removed.** The
+     * filtering is the client's to do, and it can only offer an honest filter if it is holding the
+     * things being filtered: an issue that simply is not in the list gives a PM no way to tell
+     * "somebody else has this" from "not ingested". [CandidatePoolState] and the three-valued
+     * `hasAssignee` carry that, so nothing has to be inferred from an absence.
+     *
+     * Ordered newest-changed first, which is a fact about the issues rather than an opinion about
+     * them; ties fall back to the source id so the order is stable across calls.
+     *
+     * @param projectId The project whose ingested issues to browse.
+     */
+    @Transactional(readOnly = true)
+    fun listCandidates(projectId: UUID): List<StarterWorkCandidateResponse> {
+        val poolStateBySourceId = starterWorkTaskProposalRepository
+            .findAllByStatusIn(listOf(ProposalStatus.LIVE, ProposalStatus.REJECTED))
+            .associate { it.sourceId to it.status.toPoolState() }
+
+        return artifactIngestionApi
+            .getOpenIssues(projectId)
+            .mapNotNull { issue ->
+                // A title is what a person picks from, and there is nothing sensible to render for
+                // an issue that has none -- so it is dropped rather than shown as an empty row.
+                val title = issue.title?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val body = issue.body?.takeIf { it.isNotBlank() }
+                StarterWorkCandidateResponse(
+                    sourceId = issue.sourceId,
+                    tracker = issue.tracker,
+                    title = title,
+                    excerpt = body?.take(CANDIDATE_EXCERPT_CHARS),
+                    excerptTruncated = (body?.length ?: 0) > CANDIDATE_EXCERPT_CHARS,
+                    labels = issue.labels,
+                    sourceUrl = issue.sourceUrl,
+                    hasAssignee = issue.hasAssignee,
+                    poolState = poolStateBySourceId[issue.sourceId] ?: CandidatePoolState.AVAILABLE,
+                    updatedAtSource = issue.updatedAtSource,
+                )
+            }.sortedWith(
+                compareByDescending<StarterWorkCandidateResponse> { it.updatedAtSource }
+                    .thenBy { it.sourceId },
+            )
+    }
+
+    private fun ProposalStatus.toPoolState(): CandidatePoolState =
+        when (this) {
+            ProposalStatus.LIVE -> CandidatePoolState.IN_POOL
+            ProposalStatus.REJECTED -> CandidatePoolState.REMOVED
+        }
+
+    /**
+     * Puts one browsed corpus issue into the pool, live and reviewed.
+     *
+     * Deliberately the same landing place as [createTask]: somebody looked at this issue and vouched
+     * for it, which is the whole content of "reviewed". ⚠️ **This is not an approval gate in front
+     * of mining** — mining keeps landing tasks live without anybody's involvement, and this only
+     * adds a way in for an issue mining did not pick.
+     *
+     * The title and link come from the ingested issue, so the pool cannot disagree with the tracker
+     * about what an issue is called.
+     *
+     * **What it refuses, and what it deliberately does not:**
+     * - An issue **already in the pool** is a 409 rather than a second row, and one **removed from
+     *   the pool** is a 409 too: rejection is sticky, and letting promotion undo it by accident
+     *   would mean somebody re-rejecting the same issue after every crawl.
+     * - An issue that is **closed at its source** is a 409. Work that is already done is the one
+     *   thing a newcomer must not be handed, and the browser only lists open issues, so this can
+     *   only be reached by a race or a stale page.
+     * - An **assigned** issue is accepted. Mining skips those because it cannot ask anybody; a
+     *   person promoting one can see who holds it and has decided anyway. That override is the
+     *   reason the browser shows them at all.
+     *
+     * @throws ResponseStatusException 404 if no issue with that source id is ingested; 400 if the
+     * ingested issue has no title; 409 if it is already pooled, was removed, or is closed.
+     */
+    @Transactional
+    fun promoteCandidate(request: PromoteStarterWorkCandidateRequest): StarterWorkTaskProposalResponse {
+        val sourceId = request.sourceId.trim()
+        val issue = loadPromotableIssue(sourceId)
+        val title = titleOf(sourceId, issue)
+        refuseIfAlreadyDecided(sourceId)
+
+        val proposal = starterWorkTaskProposalRepository.save(
+            StarterWorkTaskProposal(
+                sourceId = sourceId,
+                title = title,
+                summary = request.summary?.trim()?.takeIf { it.isNotBlank() },
+                // Nothing judged this issue, so there is no rationale to state. Writing one here
+                // would be the app putting words in the promoter's mouth.
+                rationale = null,
+                sourceUrl = issue.sourceUrl,
+                competencyKeys = request.competencyKeys.toMutableList(),
+                status = ProposalStatus.LIVE,
+                reviewed = true,
+                decidedAt = Instant.now(),
+                onboardingTrackKey = request.onboardingTrackKey?.trim()?.takeIf { it.isNotBlank() },
+            ),
+        )
+        return proposal.toResponse()
+    }
+
+    /** The ingested issue, if there is one and it is still work somebody could be handed. */
+    private fun loadPromotableIssue(sourceId: String): IngestedIssue {
+        val issue = artifactIngestionApi.getIssue(sourceId)
+            ?: throw ResponseStatusException(
+                HttpStatus.NOT_FOUND,
+                "No ingested issue found with source id: $sourceId",
+            )
+        // Only a definite "CLOSED" refuses. A row whose state was never captured is unknown, and
+        // refusing on unknown would make an un-promotable issue out of one nobody can check.
+        if (CLOSED_STATE.equals(issue.state, ignoreCase = true)) {
+            throw ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Issue $sourceId is closed at its source and is not work to hand a newcomer",
+            )
+        }
+        return issue
+    }
+
+    private fun titleOf(sourceId: String, issue: IngestedIssue): String =
+        issue.title?.takeIf { it.isNotBlank() }
+            ?: throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Issue $sourceId has no title and cannot be put in the pool",
+            )
+
+    /**
+     * Refuses an issue that already has a proposal, live or rejected.
+     *
+     * ⚠️ The rejected half is the load-bearing one: rejection is sticky, so promotion must not
+     * become the accidental way to undo it.
+     */
+    private fun refuseIfAlreadyDecided(sourceId: String) {
+        val existing = starterWorkTaskProposalRepository.findBySourceId(sourceId) ?: return
+        val reason = when (existing.status) {
+            ProposalStatus.LIVE -> "Issue $sourceId is already in the starter-work pool"
+            ProposalStatus.REJECTED ->
+                "Issue $sourceId was removed from the starter-work pool and is not re-addable"
+        }
+        throw ResponseStatusException(HttpStatus.CONFLICT, reason)
+    }
+
+    /**
      * Takes a task out of the pool, permanently.
      *
      * **Sticky**: the row is kept and mining consults it, so a task somebody turned down is never
@@ -454,6 +604,18 @@ class StarterWorkTaskProposalService(
          * finds no ingested artifact -- both degrade to "no signal" rather than misattributing.
          */
         private const val HAND_AUTHORED_SOURCE_PREFIX = "authored:"
+
+        /** How the ingestion mappers spell "finished at the source", for GitHub and Jira alike. */
+        private const val CLOSED_STATE = "CLOSED"
+
+        /**
+         * How much of a browsed issue's body a list row carries.
+         *
+         * A browser over an organisation-sized corpus is thousands of rows, and an issue body is by
+         * far the largest thing on one. Enough to judge scope, and the response says outright when
+         * something was cut rather than letting a reader mistake a truncated body for a short one.
+         */
+        private const val CANDIDATE_EXCERPT_CHARS = 600
     }
 
     private fun findLiveProposal(id: UUID): StarterWorkTaskProposal {
