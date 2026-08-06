@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.connectors.github.models.GithubRepositoryConnection
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoverRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.DiscoveredRepository
+import com.sprintstart.sprintstartbackend.connectors.github.models.api.responses.PullRequestFileResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphql.GithubIssuesResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphql.GithubPrSearchResponse
 import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphql.GithubSinglePrResponse
@@ -14,6 +15,7 @@ import com.sprintstart.sprintstartbackend.connectors.github.models.client.graphq
 import com.sprintstart.sprintstartbackend.connectors.github.util.GithubQueryLoader
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import tools.jackson.module.kotlin.jacksonObjectMapper
 
@@ -47,6 +49,7 @@ class GithubClient(
     private val queryLoader: GithubQueryLoader,
 ) {
     private val objectMapper = jacksonObjectMapper()
+    private val logger = LoggerFactory.getLogger(GithubClient::class.java)
 
     /**
      * Checks if a repository exists on GitHub.
@@ -189,6 +192,43 @@ class GithubClient(
     suspend fun fetchPullRequest(repository: GithubRepositoryConnection, prNumber: Int): PullRequest? {
         val query = queryLoader.load("github/graphql/100-pullrequests-deep.graphql")
         return fetchSinglePullRequest(repository, prNumber, query)
+    }
+
+    /**
+     * The changed files of one pull request, **with their diffs**.
+     *
+     * ⚠️ **A second call, deliberately.** Everything else about a pull request comes from one
+     * GraphQL query, and this does not join it because it cannot: GraphQL's
+     * `PullRequestChangedFile` has a path and counts but **no patch**. Artifact verification was
+     * judging whether work was really done from filenames alone — which cannot tell a fix from a
+     * whitespace edit to the right file — so it pays for one REST call rather than guessing.
+     *
+     * Capped at [MAX_FILES_PER_PAGE] files, one page. A pull request with more changed files than
+     * that is not a starter task, and paging it would spend a hire's verification latency gathering
+     * evidence no judge should be reading in full anyway.
+     *
+     * Returns an empty list rather than throwing when GitHub will not answer: **an unavailable diff
+     * is not evidence of an empty one**, and the caller says so to the model rather than failing
+     * somebody's work on a network error.
+     */
+    suspend fun fetchPullRequestFiles(
+        repository: GithubRepositoryConnection,
+        prNumber: Int,
+    ): List<PullRequestFileResponse> {
+        val uri = "${applicationConfig.github.baseUrl}/repos/${repository.owner}/${repository.name}" +
+            "/pulls/$prNumber/files?per_page=$MAX_FILES_PER_PAGE"
+        return try {
+            webClient
+                .get()
+                .uri(uri)
+                .header("Authorization", "Bearer ${repository.user.token}")
+                .sync()
+                .perform<Array<PullRequestFileResponse>>()
+                .toList()
+        } catch (e: WebClientException) {
+            logger.warn("Could not read the diff of pull request #{}: {}", prNumber, e.message)
+            emptyList()
+        }
     }
 
     /**
@@ -373,5 +413,11 @@ class GithubClient(
         } while (cursor != null)
 
         return entities
+    }
+
+    private companion object {
+        // One page. A pull request touching more files than this is not a starter task, and paging
+        // it would spend a hire's verification latency gathering evidence nobody should read whole.
+        const val MAX_FILES_PER_PAGE = 100
     }
 }
