@@ -109,6 +109,34 @@ data class BuddyOpenRequest(
     val state: String = "",
 )
 
+/**
+ * Asks the AI service to fold [folded] into the mentor's durable memory note.
+ *
+ * ⚠️ **Nobody is waiting on this call, which is the whole reason it is one.** The same fold used to
+ * ride [BuddyAgentRequest.summarizeUpto], running *before* the agent loop — so once a visit's active
+ * window outgrew `BuddyService.WINDOW`, every further turn paid an extra serialized model call to
+ * compress one exchange ahead of the answer the hire was waiting for.
+ *
+ * The cursor is this side's: [folded] is exactly the slice to advance past once the fold succeeds.
+ */
+@Serializable
+data class BuddyCompactRequest(
+    @SerialName("prior_summary") val priorSummary: String? = null,
+    val folded: List<BuddyAgentMessageDto> = emptyList(),
+)
+
+/**
+ * The rewritten memory note.
+ *
+ * ⚠️ **A failure arrives as a non-2xx, never as this carrying the note unchanged** — the caller must
+ * be able to tell *nothing folded* from *folded to the same words*, because advancing the cursor
+ * past messages nothing summarized is the one way this design loses a transcript.
+ */
+@Serializable
+data class BuddyCompactResponse(
+    val memory: String,
+)
+
 @Serializable
 data class BuddyOpenActionDto(
     val label: String,

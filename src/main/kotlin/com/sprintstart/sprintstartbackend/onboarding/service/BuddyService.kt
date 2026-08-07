@@ -14,15 +14,18 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyVocabul
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
+import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toAgentMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -52,6 +55,8 @@ class BuddyService(
     private val buddyActionService: BuddyActionService,
     private val userApi: UserApi,
     private val trackService: TrackService,
+    private val buddyCompactionService: BuddyCompactionService,
+    private val applicationScope: CoroutineScope,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -63,16 +68,25 @@ class BuddyService(
     /**
      * Returns the current visit's buddy messages, oldest first.
      *
-     * Only the window after [BuddySession.summarizedCount] — everything older has been folded into
-     * the mentor's memory and is intentionally not replayed. A visit opens fresh with a greeting
-     * ([streamOpenForMe]); the durable memory, not a transcript, carries continuity across visits.
+     * From this visit's opening greeting onward. A visit opens fresh ([streamOpenForMe]); the
+     * durable memory, not a transcript, carries continuity across visits.
+     *
+     * ⚠️ **This used to be "everything after [BuddySession.summarizedCount]", and that was the
+     * compaction cursor doing a job it only appeared to do.** It read as "this visit" solely
+     * because opening one advanced the cursor to the end of the transcript. Two consequences came
+     * with it, both now gone: a hire's own scrollback **shrank as the model compacted its prompt**,
+     * so messages they were still reading could vanish mid-conversation; and a visit's boundary
+     * depended on a fold having happened.
      */
     fun getMessagesForMe(authId: String): List<BuddyMessageResponse> {
         val userId = resolveUserId(authId)
         val session = buddySessionRepository.findByUserId(userId) ?: return emptyList()
-        return buddyMessageRepository
-            .findAllBySessionIdOrderByCreatedAtAsc(session.id)
-            .drop(session.summarizedCount)
+        val messages = buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
+        // No marker anywhere means no visit boundary to find, and the fallback shows *everything*
+        // rather than nothing. Erring the other way would render a hire's conversation as empty --
+        // indistinguishable, to them, from having lost it.
+        return messages
+            .drop(messages.indexOfLast { it.opening }.takeIf { it >= 0 } ?: 0)
             .map { it.toResponse() }
     }
 
@@ -103,21 +117,20 @@ class BuddyService(
         val session = getOrCreateSession(userId)
 
         val all = buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
-        val unspoken = all.drop(session.summarizedCount)
 
         // ⚠️ Opening twice without the hire saying anything is the same visit, not a new one.
         //
-        // A refresh, or a navigation away and back, used to generate a second greeting: the window
-        // sent for folding was the *previous greeting*, which the memory prompt is explicitly told
-        // to drop, and the reply was persisted as another opening message. So each reload paid for
-        // a model call to compress something it then discarded, and left one more greeting in the
-        // transcript for the next reload to fold.
+        // A refresh, or a navigation away and back, used to generate a second greeting, and each
+        // reload left one more greeting in the transcript for the next reload to fold.
         //
         // A visit ends when the hire speaks. Until then the greeting already sitting there is this
         // visit's greeting, and replaying it costs nothing. It arrives whole rather than a word at a
         // time -- there is nothing to wait for, and pretending to type it out would be theatre.
-        val hireHasSpoken = unspoken.any { it.role == BuddyMessageRole.USER }
-        val greetingAlreadyThere = if (hireHasSpoken) null else unspoken.lastOrNull()
+        //
+        // ⚠️ Read as *the last message is an opening*, never *an opening exists*: the hire speaking
+        // is exactly what puts something after it. This used to be inferred from the compaction
+        // cursor, which worked only while opening a visit advanced that cursor itself.
+        val greetingAlreadyThere = all.lastOrNull()?.takeIf { it.opening }
         if (greetingAlreadyThere != null) {
             return flowOf(
                 BuddyStreamEvent(type = TOKEN, content = greetingAlreadyThere.content),
@@ -125,8 +138,10 @@ class BuddyService(
             )
         }
 
-        val recent = unspoken
-            .map { BuddyAgentMessageDto(role = it.role.toHistoryRole(), content = it.content) }
+        // Everything the memory note does not yet cover, so the greeting can be specific about a
+        // previous visit. Still the compaction cursor -- this is a prompt, which is the one
+        // question that cursor really answers.
+        val recent = all.drop(session.summarizedCount).map { it.toAgentMessage() }
         val state = buddyToolExecutor.stateSnapshot(userId)
 
         return flow {
@@ -151,7 +166,24 @@ class BuddyService(
                 logger.warn("Buddy open stream failed: {}", e.message)
             }
 
-            finishOpen(session, all, streamed.toString(), opening)
+            finishOpen(session, streamed.toString(), opening)
+            // Whatever the previous visit left unfolded gets folded now, while the hire is reading
+            // the greeting rather than waiting on it.
+            compactInBackground(userId)
+        }
+    }
+
+    /**
+     * Folds this session's backlog into the mentor's memory without anybody waiting on it.
+     *
+     * Fire-and-forget on the application scope, matching `CorpusIndexedListener`: the fold is a
+     * prompt-shaping device, so one that dies costs a longer prompt on the next turn and nothing
+     * else. ⚠️ The point of the whole change is that **no hire is ever blocked on this**, so it must
+     * not be awaited here, and [BuddyCompactionService.compactIfNeeded] never throws.
+     */
+    private fun compactInBackground(userId: UUID) {
+        applicationScope.launch {
+            buddyCompactionService.compactIfNeeded(userId)
         }
     }
 
@@ -159,12 +191,16 @@ class BuddyService(
      * Persists what the open produced and emits the terminal events.
      *
      * Split out because the three outcomes differ in what they may write, and running them together
-     * hid that: a complete open folds the memory *and* stores the greeting, a broken one stores only
-     * the words the hire already saw, and one that produced nothing writes nothing at all.
+     * hid that: a complete open stores the greeting, a broken one stores only the words the hire
+     * already saw, and one that produced nothing writes nothing at all.
+     *
+     * ⚠️ **Nothing here touches the memory or the cursor any more.** Opening a visit used to fold
+     * the previous one, because the AI service returned the greeting and a rewritten memory note
+     * from the same model call. That is [BuddyCompactionService]'s now, which is what lets the
+     * greeting call go back to doing one job.
      */
     private suspend fun FlowCollector<BuddyStreamEvent>.finishOpen(
         session: BuddySession,
-        all: List<BuddyMessage>,
         streamed: String,
         opening: BuddyOpenStreamEvent?,
     ) {
@@ -178,15 +214,15 @@ class BuddyService(
             return
         }
 
-        if (opening != null) {
-            // Advance the cursor past everything folded *before* persisting the greeting, so the
-            // greeting lands in the fresh active window and the just-folded window drops out of it.
-            session.summary = opening.memory ?: session.summary
-            session.summarizedCount = all.size
-            buddySessionRepository.save(session)
-        }
         buddyMessageRepository.save(
-            BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = greeting),
+            BuddyMessage(
+                session = session,
+                role = BuddyMessageRole.ASSISTANT,
+                content = greeting,
+                // What makes this the visit's boundary -- for the replay check above, and for the
+                // hire's own transcript.
+                opening = true,
+            ),
         )
 
         opening?.action?.let {
@@ -203,10 +239,16 @@ class BuddyService(
      *
      * The AI never receives the whole transcript: only the window after the session's
      * [BuddySession.summarizedCount] cursor, plus the running summary standing in for the rest.
-     * When the window outgrows [WINDOW], the first agent hop asks the AI to fold the oldest part
-     * into the summary (`summarizeUpto`); the returned summary and the advanced cursor are
-     * persisted with the reply. An AI that never returns an updated summary simply leaves the
-     * cursor where it is — the conversation still works, it just hasn't compacted yet.
+     *
+     * ⚠️ **Folding is no longer part of this turn, and that was the point of moving it.** The first
+     * agent hop used to carry `summarizeUpto`, which the AI service honoured *before* it began
+     * composing a reply — and since the cursor advanced by exactly what it folded, the window sat
+     * at [WINDOW] forever once it first filled. So past roughly ten exchanges in a sitting, **every
+     * turn paid an extra serialized model call**, in front of the answer, to compress one exchange.
+     * [BuddyCompactionService] does it afterwards instead.
+     *
+     * A fold that has not happened yet simply means a longer window on this turn. That is the
+     * honest degradation: the transcript is durable, and the note is a prompt-shaping device.
      *
      * @throws ResponseStatusException 404 if the authenticated user doesn't exist.
      */
@@ -219,7 +261,7 @@ class BuddyService(
         val history = buddyMessageRepository
             .findAllBySessionIdOrderByCreatedAtAsc(session.id)
             .drop(session.summarizedCount)
-            .map { BuddyAgentMessageDto(role = it.role.toHistoryRole(), content = it.content) }
+            .map { it.toAgentMessage() }
 
         buddyMessageRepository.save(
             BuddyMessage(session = session, role = BuddyMessageRole.USER, content = content),
@@ -236,25 +278,18 @@ class BuddyService(
         // Resolved once per turn, for the same reason: membership cannot change mid-conversation.
         val projectIds = projectIdsFor(userId)
 
-        // Fold the oldest part of the window into the summary once it outgrows the window. The
-        // cursor arithmetic never reaches the just-sent user message (summarizeUpto <= the window's
-        // persisted prefix), so nothing is summarized before it is durably stored.
-        val summarizeUpto = (history.size + 1 - WINDOW).takeIf { it > 0 }
-
         return flow {
             var messages = history + BuddyAgentMessageDto(role = "user", content = content)
             var citations: List<BuddyCitationDto> = emptyList()
             var answer: String? = null
             var step = 0
-            var updatedSummary: String? = null
 
             while (answer == null && step < MAX_AGENT_STEPS) {
                 step++
                 val response = onboardingAiClient.buddyAgentTurn(
-                    agentRequest(messages, tools, step, session, summarizeUpto, vocabulary, projectIds),
+                    agentRequest(messages, tools, step, session, vocabulary, projectIds),
                 )
                 citations = response.citations
-                response.updatedSummary?.let { updatedSummary = it }
                 if (response.final) {
                     answer = response.text
                 } else {
@@ -296,11 +331,9 @@ class BuddyService(
             buddyMessageRepository.save(
                 BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = reply),
             )
-            updatedSummary?.let {
-                session.summary = it
-                session.summarizedCount += summarizeUpto ?: 0
-                buddySessionRepository.save(session)
-            }
+            // Only now, with the reply persisted and the hire reading it. Folding before this point
+            // is what the whole change exists to stop.
+            compactInBackground(userId)
         }
     }
 
@@ -315,16 +348,18 @@ class BuddyService(
     }
 
     /**
-     * Builds one agent request. Summary fields go on the first hop only: after that the AI has
-     * folded them into the running conversation it returns, and re-sending would double-fold
-     * messages already inside the summary.
+     * Builds one agent request. The summary goes on the first hop only: after that the AI has
+     * folded it into the running conversation it returns, and re-sending would double-fold
+     * messages already inside it.
+     *
+     * ⚠️ `summarizeUpto` is deliberately never set. The AI service still honours it, and asking it
+     * to here would put a model call back in front of the answer — see [sendMessageForMe].
      */
     private fun agentRequest(
         messages: List<BuddyAgentMessageDto>,
         tools: List<BuddyToolSpecDto>,
         step: Int,
         session: BuddySession,
-        summarizeUpto: Int?,
         vocabulary: BuddyVocabularyDto,
         projectIds: List<String>,
     ): BuddyAgentRequest =
@@ -332,7 +367,6 @@ class BuddyService(
             messages = messages,
             backendTools = tools,
             priorSummary = if (step == 1) session.summary else null,
-            summarizeUpto = if (step == 1) summarizeUpto else null,
             // Sent on every hop, unlike the summary: the persona is rebuilt from scratch whenever
             // the running conversation has no system message yet, so withholding it after the
             // first hop would let a resumed turn fall back to the engineering wording.
@@ -396,26 +430,24 @@ class BuddyService(
             buddyToolExecutor.execute(call, userId)
         }
 
-    private fun BuddyMessageRole.toHistoryRole(): String =
-        when (this) {
-            BuddyMessageRole.USER -> "user"
-            BuddyMessageRole.ASSISTANT -> "assistant"
-        }
-
     private fun resolveUserId(authId: String): UUID =
         userApi
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
 
-    private companion object {
+    companion object {
         // How many agent round-trips (AI reason -> backend tool -> AI reason) before we stop and
         // answer with what we have. The AI service has its own internal search budget; this bounds
         // only the backend-tool hops so a loop can never run unbounded.
-        const val MAX_AGENT_STEPS = 5
+        private const val MAX_AGENT_STEPS = 5
 
         // The most messages (user + assistant) the AI is ever sent. Older turns reach it only
         // through the session's running summary -- the transcript is durable, the prompt is
         // bounded. 20 keeps ~10 exchanges verbatim, plenty for immediate context.
+        //
+        // Visible to BuddyCompactionService, which folds a conversation back down to it. One
+        // constant rather than two: a fold target that disagreed with the window it feeds would
+        // either leave the prompt over budget or compact turns the mentor still needs verbatim.
         const val WINDOW = 20
 
         const val FALLBACK_REPLY =

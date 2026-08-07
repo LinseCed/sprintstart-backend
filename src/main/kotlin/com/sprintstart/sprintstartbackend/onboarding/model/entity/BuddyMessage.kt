@@ -36,4 +36,19 @@ class BuddyMessage(
     val content: String,
     @Column(name = "created_at", nullable = false)
     val createdAt: Instant = Instant.now(),
+    /**
+     * True for the greeting that opens a visit, false for every reply inside one.
+     *
+     * ⚠️ **This is what makes "a visit" a fact about the transcript rather than a side effect of
+     * compaction.** Both "does this visit already have a greeting?" and "what does the hire see?"
+     * used to be answered from [BuddySession.summarizedCount], which worked only because opening a
+     * visit advanced that cursor to the end of the transcript. Once folding moved to a background
+     * pass that cursor stopped marking anything a person would recognise, and borrowing it would
+     * have regenerated a greeting on every refresh — the bug `#176` fixed.
+     *
+     * A visit ends when the hire speaks, so the marker is read as *the last message is an opening*,
+     * never as *an opening exists*.
+     */
+    @Column(nullable = false)
+    val opening: Boolean = false,
 )
