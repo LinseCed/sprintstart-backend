@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMe
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenActionDto
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
@@ -23,6 +24,8 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
@@ -56,6 +59,12 @@ class BuddyServiceTest {
         )
     }
 
+    // Folding is somebody else's job now, and these tests assert it is *asked for*, never that it
+    // happened. BuddyCompactionServiceTest owns what a fold does.
+    private val buddyCompactionService: BuddyCompactionService = mockk(relaxed = true)
+
+    // Unconfined so the fire-and-forget launch runs inline: the tests can then verify the pass was
+    // triggered without sleeping, which would make them slow and flaky in equal measure.
     private val service = BuddyService(
         buddySessionRepository,
         buddyMessageRepository,
@@ -64,6 +73,8 @@ class BuddyServiceTest {
         buddyActionService,
         userApi,
         trackService,
+        buddyCompactionService,
+        CoroutineScope(Dispatchers.Unconfined),
     )
 
     private val userId = UUID.randomUUID()
@@ -265,9 +276,15 @@ class BuddyServiceTest {
             verify(exactly = 0) { buddySessionRepository.save(any()) }
         }
 
+        /**
+         * ⚠️ The open used to fold the previous visit into the memory note itself, because the AI
+         * service returned the greeting and a rewritten note from one model call. It no longer
+         * writes either the note or the cursor — [BuddyCompactionService] owns both — so this pins
+         * the *absence*, which is the part a future change could quietly undo.
+         */
         @Test
-        fun `folds the previous window into memory, advances the cursor, and persists the greeting`() = runTest {
-            val session = BuddySession(userId = userId)
+        fun `persists the greeting as the visit's opening and touches neither memory nor cursor`() = runTest {
+            val session = BuddySession(userId = userId, summary = "the note as it stands")
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { buddySessionRepository.findByUserId(userId) } returns session
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
@@ -277,53 +294,101 @@ class BuddyServiceTest {
             every { buddyToolExecutor.stateSnapshot(userId) } returns "2 closed PRs"
             every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
                 BuddyOpenStreamEvent(type = "token", content = "Welcome back, Sam!"),
-                BuddyOpenStreamEvent(
-                    type = "done",
-                    greeting = "Welcome back, Sam!",
-                    memory = "Sam asked how to build; taught ./gradlew.",
-                ),
+                BuddyOpenStreamEvent(type = "done", greeting = "Welcome back, Sam!"),
             )
-            every { buddySessionRepository.save(any()) } answers { firstArg() }
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
 
             service.streamOpenForMe(authId).toList()
 
-            assertThat(session.summary).isEqualTo("Sam asked how to build; taught ./gradlew.")
-            assertThat(session.summarizedCount).isEqualTo(2)
-            verify { buddySessionRepository.save(session) }
+            assertThat(session.summary).isEqualTo("the note as it stands")
+            assertThat(session.summarizedCount).isEqualTo(0)
+            verify(exactly = 0) { buddySessionRepository.save(any()) }
             verify {
                 buddyMessageRepository.save(
-                    match { it.role == BuddyMessageRole.ASSISTANT && it.content == "Welcome back, Sam!" },
+                    match { it.content == "Welcome back, Sam!" && it.opening },
                 )
             }
         }
 
         /**
-         * The visit ends when the hire speaks: once they have, the next open is genuinely new and
-         * folds what was said into memory. Without this the greeting would freeze permanently.
+         * Reading the greeting is when nobody is waiting, so it is when the backlog gets folded.
+         */
+        @Test
+        fun `asks for a fold once the greeting has been persisted`() = runTest {
+            val session = BuddySession(userId = userId)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
+            every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
+            every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
+                BuddyOpenStreamEvent(type = "done", greeting = "Hello!"),
+            )
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+
+            service.streamOpenForMe(authId).toList()
+
+            coVerify { buddyCompactionService.compactIfNeeded(userId) }
+        }
+
+        /**
+         * The visit ends when the hire speaks: once they have, the next open is genuinely new.
+         * Without this the greeting would freeze permanently.
+         *
+         * ⚠️ Note the last message is an assistant reply, not an opening. "An opening exists" would
+         * wrongly replay here; "the last message is an opening" is the rule.
          */
         @Test
         fun `opening again after the hire has spoken generates a fresh greeting`() = runTest {
-            val session = BuddySession(userId = userId, summarizedCount = 0)
+            val session = BuddySession(userId = userId)
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { buddySessionRepository.findByUserId(userId) } returns session
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
-                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Hi!"),
+                BuddyMessage(
+                    session = session,
+                    role = BuddyMessageRole.ASSISTANT,
+                    content = "Hi!",
+                    opening = true,
+                ),
                 BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "where do I start?"),
                 BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Here."),
             )
             every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
             every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
                 BuddyOpenStreamEvent(type = "token", content = "Welcome back!"),
-                BuddyOpenStreamEvent(type = "done", greeting = "Welcome back!", memory = "folded"),
+                BuddyOpenStreamEvent(type = "done", greeting = "Welcome back!"),
             )
-            every { buddySessionRepository.save(any()) } answers { firstArg() }
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
 
             val events = service.streamOpenForMe(authId).toList()
 
             assertThat(events.single { it.type == "token" }.content).isEqualTo("Welcome back!")
-            assertThat(session.summary).isEqualTo("folded")
+        }
+
+        /**
+         * ⚠️ The greeting can only be specific about a previous visit if it is *sent* one. The
+         * cursor still answers this question — what the note does not yet cover — which is the one
+         * job it genuinely has.
+         */
+        @Test
+        fun `sends everything the memory note does not yet cover as recent context`() = runTest {
+            val session = BuddySession(userId = userId, summary = "older still", summarizedCount = 1)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
+                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "already folded"),
+                BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "not folded yet"),
+            )
+            every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
+            val requests = mutableListOf<BuddyOpenRequest>()
+            every { onboardingAiClient.streamBuddyOpen(capture(requests)) } returns flowOf(
+                BuddyOpenStreamEvent(type = "done", greeting = "Hello!"),
+            )
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+
+            service.streamOpenForMe(authId).toList()
+
+            assertThat(requests.single().memory).isEqualTo("older still")
+            assertThat(requests.single().recent.map { it.content }).containsExactly("not folded yet")
         }
 
         @Test
@@ -350,7 +415,12 @@ class BuddyServiceTest {
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { buddySessionRepository.findByUserId(userId) } returns session
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns listOf(
-                BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "Hi again!"),
+                BuddyMessage(
+                    session = session,
+                    role = BuddyMessageRole.ASSISTANT,
+                    content = "Hi again!",
+                    opening = true,
+                ),
             )
 
             val events = service.streamOpenForMe(authId).toList()
@@ -738,8 +808,17 @@ class BuddyServiceTest {
             assertThat(requests.first().summarizeUpto).isNull()
         }
 
+        /**
+         * ⚠️ **The turn never asks the AI to fold, however far over the window it is.**
+         *
+         * It used to, and that was the defect: the AI service performs `summarizeUpto` *before* it
+         * composes a reply, and since the cursor advanced by exactly what was folded, the window
+         * sat at the limit forever once it first filled. So past ~10 exchanges in a sitting every
+         * turn paid an extra serialized model call, in front of the answer, to compress one
+         * exchange. An over-long window on one turn is the honest cost of fixing that.
+         */
         @Test
-        fun `folds the oldest messages into the summary when the window outgrows the limit`() = runTest {
+        fun `never asks the AI to fold, even with the window well over the limit`() = runTest {
             val session = BuddySession(userId = userId)
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { buddySessionRepository.findByUserId(userId) } returns session
@@ -753,40 +832,66 @@ class BuddyServiceTest {
                     )
                 }
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
-            every { buddySessionRepository.save(any()) } answers { firstArg() }
             every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             val requests = mutableListOf<BuddyAgentRequest>()
-            coEvery { onboardingAiClient.buddyAgentTurn(capture(requests)) } returns BuddyAgentResponse(
-                final = true,
-                text = "Picking up where we were.",
-                updatedSummary = "We covered m1 through m6.",
-            )
+            coEvery { onboardingAiClient.buddyAgentTurn(capture(requests)) } returns
+                finalReply("Picking up where we were.")
 
             service.sendMessageForMe(authId, "m26").toList()
 
-            // The first (and only) hop asks the AI to fold the 6 oldest messages...
-            assertThat(requests.first().summarizeUpto).isEqualTo(6)
-            // ...and the returned summary plus the advanced cursor are persisted with the reply.
-            assertThat(session.summary).isEqualTo("We covered m1 through m6.")
-            assertThat(session.summarizedCount).isEqualTo(6)
-            verify { buddySessionRepository.save(session) }
+            assertThat(requests.first().summarizeUpto).isNull()
+            // Nothing is written to the session on a turn any more, so a fold that has not happened
+            // yet cannot half-happen here either.
+            assertThat(session.summarizedCount).isEqualTo(0)
+            verify(exactly = 0) { buddySessionRepository.save(any()) }
         }
 
+        /**
+         * The whole point: the fold is asked for *after* the reply is persisted, so the hire is
+         * reading it rather than waiting on it.
+         */
         @Test
-        fun `sends the summary fields on the first hop only, never re-folded on a resume`() = runTest {
+        fun `asks for a fold once the reply has been persisted`() = runTest {
             val session = BuddySession(userId = userId)
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { buddySessionRepository.findByUserId(userId) } returns session
-            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns
-                (1..25).map {
-                    BuddyMessage(
-                        session = session,
-                        role = if (it % 2 == 1) BuddyMessageRole.USER else BuddyMessageRole.ASSISTANT,
-                        content = "m$it",
-                    )
-                }
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
-            every { buddySessionRepository.save(any()) } answers { firstArg() }
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
+            coEvery { onboardingAiClient.buddyAgentTurn(any()) } returns finalReply("Here you go.")
+
+            service.sendMessageForMe(authId, "Hi").toList()
+
+            coVerify { buddyCompactionService.compactIfNeeded(userId) }
+        }
+
+        /**
+         * ⚠️ A stream that dies part-way must not fold: the reply was never persisted, so folding
+         * would advance the note past a turn the transcript does not contain.
+         */
+        @Test
+        fun `asks for no fold when the agent turn fails`() = runTest {
+            val session = BuddySession(userId = userId)
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
+            every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
+            coEvery { onboardingAiClient.buddyAgentTurn(any()) } throws
+                OnboardingAiException(500, "boom", "AI down")
+
+            assertThrows<OnboardingAiException> { service.sendMessageForMe(authId, "Hi").toList() }
+
+            coVerify(exactly = 0) { buddyCompactionService.compactIfNeeded(any()) }
+        }
+
+        @Test
+        fun `sends the prior summary on the first hop only, never re-sent on a resume`() = runTest {
+            val session = BuddySession(userId = userId).apply { summary = "Earlier notes." }
+            every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
+            every { buddySessionRepository.findByUserId(userId) } returns session
+            every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
+            every { buddyMessageRepository.save(any()) } answers { firstArg() }
             every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             val toolCall = BuddyToolCallDto(id = "call_0", name = "get_my_metrics")
             val requests = mutableListOf<BuddyAgentRequest>()
@@ -797,7 +902,6 @@ class BuddyServiceTest {
                         BuddyAgentMessageDto(role = "assistant", content = "", toolCalls = listOf(toolCall)),
                     ),
                     pendingToolCalls = listOf(toolCall),
-                    updatedSummary = "We covered m1 through m6.",
                 ),
                 finalReply("Your PR is waiting on a review."),
             )
@@ -805,13 +909,10 @@ class BuddyServiceTest {
 
             service.sendMessageForMe(authId, "m26").toList()
 
-            // Hop one carries the fold request...
-            assertThat(requests[0].summarizeUpto).isEqualTo(6)
-            // ...the resume carries neither field: the summary is already folded into the running
-            // conversation the AI returned, and re-sending would double-fold it.
-            assertThat(requests[1].summarizeUpto).isNull()
+            assertThat(requests[0].priorSummary).isEqualTo("Earlier notes.")
+            // The resume carries none: the summary is already folded into the running conversation
+            // the AI returned, and re-sending would double-fold it.
             assertThat(requests[1].priorSummary).isNull()
-            assertThat(session.summarizedCount).isEqualTo(6)
         }
     }
 }

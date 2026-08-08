@@ -10,6 +10,8 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTu
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssessmentTurnResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCompactRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCompactResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.DiagramOutcome
@@ -343,6 +345,35 @@ class OnboardingAiClient(
                 .perform<BuddyAgentResponse>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
             val msg = "Failed to run buddy agent turn (HTTP ${e.statusCode}): ${e.body}"
+            throw OnboardingAiException(e.statusCode, e.body, msg)
+        }
+
+    /**
+     * Folds older buddy turns into the mentor's durable memory note.
+     *
+     * ⚠️ **This is the call nobody is waiting on.** The same fold used to ride
+     * [BuddyAgentRequest.summarizeUpto] and run *before* the agent loop, so a long visit paid an
+     * extra serialized model call on every turn — ahead of the answer — to compress one exchange.
+     * The caller runs this after a turn instead.
+     *
+     * A non-2xx (including the AI service's 503 for an unavailable model) is wrapped in an
+     * [OnboardingAiException]. **That is not a degraded success**: the caller must leave its cursor
+     * where it is, because advancing past messages nothing summarized would drop them from both the
+     * prompt and the memory standing in for it.
+     *
+     * @param request The note as it stands and the messages sliding out of the window.
+     * @return The rewritten note, covering the prior note plus those messages.
+     */
+    suspend fun compactBuddyMemory(request: BuddyCompactRequest): BuddyCompactResponse =
+        try {
+            webClient
+                .post()
+                .uri(uri("/api/v1/onboarding/buddy/compact"))
+                .body(request)
+                .sync()
+                .perform<BuddyCompactResponse>()
+        } catch (@Suppress("SwallowedException") e: WebClientException) {
+            val msg = "Failed to compact buddy memory (HTTP ${e.statusCode}): ${e.body}"
             throw OnboardingAiException(e.statusCode, e.body, msg)
         }
 
