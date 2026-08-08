@@ -34,8 +34,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.net.URI
 
-// One method per AI-service endpoint: the count tracks the size of Seam 1, not a class doing too
-// many things. Splitting it by endpoint group would hide that seam rather than shrink it.
+// One method per AI-service endpoint.
 @Suppress("TooManyFunctions")
 @Component
 class OnboardingAiClient(
@@ -76,17 +75,14 @@ class OnboardingAiClient(
      *
      * The result is a flat vocabulary: it states no ordering.
      *
-     * Called by `VocabularyGenerationService` when a crawl's AI sync first reaches `SUCCEEDED`, so
-     * that "set up onboarding" collapses into "connect a repo"; there is no PM proposal queue in
-     * front of it, and no surface that triggers this by hand.
+     * Called by `VocabularyGenerationService` when a crawl's AI sync first reaches `SUCCEEDED`.
      *
-     * @param activeCompetencies The backend's current live competencies, which drive dedup.
-     * @param existingAreas The grouping areas in use, so a proposal joins one rather than coining a
-     * synonym of it.
-     * @param tombstonedCompetencies What somebody deliberately removed. Blocked by key *and* by
-     * similarity, so a deletion cannot leak back under a rephrasing.
-     * @param lastFingerprint The corpus fingerprint recorded from the most recent prior proposal, if any.
-     * @return The proposal outcome returned by the AI service.
+     * @param activeCompetencies The current live competencies, which drive dedup.
+     * @param existingAreas The grouping areas in use, so a proposal joins one instead of coining a
+     * synonym.
+     * @param tombstonedCompetencies Removed competencies. ⚠️ Blocked by key *and* by similarity, so
+     * a deletion cannot return under a rephrasing.
+     * @param lastFingerprint The corpus fingerprint recorded from the most recent prior proposal.
      */
     suspend fun proposeCompetencyGraph(
         activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
@@ -115,11 +111,10 @@ class OnboardingAiClient(
     /**
      * Proposes the shared module one competency teaches.
      *
-     * Heavyweight/offline, matching [synthesizeLesson]: one retrieval + LLM pass, intended for an
-     * authoring action rather than a hire's request path. Nothing about an individual hire is sent
-     * -- one competency yields one module everybody reads. [lastFingerprint] is whatever
-     * fingerprint the caller last recorded for this competency, so an unchanged corpus does not
-     * churn a module a PM has already edited.
+     * Heavyweight/offline: one retrieval + LLM pass, for an authoring action, not a hire's request
+     * path. ⚠️ Nothing about an individual hire is sent — one competency yields one shared module.
+     * [lastFingerprint] is the fingerprint last recorded for this competency, so an unchanged corpus
+     * does not churn a module a PM has edited.
      *
      * @param competencyKey The competency this module teaches.
      * @param competencyLabel The competency's display label.
