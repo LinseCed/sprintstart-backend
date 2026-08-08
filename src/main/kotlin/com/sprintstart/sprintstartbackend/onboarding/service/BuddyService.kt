@@ -240,12 +240,12 @@ class BuddyService(
      * The AI never receives the whole transcript: only the window after the session's
      * [BuddySession.summarizedCount] cursor, plus the running summary standing in for the rest.
      *
-     * ⚠️ **Folding is no longer part of this turn, and that was the point of moving it.** The first
-     * agent hop used to carry `summarizeUpto`, which the AI service honoured *before* it began
-     * composing a reply — and since the cursor advanced by exactly what it folded, the window sat
-     * at [WINDOW] forever once it first filled. So past roughly ten exchanges in a sitting, **every
-     * turn paid an extra serialized model call**, in front of the answer, to compress one exchange.
-     * [BuddyCompactionService] does it afterwards instead.
+     * ⚠️ **Folding is not part of this turn, and keeping it out is the point.** An agent hop that
+     * asks for a fold gets it *before* the AI begins composing a reply — and since the cursor
+     * advances by exactly what it folds, the window then sits at [WINDOW] forever once it first
+     * fills. Past roughly ten exchanges in a sitting that is **an extra serialized model call on
+     * every turn**, in front of the answer, to compress one exchange. [BuddyCompactionService] does
+     * it afterwards instead.
      *
      * A fold that has not happened yet simply means a longer window on this turn. That is the
      * honest degradation: the transcript is durable, and the note is a prompt-shaping device.
@@ -352,8 +352,9 @@ class BuddyService(
      * folded it into the running conversation it returns, and re-sending would double-fold
      * messages already inside it.
      *
-     * ⚠️ `summarizeUpto` is deliberately never set. The AI service still honours it, and asking it
-     * to here would put a model call back in front of the answer — see [sendMessageForMe].
+     * ⚠️ **Nothing here may ask the AI to fold.** Neither side carries a field for it any more, and
+     * that is deliberate: the AI service performs a fold before it composes a reply, which puts a
+     * model call back in front of the answer — see [sendMessageForMe] and [BuddyCompactionService].
      */
     private fun agentRequest(
         messages: List<BuddyAgentMessageDto>,

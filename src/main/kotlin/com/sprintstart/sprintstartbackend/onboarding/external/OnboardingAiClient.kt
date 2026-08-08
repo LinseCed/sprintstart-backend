@@ -351,10 +351,10 @@ class OnboardingAiClient(
     /**
      * Folds older buddy turns into the mentor's durable memory note.
      *
-     * ⚠️ **This is the call nobody is waiting on.** The same fold used to ride
-     * [BuddyAgentRequest.summarizeUpto] and run *before* the agent loop, so a long visit paid an
-     * extra serialized model call on every turn — ahead of the answer — to compress one exchange.
-     * The caller runs this after a turn instead.
+     * ⚠️ **This is the call nobody is waiting on**, and it must stay that way. Folding on the agent
+     * hop runs the fold *before* the agent loop, so a long visit pays an extra serialized model call
+     * on every turn — ahead of the answer — to compress one exchange. The caller runs this after a
+     * turn instead.
      *
      * A non-2xx (including the AI service's 503 for an unavailable model) is wrapped in an
      * [OnboardingAiException]. **That is not a degraded success**: the caller must leave its cursor
