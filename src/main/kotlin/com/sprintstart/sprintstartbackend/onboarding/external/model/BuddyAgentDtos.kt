@@ -48,12 +48,6 @@ data class BuddyAgentRequest(
      */
     @SerialName("prior_summary") val priorSummary: String? = null,
     /**
-     * When set, the AI must fold the first this-many messages of [messages] into the summary and
-     * return it as [BuddyAgentResponse.updatedSummary]. How the backend bounds an unbounded
-     * transcript: the window stays small, and the summary accretes what slides out of it.
-     */
-    @SerialName("summarize_upto") val summarizeUpto: Int? = null,
-    /**
      * What one unit of this hire's accepted work is called, for the mentor's persona.
      *
      * Three structured fields rather than persona prose: the AI renders them into a fixed sentence
@@ -112,10 +106,10 @@ data class BuddyOpenRequest(
 /**
  * Asks the AI service to fold [folded] into the mentor's durable memory note.
  *
- * ⚠️ **Nobody is waiting on this call, which is the whole reason it is one.** The same fold used to
- * ride [BuddyAgentRequest.summarizeUpto], running *before* the agent loop — so once a visit's active
- * window outgrew `BuddyService.WINDOW`, every further turn paid an extra serialized model call to
- * compress one exchange ahead of the answer the hire was waiting for.
+ * ⚠️ **Nobody is waiting on this call, which is the whole reason it is one.** Folding on the agent
+ * hop instead puts the fold *before* the agent loop, so once a visit's active window outgrows
+ * `BuddyService.WINDOW`, every further turn pays an extra serialized model call to compress one
+ * exchange ahead of the answer the hire is waiting for. Keep it off the answering path.
  *
  * The cursor is this side's: [folded] is exactly the slice to advance past once the fold succeeds.
  */
@@ -180,9 +174,4 @@ data class BuddyAgentResponse(
     val messages: List<BuddyAgentMessageDto> = emptyList(),
     @SerialName("pending_tool_calls") val pendingToolCalls: List<BuddyToolCallDto> = emptyList(),
     val citations: List<BuddyCitationDto> = emptyList(),
-    /**
-     * The accreted summary when the request asked for compaction (`summarize_upto`): covers the
-     * prior summary plus the folded messages. The backend persists it and advances its cursor.
-     */
-    @SerialName("updated_summary") val updatedSummary: String? = null,
 )

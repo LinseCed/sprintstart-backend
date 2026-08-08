@@ -804,21 +804,20 @@ class BuddyServiceTest {
                 "Can you say more?",
             )
             assertThat(requests.first().priorSummary).isEqualTo("Earlier we got the repo building.")
-            // ...and nothing needs folding: the window fits, so no compaction is requested.
-            assertThat(requests.first().summarizeUpto).isNull()
         }
 
         /**
-         * ⚠️ **The turn never asks the AI to fold, however far over the window it is.**
+         * ⚠️ **A turn folds nothing, however far over the window it is.**
          *
-         * It used to, and that was the defect: the AI service performs `summarizeUpto` *before* it
-         * composes a reply, and since the cursor advanced by exactly what was folded, the window
-         * sat at the limit forever once it first filled. So past ~10 exchanges in a sitting every
-         * turn paid an extra serialized model call, in front of the answer, to compress one
-         * exchange. An over-long window on one turn is the honest cost of fixing that.
+         * The request no longer carries a field that could ask for one, so what is left to pin is
+         * the consequence: an over-long window is sent as it stands and the session is untouched.
+         * That is the honest cost of keeping the fold off the answering path — a fold performed
+         * during the turn happens *before* the reply is composed, and since the cursor advances by
+         * exactly what it folds, the window would sit at the limit forever once it first filled,
+         * making it an extra serialized model call on every turn past ~10 exchanges.
          */
         @Test
-        fun `never asks the AI to fold, even with the window well over the limit`() = runTest {
+        fun `sends the whole over-long window and folds nothing`() = runTest {
             val session = BuddySession(userId = userId)
             every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
             every { buddySessionRepository.findByUserId(userId) } returns session
@@ -839,9 +838,11 @@ class BuddyServiceTest {
 
             service.sendMessageForMe(authId, "m26").toList()
 
-            assertThat(requests.first().summarizeUpto).isNull()
-            // Nothing is written to the session on a turn any more, so a fold that has not happened
-            // yet cannot half-happen here either.
+            // The over-long window goes to the AI as it stands, rather than being trimmed by a fold
+            // performed on the way.
+            assertThat(requests.first().messages).hasSize(26)
+            // A turn writes nothing to the session, so a fold that has not happened yet cannot
+            // half-happen here either.
             assertThat(session.summarizedCount).isEqualTo(0)
             verify(exactly = 0) { buddySessionRepository.save(any()) }
         }

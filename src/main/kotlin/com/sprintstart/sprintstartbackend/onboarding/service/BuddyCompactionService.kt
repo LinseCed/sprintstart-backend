@@ -19,16 +19,16 @@ import java.util.UUID
  *
  * ### Why this is not part of a turn
  *
- * ⚠️ **The fold used to run in front of the answer the hire was waiting for.** It rode
- * `BuddyAgentRequest.summarizeUpto`, and the AI service performed it as the *first* step of the
- * agent turn — before the model began composing a reply. Because the cursor advanced by exactly
- * what it folded, the active window sat at [BuddyService.WINDOW] forever after it first filled, so
- * this was not an occasional cost: past roughly ten exchanges in a sitting, **every** turn paid an
- * extra serialized model call to compress one exchange.
+ * ⚠️ **Folding as part of the agent turn puts it in front of the answer the hire is waiting for.**
+ * The AI service performs it as the *first* step of the turn, before the model begins composing a
+ * reply, and because the cursor advances by exactly what it folds, the active window then sits at
+ * [BuddyService.WINDOW] forever after it first fills. That is not an occasional cost: past roughly
+ * ten exchanges in a sitting, **every** turn pays an extra serialized model call to compress one
+ * exchange.
  *
- * ⚠️ Its *quality* was never the problem, and an earlier note in this workspace claiming otherwise
- * was wrong. The fold has always had its own prompt and its own call at temperature 0. What it did
- * not have was a moment when nobody was waiting. That is all this service adds.
+ * ⚠️ The fold's *quality* is not the reason it lives here. It has always had its own prompt and its
+ * own call at temperature 0. What it lacked was a moment when nobody was waiting. That is all this
+ * service adds.
  *
  * ### Read, call, re-read
  *
