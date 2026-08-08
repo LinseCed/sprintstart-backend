@@ -17,33 +17,18 @@ import java.util.UUID
 /**
  * Folds a buddy conversation's oldest turns into the mentor's durable memory note.
  *
- * ### Why this is not part of a turn
+ * ⚠️ **Must stay off the answering path.** Folding during an agent turn runs before the model
+ * composes its reply, and since the cursor advances by exactly what it folds, the active window
+ * then sits at [BuddyService.WINDOW] permanently — an extra serialized model call on every turn.
  *
- * ⚠️ **Folding as part of the agent turn puts it in front of the answer the hire is waiting for.**
- * The AI service performs it as the *first* step of the turn, before the model begins composing a
- * reply, and because the cursor advances by exactly what it folds, the active window then sits at
- * [BuddyService.WINDOW] forever after it first fills. That is not an occasional cost: past roughly
- * ten exchanges in a sitting, **every** turn pays an extra serialized model call to compress one
- * exchange.
- *
- * ⚠️ The fold's *quality* is not the reason it lives here. It has always had its own prompt and its
- * own call at temperature 0. What it lacked was a moment when nobody was waiting. That is all this
- * service adds.
- *
- * ### Read, call, re-read
- *
- * The model call happens outside any transaction — the shape every AI-touching service here uses —
- * so the write must re-read what it enforces. Two things guard the swap, and they catch different
- * races:
+ * The model call happens outside any transaction, so the write re-reads what it enforces. Two
+ * guards catch different races:
  *
  * - **The cursor comparison** catches a fold that committed while the model was thinking.
  * - **[com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession.version]** catches
- *   one committing *between* the re-read and the flush. ⚠️ A re-check alone is not a lock:
- *   `backend#170` is the local cautionary tale, where read-then-insert with no unique index started
- *   two assessment sessions at once and narrowing the window did not close it.
+ *   one committing *between* the re-read and the flush. ⚠️ A re-check alone is not a lock.
  *
- * Losing either race discards this fold and leaves the cursor alone. Nothing is lost by that: the
- * transcript is durable, and the next turn re-triggers the pass.
+ * Losing either race discards this fold and leaves the cursor alone; the next turn retries.
  */
 @Service
 class BuddyCompactionService(
@@ -60,8 +45,7 @@ class BuddyCompactionService(
      * Folds this session's backlog into its memory note, if it has one.
      *
      * Safe to call after every turn: a conversation whose active window still fits does nothing and
-     * costs one query. **Never throws** — the caller is a fire-and-forget launch, and a fold that
-     * fails must leave a working conversation behind, not a failed reply.
+     * costs one query. ⚠️ **Never throws** — the caller is a fire-and-forget launch.
      *
      * @param userId The hire whose session to compact.
      */
@@ -72,9 +56,8 @@ class BuddyCompactionService(
         val memory = try {
             onboardingAiClient.compactBuddyMemory(request).memory
         } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
-            // The note is a prompt-shaping device, never the record. An unavailable model costs a
-            // longer prompt on the next turn and nothing else, so this is a warning and not a
-            // retry queue.
+            // The note shapes the prompt and is not the record, so a failed fold costs only a
+            // longer prompt next turn. Warned, not retried.
             logger.warn("Buddy compaction skipped for user {}: {}", userId, e.message)
             return
         }
@@ -85,9 +68,8 @@ class BuddyCompactionService(
     private fun planFor(userId: UUID): FoldPlan? {
         val session = buddySessionRepository.findByUserId(userId) ?: return null
         val messages = buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
-        // Fold whatever it takes to bring the active window back to WINDOW — not a fixed slice.
-        // A pass that missed its turn (the model was down, the process restarted) catches up in one
-        // call rather than one exchange at a time.
+        // Folds whatever it takes to bring the active window back to WINDOW, not a fixed slice, so
+        // a pass that missed its turn catches up in one call.
         val foldCount = messages.size - session.summarizedCount - BuddyService.WINDOW
         if (foldCount <= 0) return null
         return FoldPlan(
@@ -107,9 +89,8 @@ class BuddyCompactionService(
                 val session = buddySessionRepository.findById(plan.sessionId).orElse(null)
                     ?: return@execute
                 if (session.summarizedCount != plan.cursor) {
-                    // A fold committed while the model was thinking. Discarding this one is
-                    // correct: applying it would move the cursor past messages that the note the
-                    // other pass wrote does not cover.
+                    // A fold committed while the model was thinking. Applying this one would move
+                    // the cursor past messages the other pass's note does not cover.
                     logger.debug(
                         "Discarding stale buddy fold for session {}: cursor moved {} -> {}",
                         plan.sessionId,
@@ -123,8 +104,8 @@ class BuddyCompactionService(
                 buddySessionRepository.save(session)
             }
         } catch (@Suppress("SwallowedException") e: ObjectOptimisticLockingFailureException) {
-            // The other half of the same race: a concurrent fold committed between the re-read and
-            // the flush. Same outcome, and the next turn tries again.
+            // A concurrent fold committed between the re-read and the flush. Same outcome as a
+            // moved cursor: discard, and the next turn retries.
             logger.debug("Buddy fold for session {} lost the swap: {}", plan.sessionId, e.message)
         }
     }
@@ -132,8 +113,7 @@ class BuddyCompactionService(
     /**
      * One fold, decided under a read transaction and applied under a write one.
      *
-     * [cursor] is carried so the write can tell whether the session moved underneath it — the
-     * value it must still see, not the value it will set.
+     * [cursor] is the value the write must still see, not the value it will set.
      */
     private data class FoldPlan(
         val sessionId: UUID,
