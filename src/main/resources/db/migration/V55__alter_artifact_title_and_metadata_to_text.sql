@@ -1,6 +1,0 @@
-ALTER TABLE artifact
-    ADD COLUMN IF NOT EXISTS metadata TEXT NOT NULL DEFAULT '{}';
-
-ALTER TABLE artifact
-    ALTER COLUMN title TYPE TEXT,
-    ALTER COLUMN metadata TYPE TEXT;
