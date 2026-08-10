@@ -11,8 +11,8 @@ import java.util.UUID
  * internal entities. Other modules should depend on this interface instead of querying the
  * ingestion repositories directly.
  *
- * One method per distinct question another module asks of the corpus; the count tracks how many
- * things ingestion is asked, not an interface doing too many jobs.
+ * One method per distinct question another module asks of the corpus, hence the function-count
+ * suppression.
  */
 @Suppress("TooManyFunctions")
 interface ArtifactIngestionApi {
@@ -49,11 +49,10 @@ interface ArtifactIngestionApi {
     /**
      * Summarizes what one GitHub account has authored inside a project's ingested artifacts.
      *
-     * Reads only the corpus the project already has connected -- no GitHub call -- so it can
-     * describe a person's prior involvement without any new data source. Only issues and pull
-     * requests carry an author, so commits and files never contribute (see `Artifact.authorLogin`).
+     * Reads only the corpus the project already has connected -- no GitHub call. ⚠️ Only issues
+     * and pull requests carry an author, so commits and files never contribute (see
+     * `Artifact.authorLogin`).
      *
-     * @param projectId The project whose ingested artifacts to look at.
      * @param authorLogin Lower-cased GitHub login to attribute artifacts to.
      * @return One entry per artifact authored by that account; empty when there are none.
      */
@@ -63,11 +62,6 @@ interface ArtifactIngestionApi {
      * The pull requests one GitHub account has authored in a project, with the timestamps
      * onboarding measures against.
      *
-     * Separate from [getAuthoredWork] because it answers a different question with a different
-     * shape: that one describes involvement (where, what kind), this one describes a lifecycle
-     * (opened, answered, merged). Folding the timestamps into `AuthoredArtifact` would put a
-     * pull-request-only concern on a type that also covers issues.
-     *
      * Reads only artifacts already ingested -- no GitHub call.
      */
     fun getAuthoredPullRequests(projectId: UUID, authorLogin: String): List<AuthoredPullRequest>
@@ -76,16 +70,13 @@ interface ArtifactIngestionApi {
      * The tracked issues assigned to one person in a project, with the timestamps onboarding
      * measures against.
      *
-     * The non-code counterpart of [getAuthoredPullRequests], and the reason a role that never opens
-     * a pull request can still be *observed* rather than vouched for. Reads only issues already
-     * ingested — no call to the tracker.
+     * The non-code counterpart of [getAuthoredPullRequests]. Reads only issues already ingested —
+     * no call to the tracker.
      *
      * ⚠️ **Attribution is by display name**, because that is the only identity the ingested Jira
-     * data carries. A blank or unmatched name yields nothing, which callers already read as "no
+     * data carries. A blank or unmatched name yields nothing, which callers must read as "no
      * attribution possible" rather than "did no work".
      *
-     * @param projectId The project whose ingested issues to look at.
-     * @param assigneeDisplayName The name the person appears under in the tracker, as stored.
      * @return One entry per issue currently assigned to that name; empty when there are none.
      */
     fun getAssignedIssues(projectId: UUID, assigneeDisplayName: String): List<AssignedIssue>
@@ -93,9 +84,7 @@ interface ArtifactIngestionApi {
     /**
      * The ingested artifact one starter-work task was mined from, by its source id.
      *
-     * Exists so task-scoped orientation can be assembled from what the issue *actually says* — its
-     * body and its labels — rather than from the one-line summary the mining pass wrote. Reads only
-     * artifacts already ingested; no GitHub call.
+     * Reads only artifacts already ingested; no GitHub call.
      *
      * @param sourceId The backend's stable identifier, e.g. `github:org/repo:ISSUE:123`.
      * @return The artifact's own text, or null when nothing with that source id is ingested.
@@ -105,16 +94,11 @@ interface ArtifactIngestionApi {
     /**
      * Every open tracker issue in a project, whoever it belongs to.
      *
-     * The corpus can already answer "which issues could a newcomer take?" without a model call —
-     * that filter is deterministic — so this exists to let a person browse the same material mining
-     * reads. ⚠️ **Assigned issues are returned too, marked**, unlike mining's candidate list: mining
-     * must skip them, because proposing somebody else's work is a wrong answer a hire cannot detect,
-     * but a person browsing can see who holds one and decide anyway. Filtering here would turn that
-     * exclusion into an absence nobody can account for.
+     * ⚠️ **Assigned issues are returned too, marked**, unlike mining's candidate list — filtering
+     * here would turn that exclusion into an absence nobody can account for.
      *
      * Reads only artifacts already ingested; no call to GitHub or the tracker.
      *
-     * @param projectId The project whose ingested issues to list.
      * @return One entry per open issue; empty when the project has none ingested.
      */
     fun getOpenIssues(projectId: UUID): List<IngestedIssue>
@@ -132,34 +116,23 @@ interface ArtifactIngestionApi {
     /**
      * How responsive each of a project's repositories is to pull requests.
      *
-     * A property of the *repository*, not of any one author: it is derived from every ingested pull
-     * request in the project, so it describes the people who review there. That is the only honest
-     * grain available — ingestion records when a pull request first got a response, but not **who**
-     * responded, so per-person responsiveness cannot be computed today.
+     * ⚠️ A property of the *repository*, not of any one author: ingestion records when a pull
+     * request first got a response but not **who** responded, so per-person responsiveness cannot
+     * be computed.
      *
-     * @param projectId The project whose repositories to characterise.
      * @return One entry per repository that has at least one ingested pull request.
      */
     fun getRepositoryResponsiveness(projectId: UUID): List<RepositoryResponsiveness>
 
-    /**
-     * Finds and retrieves an artifact by its unique identifier.
-     *
-     * @param artifactId The unique identifier of the artifact to be retrieved.
-     * @return The artifact details wrapped in an [ArtifactDto] object.
-     */
+    /** Finds and retrieves an artifact by its unique identifier. */
     fun findArtifactById(artifactId: UUID): ArtifactDto?
 }
 
 /**
  * How long a repository takes to answer a pull request, and how many go unanswered.
  *
- * Exists because "an unblocked task owned by someone who never answers is not an unblocked task":
- * a newcomer's first contribution succeeding depends at least as much on somebody responding as on
- * the task being well scoped.
- *
- * [medianHoursToFirstResponse] is null when no ingested pull request here has been answered at all
- * — which is *worse* than a slow median, not unknown, and callers must not read it as "no data".
+ * ⚠️ [medianHoursToFirstResponse] is null when no ingested pull request here has been answered at
+ * all — which is *worse* than a slow median, not unknown. Callers must not read it as "no data".
  */
 data class RepositoryResponsiveness(
     val repositoryFullName: String,
@@ -171,12 +144,11 @@ data class RepositoryResponsiveness(
 /**
  * One ingested tracker issue, with everything a person needs to judge it as starter work.
  *
- * Carries the issue's own text and labels like [TaskSourceArtifact], plus the two fields a
- * *selection* turns on and orientation does not: [state] and [hasAssignee].
+ * Carries the issue's own text and labels like [TaskSourceArtifact], plus [state] and
+ * [hasAssignee].
  *
  * ⚠️ **[hasAssignee] is three-valued and null means *we do not know*, never "nobody".** GitHub
- * issues have assignees this system does not ingest, so a null here is an absence of information
- * about the issue, not information that it is free. A caller rendering it must say so; a caller
+ * issues have assignees this system does not ingest. A caller rendering it must say so; a caller
  * filtering on it must treat only a definite `true` as "somebody has this".
  *
  * [state] is `"OPEN"` / `"CLOSED"` as the tracker reports it, folded to those two by the mappers,
@@ -199,9 +171,8 @@ data class IngestedIssue(
 /**
  * The text of the artifact a task came from.
  *
- * Carries body and labels, unlike [AuthoredArtifact], because here the content *is* the point:
- * orientation is aimed at what this task involves, so the retrieval it drives has to see the task's
- * own words.
+ * Carries body and labels, unlike [AuthoredArtifact]: the retrieval this drives has to see the
+ * task's own words.
  */
 data class TaskSourceArtifact(
     val title: String?,
@@ -226,8 +197,7 @@ data class AuthoredPullRequest(
     /**
      * How many reviews asked the author to change this pull request.
      *
-     * Zero is the whole point: "done with no rework" is half the operational definition of
-     * autonomy, and merge state alone cannot tell a clean change from one sent back three times.
+     * ⚠️ Merge state alone cannot tell a clean change from one sent back three times.
      */
     val changesRequestedCount: Int = 0,
     val repositoryFullName: String? = null,
@@ -254,16 +224,11 @@ data class AuthoredPullRequest(
 /**
  * One tracked issue assigned to a person, reduced to the four moments onboarding measures.
  *
- * Deliberately the same four as [AuthoredPullRequest] — opened, first answered, accepted, sent back
- * — because that is the whole claim of the contribution stream: a draft plan returned for changes
- * and a pull request with changes requested are the same event, so neither needs its own metrics.
- *
- * ### What "accepted" means here, and what it refuses to mean
+ * The same four moments as [AuthoredPullRequest] — opened, first answered, accepted, sent back.
  *
  * ⚠️ **[acceptedAt] is null when the person moved their own issue to Done.** Closing your own
- * ticket is a claim, not an observation, and the whole reason this source exists is to produce
- * evidence nobody had to vouch for. Such an issue stays in flight rather than being downgraded to a
- * weaker acceptance: absent evidence stays "no evidence".
+ * ticket is a claim, not an observation. Such an issue stays in flight rather than being downgraded
+ * to a weaker acceptance: absent evidence stays "no evidence".
  */
 data class AssignedIssue(
     val artifactId: UUID,
@@ -276,10 +241,8 @@ data class AssignedIssue(
     /**
      * How many times somebody else moved the issue out of a status the assignee had put it in.
      *
-     * The tracker equivalent of a review asking for changes, and derived from the changelog rather
-     * than guessed: "done with no rework" is half the operational definition of autonomy, so
-     * reporting a flat zero here would quietly hand every tracked issue an autonomy signal it had
-     * not earned.
+     * The tracker equivalent of a review asking for changes. ⚠️ Derived from the changelog rather
+     * than guessed — a flat zero would hand every tracked issue an unearned clean run.
      */
     val returnedCount: Int = 0,
     /** The issue key (e.g. `ONB-42`), so a hire can be told *which* issue. */
@@ -291,8 +254,7 @@ data class AssignedIssue(
 /**
  * One artifact a person authored, reduced to what a prior can be built from.
  *
- * Deliberately carries no title or body: the point is *that* somebody has worked here and on what
- * kind of thing, not the content of their work.
+ * ⚠️ Carries no title or body: only *that* somebody worked here, and on what kind of thing.
  */
 data class AuthoredArtifact(
     val artifactType: String,

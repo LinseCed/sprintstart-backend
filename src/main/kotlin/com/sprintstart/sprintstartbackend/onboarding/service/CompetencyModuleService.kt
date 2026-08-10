@@ -52,9 +52,8 @@ import java.util.UUID
  * [ModuleStatus.PROPOSED], and only [approve] makes one live — archiving whatever was live before,
  * so exactly one version per `(competency, project)` is ever [ModuleStatus.ACTIVE].
  *
- * Editing a live module means creating a new version from it, not mutating it: a hire halfway
- * through a module should not have the ground move under them, and the superseded version stays
- * as the record of what earlier hires were actually taught.
+ * ⚠️ Editing a live module means creating a new version from it, never mutating it — the
+ * superseded version is the record of what earlier hires were taught.
  */
 @Suppress("TooManyFunctions")
 @Service
@@ -77,10 +76,9 @@ class CompetencyModuleService(
     /**
      * Starts a new module version for `(competencyKey, projectId)`.
      *
-     * @param copyFromActive When true, the current ACTIVE version's pages and check are copied in,
-     * so editing what is live starts from what is live rather than from nothing.
-     * @throws ResponseStatusException 404 if the competency does not exist in the graph — a module
-     * teaches a node, so there has to be one.
+     * @param copyFromActive When true, the current ACTIVE version's pages and check are copied in.
+     * @throws ResponseStatusException 404 if the competency does not exist — a module teaches one,
+     * so there has to be one.
      */
     @Transactional
     fun create(request: CreateCompetencyModuleRequest): CompetencyModuleResponse {
@@ -122,14 +120,14 @@ class CompetencyModuleService(
      * The draft lands as [ModuleStatus.PROPOSED] with [ContentProvenance.AI] pages, so a later
      * re-synthesis can replace what the AI wrote while leaving anything a PM edited alone.
      *
-     * The AI call runs outside any transaction; the surrounding reads and the write are their own
-     * short ones. Idempotent per competency: the fingerprint of the last proposal for this
+     * ⚠️ The AI call runs outside any transaction; the surrounding reads and the write are their
+     * own short ones. Idempotent per competency: the fingerprint of the last proposal for this
      * `(competency, project)` is sent, so an unchanged corpus returns `unchanged` and nothing new
-     * is written -- a PM's review queue does not refill with identical drafts.
+     * is written.
      *
      * @return The stored proposal, or null when the AI had nothing to propose (empty corpus, no
      * grounded pages, or an unchanged corpus).
-     * @throws ResponseStatusException 404 if the competency does not exist in the graph.
+     * @throws ResponseStatusException 404 if the competency does not exist.
      */
     suspend fun proposeFromCorpus(competencyKey: String, projectId: UUID): CompetencyModuleResponse? {
         val context = withContext(Dispatchers.IO) {
@@ -162,14 +160,13 @@ class CompetencyModuleService(
     /**
      * Streams the AI drafting a module as [AiProgressEvent]s, persisting the proposal on `done`.
      *
-     * The live twin of [proposeFromCorpus]: a PM watches the module take shape (retrieve → write →
-     * ground, a page landing at a time) instead of waiting on a spinner. The AI's stage/item/warning
-     * events are relayed as-is; on the terminal `done` the outcome is persisted with the very same
-     * [persistProposal] the non-streaming path uses, before the event reaches the browser — so the
-     * stored proposal is identical whether or not anyone watched. Nothing is stored for an empty
-     * corpus, an unchanged corpus, or an ungroundable competency, exactly as [proposeFromCorpus].
+     * The live twin of [proposeFromCorpus]. The AI's stage/item/warning events are relayed as-is;
+     * on the terminal `done` the outcome is persisted with the very same [persistProposal] the
+     * non-streaming path uses, before the event reaches the browser, so the stored proposal is
+     * identical whether or not anyone watched. Nothing is stored for an empty corpus, an unchanged
+     * corpus, or an ungroundable competency.
      *
-     * @throws ResponseStatusException 404 if the competency does not exist in the graph.
+     * @throws ResponseStatusException 404 if the competency does not exist.
      */
     suspend fun streamProposalFromCorpus(competencyKey: String, projectId: UUID): Flow<AiProgressEvent> {
         val context = withContext(Dispatchers.IO) {
@@ -236,9 +233,8 @@ class CompetencyModuleService(
         return ProposalContext(
             label = competency.label,
             description = competency.description.orEmpty(),
-            // Teach to the bar the node is actually held to, so the module's depth and its check
-            // agree: a check pitched at the target level with a beginner's lesson behind it is
-            // exactly the mismatch that strands a hire.
+            // ⚠️ Teach to the competency's target level, so the module's depth and its check
+            // agree.
             level = LEVEL_NAMES[competency.targetLevel] ?: LEVEL_NAMES.getValue(Competency.DEFAULT_TARGET_LEVEL),
             lastFingerprint = previous?.corpusFingerprint,
         )
@@ -269,8 +265,8 @@ class CompetencyModuleService(
         )
 
         proposed.pages
-            // A kind the enum does not know is dropped rather than stored: the AI validates against
-            // the same set, so this is the backend not trusting that.
+            // ⚠️ A kind the enum does not know is dropped: the backend re-validates rather than
+            // trusting the AI's own check against the same set.
             .mapNotNull { page -> parsePageKind(page.kind)?.let { it to page } }
             .forEachIndexed { index, (kind, page) ->
                 val modulePage = ModulePage(
@@ -281,9 +277,8 @@ class CompetencyModuleService(
                     position = index,
                     provenance = ContentProvenance.AI,
                 )
-                // The grounding travels with the prose: the AI cites every claim it grounds, and a
-                // page whose citations were dropped on persist would read as content somebody made
-                // up. Stored the same way orientation packets store theirs.
+                // ⚠️ Citations must be persisted with the page — a page whose citations were
+                // dropped reads as content somebody made up.
                 page.citations.forEachIndexed { citationIndex, citation ->
                     modulePage.citations.add(
                         ModulePageCitation(
@@ -300,13 +295,7 @@ class CompetencyModuleService(
 
         competencyModuleRepository.save(module)
 
-        // Generation no longer manufactures a gate. A recall quiz (KNOWLEDGE/EXACT) auto-created
-        // for every module made the *default* rigor tier a memory test -- the exact thing the
-        // north star disavows, while artifact-first is the stated intent. A node with no check is
-        // more honest than a node gated by recall: it says "we have not defined a proof for this"
-        // rather than "answer these questions". Only real proof is persisted -- ARTIFACT (a merged
-        // PR, the preferred rung) and ATTEST (a self-confirmation for what genuinely cannot be
-        // shown in a PR: a policy read, an access granted, a person met). Anything else the AI
+        // ⚠️ Only real proof is persisted -- see HONEST_CHECK_TYPES. Anything else the AI
         // proposes as a check is dropped, and the module ships as content without a gate.
         proposed.verification
             ?.let { check -> parseVerificationType(check.type) to check }
@@ -351,10 +340,9 @@ class CompetencyModuleService(
     /**
      * Returns a live module for the hire opening it.
      *
-     * The access rule is project membership, not "this row belongs to you": the module is shared,
-     * so there is no per-user copy to match a hire against. A module that is not live is reported
-     * as absent rather than forbidden -- an unpublished draft is not something a hire is being
-     * denied, it is something that does not exist for them.
+     * ⚠️ The access rule is project membership, not "this row belongs to you" — the module is
+     * shared, so there is no per-user copy to match a hire against. A module that is not live is
+     * reported as absent rather than forbidden.
      *
      * @throws ResponseStatusException 404 if no live module has that id; 403 if the user is not a
      * member of its project.
@@ -380,10 +368,7 @@ class CompetencyModuleService(
         return module.toResponseWithJoins()
     }
 
-    /**
-     * Offers a draft for review. Separate from [approve] so the author and the approver can be
-     * different people — the whole point of a proposal-only lifecycle.
-     */
+    /** Offers a draft for review; [approve] is a separate step. */
     @Transactional
     fun propose(moduleId: UUID): CompetencyModuleResponse {
         val module = findModule(moduleId)
@@ -400,8 +385,7 @@ class CompetencyModuleService(
      * one. This is the only path by which what a hire sees changes.
      *
      * @throws ResponseStatusException 409 if the module is already archived, or if it has no
-     * pages — approving an empty module would put a node on every hire's path that opens to
-     * nothing.
+     * pages — an approved module with nothing in it opens to nothing.
      */
     @Transactional
     fun approve(moduleId: UUID): CompetencyModuleResponse {
@@ -566,8 +550,7 @@ class CompetencyModuleService(
 
     /**
      * Renumbers positions to a dense 0..n-1 sequence, keeping [movedTo] at the slot it asked for.
-     * Positions are an ordering, not identifiers, so gaps and ties are corrected on every write
-     * rather than tolerated until they surface as an arbitrary render order.
+     * ⚠️ Positions are an ordering, not identifiers: gaps and ties are corrected on every write.
      */
     private fun normalizePositions(module: CompetencyModule, movedTo: ModulePage? = null) {
         val ordered = module.pages.sortedWith(
@@ -578,8 +561,8 @@ class CompetencyModuleService(
     }
 
     /**
-     * A live or archived version is a record of what hires were taught, so it is not edited in
-     * place — a new version is created from it instead.
+     * ⚠️ A live or archived version is a record of what hires were taught: it is never edited in
+     * place, a new version is created from it instead.
      */
     private fun requireEditable(module: CompetencyModule) {
         if (module.status == ModuleStatus.ACTIVE || module.status == ModuleStatus.ARCHIVED) {
@@ -618,9 +601,8 @@ private const val MODULE = "module"
 
 /**
  * The check types module generation will persist. ARTIFACT is real proof (a merged PR); ATTEST is
- * a self-confirmation for what cannot be shown in a PR. KNOWLEDGE and EXACT are recall gates and
- * are deliberately not auto-created -- a node with no check is more honest than one gated by a quiz
- * nobody chose to write.
+ * a self-confirmation for what cannot be shown in a PR. ⚠️ KNOWLEDGE and EXACT are recall gates and
+ * are never auto-created; a module with no check ships without a gate.
  */
 private val HONEST_CHECK_TYPES = setOf(VerificationType.ARTIFACT, VerificationType.ATTEST)
 
