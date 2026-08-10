@@ -20,22 +20,15 @@ import java.util.UUID
 /**
  * Checks the arrival steps the system can observe, and records what it saw.
  *
- * ### Reading and checking are split, deliberately
+ * ⚠️ **Reading and checking are split.** [ArrivalStepService.forHire] is a pure database read and
+ * never calls anything, because the arrival card is on every hire's board and a board that waits on
+ * GitHub to open is a board nobody opens. This is what actually looks, and the client calls it once
+ * after the board has rendered.
  *
- * [ArrivalStepService.forHire] is a pure database read and never calls anything: a board that waits
- * on GitHub to open is a board nobody opens, and the arrival card is on every hire's board. This is
- * what actually looks, and the client calls it once after the board has rendered — the same split
- * the diagram card already makes between serving the picture it has and checking it is still true.
- *
- * ### Observation settles a step; failing to observe never unsettles one
- *
- * Every check answers *"can I see that this is done?"*, and no is always **"not that I can see"**.
- * Nothing here writes a negative, deletes a state row, or reverses a hire's own confirmation. A
- * GitHub outage, a rate limit and a project with no contributions yet are all indistinguishable
- * from each other at this level, and all three mean the same thing: leave it alone.
- *
- * That is the same rule the ledger, the autonomy milestone and the orientation cache all hold to —
- * an outage is not evidence about the world.
+ * ⚠️ **Observation settles a step; failing to observe never unsettles one.** Nothing here writes a
+ * negative, deletes a state row, or reverses a hire's own confirmation. A GitHub outage, a rate
+ * limit and a project with no contributions yet are indistinguishable at this level, and all three
+ * mean the same thing: leave it alone.
  */
 @Service
 class ArrivalEvidenceService(

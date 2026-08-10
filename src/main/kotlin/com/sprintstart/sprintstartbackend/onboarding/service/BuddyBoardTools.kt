@@ -17,31 +17,17 @@ import java.util.UUID
 /**
  * The buddy's board tool: putting something where the hire will still find it tomorrow.
  *
- * ### Not an action tool
+ * ⚠️ **Not an action tool.** Every tool in `BuddyActionService` proposes and waits for a button
+ * because each changes the hire's onboarding. Placing a card changes what is on a page, so this
+ * applies immediately, attributed and dismissible.
  *
- * Every tool in `BuddyActionService` proposes and waits for a button because each changes the
- * hire's onboarding. Placing a card changes what is on a page, not the onboarding, and the cost of
- * a wrong one is a dismissal — so this applies immediately, attributed and dismissible.
+ * ⚠️ **It cannot invent anything.** The tool takes a `kind` from a closed catalog and nothing else
+ * — no content, title or caption. Whatever the card ends up saying is read server-side from the
+ * same services the buddy's read tools use.
  *
- * ### Why it cannot invent anything
- *
- * The tool takes a `kind` from a closed catalog and nothing else. It cannot pass content, a title,
- * or a caption. Whatever the card ends up saying is read server-side from the same services the
- * buddy's read tools use — so the mentor decides *that* something is worth keeping, never *what it
- * says*. That is the constraint the whole board rests on.
- *
- * ### The one extension
- *
- * `DIAGRAM` takes a **subject**, because a diagram is *of* something and only the conversation
- * knows whether the mentor has been explaining authentication or the ingestion pipeline. The rule
- * it extends, stated rather than implied:
- *
- * > The model may choose the question. It never writes the answer.
- *
- * ⚠️ The subject aims retrieval and is asserted nowhere. Every box comes back derived from the
- * project's corpus with the citation proving it, and an ungrounded box is dropped — so a subject
- * the model invented cannot become a claim the model invented. It is the only argument any card
- * kind takes beyond its kind, and not a foothold for a second one.
+ * ⚠️ **`DIAGRAM`'s `subject` is the one extension, and not a foothold for a second.** It aims
+ * retrieval and is asserted nowhere: every box comes back derived from the project's corpus with
+ * the citation proving it, and an ungrounded box is dropped.
  */
 @Component
 class BuddyBoardTools(

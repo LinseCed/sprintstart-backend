@@ -10,26 +10,17 @@ import java.util.UUID
 /**
  * The last picture assembled for one [BoardCard] of kind `DIAGRAM` — a cache, and nothing more.
  *
- * ### Why a live card has a stored row at all
- *
- * Because a diagram costs an LLM call to derive and a board card hydrates on *every* page load.
- * Without this, opening the board would mean waiting on a generation, every time. So the picture is
- * cached and the cache is **validated, never trusted**: every revalidation sends
+ * A diagram costs an LLM call to derive and a board card hydrates on *every* page load, so the
+ * picture is cached — and ⚠️ **the cache is validated, never trusted**: every revalidation sends
  * [corpusFingerprint], an unchanged corpus comes back `unchanged` with no retrieval and no
- * generation, and a corpus that has moved is redrawn. The same rule `TaskOrientationService` keeps,
- * for the same reason — a diagram of code that has since changed is worse than no diagram, because
- * the reader cannot tell.
+ * generation, and a corpus that has moved is redrawn.
  *
- * The *question* is not here: it lives on [BoardCard.subject], because that is the card's identity
- * and it survives the cache being dropped.
+ * ⚠️ The *question* is not here: it lives on [BoardCard.subject], so it survives the cache being
+ * dropped.
  *
- * ### Why the picture is JSON and a note is not
- *
- * The same argument [BoardCardPayload] makes — small, read and written whole, never queried into —
- * with one consequence that runs the opposite way. A note that will not decode fails the board read
- * on purpose: it is the hire's own work, and silently blanking it would look like the board lost
- * something. A diagram that will not decode is simply a **cache miss**, redrawn on the next
- * revalidation, because everything in it is derivable and nothing in it was anybody's work.
+ * ⚠️ **A diagram that will not decode is a cache miss, not an error** — everything in it is
+ * derivable and none of it was anybody's work. (A [BoardCardPayload] that will not decode fails the
+ * board read instead, because that *is* the hire's own work.)
  */
 @Entity
 @Table(name = "board_diagrams")

@@ -15,39 +15,24 @@ import java.util.UUID
  * One thing that has to be true before a hire can work — an account, an access grant, a machine
  * that builds.
  *
- * ### What this is not
+ * ⚠️ It is **not** a gate. Nothing refuses to serve a hire because an arrival step is
+ * outstanding: "not settled" is a value in a response body, never a 403.
  *
- * ⚠️ It is **not** a gate. Nothing in the system refuses to serve a hire because an arrival step
- * is outstanding: "not settled" is a value in a response body, never a 403. "Mandatory" here means
- * somebody is expected to do this and it is tracked — being blocked by your employer must not also
- * mean being blocked by the tool.
+ * ⚠️ It is **not** per-hire content: one shared definition, with per-hire state beside it
+ * ([ArrivalStepState]).
  *
- * ⚠️ It is also **not** per-hire content. **One shared definition, and per-hire state beside it**
- * ([ArrivalStepState]) — a per-user copy would mean there was no "the step for X", only N private
- * copies nobody could maintain.
+ * ⚠️ [projectId] is nullable and **null means company-wide**, not "no scope". A hire's list is
+ * company steps plus the steps of the projects they are on, deduplicated by [key] with a
+ * project-scoped definition winning — so a project can sharpen a company step's wording without
+ * forking the key its state is stored against.
  *
- * ### Scope
- *
- * [projectId] is nullable and **null means company-wide**. Account creation and HR paperwork are
- * the same on every project; making each PM re-author them is the effort this design exists to
- * avoid. This is the fourth use of a rule already load-bearing elsewhere in this codebase —
- * *absent scope is not excluded scope* — which a null track (suits any role), unscoped corpus
- * material (visible to every project) and a null `connector_id` already follow.
- *
- * A hire's list is company steps plus the steps of the projects they are on, deduplicated by
- * [key], with a project-scoped definition winning. That lets a project sharpen a company step's
- * wording without forking the key its state is stored against.
- *
- * ### Uniqueness is enforced twice, on purpose
- *
- * A [key] must be unique within its scope, but **`NULL` does not conflict with `NULL` in Postgres**
- * — so a single unique index on `(key, project_id)` would constrain project-scoped rows and
- * silently permit unlimited duplicate company-wide ones. The
- * migration therefore declares **two partial unique indexes**, and because Hibernate cannot express
- * a partial index at all — and the test suite builds its schema from these entities, never from the
- * migrations — [com.sprintstart.sprintstartbackend.onboarding.service.ArrivalStepService] enforces
- * the same rule in code. Neither guard is redundant: the index protects the database, the service
- * protects the tests.
+ * ⚠️ **Uniqueness is enforced twice.** A [key] must be unique within its scope, but **`NULL` does
+ * not conflict with `NULL` in Postgres**, so a single unique index on `(key, project_id)` would
+ * constrain project-scoped rows and silently permit unlimited duplicate company-wide ones. The
+ * migration declares **two partial unique indexes**; Hibernate cannot express a partial index at
+ * all and the test suite builds its schema from these entities, so
+ * [com.sprintstart.sprintstartbackend.onboarding.service.ArrivalStepService] enforces the same rule
+ * in code. The index protects the database, the service protects the tests.
  */
 @Entity
 @Table(name = "arrival_steps")
@@ -57,13 +42,12 @@ class ArrivalStep(
     /**
      * The stable identifier this step is known by, immutable once created.
      *
-     * [ArrivalStepState] points at this string rather than at [id], which is the ledger pattern:
-     * a definition can be deleted and re-added without destroying what a hire already settled. That
-     * property is what has made five deletions safe across this codebase, and it is why changing a
-     * key is rejected rather than cascaded.
+     * ⚠️ [ArrivalStepState] points at this string rather than at [id], so a definition can be
+     * deleted and re-added without destroying what a hire already settled. Changing a key is
+     * rejected rather than cascaded.
      *
-     * The column name is backticked because `key` is a reserved word in several dialects (e.g. H2);
-     * that tells Hibernate to emit a dialect-appropriate quoted identifier. Same as [Competency].
+     * ⚠️ The column name is backticked because `key` is a reserved word in several dialects (e.g.
+     * H2); that tells Hibernate to emit a dialect-appropriate quoted identifier.
      */
     @Column(name = "`key`", nullable = false)
     val key: String,
@@ -81,12 +65,8 @@ class ArrivalStep(
     @Column(nullable = false)
     var position: Int = 0,
     /**
-     * How this step is settled: observed by the system, or declared by the hire.
-     *
-     * Reuses [Rigor] rather than introducing a parallel vocabulary, which also means
-     * [Rigor.ATTESTED] exists as a slot without being built — role tracks already has a real
-     * `Attestation` (a named colleague, never the hire, enforced in the service *and* a DB check),
-     * so if "IT granted access" ever wants a genuine confirmer the mechanism is there.
+     * How this step is settled: observed by the system, or declared by the hire. [Rigor.ATTESTED]
+     * is an unused slot here.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "settled_by", nullable = false)
@@ -94,27 +74,22 @@ class ArrivalStep(
     /**
      * Whether the hire may settle this step by saying so.
      *
-     * Separate from [settledBy] because observation and self-confirmation are not alternatives for
-     * every step. "Your machine builds the project" is something the system can sometimes *observe*
-     * — they authored work, so it evidently did — but never *refute*: no contribution yet says
-     * nothing about whether the environment runs. So that step is derived **and** self-confirmable.
+     * ⚠️ **Not a synonym for [settledBy].** "Your machine builds" is observable but never
+     * *refutable* — no contribution yet says nothing about the environment — so it is derived
+     * **and** self-confirmable. "You have a GitHub account we can attribute work to" is the
+     * opposite: the check is definitive, so letting somebody assert it would let them declare away
+     * the one thing their work being credited depends on.
      *
-     * "You have a GitHub account we can attribute work to" is the opposite: the check is definitive,
-     * so letting somebody assert it would let them declare away the one thing that has to be true
-     * for their work to be credited to them.
-     *
-     * **Defaults to true**, which is the safe direction: a step that nothing observes and nobody may
-     * tick can never be settled at all, which is a worse failure than one settled too easily.
+     * **Defaults to true**: a step that nothing observes and nobody may tick can never be settled
+     * at all.
      */
     @Column(name = "self_confirmable", nullable = false)
     var selfConfirmable: Boolean = true,
     /**
      * Who authored this step.
      *
-     * Nothing generates arrival steps — account creation is a fact about a company, not something
-     * derivable from a corpus — so every row is `PM` today. ⚠️ The field mirrors [Competency] and
-     * `ModulePage` so that if generation ever arrives it cannot silently overwrite somebody's
-     * wording.
+     * Nothing generates arrival steps, so every row is `PM` today. ⚠️ The field exists so that if
+     * generation ever arrives it cannot silently overwrite somebody's wording.
      */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
