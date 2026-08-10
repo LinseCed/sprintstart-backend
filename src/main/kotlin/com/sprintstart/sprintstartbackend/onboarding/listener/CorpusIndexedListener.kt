@@ -14,28 +14,20 @@ import org.springframework.transaction.event.TransactionalEventListener
 /**
  * Turns "somebody connected a repository" into "the project has a vocabulary and material".
  *
- * Onboarding setup is a consequence of the corpus existing rather than a checklist a PM works
- * through. Nothing here is approved by anyone — the gate is grounding, applied inside the
- * generator.
+ * Nothing here is approved by anyone — the gate is grounding, applied inside the generator.
  *
- * ### Fire and forget, deliberately
+ * ⚠️ **Fire and forget**: `AFTER_COMMIT`, then a coroutine on the application scope. A crawl must
+ * not wait on generation and a failed generation must not fail the crawl. The consequence to accept
+ * is that a generation which dies leaves the vocabulary un-regenerated until the next crawl.
  *
- * Generation takes model calls and minutes; a crawl must not wait on it, and a failure must not fail
- * the crawl. This mirrors `IngestionEventListener`: `AFTER_COMMIT`, then a coroutine on the
- * application scope. The consequence to accept is that a generation which dies leaves the corpus
- * indexed and the vocabulary un-regenerated until the next crawl — recoverable, and quieter than
- * rolling back an ingestion because a model was unavailable.
+ * ⚠️ **Order matters: vocabulary, then modules, then claimable work.** A module hangs off a
+ * competency and a mined task is tagged with competency keys, so the vocabulary goes first or the
+ * other two describe a vocabulary that does not exist yet. Each pass is independent after that —
+ * one failing does not cancel the others.
  *
- * ### Vocabulary, then modules, then claimable work
- *
- * A module hangs off a competency and a mined task is tagged with competency keys, so the
- * vocabulary goes first or the other two describe a vocabulary that does not exist yet. Each pass
- * is independent after that: one failing does not cancel the others, because a project with tasks
- * and no modules is more useful than a project with neither.
- *
- * ⚠️ The two passes are guarded differently, on purpose: the vocabulary is fingerprint-guarded and
- * does nothing when the corpus has not moved, while the module pass is guarded by "this competency
- * has no module" and keeps chipping at the backlog on every run.
+ * ⚠️ The two passes are guarded differently: the vocabulary is fingerprint-guarded and does nothing
+ * when the corpus has not moved, while the module pass is guarded by "this competency has no
+ * module" and keeps chipping at the backlog on every run.
  */
 @Component
 class CorpusIndexedListener(
@@ -52,8 +44,8 @@ class CorpusIndexedListener(
             try {
                 vocabularyGenerationService.generate()
             } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-                // The module pass still runs: competencies from earlier crawls may have no material,
-                // and that backlog is worth clearing even when today's generation could not.
+                // ⚠️ The module pass still runs: competencies from earlier crawls may have no
+                // material, and that backlog is worth clearing even when today's generation failed.
                 logger.error("Vocabulary generation failed after run {}", event.runId, e)
             }
 
@@ -66,8 +58,7 @@ class CorpusIndexedListener(
             }
 
             try {
-                // Mined tasks are live on arrival, so this is the last thing standing between
-                // "a repository is connected" and "a hire has something to claim".
+                // Mined tasks are live on arrival -- nothing gates them behind a review.
                 starterWorkTaskProposalService.generate()
             } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
                 logger.error("Starter-work mining failed after run {}", event.runId, e)

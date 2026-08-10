@@ -21,24 +21,16 @@ import java.util.UUID
  * that must be requested by hand would leave the buddy with a longer list of things it cannot teach.
  * This closes that: every competency on a project ends up with material, without anyone asking.
  *
- * ### It publishes, and that is the point
+ * A generated module lands **live**, not as a draft in a queue: the gate is grounding, so the AI
+ * drops any page it cannot cite and returns nothing at all when it cannot ground the module.
  *
- * A generated module lands **live**, not as a draft in a queue. The gate is grounding: the AI drops
- * any page it cannot cite and returns nothing at all when it cannot ground the module, so what
- * arrives is already evidence-backed. A human may correct it and never has to.
+ * ⚠️ **It refuses to touch a module anybody has edited.** One `PM` page in the live version and the
+ * whole module is left alone.
  *
- * ### What it refuses to touch
- *
- * **A module anybody has edited.** If the live version has a single `PM` page, this leaves the
- * whole module alone — regenerating over it would discard the edit.
- *
- * ### Why it is capped
- *
- * One crawl must not become an unbounded model bill: a fresh project with sixty competencies would
- * otherwise fire sixty generations the moment somebody connects a repository. Uncovered
- * competencies are taken in a stable order and the rest wait for the next run — the pass is
- * deliberately *not* fingerprint-guarded, so an unchanged corpus still makes progress through the
- * backlog rather than stalling forever at the cap.
+ * ⚠️ **Capped per run**, so one crawl cannot become an unbounded model bill. Uncovered competencies
+ * are taken in a **stable order** and the rest wait for the next run — and the pass is *not*
+ * fingerprint-guarded, so an unchanged corpus still makes progress through the backlog rather than
+ * stalling forever at the cap.
  */
 @Service
 class ModuleBackfillService(

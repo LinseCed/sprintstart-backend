@@ -27,20 +27,14 @@ import java.time.Instant
  * button, and nobody approves the result. The gate is **grounding, not a click** — a competency that
  * cannot cite a chunk never reaches this service, and one that can is published.
  *
- * ### The two things it must not destroy
- *
- * Auto-generation is only safe because of two protections:
+ * ⚠️ **Two things it must never destroy:**
  * - **A `PM` row is never touched.** Somebody corrected it, and regeneration overwriting that would
  *   mean the correction quietly never happened.
  * - **A tombstoned key is never resurrected.** The generator is told about them, but being told is
- *   not the same as being prevented, so the persister refuses them too. Belt and braces on purpose:
- *   this is the layer that owns the database.
+ *   not the same as being prevented, so the persister refuses them too.
  *
- * ### Transaction shape
- *
- * Read tx → AI call outside any transaction → write tx, the same split every other AI-calling
- * service here uses. Holding a transaction open across a model call would pin a connection for the
- * length of a generation.
+ * ⚠️ Read tx → AI call outside any transaction → write tx. Holding a transaction open across a
+ * model call would pin a connection for the length of a generation.
  */
 @Service
 class VocabularyGenerationService(
