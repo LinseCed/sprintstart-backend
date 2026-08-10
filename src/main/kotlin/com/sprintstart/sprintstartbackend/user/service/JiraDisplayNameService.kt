@@ -13,19 +13,16 @@ import org.springframework.web.server.ResponseStatusException
  * this value is what attributes an ingested Jira issue to a hire, so getting it wrong is a
  * measurement bug, not a cosmetic profile flaw. One writer, however many entry points.
  *
- * ### Why the rules differ from a GitHub login
+ * ⚠️ **Not lower-cased**, unlike a GitHub login: this is a person's name, matched against what
+ * Jira renders, so folding case would both misspell somebody and stop matching.
  *
- * **It is not lower-cased.** A GitHub login is case-insensitive at the source, so folding case
- * there loses nothing. A Jira display name is a *person's name*, rendered back to them and matched
- * against what Jira renders — folding it would both misspell somebody and stop matching.
+ * ⚠️ **No syntax rule.** Anything Jira renders is a valid display name; a pattern would reject real
+ * people for looking wrong to a regex.
  *
- * **There is no syntax rule.** Anything Jira renders is a valid display name; inventing a pattern
- * would reject real people for looking wrong to a regex.
- *
- * ⚠️ **The one thing this cannot defend against is a namesake inside Jira.** Uniqueness here means
- * no two *SprintStart users* claim one name. If two Jira accounts genuinely share a display name,
- * nothing ingested distinguishes them — the connector drops Jira's `accountId` at parse time — and
- * their work would land on one record. Parsing that id is the fix when somebody hits it.
+ * ⚠️ **It cannot defend against a namesake inside Jira.** Uniqueness here means no two *SprintStart
+ * users* claim one name. Two Jira accounts genuinely sharing a display name are indistinguishable —
+ * the connector drops Jira's `accountId` at parse time — and their work lands on one record.
+ * Parsing that id is the fix when somebody hits it.
  */
 @Service
 class JiraDisplayNameService(

@@ -34,12 +34,9 @@ data class SetupRungResponse(
 /**
  * Whether a stage is in the state a ready project has.
  *
- * ### There is no third value, and there must not be one
- *
- * ⚠️ A `BLOCKED` state would render as a padlock on the one surface whose entire point is that
- * **nothing here gates anything**. Keeping it out of the enum rather than merely unused is what
- * makes "no state gates onboarding" enforceable instead of a comment — a value lying around is an
- * invitation, and a gate is one convenient assignment away.
+ * ⚠️ **There is no third value, and there must not be one.** A `BLOCKED` state would render as a
+ * padlock on the one surface whose entire point is that **nothing here gates anything**. Keeping it
+ * out of the enum rather than merely unused is what makes that enforceable rather than a comment.
  *
  * @property OK This stage is in the state a ready project has.
  * @property WARN It is not, yet. Never a lock and never a chore — most of what lands here follows

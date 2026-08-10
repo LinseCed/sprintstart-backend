@@ -11,25 +11,16 @@ import java.time.Instant
 /**
  * Turns an ingested tracked issue into the four moments onboarding measures.
  *
- * ### Why this is its own component
- *
- * A pull request arrives with its lifecycle already flattened into columns — `mergedAtSource`,
- * `firstResponseAtSource`, `changesRequestedCount` — because ingestion had somewhere to put them. A
- * tracked issue has none of that: everything is a changelog to be walked. Keeping the walk here
- * rather than inside the API service is what lets it be tested against a changelog directly, and it
- * is the only part of Jira evidence with any judgement in it.
- *
- * ### What the changelog can and cannot answer
+ * A pull request arrives with its lifecycle flattened into columns; a tracked issue is a changelog
+ * to be walked, and this is the only part of Jira evidence with any judgement in it.
  *
  * ⚠️ **Comments carry no timestamp.** The ingested `JiraIssueComment` has an author and a body and
- * nothing else, so "the first time somebody replied" cannot come from comments at all. First
- * response is therefore *the first time somebody other than the assignee touched the issue* — a
- * changelog entry of theirs. That is a narrower reading than a comment, and it is the one the data
- * supports.
+ * nothing else, so first response is *the first time somebody other than the assignee touched the
+ * issue* — a changelog entry of theirs, which is narrower than a comment and what the data supports.
  *
  * ⚠️ **"Done" is a status category, not a resolution.** Jira files "Won't Do" under the same Done
- * category as "Done", and the connector does not parse the resolution field — so an abandoned issue
- * and a finished one are indistinguishable here. Nothing is therefore reported as abandoned; the
+ * category as "Done" and the connector does not parse the resolution field, so an abandoned issue
+ * and a finished one are indistinguishable here. **Nothing is reported as abandoned** — the
  * alternative is guessing from status *names*, which are whatever each team typed.
  */
 @Component

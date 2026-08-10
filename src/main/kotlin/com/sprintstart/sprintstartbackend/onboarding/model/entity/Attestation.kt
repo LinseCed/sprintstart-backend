@@ -13,27 +13,16 @@ import java.util.UUID
 /**
  * A named person confirming that a hire did a piece of real work, and that it met the bar.
  *
- * ### Why this is a table when contributions are derived
+ * A table rather than a derivation because it is the one piece of evidence that exists nowhere
+ * else: nobody records "the retro was well run" until somebody is asked.
  *
- * Everything the ramp reads is composed on read from facts that already live somewhere durable — a
- * pull request, an assignment, a claimed goal. An attestation is the first piece of evidence that
- * exists nowhere else: nobody records "the retro was well run" until somebody is asked. That is
- * what earns it a table rather than a derivation.
+ * ⚠️ **[attesterId] must be a different person from [hireId]**, enforced at the service boundary.
+ * Letting a hire sign off their own work here would put the weakest possible evidence under the
+ * metric onboarding is judged on while calling it something stronger.
  *
- * ### The one rule that makes it evidence rather than a formality
- *
- * [attesterId] is a **different person** from [hireId], enforced at the service boundary. Self-
- * attestation already exists one rung down the ladder as
- * [com.sprintstart.sprintstartbackend.onboarding.external.enums.VerificationType.ATTEST], and
- * quietly letting a hire sign off their own work here would put the weakest possible evidence under
- * the metric onboarding is judged on while calling it something stronger.
- *
- * ### Rework is counted, not smoothed over
- *
- * A returned attestation goes back to [AttestationState.REQUESTED] and increments
- * [returnedCount], exactly as a pull request sent back for changes does. Autonomy asks whether the
- * last piece of work needed no rework, and an attestation that took three passes must not read like
- * one that took none.
+ * ⚠️ **Rework is counted, not smoothed over.** A returned attestation goes back to
+ * [AttestationState.REQUESTED] and increments [returnedCount], exactly as a pull request sent back
+ * for changes does — an attestation that took three passes must not read like one that took none.
  */
 @Entity
 @Table(name = "attestations")

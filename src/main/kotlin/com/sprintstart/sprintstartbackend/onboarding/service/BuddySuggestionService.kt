@@ -13,27 +13,19 @@ import java.util.UUID
  * überhaupt über den Chat geht, dann wird es kaum verwendet werden."* A chip answers the second
  * half of that — it is a person looking at an empty composer with no idea what goes in it.
  *
- * ### Derived from what is mounted, never listed independently
+ * ⚠️ **Derived from what is mounted, never listed independently.** Every chip names a tool and is
+ * offered **only when that tool is mounted for this hire** — the same per-hire gate
+ * [BuddyToolExecutor.toolSpecs] applies. Deriving rather than listing is what makes the two
+ * incapable of disagreeing, and a chip is louder than a tool because the hire sees it.
  *
- * Every chip names a tool, and a chip is offered **only when that tool is mounted for this hire** —
- * the same per-hire gate [BuddyToolExecutor.toolSpecs] already applies. This is not tidiness:
- * offering a Scrum Master *"which of my pull requests are waiting?"* is the invisible-hire failure
- * in a new place, and **louder than the tool version, because a chip is something the hire sees**.
- * Deriving rather than listing is what makes the two incapable of disagreeing.
+ * Order follows the spec list, so arrival comes first.
  *
- * Order follows the spec list, so arrival comes first: what has to be true before somebody can
- * work comes before how their work is going.
+ * ⚠️ **No action tools.** `claim_goal`, `request_attestation` and the rest are proposed by the
+ * mentor and confirmed by the hire; a chip naming one would read as a button that does it. A chip
+ * asks a question.
  *
- * ### What is deliberately not here
- *
- * **No action tools.** `claim_goal`, `request_attestation` and the rest are proposed by the mentor
- * and confirmed by the hire; a chip that named one would read as a button that does it, which is
- * the one shape the board's design has already rejected. A chip asks a question. The mentor decides
- * whether an action follows, and the hire still confirms it.
- *
- * **No `search_canonical_answers`, no `place_card`.** Neither is a question a hire arrives with —
- * the first needs a query only they can supply, and the second is something the mentor does *to*
- * the board rather than something to ask about.
+ * **No `search_canonical_answers`, no `place_card`** — the first needs a query only the hire can
+ * supply, and the second is something the mentor does *to* the board.
  */
 @Service
 class BuddySuggestionService(
