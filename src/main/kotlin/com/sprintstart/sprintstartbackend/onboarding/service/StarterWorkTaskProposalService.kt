@@ -42,7 +42,7 @@ import java.util.UUID
 /**
  * Orchestrates AI-mined starter-work task proposals, PM review, and hire-fit matching.
  *
- * Reviewing a proposal marks the row and nothing else -- a goal points at the task itself.
+ * Reviewing a proposal marks the row and nothing else.
  *
  * [StarterWorkTaskProposal.competencyKeys] is one of the four signals [StarterWorkMatcher] ranks a
  * task by. ⚠️ It says what the work exercises; it does not gate who may claim it.
@@ -71,12 +71,9 @@ class StarterWorkTaskProposalService(
     /**
      * Triggers AI starter-work mining and persists the results as `LIVE`.
      *
-     * Issues already in the pool (`LIVE` -- not `REJECTED`, so a rejection doesn't permanently
-     * block re-mining if circumstances change) and the current live
-     * competency keys are sent to the stateless AI service so it can dedupe and ground competency
-     * tags. The AI call runs outside any transaction.
-     *
-     * @return Summary of how many tasks were newly proposed.
+     * Issues already decided (`LIVE` or `REJECTED`) and the current live competency keys are sent
+     * to the stateless AI service so it can dedupe and ground competency tags. ⚠️ The AI call runs
+     * outside any transaction.
      */
     suspend fun generate(): GenerateStarterWorkResponse {
         val (activeSourceIds, activeCompetencyKeys) = withContext(Dispatchers.IO) {
@@ -99,11 +96,10 @@ class StarterWorkTaskProposalService(
     /**
      * The streaming twin of [generate].
      *
-     * Relays the AI's `stage`/`item` events so a PM watches the pool fill one task at a time, and
-     * on the terminal `done` persists the tasks through the very same [persistProposals] the sync
-     * path uses — so the stored pool equals the non-streaming path (invariant 2). A task the backend
-     * re-gates away on persist (already pooled) is announced as a `warning` before the `done`, never
-     * silently dropped (invariant 1). A stream failure becomes a synthesised terminal `error`.
+     * Relays the AI's `stage`/`item` events, and on the terminal `done` persists through the very
+     * same [persistProposals] the sync path uses, so the stored pool is identical either way. ⚠️ A
+     * task the backend re-gates away on persist (already pooled) is announced as a `warning` before
+     * the `done`, never silently dropped. A stream failure becomes a synthesised terminal `error`.
      */
     suspend fun streamGenerate(): Flow<AiProgressEvent> {
         val active = withContext(Dispatchers.IO) { readTxTemplate.execute { loadActiveState() }!! }
@@ -151,15 +147,14 @@ class StarterWorkTaskProposalService(
 
     /**
      * Persists the outcome's tasks as `LIVE` rows, re-applying the backend's own dedup: a task
-     * whose issue is already in the pool is not mined again. The AI dedupes against the active pool
-     * the caller sends, but this is the authoritative check at write time -- and it closes the
-     * window where two mining runs could double-pool an issue. Returns how many landed and a human
-     * note per skipped task, so the streaming path can surface each skip as a `warning`.
+     * whose issue is already in the pool is not mined again. ⚠️ The AI dedupes against the active
+     * pool the caller sends, but this is the authoritative check at write time — it closes the
+     * window where two mining runs could double-pool an issue. Returns how many landed and a note
+     * per skipped task, so the streaming path can surface each skip as a `warning`.
      */
     private fun persistProposals(outcome: StarterWorkOutcome): PersistResult {
-        // REJECTED counts as already-pooled, which is what makes a rejection **sticky**: a task
-        // somebody turned down must not be mined back into existence on the next crawl, or they
-        // turn it down again, forever. The row survives precisely so this check can see it.
+        // REJECTED counts as already-pooled: a rejection is sticky, so a task somebody turned
+        // down must never be mined back into existence.
         val alreadyPooled = starterWorkTaskProposalRepository
             .findAllByStatusIn(listOf(ProposalStatus.LIVE, ProposalStatus.REJECTED))
             .map { it.sourceId }
@@ -179,8 +174,7 @@ class StarterWorkTaskProposalService(
                     rationale = proposed.rationale.takeIf { it.isNotBlank() },
                     sourceUrl = proposed.citations.firstOrNull()?.sourceUrl,
                     competencyKeys = proposed.competencyKeys.toMutableList(),
-                    // Claimable immediately, and honest about nobody having looked yet. The
-                    // matcher demotes it until somebody does.
+                    // Claimable immediately; the matcher demotes it until somebody reviews it.
                     reviewed = false,
                 ),
             )
@@ -208,9 +202,8 @@ class StarterWorkTaskProposalService(
     /**
      * Returns the live starter-work pool, for a PM choosing a task to author orientation for.
      *
-     * The whole live set, ordered by title, not scoped to a project: tasks are a global
-     * pool (the entity has no `projectId`), and orientation is per-`(task, project)` only because the
-     * corpus a packet is grounded in is per-project.
+     * The whole live set, ordered by title and ⚠️ not scoped to a project — tasks are a global
+     * pool (the entity has no `projectId`).
      */
     @Transactional(readOnly = true)
     fun listPool(): List<StarterWorkTaskProposalResponse> =
@@ -222,9 +215,8 @@ class StarterWorkTaskProposalService(
     /**
      * Records that a person has looked at this task and is happy with it.
      *
-     * It was already claimable — reviewing does not admit it to the pool, it lifts the demotion
-     * `StarterWorkMatcher` applies while nobody has vouched for it. Idempotent: reviewing twice is
-     * the same statement made twice.
+     * ⚠️ Reviewing does not admit the task to the pool — it was already claimable. It lifts the
+     * demotion [StarterWorkMatcher] applies while nobody has vouched for it. Idempotent.
      *
      * @throws ResponseStatusException 404 if no task matches [id]; 409 if it was rejected.
      */
@@ -239,12 +231,9 @@ class StarterWorkTaskProposalService(
     /**
      * Creates a hand-authored starter-work task, with no AI mining in the loop.
      *
-     * Born reviewed and materialised straight away: writing a task is vouching for it, so it never
-     * joins the unreviewed queue. The task
-     * has no ingested source, so a stable synthetic [sourceId] is minted -- unique per task, and by
-     * design not a `github:owner/name:...` id, so fit-ranking's repository-responsiveness and
-     * ingested-label lookups simply find nothing for it rather than misattributing it, both of which
-     * already degrade gracefully to "no signal".
+     * Born reviewed: writing a task is vouching for it, so it never joins the unreviewed queue.
+     * The task has no ingested source, so a synthetic source id is minted — see
+     * `HAND_AUTHORED_SOURCE_PREFIX` for why its shape matters.
      *
      * @throws ResponseStatusException 400 if the title is blank.
      */
@@ -262,8 +251,6 @@ class StarterWorkTaskProposalService(
                 sourceUrl = request.sourceUrl?.trim()?.takeIf { it.isNotBlank() },
                 competencyKeys = request.competencyKeys.toMutableList(),
                 status = ProposalStatus.LIVE,
-                // Somebody wrote it, so it is reviewed by construction -- there is nothing to
-                // vouch for back to them.
                 reviewed = true,
                 decidedAt = Instant.now(),
                 onboardingTrackKey = request.onboardingTrackKey?.trim()?.takeIf { it.isNotBlank() },
@@ -275,19 +262,13 @@ class StarterWorkTaskProposalService(
     /**
      * The open issues in a project's corpus, each marked with where it stands in the pool.
      *
-     * Deterministic and LLM-free: this is the same material mining reads, shown to a person
-     * instead. Nothing is scored, because the judgement being made here is the reader's.
+     * Deterministic and LLM-free: the same material mining reads, shown to a person instead.
      *
-     * ⚠️ **Assigned issues are returned, marked, and so are issues already pooled or removed.** The
-     * filtering is the client's to do, and it can only offer an honest filter if it is holding the
-     * things being filtered: an issue that simply is not in the list gives a PM no way to tell
-     * "somebody else has this" from "not ingested". [CandidatePoolState] and the three-valued
-     * `hasAssignee` carry that, so nothing has to be inferred from an absence.
+     * ⚠️ Assigned issues are returned, and so are issues already pooled or removed — filtering is
+     * the client's to do. [CandidatePoolState] and the three-valued `hasAssignee` carry that, so an
+     * absence from the list never has to stand in for "somebody else has this".
      *
-     * Ordered newest-changed first, which is a fact about the issues rather than an opinion about
-     * them; ties fall back to the source id so the order is stable across calls.
-     *
-     * @param projectId The project whose ingested issues to browse.
+     * Ordered newest-changed first; ties fall back to the source id so the order is stable.
      */
     @Transactional(readOnly = true)
     fun listCandidates(projectId: UUID): List<StarterWorkCandidateResponse> {
@@ -298,8 +279,7 @@ class StarterWorkTaskProposalService(
         return artifactIngestionApi
             .getOpenIssues(projectId)
             .mapNotNull { issue ->
-                // A title is what a person picks from, and there is nothing sensible to render for
-                // an issue that has none -- so it is dropped rather than shown as an empty row.
+                // An issue with no title is dropped rather than shown as an empty row.
                 val title = issue.title?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 val body = issue.body?.takeIf { it.isNotBlank() }
                 StarterWorkCandidateResponse(
@@ -329,24 +309,16 @@ class StarterWorkTaskProposalService(
     /**
      * Puts one browsed corpus issue into the pool, live and reviewed.
      *
-     * Deliberately the same landing place as [createTask]: somebody looked at this issue and vouched
-     * for it, which is the whole content of "reviewed". ⚠️ **This is not an approval gate in front
-     * of mining** — mining keeps landing tasks live without anybody's involvement, and this only
-     * adds a way in for an issue mining did not pick.
+     * The same landing place as [createTask]: somebody looked at this issue and vouched for it.
+     * ⚠️ This is not an approval gate in front of mining — mining keeps landing tasks live without
+     * anybody's involvement, and this only adds a way in for an issue mining did not pick.
      *
      * The title and link come from the ingested issue, so the pool cannot disagree with the tracker
      * about what an issue is called.
      *
-     * **What it refuses, and what it deliberately does not:**
-     * - An issue **already in the pool** is a 409 rather than a second row, and one **removed from
-     *   the pool** is a 409 too: rejection is sticky, and letting promotion undo it by accident
-     *   would mean somebody re-rejecting the same issue after every crawl.
-     * - An issue that is **closed at its source** is a 409. Work that is already done is the one
-     *   thing a newcomer must not be handed, and the browser only lists open issues, so this can
-     *   only be reached by a race or a stale page.
-     * - An **assigned** issue is accepted. Mining skips those because it cannot ask anybody; a
-     *   person promoting one can see who holds it and has decided anyway. That override is the
-     *   reason the browser shows them at all.
+     * Refuses an issue **already in the pool** or **removed from** it (409 — rejection is sticky,
+     * and promotion must not undo it), and one **closed at its source** (409). ⚠️ An **assigned**
+     * issue is accepted: mining skips those, and a person promoting one can see who holds it.
      *
      * @throws ResponseStatusException 404 if no issue with that source id is ingested; 400 if the
      * ingested issue has no title; 409 if it is already pooled, was removed, or is closed.
@@ -363,8 +335,7 @@ class StarterWorkTaskProposalService(
                 sourceId = sourceId,
                 title = title,
                 summary = request.summary?.trim()?.takeIf { it.isNotBlank() },
-                // Nothing judged this issue, so there is no rationale to state. Writing one here
-                // would be the app putting words in the promoter's mouth.
+                // Nothing judged this issue, so there is no rationale to state.
                 rationale = null,
                 sourceUrl = issue.sourceUrl,
                 competencyKeys = request.competencyKeys.toMutableList(),
@@ -384,8 +355,7 @@ class StarterWorkTaskProposalService(
                 HttpStatus.NOT_FOUND,
                 "No ingested issue found with source id: $sourceId",
             )
-        // Only a definite "CLOSED" refuses. A row whose state was never captured is unknown, and
-        // refusing on unknown would make an un-promotable issue out of one nobody can check.
+        // ⚠️ Only a definite "CLOSED" refuses — an uncaptured state is unknown, never "closed".
         if (CLOSED_STATE.equals(issue.state, ignoreCase = true)) {
             throw ResponseStatusException(
                 HttpStatus.CONFLICT,
@@ -421,10 +391,8 @@ class StarterWorkTaskProposalService(
     /**
      * Takes a task out of the pool, permanently.
      *
-     * **Sticky**: the row is kept and mining consults it, so a task somebody turned down is never
-     * mined back into existence — otherwise they would turn it down again after every crawl. Same
-     * rule as a competency tombstone, expressed here as a status rather than a separate table
-     * because the row is already keyed by the `sourceId` mining deduplicates on.
+     * ⚠️ **Sticky**: the row is kept and mining consults it, so a task somebody turned down is
+     * never mined back into existence.
      *
      * @throws ResponseStatusException 404 if no task matches [id]; 409 if it was already rejected.
      */
@@ -440,12 +408,8 @@ class StarterWorkTaskProposalService(
     /**
      * Ranks the current `LIVE` starter-work pool by fit for the authenticated user on a project.
      *
-     * A hire must be told in one line why a task was suggested, and an embedding distance cannot
-     * say. The ranking is deterministic, local and self-explaining (see [StarterWorkMatcher]) —
-     * which also keeps a network round trip off a hire's request path.
-     *
-     * Project-scoped, unlike the previous version: two of the signals (prior involvement and
-     * repository responsiveness) are only meaningful inside one project's ingested corpus.
+     * Deterministic, local and self-explaining (see [StarterWorkMatcher]): no model call on a
+     * hire's request path, and every task carries the sentence justifying its rank.
      *
      * @throws ResponseStatusException 404 if no user matches [authId].
      */
@@ -461,11 +425,8 @@ class StarterWorkTaskProposalService(
      * Ranks the current `LIVE` starter-work pool by fit for an already-resolved user on a
      * project.
      *
-     * The user-id counterpart of [matchForUser], for callers that hold a user id rather than an auth
-     * subject (e.g. the buddy agent ranking tasks for the caller).
-     *
-     * @param userId Internal SprintStart user identifier.
-     * @param projectId The project whose responsiveness/involvement signals score the pool.
+     * The user-id counterpart of [matchForUser], for callers that hold a user id rather than an
+     * auth subject (e.g. the buddy agent ranking tasks for the caller).
      */
     @Transactional(readOnly = true)
     fun matchForUserId(userId: UUID, projectId: UUID): List<RankedStarterWorkTaskResponse> {
@@ -492,20 +453,14 @@ class StarterWorkTaskProposalService(
                     reasons = scored.reasons,
                 )
             }
-            // Ties broken by the oldest task first, so the ranking is stable across calls rather
-            // than reshuffling equally-good suggestions every time the hire reloads.
+            // Ties broken by title, so the ranking is stable across reloads.
             .sortedWith(compareByDescending<RankedStarterWorkTaskResponse> { it.score }.thenBy { it.task.title })
     }
 
     /**
-     * The approved tasks worth suggesting to this hire: their own track's, plus every unscoped one.
+     * The tasks worth suggesting to this hire: their own track's, plus every unscoped one.
      *
-     * Filtering here rather than scoring it as a signal is deliberate. A task for another role is
-     * not a *worse* suggestion, it is the wrong job — offering a Scrum Master "fix the null pointer
-     * in checkout", however far down the list, is noise that costs trust in everything above it.
-     *
-     * An **unscoped** task stays in every hire's pool. Null means "any track", which is how every
-     * task behaved before tracks existed and the only honest reading of a mined issue: mining
+     * ⚠️ A null `onboardingTrackKey` means "any track" and stays in every hire's pool — mining
      * cannot know which role an issue suits, so it must not pretend to.
      */
     private fun suggestablePool(userId: UUID, projectId: UUID): List<StarterWorkTaskProposal> {
@@ -519,13 +474,11 @@ class StarterWorkTaskProposalService(
     /**
      * What is known about one hire, from data already held.
      *
-     * The GitHub-history half is **consent-gated and may simply be absent**; an empty prior means
-     * *no evidence*, never "beginner" — the same rule the assessment interviewer follows, and for
-     * the same reason: otherwise the feature meant to help new joiners punishes them.
+     * ⚠️ The GitHub-history half is consent-gated and may simply be absent. An empty prior means
+     * *no evidence*, never "beginner".
      */
     private fun buildProfile(userId: UUID): StarterWorkMatcher.HireProfile {
-        // Level 0 means "unknown/not yet placed" -- such a ledger row is not a competency the
-        // hire has met, so it must not count toward fit.
+        // Level 0 means "unknown/not yet placed", not a competency the hire has met.
         val competencyKeys = userCompetencyStateRepository
             .findAllByUserId(userId)
             .filter { it.level > 0 }
@@ -547,8 +500,8 @@ class StarterWorkTaskProposalService(
             competencyKeys = competencyKeys,
             familiarRepositories = repositories,
             familiarLabels = labels,
-            // Derived from the same labels rather than stored separately, so a hire's task-type
-            // familiarity and a task's type are always read off the same vocabulary.
+            // Derived from the same labels a task's type is read from, so the two cannot
+            // disagree about the vocabulary.
             familiarTaskTypes = labels
                 .mapNotNull { label ->
                     TaskType.fromLabels(listOf(label)).takeIf { it != TaskType.OTHER }
@@ -559,10 +512,9 @@ class StarterWorkTaskProposalService(
     /**
      * The ranking features of one pool task.
      *
-     * Labels and repository come from the **ingested issue**, not from the proposal row: mining
-     * stored a title, a summary and competency tags, but the issue's own labels are what the
-     * project actually says this work is. Falls back to no labels when the issue is no longer
-     * ingested, which costs the task its type signal rather than inventing one.
+     * ⚠️ Labels and repository come from the ingested issue, not from the proposal row. Falls back
+     * to no labels when the issue is no longer ingested, costing the task its type signal rather
+     * than inventing one.
      */
     private fun featuresOf(proposal: StarterWorkTaskProposal): StarterWorkMatcher.TaskFeatures {
         val source = artifactIngestionApi.getTaskSource(proposal.sourceId)
@@ -598,10 +550,10 @@ class StarterWorkTaskProposalService(
         private const val LABEL_SIGNAL_PREFIX = "label:"
 
         /**
-         * Source-id namespace for a hand-authored task, deliberately not the `github:owner/name:...`
-         * shape a mined task carries. [repositoryOf] finds no `owner/name` in it (so fit-ranking
-         * attaches no repository-responsiveness signal) and `ArtifactIngestionApi.getTaskSource`
-         * finds no ingested artifact -- both degrade to "no signal" rather than misattributing.
+         * Source-id namespace for a hand-authored task. ⚠️ Not the `github:owner/name:...` shape a
+         * mined task carries: [repositoryOf] finds no `owner/name` in it and
+         * `ArtifactIngestionApi.getTaskSource` finds no ingested artifact, so both degrade to "no
+         * signal" rather than misattributing.
          */
         private const val HAND_AUTHORED_SOURCE_PREFIX = "authored:"
 
@@ -609,11 +561,8 @@ class StarterWorkTaskProposalService(
         private const val CLOSED_STATE = "CLOSED"
 
         /**
-         * How much of a browsed issue's body a list row carries.
-         *
-         * A browser over an organisation-sized corpus is thousands of rows, and an issue body is by
-         * far the largest thing on one. Enough to judge scope, and the response says outright when
-         * something was cut rather than letting a reader mistake a truncated body for a short one.
+         * How much of a browsed issue's body a list row carries. ⚠️ The response flags when
+         * something was cut, so a truncated body is never mistaken for a short one.
          */
         private const val CANDIDATE_EXCERPT_CHARS = 600
     }

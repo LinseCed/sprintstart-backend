@@ -40,13 +40,10 @@ import java.util.UUID
  * ([UserCompetencyState]).
  *
  * Per-project: a hire runs this interview once per project they are on, not once ever. Candidate
- * competencies are the [CompetencyKind.SKILL] nodes that project actually teaches -- the keys of
- * its live [com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule]s, the same
- * association the project's path already points modules through -- not the whole global catalog, so
- * a hire on the frontend project is never interviewed on a backend-only project's competencies. The
- * placement it writes still lands on the global ledger: "earn once, transfers across projects" is
- * unchanged, only the interview itself is scoped. `repo_signal` stays the empty placeholder, since
- * nothing in `ingestion` aggregates languages/frameworks yet.
+ * competencies are the [CompetencyKind.SKILL] keys that project's live
+ * [com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule]s teach, never the
+ * whole global catalog. ⚠️ The placement it writes still lands on the *global* ledger — "earn
+ * once, transfers across projects".
  */
 @Suppress("TooManyFunctions")
 @Service
@@ -63,8 +60,7 @@ class AssessmentService(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     // ⚠️ The AI call is a long-running suspend operation and must not run inside a transaction --
-    // it would pin a DB connection for its whole duration. DB reads/writes bracket it in their own
-    // explicit transactions, the standard read-tx -> AI -> write-tx shape in this module.
+    // it would pin a DB connection for its whole duration. The shape is read-tx -> AI -> write-tx.
     private val txTemplate = TransactionTemplate(transactionManager)
     private val readTxTemplate =
         TransactionTemplate(transactionManager).apply { isReadOnly = true }
@@ -72,13 +68,8 @@ class AssessmentService(
     /**
      * Whether the authenticated user has ever completed an assessment session for this project.
      *
-     * The frontend's "needs assessment" gate checks this -- a COMPLETED session is the thing the
-     * assessment flow actually produces. Scoped per project: completing it for one project says
-     * nothing about another, since the questions asked (and the project's live modules they were
-     * scoped to) differ.
+     * ⚠️ Scoped per project: completing it for one project says nothing about another.
      *
-     * @param authId The authenticated user's auth (JWT subject) id.
-     * @param projectId The project to check completion for.
      * @throws ResponseStatusException 404 if no user exists for [authId].
      */
     fun hasCompletedAssessment(authId: String, projectId: UUID): Boolean {
@@ -94,18 +85,14 @@ class AssessmentService(
      * Starts a new assessment for the authenticated user on [projectId], or resumes their
      * in-progress one for it.
      *
-     * @param authId The authenticated user's auth (JWT subject) id.
-     * @param projectId The project to run the interview for.
      * @return The session id and the question to show next, or `done=true` with no question if the
      * project has nothing configured to assess yet.
      */
     suspend fun startAssessment(authId: String, projectId: UUID): StartAssessmentResponse {
         val userId = resolveUserId(authId)
 
-        // ⚠️ Reserve the session *before* the slow AI call. Check resumption against state that
-        // only exists after it and a second start issued while the first is still generating sees
-        // nothing to resume, creating its own -- four sessions for one assessment, three stranded
-        // IN_PROGRESS with a question nobody ever saw.
+        // ⚠️ Reserve the session *before* the slow AI call: a second start issued while the first
+        // is still generating would see nothing to resume and create its own.
         val reserved = withContext(Dispatchers.IO) {
             reserveSessionSerially(userId, projectId)
         }
@@ -117,10 +104,8 @@ class AssessmentService(
             readTxTemplate.execute { loadCandidateCompetencies(projectId) }.orEmpty()
         }
         if (candidates.isEmpty()) {
-            // Nothing this project teaches yet to place the hire against -- an honest empty
-            // result, the same way GET /me/path treats "nothing set up yet" as a real state
-            // rather than an error. Finishing without ever calling the AI also avoids handing it
-            // an empty candidate list, which it cannot legitimately finish over either.
+            // Nothing this project teaches yet: an honest empty result, and finishing without
+            // calling the AI avoids handing it an empty candidate list it cannot finish over.
             return withContext(Dispatchers.IO) {
                 txTemplate.execute { completeWithNothingToAssess(reserved.sessionId) }!!
             }
@@ -153,19 +138,12 @@ class AssessmentService(
      * Reserves the hire's single in-progress session, serializing concurrent starts.
      *
      * ⚠️ **A short transaction is not a serialization point.** Under `READ COMMITTED` two starts
-     * both read no in-progress session and both insert one, which is how one hire ended up with
-     * two interviews running at once. The client makes this easy to hit rather than rare:
-     * `<React.StrictMode>` double-invokes the effect that calls start, so the two requests are
-     * genuinely simultaneous.
+     * both read no in-progress session and both insert one. The lock is what serializes them, and
+     * it is **striped** rather than one per hire so the map cannot grow without bound.
      *
-     * The lock is what actually serializes them. It is **striped** rather than one per hire so the
-     * map cannot grow without bound; two unrelated hires occasionally sharing a stripe costs a
-     * moment of contention on a call that does no I/O beyond one read and one insert.
-     *
-     * ⚠️ **A unique index would be the better guard and is not available here.** It would have to
-     * be partial (`WHERE status = 'IN_PROGRESS'`, since a hire may be re-assessed later and every
-     * completed session keeps its row), Hibernate cannot express a partial index, and this service
-     * builds its schema from the entities -- see [reserveSession].
+     * ⚠️ **A unique index would be the better guard and is not available here**: it would have to
+     * be partial (`WHERE status = 'IN_PROGRESS'`), Hibernate cannot express a partial index, and
+     * this service builds its schema from the entities -- see [reserveSession].
      */
     private fun reserveSessionSerially(userId: UUID, projectId: UUID): ReservedSession {
         val stripe = RESERVATION_LOCKS[
@@ -245,9 +223,6 @@ class AssessmentService(
     /**
      * Submits the candidate's answer for the currently open turn and advances the interview.
      *
-     * @param authId The authenticated user's auth (JWT subject) id.
-     * @param sessionId The session being answered.
-     * @param answer The candidate's free-text answer.
      * @return The next question, or `done=true` once the AI has returned a final placement.
      * @throws ResponseStatusException 404 if no session with this id belongs to the user; 409 if
      * the session has no open turn to answer.
@@ -328,10 +303,8 @@ class AssessmentService(
     /**
      * What every past question set out to probe, per turn.
      *
-     * Turns that targeted nothing are dropped rather than sent as empty lists: an interview
-     * started before targets were recorded would otherwise look like it had probed a set of keys
-     * and come up empty, when in fact nothing was ever asked. Absent is the honest reading, and it
-     * makes the interviewer cover more rather than less.
+     * ⚠️ Turns that targeted nothing are dropped rather than sent as empty lists — an empty list
+     * reads as "probed these keys and found nothing", which is not what happened.
      */
     private fun buildTargets(session: SkillAssessmentSession): List<AssessmentTargetsSchema> =
         session.turns
@@ -341,15 +314,13 @@ class AssessmentService(
     /**
      * The candidate's consented involvement prior, or an empty signal.
      *
-     * Sent on every turn because the AI service is stateless and re-derives its belief from the
-     * request each time -- omitting it after turn 0 would silently change how later turns are
-     * calibrated. Consent is re-checked on each read, so withdrawing it takes effect immediately,
-     * mid-interview included.
+     * Sent on every turn because the AI service is stateless: omitting it after turn 0 would
+     * silently change how later turns are calibrated. Consent is re-checked on each read, so
+     * withdrawing it takes effect immediately, mid-interview included.
      *
      * ⚠️ **Must be called inside a transaction.** `signals` is a lazy `@ElementCollection`, so
-     * reading it on a detached prior throws `LazyInitializationException` — which is exactly what
-     * `POST /me/assessment/start` returned as a 500 for every hire who actually had a prior. Both
-     * call sites wrap it in [readTxTemplate], and those two are the only ones.
+     * reading it on a detached prior throws `LazyInitializationException`. Both call sites wrap it
+     * in [readTxTemplate], and those two are the only ones.
      */
     private fun loadCandidateSignal(userId: UUID): CandidateSignalSchema {
         val prior = githubHistoryPriorService.getPrior(userId) ?: return CandidateSignalSchema()
@@ -358,10 +329,9 @@ class AssessmentService(
 
     /**
      * The [CompetencyKind.SKILL] competencies [projectId] actually teaches: the keys of its live
-     * [com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule]s, the same
-     * per-`(competencyKey, projectId)` association the path already points modules through. A
-     * project with no live modules yet returns an empty list -- callers must treat that as nothing
-     * to assess, not as a request to send an empty candidate set to the AI.
+     * [com.sprintstart.sprintstartbackend.onboarding.model.entity.CompetencyModule]s. ⚠️ A project
+     * with no live modules returns an empty list -- callers must treat that as nothing to assess,
+     * never as a request to send an empty candidate set to the AI.
      */
     private fun loadCandidateCompetencies(projectId: UUID): List<CandidateCompetencySchema> {
         val taughtKeys = competencyModuleRepository
@@ -406,10 +376,9 @@ class AssessmentService(
         }
 
     /**
-     * The ledger write is monotonic: a self-reported placement never overwrites a
-     * [CompetencySource.VERIFIED] entry (proof always outranks a chat placement), and a
-     * re-assessment never lowers an already-recorded level -- reconciliation's "never un-earns
-     * progress" invariant applies to the ledger itself, not just graph changes.
+     * ⚠️ The ledger write is monotonic: a self-reported placement never overwrites a
+     * [CompetencySource.VERIFIED] entry, and a re-assessment never lowers an already-recorded
+     * level.
      */
     private fun writeCompetencyState(userId: UUID, competencyKey: String, level: String, confidence: Double) {
         val rank = placementRank(level, confidence)
@@ -434,14 +403,11 @@ class AssessmentService(
     /**
      * The rank a placement is allowed to record.
      *
-     * Two different things both record `0`, and they are not interchangeable:
+     * ⚠️ Two different things both record `0`, and they are not interchangeable:
      *
-     * - **`none`** -- the hire *told* the interviewer they have never used it. A clear answer, and
-     *   usually a confident one, so ⚠️ **the confidence floor below would never have caught it**:
-     *   the more plainly somebody says they know nothing, the surer the interviewer is, and the
-     *   more certainly a `beginner` placement would have credited them with the competency.
-     * - **low confidence** -- the interviewer could not tell. "We asked, and saw no competence",
-     *   rather than the level it guessed.
+     * - **`none`** -- the hire *told* the interviewer they have never used it. Usually a
+     *   *confident* answer, so the confidence floor below never catches it.
+     * - **low confidence** -- the interviewer could not tell.
      *
      * `0` is a real state elsewhere in the ledger (known-but-unplaced, filtered out of matching),
      * so this records that the assessment happened without claiming a skill.
@@ -457,10 +423,8 @@ class AssessmentService(
      * Runs one AI interviewer turn, translating a transport-level AI failure into a retryable
      * 503 instead of letting [OnboardingAiException] surface as an opaque 500.
      *
-     * The AI service itself now refuses to fabricate a placement when it is still too early to
-     * legitimately finish (a model that won't stop trying to finish early, or an unparseable
-     * response at that point) -- it answers with its own 503 rather than a hollow `done=true`.
-     * This is that failure reaching the caller as what it is: a "please retry", not a finished
+     * ⚠️ The AI service answers with its own 503 rather than a hollow `done=true` when it is too
+     * early to legitimately finish, so this path also carries "please retry", never a finished
      * assessment nothing backed.
      */
     private suspend fun runAssessTurn(request: AssessmentTurnRequest): AssessmentTurnResponse =
@@ -499,11 +463,7 @@ class AssessmentService(
         const val MIN_PLACEMENT_CONFIDENCE = 0.4
 
         // Aligned 1:1 with the AI SKILL_LEVELS (beginner..expert -> 1..4); unknown -> 0.
-        //
-        // ⚠️ "none" is the interviewer saying the hire told them they have not used this, and is
-        // deliberately listed rather than left to fall through to the same 0: a reader checking
-        // what happens to a disclaimer should find the answer here, not have to know that the
-        // lookup's default happens to be right.
+        // "none" is listed explicitly rather than left to fall through to the lookup's default.
         val LEVEL_RANKS = mapOf(
             NO_EXPERIENCE to 0,
             "beginner" to 1,
