@@ -66,17 +66,10 @@ data class DerivableArrivalStepResponse(
 /**
  * The caller's arrival steps, with the outstanding work counted **by rigor and never blended**.
  *
- * ### Why there is no percentage here, and must never be
- *
- * The onboarding model this replaces reported a single `progressPercentage` that counted a step
- * somebody had ticked exactly the same as a check they had actually passed. That conflation is the
- * specific defect that made the old progress number meaningless, and it is trivial to reintroduce
- * by adding one convenient field to a response like this one.
- *
- * So the wire shape refuses to make it easy: there are counts per rigor and a count of what is
- * outstanding, and no total to divide by. A client that wants to say something honest says
- * *"5 confirmed by the system · 2 you told us about · 2 outstanding"*. `ArrivalControllerTest`
- * asserts that no field here is a blended completion figure.
+ * ⚠️ **No field here may be a blended completion figure, and none may be added.** Counting a step
+ * somebody ticked the same as a check they passed is what made the old progress number meaningless.
+ * The wire shape refuses to make it easy: counts per rigor and a count of what is outstanding, with
+ * **no total to divide by**. `ArrivalControllerTest` asserts it.
  */
 @Schema(description = "The caller's arrival steps, counted by how each was established")
 data class MyArrivalResponse(

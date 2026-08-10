@@ -42,30 +42,25 @@ import java.util.UUID
 /**
  * Serving of task-scoped orientation: what this project already says about doing the task a hire has.
  *
- * The interesting decisions are all about *not* lying to the reader:
+ * ⚠️ The three cache rules, which are not interchangeable:
  *
  * * **The cache is validated, never trusted.** Every read sends the fingerprint of the corpus the
  *   cached packet was built from. An unchanged corpus comes back `unchanged` with no retrieval or
- *   LLM pass and the cache is served; a corpus that has moved is re-assembled. A packet describing
- *   code that has since changed is worse than no packet, because a hire cannot tell.
+ *   LLM pass and the cache is served; a corpus that has moved is re-assembled.
  * * **`skipped` deletes the cache.** The AI service compared against the *current* corpus and could
- *   not ground a packet, so whatever is cached describes a corpus that no longer exists. Keeping it
- *   would be exactly the stale-serving the point above forbids.
- * * **A transport failure serves the cache.** Unlike `skipped`, an unreachable AI service is no
- *   evidence at all about staleness — so the last known good packet is still the most honest thing
- *   available, and losing orientation to a flaky call helps nobody.
- * * **Nothing is ever fabricated.** "No packet" is an ordinary returned state carrying the reason —
- *   never an empty packet, never an error.
+ *   not ground a packet, so whatever is cached describes a corpus that no longer exists.
+ * * **A transport failure serves the cache.** An unreachable AI service is no evidence at all about
+ *   staleness.
  *
- * Reading orientation is not a gate and never assigns anything: the hire's current task is read
- * straight from the assignment table rather than through [TaskZeroService.getForHire], which assigns
- * on read. Opening the help must not be what hands somebody their first task.
+ * **Nothing is ever fabricated.** "No packet" is an ordinary returned state carrying the reason —
+ * never an empty packet, never an error.
  *
- * A packet may also be **human-authored** -- by a PM from the Starter Work page, or by the hire fixing
- * their own task's orientation in place. A human packet is pinned [OrientationOrigin.HUMAN] and every
- * cache rule above is switched off for it: [getForHire] serves it as-is and never calls the AI, so it
- * is never re-assembled, never fingerprinted and never auto-deleted as stale. The staleness dance is
- * an AI guardrail; a person stands behind their own words.
+ * ⚠️ Reading orientation never assigns anything: the hire's current task is read straight from the
+ * assignment table, not through [TaskZeroService.getForHire], which assigns on read.
+ *
+ * ⚠️ A **human-authored** packet is pinned [OrientationOrigin.HUMAN] and every cache rule above is
+ * switched off for it: [getForHire] serves it as-is and never calls the AI, so it is never
+ * re-assembled, never fingerprinted and never auto-deleted as stale.
  */
 @Service
 @Suppress("TooManyFunctions")
@@ -107,8 +102,7 @@ class TaskOrientationService(
                 taskTitle = context.title,
                 taskBody = context.body,
                 labels = context.labels,
-                // Which paths a task touches is not knowable from an issue -- it becomes real when
-                // there is a pull request to read it off. Sent empty rather than guessed at.
+                // Not knowable from an issue, so sent empty rather than guessed at.
                 touchedPaths = emptyList(),
                 lastFingerprint = context.cachedFingerprint,
             )
@@ -263,8 +257,7 @@ class TaskOrientationService(
     ): OrientationPacketResponse {
         validate(request)
 
-        // Replaced wholesale rather than merged, exactly as the AI path does: the request is the whole
-        // packet, so there is nothing a merge would protect.
+        // Replaced wholesale: the request is the whole packet, so there is nothing to merge.
         taskOrientationPacketRepository
             .findByTaskProposalIdAndProjectId(proposal.id, projectId)
             ?.let { taskOrientationPacketRepository.delete(it) }
@@ -309,9 +302,8 @@ class TaskOrientationService(
             )
         }
 
-        // Sources -- "the ground the packet stands on" -- are derived from the distinct citation links
-        // rather than authored separately, so "this is out of date" has somewhere to point without
-        // asking the author to restate anything. A packet with no citations simply has no sources.
+        // Sources are derived from the distinct citation links, never authored separately. A
+        // packet with no citations simply has no sources.
         request.sections
             .flatMap { it.citations }
             .map { it.filename.trim() to it.sourceUrl?.trim()?.takeIf { url -> url.isNotBlank() } }
@@ -384,8 +376,7 @@ class TaskOrientationService(
         outcome: OrientationOutcome,
         schema: OrientationPacketSchema,
     ): TaskOrientationPacket {
-        // Replaced wholesale rather than merged: a packet is disposable and holds no human edits, so
-        // there is nothing a merge would protect and plenty it could leave inconsistent.
+        // Replaced wholesale: an AI packet holds no human edits, so there is nothing to merge.
         taskOrientationPacketRepository
             .findByTaskProposalIdAndProjectId(context.proposalId, context.projectId)
             ?.let { taskOrientationPacketRepository.delete(it) }

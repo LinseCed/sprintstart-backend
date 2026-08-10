@@ -15,24 +15,15 @@ import java.util.UUID
 /**
  * One card on a [Board].
  *
- * ### What a row does and does not hold
- *
- * For a live card the row holds no content at all — only that this hire wants this card, where it
+ * ⚠️ **For a live card the row holds no content** — only that this hire wants this card, where it
  * sits, and whether it is still there. The content is re-read on every board load from the same
- * services the buddy's tools read, which is what makes a card and the tool of the same name unable
- * to disagree. Storing a copy would be a second record of facts that already live somewhere
- * durable, and this codebase has repeatedly found that the copy is the one that goes stale.
+ * services the buddy's tools read, so a card and the tool of the same name cannot disagree.
+ * Authored cards (a note, a link, a checklist) do have content of their own, in [payload].
  *
- * Authored cards — a note, a link, a checklist — genuinely have content of their own, and it lives
- * in [payload] because there is nowhere else for it to be.
- *
- * ### One row per kind, except for the ones the hire writes
- *
- * A live card is a single read, so a second copy would be the same card twice — and uniqueness is
- * also what makes "ensure this card exists" idempotent. Authored cards are the exception: several
- * notes are several notes. The database enforces it with a partial unique index covering only the
- * non-authored kinds; Hibernate cannot express a partial index, so the constraint is absent from
- * this mapping and [BoardService] enforces the same rule in code.
+ * ⚠️ **One row per kind, except for the ones the hire writes** — which is also what makes "ensure
+ * this card exists" idempotent. The database enforces it with a partial unique index covering only
+ * the non-authored kinds; Hibernate cannot express a partial index, so the constraint is absent
+ * from this mapping and [BoardService] enforces the same rule in code.
  */
 @Entity
 @Table(name = "board_cards")

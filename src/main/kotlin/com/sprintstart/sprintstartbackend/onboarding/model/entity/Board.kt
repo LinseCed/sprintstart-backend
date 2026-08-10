@@ -11,21 +11,8 @@ import java.util.UUID
 /**
  * A hire's persistent working surface on one project.
  *
- * ### Why this exists
- *
- * The buddy conversation opens fresh every visit: the previous window is folded into the mentor's
- * private memory and never replayed. That is deliberate, and it leaves a hole — anything durable
- * the mentor shows you (where you stand, which pull request is stuck, what to do next) scrolls
- * away and is gone by the next visit. The board is where those things live instead.
- *
- * Chat is the conversation. The board is the whiteboard beside it: the shared surface the mentor
- * curates and the hire owns.
- *
- * ### Per project, lazily created
- *
- * Keyed by `(userId, projectId)` like the rest of onboarding, because what belongs on it — the
- * ramp, the open work, the suggested tasks — is per project. Created on first read rather than
- * when somebody joins, so nobody accumulates empty boards for projects they never onboard on.
+ * Keyed by `(userId, projectId)`, and **created on first read** rather than when somebody joins,
+ * so nobody accumulates empty boards for projects they never onboard on.
  */
 @Entity
 @Table(

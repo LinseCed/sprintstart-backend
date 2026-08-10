@@ -34,30 +34,22 @@ import java.util.UUID
 /**
  * The picture on a hire's diagram card: kept, checked against the corpus, and redrawn when it moved.
  *
- * ### Why a live card has a cache at all
- *
- * Every other live card hydrates from a database read costing nothing. A diagram costs a generation,
- * and a board card hydrates on every page load — so drawing on load would mean waiting on a model to
- * open a page. The picture is therefore kept, and kept the way `TaskOrientationService` keeps a
- * packet: **validated, never trusted.**
+ * A diagram costs a generation and a board card hydrates on every page load, so the picture is
+ * kept — ⚠️ **validated, never trusted**, the same three rules `TaskOrientationService` keeps:
  *
  * * **Every revalidation sends the fingerprint of the corpus the picture was drawn from.** An
  *   unchanged corpus comes back `unchanged` with no retrieval and no generation, and the kept
- *   picture is served. Age is not staleness — a diagram of code nobody has touched is current.
+ *   picture is served. ⚠️ Age is not staleness.
  * * **`skipped` deletes the cache.** The AI service looked at the *current* corpus and could not
- *   ground a picture, so whatever is kept describes a corpus that is gone. Keeping it would be
- *   exactly the stale-serving the rule above forbids.
+ *   ground a picture, so whatever is kept describes a corpus that is gone.
  * * **A transport failure serves the cache.** Unlike `skipped`, an unreachable AI service is no
- *   evidence at all about staleness, so the last picture drawn is still the most honest thing
- *   available. Losing a diagram to a flaky call helps nobody.
+ *   evidence at all about staleness.
  * * **Nothing is ever fabricated.** "No picture, and here is why" is an ordinary returned state.
  *
- * ### The split between reading a board and revalidating a card
- *
- * [contentFor] is what a board read uses: it serves the kept picture and never calls anything. The
- * suspend [refresh] is what checks it. That is the split that makes the board load free — and it is
- * also why [DiagramContent.assembledAt] travels to the client, because a picture served from the
- * cache is a claim about code as it was at a moment, and the reader is entitled to know which.
+ * ⚠️ **Reading a board and revalidating a card are split.** [contentFor] serves the kept picture
+ * and never calls anything; the suspend [refresh] is what checks it. [DiagramContent.assembledAt]
+ * travels to the client because a picture served from the cache is a claim about code as it was at
+ * a moment.
  */
 @Service
 class BoardDiagramService(

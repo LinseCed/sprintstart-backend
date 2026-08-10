@@ -29,10 +29,8 @@ data class ResolvedArrivalStep(
     /**
      * The name of the project this step is scoped to; null for a company-wide step.
      *
-     * Resolved here rather than left to the client because a hire's list is a *union across their
-     * projects*, and once two projects both add a step the id alone is unreadable: "Request staging
-     * access" appearing twice with nothing to tell the two apart is worse than either one alone.
-     * The client groups under this name, so it has to be a name.
+     * ⚠️ The client groups under this name, so it must be a name rather than an id — a hire's
+     * list is a union across their projects, and the same title can appear once per project.
      */
     val projectName: String? = null,
 ) {
@@ -42,28 +40,19 @@ data class ResolvedArrivalStep(
 /**
  * Owns arrival steps: what they are, who they apply to, and what a given hire has settled.
  *
- * ### Nothing here blocks anything
+ * ⚠️ **Nothing here blocks anything.** There is deliberately no method answering "may this hire
+ * proceed", because no caller should be able to ask. An outstanding step changes what a hire is
+ * *shown*, never what they are *allowed to do*. A gate would be a design change, not a missing
+ * method.
  *
- * There is deliberately no method that answers "may this hire proceed", because no caller should be
- * able to ask. An outstanding arrival step changes what a hire is *shown*, never what they are
- * *allowed to do* — the ordering-not-blocking decision, which exists because the previous
- * generation of this model gated work behind a placement and stranded people who could have done
- * it. If a future caller wants a gate, that is a design change, not a missing method.
+ * ⚠️ **Uniqueness is enforced here as well as in the database.** A step's key must be unique within
+ * its scope, and company-wide steps carry `project_id = NULL`. **Postgres does not treat two NULLs
+ * as conflicting**, so the rule needs two partial unique indexes — and Hibernate cannot express a
+ * partial index, so the schema the test suite builds from these entities has neither. Without the
+ * explicit checks below, the rule would hold in the database and quietly not hold in every test.
  *
- * ### Uniqueness is enforced here as well as in the database
- *
- * A step's key must be unique within its scope, and company-wide steps carry `project_id = NULL`.
- * **Postgres does not treat two NULLs as conflicting**, so the migration expresses this as two
- * partial unique indexes rather than one composite index — and Hibernate cannot express a partial
- * index at all, so the schema the test suite builds from these entities has neither. Hence the
- * explicit checks below: without them the rule would hold in production and quietly not hold in
- * every test, which is the worse half of that failure. `BoardService` guards its own
- * one-row-per-kind rule the same way and for the same reason.
- *
- * Two audiences share this one model: the hire's read plus confirm, and the authoring behind it.
- * They also share the scoping and uniqueness rules above, so splitting the class would mean either
- * duplicating those or adding a third class to hold them — hence the function-count suppression,
- * which `BoardService` carries for the same shape.
+ * Both audiences — the hire's read plus confirm, and the authoring behind it — share those scoping
+ * and uniqueness rules, hence the function-count suppression.
  */
 @Suppress("TooManyFunctions")
 @Service
@@ -97,11 +86,9 @@ class ArrivalStepService(
      * deduplicated by [ArrivalStep.key] with a project-scoped definition winning — so a project can
      * sharpen a company step's wording without forking the key its state is stored against.
      *
-     * Scoped to *all* the hire's projects rather than one, like the buddy's corpus scoping and
-     * unlike the board: arrival is a fact about a person, not about a project, and somebody's
-     * GitHub account does not become unsettled because they are looking at a different project.
+     * ⚠️ Scoped to *all* the hire's projects rather than one: arrival is a fact about a person,
+     * not about a project.
      *
-     * @param userId The hire.
      * @return Their steps, company-scoped first, each ordered by position within its own scope.
      * Empty when nobody has authored any steps, which is a real answer and not an error.
      */
@@ -120,14 +107,9 @@ class ArrivalStepService(
         // A project-scoped definition wins the key.
         val projectKeys = projectSteps.map { it.key }.toSet()
 
-        // ⚠️ Ordered by scope, not by position across scopes.
-        // Positions are assigned *within* a scope, so sorting the union by position would rank a
-        // company step against a project one on numbers that were never comparable, and two PMs
-        // authoring different projects could not coordinate the result. Grouping instead lets the
-        // client head each block with whose steps these are, which is the thing a hire on two
-        // projects actually needs: "get staging access" is unreadable twice over without it.
-        //
-        // Within a scope, position still decides. Across scopes: company first, then projects by
+        // ⚠️ Ordered by scope, not by position across scopes: positions are assigned *within* a
+        // scope, so sorting the union by them ranks numbers that were never comparable.
+        // Within a scope position still decides; across scopes, company first, then projects by
         // name, so the order is stable rather than dependent on however the ids came back.
         val ordered =
             companySteps.filterNot { it.key in projectKeys } +
@@ -152,13 +134,9 @@ class ArrivalStepService(
     /**
      * Records that [userId] says they have done the step [key].
      *
-     * Idempotent: settling an already-settled step returns what is already there and leaves
-     * [ArrivalStepState.settledAt] alone, because the day something happened does not move. This is
-     * the same monotonicity the ledger holds to, for the same reason.
+     * ⚠️ Idempotent: settling an already-settled step returns what is already there and leaves
+     * [ArrivalStepState.settledAt] alone — the day something happened does not move.
      *
-     * @param userId The hire confirming.
-     * @param key The step's stable key, which must be one that applies to this hire.
-     * @return The step with its new state.
      * @throws ResponseStatusException 404 when no step with that key applies to this hire; 400 when
      * the step is settled by observation rather than by the hire.
      */
@@ -171,11 +149,10 @@ class ArrivalStepService(
                     "No arrival step '$key' applies to this user",
                 )
 
-        // Some derived steps are still the hire's to claim -- "my machine builds" is something the
-        // system can observe but never refute, so their word is the answer that lands on day one.
-        // Others are not: the GitHub check is definitive when it answers, and letting somebody tick
-        // it would let them declare away the fact their work being credited depends on.
-        // Nothing is blocked by refusing: an unsettled step never stopped them working.
+        // ⚠️ `selfConfirmable` is not a synonym for `settledBy`. Some derived steps are still the
+        // hire's to claim -- "my machine builds" is observable but never refutable. Others are not:
+        // the GitHub check is definitive when it answers, and letting somebody tick it would let
+        // them declare away the fact their credit depends on.
         if (!resolved.step.selfConfirmable) {
             throw ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
@@ -203,10 +180,8 @@ class ArrivalStepService(
     /**
      * The steps the system knows how to check, and whether each is already on the list.
      *
-     * Offered explicitly so that adding a derived step is a choice rather than folklore about which
-     * keys happen to be magic. Nothing is seeded from this: an admin adds the ones their
-     * organisation wants, which is also what keeps a local-build step off the board of somebody who
-     * never builds anything.
+     * ⚠️ Nothing is seeded from this — an admin adds the ones their organisation wants, which is
+     * what keeps a local-build step off the board of somebody who never builds anything.
      */
     @Transactional(readOnly = true)
     fun derivable(): List<Pair<ArrivalDerivation, Boolean>> {
@@ -251,10 +226,8 @@ class ArrivalStepService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "An arrival step needs a title")
         }
 
-        // A key the system knows how to check is always created as a derived step, whatever the
-        // caller asked for. The alternative is a row that looks derived and is not, or one that is
-        // self-confirmable when the whole point of the check is that it should not be -- both of
-        // which are silent, and both of which show up as a step behaving unlike its twin elsewhere.
+        // ⚠️ A key the system knows how to check is always created as a derived step, whatever
+        // the caller asked for -- a row that looks derived and is not fails silently.
         val derivation = ArrivalDerivation.forStepKey(normalizedKey)
 
         return arrivalStepRepository.save(
@@ -275,9 +248,8 @@ class ArrivalStepService(
     /**
      * Updates a step's wording, link, ordering or settlement mechanism.
      *
-     * The key is **not** updatable. State points at it, so changing it would orphan every hire's
-     * record of having done the step while leaving the row looking healthy — a rename must be a
-     * delete and a create, where the consequence is at least visible.
+     * ⚠️ The key is **not** updatable. State points at it, so changing it would orphan every
+     * hire's record of having done the step while leaving the row looking healthy.
      *
      * @throws ResponseStatusException 404 when no such step exists in that scope; 400 on a blank
      * title.
@@ -312,9 +284,8 @@ class ArrivalStepService(
     /**
      * Applies a whole ordering at once.
      *
-     * Takes the complete list rather than a from/to pair, so two people reordering concurrently
-     * cannot interleave into an order neither of them chose — the rule board checklists already
-     * follow.
+     * ⚠️ Takes the complete list rather than a from/to pair, so two people reordering
+     * concurrently cannot interleave into an order neither of them chose.
      *
      * @throws ResponseStatusException 404 when a key in [orderedKeys] is not a step in that scope.
      */
@@ -338,10 +309,9 @@ class ArrivalStepService(
     /**
      * Deletes a step definition. **Hires' state survives**, by design.
      *
-     * [ArrivalStepState] is keyed by the step's key rather than by a foreign key, so removing a
-     * definition removes it from everybody's list without destroying the record that somebody did
-     * it — and re-adding the same key restores those records. That is the property that has made
-     * five deletions safe in this codebase, and `ArrivalStepServiceTest` pins it.
+     * ⚠️ [ArrivalStepState] is keyed by the step's key rather than by a foreign key, so removing
+     * a definition removes it from everybody's list without destroying the record that somebody
+     * did it — and re-adding the same key restores those records.
      *
      * @throws ResponseStatusException 404 when no such step exists in that scope.
      */

@@ -34,8 +34,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import java.net.URI
 
-// One method per AI-service endpoint: the count tracks the size of Seam 1, not a class doing too
-// many things. Splitting it by endpoint group would hide that seam rather than shrink it.
+// One method per AI-service endpoint.
 @Suppress("TooManyFunctions")
 @Component
 class OnboardingAiClient(
@@ -50,7 +49,6 @@ class OnboardingAiClient(
      * The backend owns session state; [request] carries the full transcript so far. A non-2xx
      * response is wrapped in an [OnboardingAiException] carrying the upstream status/body.
      *
-     * @param request The candidate competencies, repo signal, transcript, and turn/cap state.
      * @return Either the next question (`done=false`) or the final placement (`done=true`).
      */
     suspend fun assessTurn(request: AssessmentTurnRequest): AssessmentTurnResponse =
@@ -76,17 +74,10 @@ class OnboardingAiClient(
      *
      * The result is a flat vocabulary: it states no ordering.
      *
-     * Called by `VocabularyGenerationService` when a crawl's AI sync first reaches `SUCCEEDED`, so
-     * that "set up onboarding" collapses into "connect a repo"; there is no PM proposal queue in
-     * front of it, and no surface that triggers this by hand.
-     *
-     * @param activeCompetencies The backend's current live competencies, which drive dedup.
-     * @param existingAreas The grouping areas in use, so a proposal joins one rather than coining a
-     * synonym of it.
-     * @param tombstonedCompetencies What somebody deliberately removed. Blocked by key *and* by
-     * similarity, so a deletion cannot leak back under a rephrasing.
-     * @param lastFingerprint The corpus fingerprint recorded from the most recent prior proposal, if any.
-     * @return The proposal outcome returned by the AI service.
+     * @param existingAreas The grouping areas in use, so a proposal joins one instead of coining a
+     * synonym.
+     * @param tombstonedCompetencies Removed competencies. ⚠️ Blocked by key *and* by similarity, so
+     * a deletion cannot return under a rephrasing.
      */
     suspend fun proposeCompetencyGraph(
         activeCompetencies: List<ActiveCompetencySchema> = emptyList(),
@@ -115,18 +106,12 @@ class OnboardingAiClient(
     /**
      * Proposes the shared module one competency teaches.
      *
-     * Heavyweight/offline, matching [synthesizeLesson]: one retrieval + LLM pass, intended for an
-     * authoring action rather than a hire's request path. Nothing about an individual hire is sent
-     * -- one competency yields one module everybody reads. [lastFingerprint] is whatever
-     * fingerprint the caller last recorded for this competency, so an unchanged corpus does not
-     * churn a module a PM has already edited.
+     * Heavyweight/offline: one retrieval + LLM pass, for an authoring action, not a hire's request
+     * path. ⚠️ Nothing about an individual hire is sent — one competency yields one shared module.
+     * [lastFingerprint] is the fingerprint last recorded for this competency, so an unchanged corpus
+     * does not churn a module a PM has edited.
      *
-     * @param competencyKey The competency this module teaches.
-     * @param competencyLabel The competency's display label.
-     * @param competencyDescription Optional extra context for grounding the pages.
      * @param level Target level to teach to (`beginner`/`intermediate`/`advanced`/`expert`).
-     * @param lastFingerprint The corpus fingerprint recorded from the last proposal, if any.
-     * @return The proposal outcome returned by the AI service.
      */
     suspend fun proposeModule(
         competencyKey: String,
@@ -157,24 +142,15 @@ class OnboardingAiClient(
     /**
      * Draws one subject from the project's own material: typed nodes, typed edges, a citation each.
      *
-     * The rule this sits under is worth restating where it is called: **the model may choose the
-     * question, it never writes the answer.** [subject] is the only part of a diagram a model chose,
-     * and it aims retrieval rather than being asserted — every node comes back derived from a
+     * [subject] aims retrieval and is asserted nowhere: every node comes back derived from a
      * retrieved chunk and cited, and an ungrounded one is dropped along with the arrows that reached
      * it.
      *
-     * On a hire's request path in the most literal way of anything here: a board card hydrates on
-     * every page load, which is exactly why [lastFingerprint] must be sent. An unchanged corpus
-     * answers `unchanged` with no retrieval and no generation, so revalidating a diagram costs a
-     * hash rather than a model.
+     * ⚠️ [lastFingerprint] must be sent — a board card hydrates this on every page load, and an
+     * unchanged corpus answers `unchanged` with no retrieval and no generation.
      *
      * `skipped` with no diagram is a real answer — an empty corpus, nothing retrieved, or too few
-     * grounded and connected parts to be a picture rather than a word. It must reach the hire as an
-     * honest empty state.
-     *
-     * @param subject The question the diagram answers.
-     * @param lastFingerprint The corpus fingerprint the cached picture was drawn from, if any.
-     * @return The assembly outcome returned by the AI service.
+     * grounded and connected parts to draw. It must reach the hire as an honest empty state.
      */
     suspend fun assembleDiagram(
         subject: String,
@@ -195,25 +171,16 @@ class OnboardingAiClient(
     /**
      * Assembles the orientation packet for one task from the project's existing material.
      *
-     * Unlike [proposeModule] this *is* on a hire's request path â€” it is what somebody reads while
-     * doing the task they just picked up â€” which is why the caller caches the result against the
-     * task and sends [lastFingerprint] on every read: an unchanged corpus comes back `unchanged`
-     * with no retrieval or LLM pass, and a corpus that has moved is re-assembled rather than
-     * described from a packet that no longer matches the code.
+     * On a hire's request path: the caller caches the result against the task and sends
+     * [lastFingerprint] on every read, so an unchanged corpus comes back `unchanged` with no
+     * retrieval or LLM pass, and a corpus that has moved is re-assembled. [labels] and
+     * [touchedPaths] aim retrieval.
      *
-     * Nothing about the individual hire is sent, deliberately: orientation is a property of the
-     * task, so two people who claim it read the same packet and can talk about it.
+     * ⚠️ Nothing about the individual hire is sent — two people who claim the task read the same
+     * packet.
      *
-     * The AI service returns `skipped` with no packet when it cannot ground one. That is a real
-     * answer and must reach the hire as an honest empty state â€” never a fabricated packet.
-     *
-     * @param taskTitle The task the packet orients somebody for.
-     * @param taskBody The task's description, when it has one.
-     * @param labels The task's labels, used to aim retrieval.
-     * @param touchedPaths Repository paths the task is expected to touch, when known.
-     * @param lastFingerprint The corpus fingerprint recorded when this task's packet was last
-     *   assembled, if any.
-     * @return The assembly outcome returned by the AI service.
+     * `skipped` with no packet is a real answer and must reach the hire as an honest empty state,
+     * never a fabricated packet.
      */
     suspend fun assembleOrientation(
         taskTitle: String,
@@ -244,19 +211,14 @@ class OnboardingAiClient(
     /**
      * Grades a free-text answer against a rubric via the AI service's LLM judge.
      *
-     * On the learner's request path, unlike [synthesizeLesson] -- called synchronously per
-     * verification attempt. Only `knowledge`-type grading is delegated to the AI service;
-     * `exact`/`attest` are graded locally in Kotlin (see `VerificationService`), so this method has
-     * no `type` parameter. A non-2xx response is wrapped in an [OnboardingAiException] carrying the
-     * upstream status/body -- callers should treat that as a retryable failure, not a graded fail,
-     * since there is no safe local fallback for rubric-based judging.
+     * Only `knowledge`-type grading is delegated to the AI service; `exact`/`attest` are graded
+     * locally in Kotlin (see `VerificationService`), which is why this method has no `type`
+     * parameter.
      *
-     * @param question The verification prompt shown to the learner.
-     * @param rubric What a correct answer must demonstrate.
-     * @param evidence Grounded evidence backing the rubric (the step's lesson content).
-     * @param answer The learner's submitted answer.
+     * ⚠️ A non-2xx is wrapped in an [OnboardingAiException] and must be treated as a retryable
+     * failure, never a graded fail.
+     *
      * @param attemptNo The 1-based attempt number, steering hint escalation on fail.
-     * @return The grading result returned by the AI service.
      */
     suspend fun gradeKnowledge(
         question: String,
@@ -285,22 +247,15 @@ class OnboardingAiClient(
         }
 
     /**
-     * Grades a hire-submitted PR's real state against a rubric via the AI service's LLM judge --
-     * the highest-rigor rung of the verification ladder.
+     * Grades a hire-submitted PR's real state against a rubric via the AI service's LLM judge.
      *
-     * On the learner's request path, exactly like [gradeKnowledge] -- called synchronously per
-     * verification attempt, after the backend has already gathered [evidence] from GitHub itself
-     * (see `VerificationService.gradeArtifact`, which sources it via `GithubRepositoryApi`). The AI
-     * service never re-derives facts like merge/CI status; it only judges whether the evidence's
-     * content satisfies the rubric, and already short-circuits to a fail with no LLM call when
-     * there's no evidence or CI is explicitly failing. A non-2xx response is wrapped in an
-     * [OnboardingAiException] carrying the upstream status/body, same retryable-failure contract as
-     * [gradeKnowledge].
+     * [evidence] is gathered by the backend from GitHub beforehand (see
+     * `VerificationService.gradeArtifact`, which sources it via `GithubRepositoryApi`). ⚠️ The AI
+     * service never re-derives facts like merge or CI status; it judges only whether the evidence
+     * satisfies the rubric, and short-circuits to a fail with no LLM call when there is no evidence
+     * or CI is explicitly failing.
      *
-     * @param taskDescription The verification prompt describing what the PR must accomplish.
-     * @param rubric What the PR's real state must demonstrate.
-     * @param evidence The backend-gathered PR/repo state.
-     * @return The grading result returned by the AI service.
+     * A non-2xx carries the same retryable-failure contract as [gradeKnowledge].
      */
     suspend fun gradeArtifact(
         taskDescription: String,
@@ -332,7 +287,6 @@ class OnboardingAiClient(
      * running message list to carry back with each tool result appended. A non-2xx response is
      * wrapped in an [OnboardingAiException] carrying the upstream status/body.
      *
-     * @param request The running conversation and the backend tools the AI may call.
      * @return Either the final answer (`final=true`) or pending backend-tool calls (`final=false`).
      */
     suspend fun buddyAgentTurn(request: BuddyAgentRequest): BuddyAgentResponse =
@@ -351,18 +305,12 @@ class OnboardingAiClient(
     /**
      * Folds older buddy turns into the mentor's durable memory note.
      *
-     * ⚠️ **This is the call nobody is waiting on**, and it must stay that way. Folding on the agent
-     * hop runs the fold *before* the agent loop, so a long visit pays an extra serialized model call
-     * on every turn — ahead of the answer — to compress one exchange. The caller runs this after a
-     * turn instead.
+     * ⚠️ Nothing waits on this: call it after a turn, never ahead of the answer.
      *
      * A non-2xx (including the AI service's 503 for an unavailable model) is wrapped in an
-     * [OnboardingAiException]. **That is not a degraded success**: the caller must leave its cursor
+     * [OnboardingAiException]. ⚠️ That is not a degraded success — the caller must leave its cursor
      * where it is, because advancing past messages nothing summarized would drop them from both the
      * prompt and the memory standing in for it.
-     *
-     * @param request The note as it stands and the messages sliding out of the window.
-     * @return The rewritten note, covering the prior note plus those messages.
      */
     suspend fun compactBuddyMemory(request: BuddyCompactRequest): BuddyCompactResponse =
         try {
@@ -380,19 +328,10 @@ class OnboardingAiClient(
     /**
      * Opens a buddy visit: the greeting arrives as it is written.
      *
-     * ⚠️ **The AI service also has a non-streaming open, and this backend deliberately does not use
-     * it.** That one returns strict JSON whose **first** field is the memory note the hire never
-     * sees, so the greeting could not begin until up to 200 invisible words had been generated.
-     * This puts the greeting first and streams it, then carries the memory and any action on the
-     * terminal `done` — the same single model call either way.
-     *
-     * A malformed chunk is skipped rather than killing the stream, matching [streamProgress]. The
-     * AI service degrades to a plain welcome on its own failures, so an `error` chunk is not
-     * expected here — but a transport failure still surfaces to the caller, which treats it the
-     * same way [buddyOpen]'s does: the page opens with the fallback greeting.
-     *
-     * @param request The prior memory, the messages to fold, and the state snapshot.
-     * @return `token` chunks carrying the greeting, then one terminal `done`.
+     * The greeting streams as `token` chunks; the memory note and any opening action arrive on the
+     * terminal `done`. A malformed chunk is skipped rather than killing the stream, matching
+     * [streamProgress]. The AI service degrades to a plain welcome on its own failures, so an
+     * `error` chunk is not expected here — a transport failure still surfaces to the caller.
      */
     fun streamBuddyOpen(request: BuddyOpenRequest): Flow<BuddyOpenStreamEvent> =
         webClient
@@ -410,15 +349,10 @@ class OnboardingAiClient(
     /**
      * Runs the AI service's batch starter-work mining job over the ingested corpus.
      *
-     * The AI service is stateless: [activeSourceIds] (issues already in the backend's pool,
-     * proposed or approved) drive dedup, and [activeCompetencyKeys] (the backend's live graph
-     * keys) ground each proposed task's competency tags -- a tag outside this set is dropped by
-     * the AI service rather than invented. A non-2xx response is wrapped in an
-     * [OnboardingAiException] carrying the upstream status/body.
-     *
-     * @param activeSourceIds Issues already in the backend's starter-work pool.
-     * @param activeCompetencyKeys The backend's current live competency graph keys.
-     * @return The mining outcome returned by the AI service.
+     * The AI service is stateless: [activeSourceIds] (issues already in the backend's pool) drive
+     * dedup, and [activeCompetencyKeys] (the backend's live competency keys) ground each proposed
+     * task's tags — ⚠️ a tag outside this set is dropped by the AI service rather than invented. A
+     * non-2xx response is wrapped in an [OnboardingAiException] carrying the upstream status/body.
      */
     suspend fun proposeStarterWork(
         activeSourceIds: List<String> = emptyList(),
@@ -445,10 +379,9 @@ class OnboardingAiClient(
      *
      * The streaming twin of [assembleOrientation]: same inputs and same result, but the AI emits
      * [AiProgressEvent]s as it works (a `stage` per retrieval step, an `item` per grounded section,
-     * a terminal `done` carrying the whole outcome). Unlike [streamBuddy] an `error` chunk is *not*
-     * turned into an exception -- it is a terminal event the caller relays to the browser, so a hire
-     * watching the assembly sees it fail rather than the connection dropping. The persisted packet
-     * is taken from the `done` event's `result`, so it is byte-for-byte what the cached call returns.
+     * a terminal `done` carrying the whole outcome). ⚠️ An `error` chunk is not turned into an
+     * exception — it is a terminal event the caller relays to the browser. The persisted packet is
+     * taken from the `done` event's `result`, so it is byte-for-byte what the cached call returns.
      */
     fun streamOrientation(
         taskTitle: String,
@@ -497,7 +430,7 @@ class OnboardingAiClient(
      *
      * The streaming twin of [proposeStarterWork]: the AI emits a `stage` per pass and an `item` per
      * task as it clears the scope-safety judgement, then a terminal `done` carrying the outcome the
-     * backend persists — so a PM watches the pool fill one task at a time.
+     * backend persists.
      */
     fun streamStarterWork(
         activeSourceIds: List<String> = emptyList(),
@@ -514,9 +447,9 @@ class OnboardingAiClient(
     /**
      * Opens an SSE stream of [AiProgressEvent]s against [path], POSTing [body].
      *
-     * The reusable passthrough behind every streaming operation. A malformed chunk is logged and
-     * skipped (never kills the stream); the AI's own terminal `error` event passes straight through,
-     * because progress errors are shown, not thrown.
+     * The reusable passthrough behind every streaming operation. ⚠️ A malformed chunk is logged and
+     * skipped rather than killing the stream; the AI's own terminal `error` event passes straight
+     * through rather than throwing.
      */
     private inline fun <reified B> streamProgress(path: String, body: B): Flow<AiProgressEvent> =
         webClient

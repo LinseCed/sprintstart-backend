@@ -15,14 +15,10 @@ import java.util.UUID
  * be remembered. Without this row every crawl would re-derive the same vocabulary from the same
  * corpus, paying for a generation to be told nothing is new.
  *
- * ### One row, and why it is not per project
+ * ⚠️ **One row, not one per project.** Competencies are global and the generator retrieves across
+ * the whole corpus, so there is exactly one thing to remember.
  *
- * Competencies are global — "earn once, transfers" — and the generator retrieves across the whole
- * corpus rather than one project's slice, so there is exactly one thing to remember. That is the
- * pre-existing global-vocabulary decision, not something automation introduces; what automation
- * changes is how *often* it happens and that nobody is watching when it does.
- *
- * The module pass is deliberately **not** guarded by this. It has its own per-`(competency, project)`
+ * ⚠️ The module pass is **not** guarded by this. It has its own per-`(competency, project)`
  * fingerprint, and its real guard is "this competency has no module yet" — a competency left
  * uncovered by an earlier run must still be picked up when the corpus has not moved since.
  */
@@ -41,8 +37,8 @@ class VocabularyGenerationState(
         /**
          * The single row's id.
          *
-         * A fixed id rather than "whatever row exists": two crawls finishing at once would otherwise
-         * each insert their own, and the fingerprint would stop being a single fact about the corpus.
+         * ⚠️ A fixed id rather than "whatever row exists": two crawls finishing at once would each
+         * insert their own, and the fingerprint would stop being a single fact about the corpus.
          */
         val SINGLETON_ID: UUID = UUID.fromString("00000000-0000-0000-0000-00000000f1a6")
     }

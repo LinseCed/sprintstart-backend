@@ -16,33 +16,23 @@ import java.util.UUID
 /**
  * What onboarding means for one kind of role — the manifest a hire's onboarding is assembled from.
  *
- * ### A track is not a job title
+ * A track states, per role, the only two things that differ between a developer and a Scrum
+ * Master: **what counts as their work** ([evidenceKinds]) and **what to call it**
+ * ([contributionNoun] and friends). The ramp, the metrics and the ledger are shared.
  *
- * A track states, per role, the only two things that differ between a developer and a Scrum Master:
- * **what counts as their work** ([evidenceKinds]) and **what to call it** ([contributionNoun] and
- * friends). The ramp, the metrics and the ledger are shared, because none of them is about git.
+ * ⚠️ **A bundle of defaults, not a cage.** It does not stop a PM who ships code or an engineer who
+ * runs the retro from having contributions of both kinds — contributions are counted from one
+ * stream regardless of which source produced them.
  *
- * ⚠️ A track is a *bundle of defaults*, not a cage. It does not stop a PM who ships code or an
- * engineer who runs the retro from having contributions of both kinds — contributions are counted
- * from one stream regardless of which source produced them.
+ * ⚠️ **The vocabulary is structured, never prose.** The nouns are separate fields rendered into
+ * fixed slots; a track must never contribute arbitrary prose to the buddy's system prompt.
  *
- * ### Vocabulary is structured, never prose
+ * ⚠️ [evidenceKinds] is the single switch behind both "which contributions can this hire have" and
+ * "which buddy tools are worth offering them" — a track that cannot have a pull request must not be
+ * offered a tool that lists them.
  *
- * The nouns are separate fields rather than a free-text blob on purpose. They are rendered into
- * fixed slots — the ramp's copy, and later the buddy's persona skeleton. Letting a track contribute
- * arbitrary prose to the buddy's system prompt is how you get an incoherent mentor and a blown
- * context budget once there is more than one track.
- *
- * ### Evidence kinds decide what mounts
- *
- * [evidenceKinds] is the single switch behind both "which contributions can this hire even have"
- * and "which buddy tools are worth offering them". ⚠️ A track that cannot have a pull request must
- * not be offered a tool that lists pull requests, or the buddy opens a Scrum Master's first
- * conversation by discussing their pull requests.
- *
- * An **empty** [evidenceKinds] is a real and honest state, not a misconfiguration: it means nothing
- * this role does is observable yet, so their work cannot be measured until a source for it exists.
- * Saying that plainly beats inventing a number.
+ * ⚠️ An **empty** [evidenceKinds] is a real state, not a misconfiguration: nothing this role does is
+ * observable yet, so their work cannot be measured until a source for it exists.
  */
 @Entity
 @Table(name = "onboarding_tracks")

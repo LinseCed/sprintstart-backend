@@ -48,34 +48,28 @@ class BuddyToolExecutor(
     /**
      * The backend tools the AI reasoner is told it may call, for this hire.
      *
-     * Mounted per hire rather than globally, because a tool the hire's role can never have evidence
-     * for is worse than absent: offering `get_my_open_pull_requests` to a Scrum Master invites the
-     * mentor to open their first conversation by discussing pull requests they will never have. The
-     * gate is the track's evidence kinds, so a new evidence source mounts its own tools by
-     * declaring itself rather than by editing this list.
-     *
-     * It also keeps the reasoner's tool count down, which is the practical limit on how reliably it
-     * picks the right one.
+     * ⚠️ Mounted per hire, not globally: a tool the hire's role can never have evidence for
+     * invites the mentor to raise something they will never have. The gate is the track's evidence
+     * kinds, so a new evidence source mounts its own tools by declaring itself rather than by
+     * editing this list.
      */
     fun toolSpecs(userId: UUID): List<BuddyToolSpecDto> = buildList {
-        // First, because what has to be true before somebody can work comes before how their work
-        // is going. Mounted only when a step actually applies to them: the same "absent, never
-        // empty" gate the board card uses, read from the same service, so the card and the tool
-        // cannot disagree about whether this hire has an arrival list at all.
+        // ⚠️ First: what has to be true before somebody can work comes before how their work is
+        // going. Mounted only when a step applies -- "absent, never empty", read from the same
+        // service the board card uses so the two cannot disagree.
         if (arrivalStepService.forHire(userId).isNotEmpty()) {
             add(GET_ARRIVAL_STEPS_SPEC)
         }
         add(GET_MY_METRICS_SPEC)
         add(GET_MY_COMPETENCIES_SPEC)
-        // Inserted in place rather than appended, so a hire whose track admits pull requests is
-        // offered exactly the list -- and the order -- they were offered before tracks existed.
+        // Position matters: the spec order is the order the reasoner sees.
         if (admitsPullRequests(userId)) {
             add(GET_MY_OPEN_PULL_REQUESTS_SPEC)
         }
         add(GET_SUGGESTED_TASKS_SPEC)
         add(SEARCH_CANONICAL_ANSWERS_SPEC)
-        // Mounted with attestation rather than universally: naming teammates is only useful when
-        // the hire can actually ask one of them to confirm something.
+        // Gated on attestation: naming teammates is only useful when the hire can ask one of
+        // them to confirm something.
         if (trackService.admitsAnywhere(userId, ContributionEvidenceKind.ATTESTATION)) {
             add(GET_TEAMMATES_SPEC)
         }
@@ -91,21 +85,19 @@ class BuddyToolExecutor(
      * ground itself in. Reuses the exact reads the caller-scoped tools expose, so the opener and
      * the tools can never describe different states.
      *
-     * ⚠️ **Arrival comes first, and the order is the feature.** The failure this initiative exists
-     * to fix is a hire who could not clone the repository being greeted with a good first issue —
-     * and reading as calm rather than blocked, because the stall detector watches contributions. A
-     * greeting grounded in progress before setup reproduces exactly that. Omitted entirely when no
-     * step applies, for the reason the pull-request section is: a greeting grounded in "arrival:
-     * nothing" will find something to say about it.
+     * ⚠️ **Arrival comes first, and the order is the feature** — a greeting grounded in progress
+     * before setup greets a hire who cannot clone the repository with a good first issue. Omitted
+     * entirely when no step applies: a greeting grounded in "arrival: nothing" will find something
+     * to say about it.
      */
     fun stateSnapshot(userId: UUID): String =
         listOfNotNull(
             ("Before they can work:\n" + getArrivalSteps(userId))
                 .takeIf { arrivalStepService.forHire(userId).isNotEmpty() },
             "Progress:\n" + getMyMetrics(userId),
-            // Omitted entirely for a track that cannot have pull requests, rather than included as
-            // an empty section: a greeting grounded in "Open pull requests: none" will bring them
-            // up, which is exactly the opening a Scrum Master should never get.
+            // ⚠️ Omitted entirely for a track that cannot have pull requests, never included as
+            // an empty section -- a greeting grounded in "Open pull requests: none" will raise
+            // them anyway.
             ("Open pull requests:\n" + getMyOpenPullRequests(userId)).takeIf { admitsPullRequests(userId) },
             "Suggested tasks:\n" + getSuggestedTasks(userId),
             "Competencies:\n" + getMyCompetencies(userId),
@@ -131,10 +123,9 @@ class BuddyToolExecutor(
     /**
      * Who else is on the hire's projects, by id and name.
      *
-     * Exists so the buddy can offer to ask a *real, named* person to confirm the hire's work rather
-     * than guessing at one. The hire themselves is excluded from the list on purpose: an
-     * attestation confirmed by the person who did the work is not evidence, and the surest way to
-     * stop the buddy proposing that is to never show it the option.
+     * ⚠️ The hire themselves is excluded from the list: an attestation confirmed by the person
+     * who did the work is not evidence, and never showing the option is what stops the buddy
+     * proposing it.
      */
     private fun getTeammates(userId: UUID): String {
         val projects = userApi
@@ -285,8 +276,8 @@ class BuddyToolExecutor(
             return "You are not a member of any project yet, so there are no pull requests to show."
         }
         val sections = projects.mapNotNull { project ->
-            // Which pull requests count as open, and which leads, are decided in one place — the
-            // board shows the same list as cards, and the two must not be able to disagree.
+            // ⚠️ Which pull requests count as open, and which leads, are decided in one place --
+            // the board shows the same list as cards and the two must not disagree.
             val open = openPullRequestReader.openFor(project.projectId, login)
             if (open.isEmpty()) {
                 null
@@ -380,10 +371,8 @@ class BuddyToolExecutor(
         (arguments[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
 
     /**
-     * Not private, because the tool *names* are what [BuddySuggestionService] binds its chips to.
-     * A chip is only offered when the tool behind it is mounted for that hire, and binding to these
-     * constants rather than to copied strings is what makes that impossible to get wrong: rename a
-     * tool and the chip catalog stops compiling, instead of quietly offering a hire something the
+     * ⚠️ Not private: [BuddySuggestionService] binds its chips to these constants, so renaming a
+     * tool stops the chip catalog compiling rather than quietly offering a hire something the
      * mentor cannot answer.
      */
     companion object {

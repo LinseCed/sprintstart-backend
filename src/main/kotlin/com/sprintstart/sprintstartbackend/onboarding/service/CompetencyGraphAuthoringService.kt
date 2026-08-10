@@ -19,32 +19,20 @@ import java.time.Instant
 /**
  * Authoring the competency vocabulary: reading it, adding a competency, editing one, removing one.
  *
- * ### A list, not a graph
+ * ⚠️ **A list, not a graph. Nothing orders it** — there are no edges, and a structure claiming one
+ * thing "usually comes after" another is a claim nothing here can support.
  *
- * A competency is a plain, durable name for something somebody can be proficient in. The ledger
- * keys off it, a module teaches it, and the matcher counts it. ⚠️ **Nothing orders it** — there are
- * no edges, and a structure that claims one thing "usually comes after" another is a claim nothing
- * here can support.
+ * ⚠️ **Removal is a real delete**, and two things survive it because both are keyed by the
+ * competency *key* rather than by a foreign key: the **ledger** (nobody un-earns a competency
+ * because somebody tidied the vocabulary) and its **modules** (which stop appearing until a
+ * competency with that key exists again, and re-adding it restores them).
  *
- * ### Removal is a real delete
+ * ⚠️ **Deletion is sticky.** Removing a competency writes a [CompetencyTombstone] and the generator
+ * is given those as exclusions, or a removed competency returns on the next crawl under a
+ * rephrasing. A person re-adding the same key clears it — it binds the generator, not somebody who
+ * changed their mind.
  *
- * Two things deliberately survive it, both keyed by the competency *key* rather than by a foreign
- * key, which is what makes this safe:
- * - **the ledger** — `user_competency_states` rows are untouched, so nobody un-earns a competency
- *   because somebody tidied the vocabulary;
- * - **its modules** — an authored module is real work and is not thrown away on a tidy-up. It simply
- *   stops appearing in the learning area until a competency with that key exists again, which
- *   re-adding it restores.
- *
- * ### Deletion is sticky, and edits are protected
- *
- * Removing a competency writes a [CompetencyTombstone], and the generator is given those as
- * exclusions: without it, a competency a PM removes returns on the next crawl under a rephrasing and
- * they delete it forever. A person re-adding the same key clears the tombstone — it binds the
- * generator, not somebody who changed their mind.
- *
- * ⚠️ Every write here also marks the row `PM`, and regeneration must leave those alone — otherwise
- * "generation runs and an admin can correct it" means "generation overwrites the admin".
+ * ⚠️ Every write here marks the row `PM`, and regeneration must leave those alone.
  */
 @Service
 class CompetencyGraphAuthoringService(

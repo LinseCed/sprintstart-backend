@@ -13,13 +13,9 @@ import java.util.UUID
  * *where it looks* and *how strong the result is*, which is why [kind] is the only thing an
  * implementation declares beyond the read itself.
  *
- * ### Every provider runs for every hire
- *
- * Providers are **not** filtered by the hire's track. A track's admitted evidence kinds govern
- * which buddy tools mount and what a PM is warned about; they must not govern what counts, or a PM
- * who also ships code would lose credit for their pull requests and a developer who runs the retro
- * would lose credit for that. A track is a bundle of defaults, not a cage — the ramp counts
- * accepted work whatever produced it.
+ * ⚠️ **Every provider runs for every hire.** Providers are **not** filtered by the hire's track: a
+ * track's admitted evidence kinds govern which buddy tools mount and what a PM is warned about,
+ * never what counts. A track is a bundle of defaults, not a cage.
  */
 interface EvidenceProvider {
     /** What this provider produces, and therefore how strong its contributions are. */

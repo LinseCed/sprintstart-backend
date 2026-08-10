@@ -81,20 +81,14 @@ class GithubClient(
     /**
      * Whether a GitHub account with this login exists — or `null` when GitHub would not say.
      *
-     * Deliberately **three-valued, and deliberately unauthenticated.** Whether a public account
-     * exists is not privileged information, so no token is threaded through here: the alternative
-     * would be borrowing somebody's personal access token to answer a question about a third
-     * person, which couples this check to a connector being configured at all.
-     *
-     * The cost of that is GitHub's unauthenticated rate limit (60/hour per IP). It is affordable
-     * because the answer is *stored* against the user and only re-checked when their login changes
-     * or a previous check could not run — not because the limit is generous.
+     * **Three-valued, and unauthenticated** — no token is threaded through here. ⚠️ The cost is
+     * GitHub's unauthenticated rate limit (60/hour per IP), affordable only because the answer is
+     * *stored* against the user and re-checked when their login changes or a previous check could
+     * not run.
      *
      * ⚠️ **Only a 404 means "no such account".** A rate limit, a 5xx or a dropped connection all
-     * return null, never false. An outage is not evidence about the world, and telling somebody
-     * their perfectly good username does not exist is worse than telling them nothing.
+     * return null, never false — an outage is not evidence about the world.
      *
-     * @param login The account to look for, already normalised.
      * @return true when it exists, false when GitHub says it does not, null when GitHub would not
      * answer.
      */
@@ -197,19 +191,14 @@ class GithubClient(
     /**
      * The changed files of one pull request, **with their diffs**.
      *
-     * ⚠️ **A second call, deliberately.** Everything else about a pull request comes from one
-     * GraphQL query, and this does not join it because it cannot: GraphQL's
-     * `PullRequestChangedFile` has a path and counts but **no patch**. Artifact verification was
-     * judging whether work was really done from filenames alone — which cannot tell a fix from a
-     * whitespace edit to the right file — so it pays for one REST call rather than guessing.
+     * ⚠️ **A second call, and it cannot be joined into the GraphQL one**: GraphQL's
+     * `PullRequestChangedFile` has a path and counts but **no patch**. Patch text is REST-only.
      *
-     * Capped at [MAX_FILES_PER_PAGE] files, one page. A pull request with more changed files than
-     * that is not a starter task, and paging it would spend a hire's verification latency gathering
-     * evidence no judge should be reading in full anyway.
+     * Capped at [MAX_FILES_PER_PAGE] files, one page.
      *
-     * Returns an empty list rather than throwing when GitHub will not answer: **an unavailable diff
-     * is not evidence of an empty one**, and the caller says so to the model rather than failing
-     * somebody's work on a network error.
+     * ⚠️ Returns an empty list rather than throwing when GitHub will not answer: **an unavailable
+     * diff is not evidence of an empty one**, and the caller says so to the model rather than
+     * failing somebody's work on a network error.
      */
     suspend fun fetchPullRequestFiles(
         repository: GithubRepositoryConnection,
@@ -255,18 +244,10 @@ class GithubClient(
     }
 
     /**
-     * Discovers repositories of a given GitHub user.
+     * Discovers repositories of a given GitHub user, authenticating with [token].
      *
-     * This method queries the GitHub API to fetch repositories associated with the specified user.
-     * Authentication is performed using the provided personal access token (PAT).
-     *
-     * @param user the username of the GitHub user whose repositories are to be discovered.
-     * @param token the personal access token (PAT) used to authenticate the request to the GitHub API.
      * @param page the zero-based index of the page to fetch.
-     * @param pageSize the number of repositories to fetch per page.
-     * @return a [DiscoverRepositoriesResponse] object containing the list of repositories belonging to the user.
-     * @throws WebClientException if there is an issue with the network or server response, such as a non-2xx status
-     * code.
+     * @throws WebClientException on a network problem or a non-2xx status code.
      */
     suspend fun discoverRepositoriesOfUser(
         user: String,
@@ -332,14 +313,7 @@ class GithubClient(
     /**
      * Fetches a single pull request from a GitHub repository.
      *
-     * This method queries the GitHub API to retrieve details of a specific pull request
-     * identified by its number within the specified repository.
-     *
-     * @param repository the repository containing the pull request.
-     * @param prNumber the number of the pull request to fetch.
-     * @param query the GraphQL query used to retrieve the pull request data.
-     * @return the details of the requested pull request as a [PullRequest] object, or null if
-     *         the pull request does not exist or the API response is incomplete.
+     * @return the pull request, or null if it does not exist or the API response is incomplete.
      */
     private suspend fun fetchSinglePullRequest(
         repository: GithubRepositoryConnection,
@@ -368,17 +342,11 @@ class GithubClient(
     }
 
     /**
-     * Fetches all paginated data using the provided GraphQL query and variables.
+     * Sends [query] repeatedly until every page has been fetched, following the pagination
+     * information in each response.
      *
-     * This method sends a GraphQL request repeatedly until all pages of data have been fetched
-     * by leveraging the pagination information available in the response.
-     *
-     * @param query the GraphQL query used to fetch data.
-     * @param token the GitHub PAT used for authentication.
-     * @param variablesBuilder a function that builds the variables map for the query. The function takes
-     * a cursor as input and returns a map of variables. The cursor is used to navigate through
-     * the paginated results.
-     * @return a list of all fetched entities of type [S].
+     * @param variablesBuilder Builds the variables map for one page; the cursor it is given is null
+     * for the first page and the previous response's end cursor thereafter.
      */
     private suspend inline fun <S, reified T : PageableResponse<S>> doFetchAll(
         query: String,

@@ -12,30 +12,17 @@ import java.util.UUID
 /**
  * The real work a hire has completed on a project — whatever form that work takes.
  *
- * ### Why this exists
+ * A [Contribution] is a unit of real work stated generally: authored by the hire, answered by
+ * somebody, possibly sent back, eventually accepted or not. ⚠️ Those four moments are the whole
+ * measurement surface and **none of them are specific to git** — reading pull requests directly
+ * puts "this hire writes code" into the definition of progress, which leaves a Scrum Master
+ * permanently at stage zero and invisible on the PM dashboard.
  *
- * Onboarding is measured by getting somebody to a unit of real work the team accepted, and then to
- * the next one with less help. The *pull request* was never the point; it is one instantiation of
- * that idea, and the only one a code-only corpus can see. Reading pull requests directly, as
- * [RampService] and [OnboardingMetricsService] used to, put "this hire writes code" into the
- * definition of progress — so a Scrum Master or a PM was permanently at stage zero, permanently
- * "no pull request opened", and permanently invisible on the PM dashboard.
+ * ⚠️ **Derived on read** from artifacts ingestion already holds, so there is no second log to drift
+ * and nothing to backfill. Attestations are the exception, and have a table.
  *
- * A [Contribution] is that unit stated generally: authored by the hire, answered by somebody,
- * possibly sent back, eventually accepted or not. Those four moments are the whole measurement
- * surface, and none of them are specific to git.
- *
- * ### Derived where it can be
- *
- * Pull-request contributions are composed on read from artifacts ingestion already holds, following
- * the rule [OnboardingMetricsService] documents: a second log of facts that already live somewhere
- * durable would drift and would need a backfill. Attestations are the exception that proves it —
- * nobody records that a retro was well run until somebody is asked, so that one has a table.
- *
- * ### One stream, many sources
- *
- * This service is only the composition rule: every [EvidenceProvider] runs, and their
- * contributions become one time-ordered stream that the ramp and the metrics read.
+ * This service is only the composition rule: every [EvidenceProvider] runs, and their contributions
+ * become one time-ordered stream that the ramp and the metrics read.
  */
 @Service
 class ContributionService(

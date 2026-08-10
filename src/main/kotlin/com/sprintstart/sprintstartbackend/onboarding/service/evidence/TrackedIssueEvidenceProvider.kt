@@ -13,28 +13,15 @@ import java.util.UUID
 /**
  * Issues assigned to the hire in a connected tracker, as contributions.
  *
- * ### Why this is the point of the whole initiative
+ * An assigned tracker issue somebody else accepted produces [Rigor.OBSERVED] evidence, on the same
+ * stream and measured by the same four moments as a merged pull request — so a role that never
+ * opens a pull request needs nobody to vouch for it.
  *
- * Role tracks shipped with attestation so that somebody who never opens a pull request could finish
- * onboarding at all — a named colleague vouching for work nothing observed. That was always the
- * honest *interim*: the design's own words are that the end state is **connectors turning
- * attestation back into observation**, because once a system watched somebody else accept the work,
- * no person needs to vouch for it. This is that provider.
- *
- * A Scrum Master who runs the board, a designer who ships tickets, an analyst who closes
- * investigation issues — all of them now produce [Rigor.OBSERVED] evidence, on the same stream and
- * measured by the same four moments as a merged pull request.
- *
- * ### Every provider runs for every hire
- *
- * Mounted unconditionally, like its siblings, and deliberately not gated on the hire's track: a
- * developer who also closes tickets gets credit for both, and a track admitting `TRACKED_ISSUE`
- * governs which tools mount and what a PM is warned about — never what counts. A track is a bundle
- * of defaults, not a cage.
+ * ⚠️ **Mounted unconditionally, never gated on the hire's track** (see [EvidenceProvider]): a
+ * developer who also closes tickets gets credit for both.
  *
  * ⚠️ **Nothing here is stored.** Derived on read from ingested issues, exactly as pull requests
- * are, so there is no backfill and no second copy to drift. A project that connects Jira tomorrow
- * has its hires' history the same day.
+ * are, so there is no backfill and no second copy to drift.
  */
 @Component
 class TrackedIssueEvidenceProvider(
