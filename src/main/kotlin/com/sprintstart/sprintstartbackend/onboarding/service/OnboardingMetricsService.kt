@@ -18,25 +18,12 @@ import java.util.UUID
 /**
  * How long onboarding is actually taking, derived from what the system already records.
  *
- * ### Why this is derived rather than emitted
+ * ⚠️ **Derived on read, never emitted.** There is no onboarding event table: every fact here
+ * already exists somewhere durable, and a second log would be a version of the same truth that
+ * drifts.
  *
- * There is no onboarding event table. Every fact here already exists somewhere durable — a project
- * assignment, a claimed goal, an ingested pull request — and copying those into a second log would
- * create two versions of the same truth that drift, plus a backfill problem for everything that
- * happened before the log existed. Deriving means the metrics cover history from the day this
- * shipped, without migrating anything.
- *
- * Events that are *not* derivable from existing rows — a buddy conversation, an environment that
- * came up on somebody's laptop — will need somewhere to be written. That is deliberately deferred
- * to the slices that introduce them, so the storage decision is made when there is a real event to
- * store rather than in advance.
- *
- * ### What it will not do
- *
- * Nothing here reports a percentage of anything completed. The measure of onboarding is
- * time-to-first-merged-pull-request and time-to-autonomy; a completion percentage over generated
- * content is the metric this initiative moved away from, and republishing it under a new name would
- * put it straight back.
+ * ⚠️ **Nothing here reports a percentage of anything completed.** The measure is
+ * time-to-first-accepted-contribution and time-to-autonomy.
  */
 @Service
 class OnboardingMetricsService(
@@ -92,8 +79,8 @@ class OnboardingMetricsService(
         val now = clock.instant()
         val login = member.githubLogin
 
-        // No attributable identity means no contributions can be found. Reporting that as "did
-        // nothing" would be a lie about the person rather than about the data.
+        // ⚠️ No attributable identity means no contributions can be found — which is not the
+        // same as having done nothing.
         val contributions = contributionService.forHire(member, projectId)
 
         val opened = contributions.mapNotNull { it.openedAt }.minOrNull()
@@ -152,9 +139,7 @@ class OnboardingMetricsService(
     /**
      * Why this hire is stuck, in the words a PM would use — or null if they are not.
      *
-     * The reasons are ordered by what a PM should do about them, not by severity. Work waiting on a
-     * response is somebody else's action and is named first; a hire who has produced nothing is a
-     * conversation.
+     * The reasons are ordered by what a PM should do about them, not by severity.
      */
     private fun stalledReason(
         member: ProjectMember,
@@ -164,15 +149,11 @@ class OnboardingMetricsService(
         firstAcceptedAt: Instant?,
         now: Instant,
     ): String? {
-        // Can this hire's work be seen at all? A missing GitHub username used to end the question
-        // here, which is how a non-engineering hire became *invisible*: nothing could be attributed
-        // to them, so they were never stalled, so nobody was ever told. They were not calm, they
-        // were unobserved, and those read identically to a PM.
-        //
-        // Attested evidence is attributed by identity rather than by a git handle, so a track that
-        // admits it can be judged with no GitHub login at all — and for that hire an empty
-        // contribution list is a real answer rather than a blind spot. The gate is now what it
-        // always meant: skip only when there is genuinely no way to see.
+        // ⚠️ Skip only when there is genuinely no way to see this hire's work. Attested evidence
+        // is attributed by identity, not by a git handle, so a track admitting it can be judged
+        // with no GitHub login at all -- and for that hire an empty contribution list is a real
+        // answer, not a blind spot. Gating on the login alone makes such a hire *invisible*:
+        // never stalled, so nobody is ever told.
         if (member.githubLogin.isNullOrBlank() &&
             !track.admits(ContributionEvidenceKind.ATTESTATION)
         ) {
