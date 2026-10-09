@@ -30,7 +30,6 @@ class BuddyTeamTools(
     private val buddyProposalService: BuddyProposalService,
     private val buddyAppGuideTools: BuddyAppGuideTools,
 ) {
-    // Lazy: an area's tools may depend on services that depend on this one.
     private val areaTools: Map<TeamArea, TeamAreaTools> by lazy {
         areaToolsProvider.orderedStream().toList().associateBy { it.area }
     }
@@ -54,7 +53,6 @@ class BuddyTeamTools(
     fun toolSpecs(openedAreas: Set<TeamArea>): List<BuddyToolSpecDto> =
         buildList {
             addAll(teamReadTools.toolSpecs())
-            // Outside the areas, so "where do I set up roles?" is answerable before anything is opened.
             add(BuddyAppGuideTools.GET_APP_GUIDE_SPEC)
             if (openableAreas.isNotEmpty()) {
                 add(openAreaSpec())
@@ -124,8 +122,6 @@ class BuddyTeamTools(
                 "is not there, open its area first, or call it by the name listed below: its area is opened " +
                 "for you and you call it again on your next step. Never say something has been offered for " +
                 "confirmation unless a tool of an opened area did it.\n\nThe areas, and the tools in each:\n" +
-                // Names, not definitions: the model can only call a tool it knows exists, and the conversation
-                // keeps text only, so without them a later message never learns what an area holds.
                 openableAreas.sorted().joinToString("\n") {
                     "- ${it.name.lowercase()}: ${it.summary} (tools: ${toolNamesIn(it).joinToString(", ")})"
                 },
@@ -134,9 +130,6 @@ class BuddyTeamTools(
                 putJsonObject("properties") {
                     putJsonObject("area") {
                         put("type", "string")
-                        // The same set toolSpecs and openArea use. Listing only areas with read tools
-                        // would mount open_area and still forbid the model from opening an area whose
-                        // tools are all actions.
                         putJsonArray("enum") { openableAreas.sorted().forEach { add(it.name.lowercase()) } }
                         put("description", "The area to open.")
                     }

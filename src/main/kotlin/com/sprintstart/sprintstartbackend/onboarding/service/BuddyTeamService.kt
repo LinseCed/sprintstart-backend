@@ -141,10 +141,8 @@ class BuddyTeamService(
         val userId = authorize(authId, projectId)
         val session = getOrCreateSession(userId, projectId)
 
-        // Read before saving the new message so it is not sent to the AI twice.
         val transcript = buddyTeamMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
         val history = transcript.drop(session.summarizedCount).map { it.toAgentMessage() }
-        // From the whole transcript, not the unfolded part: a fold must not close an area still in use.
         val carriedOver = transcript.areasStillOpen()
 
         buddyTeamMessageRepository.save(
@@ -166,8 +164,6 @@ class BuddyTeamService(
                 areas = OpenAreas(carriedOver),
             )
 
-            // Words are streamed while the loop runs, so a stop or failure at any hop leaves a partial reply
-            // worth keeping. This also catches cancellation, which is rethrown.
             try {
                 with(teamAgentLoop) { runTurn(turn) }
             } catch (e: Exception) {
