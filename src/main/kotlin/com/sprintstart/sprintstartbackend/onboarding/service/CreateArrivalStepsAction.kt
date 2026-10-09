@@ -5,14 +5,30 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposa
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.add
-import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.springframework.stereotype.Component
+
+/** One step of a confirmed batch. */
+@Serializable
+data class NewArrivalStepParams(
+    val key: String,
+    val title: String,
+    val description: String? = null,
+    val href: String? = null,
+    @SerialName("settled_by") val settledBy: Rigor = Rigor.DECLARED,
+)
+
+/** The steps a confirmed batch adds, in order. */
+@Serializable
+data class CreateArrivalStepsParams(
+    val steps: List<NewArrivalStepParams>,
+)
 
 /**
  * Offers to add one or more steps to the project's arrival list.
@@ -22,7 +38,7 @@ import org.springframework.stereotype.Component
 @Component
 class CreateArrivalStepsAction(
     private val arrivalStepService: ArrivalStepService,
-) : TeamActionHandler {
+) : TypedTeamAction<CreateArrivalStepsParams>(CreateArrivalStepsParams.serializer()) {
     override val area = TeamArea.ARRIVAL
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -125,20 +141,10 @@ class CreateArrivalStepsAction(
             )
         }
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                putJsonArray("steps") {
-                    drafted.forEach { step ->
-                        addJsonObject {
-                            put("key", step.key)
-                            put("title", step.title)
-                            step.description?.let { put("description", it) }
-                            step.href?.let { put("href", it) }
-                            put("settled_by", step.rigor.name)
-                        }
-                    }
-                }
-            },
+        return proposed(
+            params = CreateArrivalStepsParams(
+                drafted.map { NewArrivalStepParams(it.key, it.title, it.description, it.href, it.rigor) },
+            ),
             label = if (drafted.size == 1) {
                 "Add arrival step: ${drafted.single().title.forLabel()}"
             } else {
@@ -180,20 +186,20 @@ class CreateArrivalStepsAction(
         )
     }.trim()
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
+    override fun recheckParams(params: CreateArrivalStepsParams, context: TeamToolContext): String? {
         val taken = arrivalStepService.listForAuthoring(context.projectId).map { it.key }.toSet()
-        val clash = params.objectArray("steps").map { it.text("key") }.firstOrNull { it in taken }
+        val clash = params.steps.map { it.key }.firstOrNull { it in taken }
         return clash?.let { "An arrival step '$it' was added since, so nothing was changed." }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val steps = params.objectArray("steps").map { step ->
+    override suspend fun performParams(params: CreateArrivalStepsParams, context: TeamToolContext): String {
+        val steps = params.steps.map { step ->
             NewArrivalStep(
-                key = step.text("key"),
-                title = step.text("title"),
-                description = step.text("description").ifBlank { null },
-                href = step.text("href").ifBlank { null },
-                settledBy = rigorOrNull(step.text("settled_by")) ?: Rigor.DECLARED,
+                key = step.key,
+                title = step.title,
+                description = step.description?.ifBlank { null },
+                href = step.href?.ifBlank { null },
+                settledBy = step.settledBy,
             )
         }
         arrivalStepService.createAll(context.projectId, steps)

@@ -3,11 +3,16 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
 import java.util.UUID
+
+/** The feedback a confirmed review marks as read. */
+@Serializable
+data class MarkFeedbackReadParams(
+    @SerialName("feedback_id") @Serializable(with = UuidSerializer::class) val feedbackId: UUID,
+)
 
 /**
  * Offers to mark a hire's feedback as read.
@@ -20,7 +25,7 @@ import java.util.UUID
 class MarkFeedbackReadAction(
     private val scope: ContentScope,
     private val onboardingFeedbackService: OnboardingFeedbackService,
-) : TeamActionHandler {
+) : TypedTeamAction<MarkFeedbackReadParams>(MarkFeedbackReadParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -43,8 +48,8 @@ class MarkFeedbackReadAction(
             ?: return TeamActionDraft.Refused(goneSince(PathElementKind.FEEDBACK))
         if (feedback.read) return TeamActionDraft.Refused("That feedback is already marked as read.")
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject { put("feedback_id", feedback.id.toString()) },
+        return proposed(
+            params = MarkFeedbackReadParams(feedback.id),
             label = "Mark ${scoped.owner.displayName.forLabel()}'s feedback read",
             preview = buildString {
                 appendLine("Mark this feedback from ${scoped.owner.displayName} as read:")
@@ -57,8 +62,8 @@ class MarkFeedbackReadAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
-        val scoped = scope.element(PathElementKind.FEEDBACK, params.uuid("feedback_id"), context.projectId)
+    override fun recheckParams(params: MarkFeedbackReadParams, context: TeamToolContext): String? {
+        val scoped = scope.element(PathElementKind.FEEDBACK, params.feedbackId, context.projectId)
             ?: return goneSince(PathElementKind.FEEDBACK)
         val alreadyRead = onboardingFeedbackService
             .getAllFeedbackByUserId(scoped.owner.userId)
@@ -67,9 +72,8 @@ class MarkFeedbackReadAction(
         return "Somebody already marked that feedback as read, so nothing was changed.".takeIf { alreadyRead == true }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val id: UUID = requireNotNull(params.uuid("feedback_id"))
-        onboardingFeedbackService.markFeedbackAsRead(id)
+    override suspend fun performParams(params: MarkFeedbackReadParams, context: TeamToolContext): String {
+        onboardingFeedbackService.markFeedbackAsRead(params.feedbackId)
         return "Marked as read."
     }
 }

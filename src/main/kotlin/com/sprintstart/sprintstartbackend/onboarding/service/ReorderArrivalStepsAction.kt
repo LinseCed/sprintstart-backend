@@ -3,13 +3,20 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.springframework.stereotype.Component
+
+/** The complete order, by key, that a confirmed reorder applies. */
+@Serializable
+data class ReorderArrivalStepsParams(
+    @SerialName("ordered_keys") val orderedKeys: List<String>,
+)
 
 /**
  * Offers a whole new order for the project's arrival list.
@@ -19,7 +26,7 @@ import org.springframework.stereotype.Component
 @Component
 class ReorderArrivalStepsAction(
     private val arrivalStepService: ArrivalStepService,
-) : TeamActionHandler {
+) : TypedTeamAction<ReorderArrivalStepsParams>(ReorderArrivalStepsParams.serializer()) {
     override val area = TeamArea.ARRIVAL
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -55,8 +62,8 @@ class ReorderArrivalStepsAction(
         }
 
         val titles = steps.associate { it.key to it.title }
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject { putJsonArray("ordered_keys") { ordered.forEach { add(it) } } },
+        return proposed(
+            params = ReorderArrivalStepsParams(ordered),
             label = "Reorder ${ordered.size} arrival steps",
             preview = buildString {
                 appendLine("Put this project's arrival list in this order:")
@@ -90,16 +97,14 @@ class ReorderArrivalStepsAction(
         return null
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
+    override fun recheckParams(params: ReorderArrivalStepsParams, context: TeamToolContext): String? {
         val present = arrivalStepService.listForAuthoring(context.projectId).map { it.key }
-        val ordered = params.textArray("ordered_keys")
         return "The arrival list changed since, so the order was not applied."
-            .takeIf { disagreement(ordered, present) != null }
+            .takeIf { disagreement(params.orderedKeys, present) != null }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val ordered = params.textArray("ordered_keys")
-        arrivalStepService.reorder(context.projectId, ordered)
+    override suspend fun performParams(params: ReorderArrivalStepsParams, context: TeamToolContext): String {
+        arrivalStepService.reorder(context.projectId, params.orderedKeys)
         return "Reordered. This project's arrival list now runs in the order you confirmed."
     }
 }

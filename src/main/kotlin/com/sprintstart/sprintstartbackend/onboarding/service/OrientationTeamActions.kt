@@ -9,6 +9,8 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.A
 import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.AuthorOrientationRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.AuthorOrientationSectionRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationPacketResponse
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
@@ -79,31 +81,71 @@ private fun readSections(raw: List<JsonObject>): Pair<List<AuthorOrientationSect
     return sections to null
 }
 
-private fun AuthorOrientationRequest.stored(): JsonObject =
-    buildJsonObject {
-        summary?.let { put("summary", it) }
-        putJsonArray("sections") {
-            sections.forEach { section ->
-                add(
-                    buildJsonObject {
-                        put("step", section.step.name)
-                        put("title", section.title)
-                        put("body", section.body)
-                        putJsonArray("citations") {
-                            section.citations.forEach { citation ->
-                                add(
-                                    buildJsonObject {
-                                        put("filename", citation.filename)
-                                        citation.sourceUrl?.let { put("source_url", it) }
-                                    },
-                                )
-                            }
-                        }
-                    },
-                )
-            }
-        }
-    }
+/** A source a stored section points at. */
+@Serializable
+data class StoredCitation(
+    val filename: String,
+    @SerialName("source_url") val sourceUrl: String? = null,
+)
+
+/** One section of a stored packet. */
+@Serializable
+data class StoredSection(
+    val step: OrientationStep,
+    val title: String,
+    val body: String,
+    val citations: List<StoredCitation> = emptyList(),
+)
+
+/** The packet a confirmed authoring saves, exactly as the manager saw it. */
+@Serializable
+data class StoredPacket(
+    val summary: String? = null,
+    val sections: List<StoredSection>,
+)
+
+/** The packet to save for a task, and the version of the packet the manager's preview replaced. */
+@Serializable
+data class AuthorOrientationPacketParams(
+    @SerialName("task_id") @Serializable(with = UuidSerializer::class) val taskId: UUID,
+    @SerialName("base_version") val baseVersion: String,
+    val packet: StoredPacket,
+)
+
+/** The task whose packet a confirmed revert drops, and the version the manager's preview was written against. */
+@Serializable
+data class RevertOrientationPacketParams(
+    @SerialName("task_id") @Serializable(with = UuidSerializer::class) val taskId: UUID,
+    @SerialName("base_version") val baseVersion: String,
+)
+
+private fun AuthorOrientationRequest.stored(): StoredPacket =
+    StoredPacket(
+        summary,
+        sections.map { section ->
+            StoredSection(
+                section.step,
+                section.title,
+                section.body,
+                section.citations.map { StoredCitation(it.filename, it.sourceUrl) },
+            )
+        },
+    )
+
+private fun StoredPacket.toRequest(): AuthorOrientationRequest =
+    AuthorOrientationRequest(
+        summary?.takeIf { it.isNotEmpty() },
+        sections.map { section ->
+            AuthorOrientationSectionRequest(
+                section.step,
+                section.title,
+                section.body,
+                section.citations.map {
+                    AuthorOrientationCitationRequest(it.filename, it.sourceUrl?.takeIf { url -> url.isNotEmpty() })
+                },
+            )
+        },
+    )
 
 /** The sections as the hire will read them, in full — what the manager is agreeing to is the text. */
 private fun AuthorOrientationRequest.readable(): String =
@@ -151,7 +193,7 @@ private fun orientationSectionSchema() =
 class AuthorOrientationPacketAction(
     private val scope: ContentScope,
     private val taskOrientationService: TaskOrientationService,
-) : TeamActionHandler {
+) : TypedTeamAction<AuthorOrientationPacketParams>(AuthorOrientationPacketParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -192,13 +234,9 @@ class AuthorOrientationPacketAction(
         val request = AuthorOrientationRequest(call.textArgument("summary").takeIf { it.isNotEmpty() }, sections)
         val existing = currentPacket(taskOrientationService, task.id, context.projectId)
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("task_id", task.id.toString())
-                // What the packet was when this was written, so a confirm can tell it was replaced since.
-                put("base_version", existing.version())
-                put("packet", request.stored())
-            },
+        return proposed(
+            // The version is what the packet was when this was written, so a confirm can tell it was replaced since.
+            params = AuthorOrientationPacketParams(task.id, existing.version(), request.stored()),
             label = "Write the orientation for “${task.title.forLabel()}”",
             preview = buildString {
                 appendLine("Write the orientation packet for “${task.title}” on this project. Hires read this:")
@@ -213,20 +251,14 @@ class AuthorOrientationPacketAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
-        val task = scope.proposal(params.uuid("task_id"), context.projectId) ?: return TASK_NOT_HERE
+    override fun recheckParams(params: AuthorOrientationPacketParams, context: TeamToolContext): String? {
+        val task = scope.proposal(params.taskId, context.projectId) ?: return TASK_NOT_HERE
         val now = currentPacket(taskOrientationService, task.id, context.projectId).version()
-        return PACKET_CHANGED.takeIf { now != params.text("base_version") }
+        return PACKET_CHANGED.takeIf { now != params.baseVersion }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val packet = params["packet"] as JsonObject
-        val (sections, _) = readSections(packet.objectArray("sections"))
-        taskOrientationService.authorPacket(
-            requireNotNull(params.uuid("task_id")),
-            context.projectId,
-            AuthorOrientationRequest(packet.text("summary").takeIf { it.isNotEmpty() }, requireNotNull(sections)),
-        )
+    override suspend fun performParams(params: AuthorOrientationPacketParams, context: TeamToolContext): String {
+        taskOrientationService.authorPacket(params.taskId, context.projectId, params.packet.toRequest())
         return "Saved. Hires get exactly this text for the task."
     }
 }
@@ -236,7 +268,7 @@ class AuthorOrientationPacketAction(
 class RevertOrientationPacketAction(
     private val scope: ContentScope,
     private val taskOrientationService: TaskOrientationService,
-) : TeamActionHandler {
+) : TypedTeamAction<RevertOrientationPacketParams>(RevertOrientationPacketParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
     override val spec = BuddyToolSpecDto(
@@ -257,11 +289,8 @@ class RevertOrientationPacketAction(
         val existing = currentPacket(taskOrientationService, task.id, context.projectId)
             ?: return TeamActionDraft.Refused("There is no packet for that task, so there is nothing to drop.")
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("task_id", task.id.toString())
-                put("base_version", existing.version())
-            },
+        return proposed(
+            params = RevertOrientationPacketParams(task.id, existing.version()),
             label = "Drop the orientation for “${task.title.forLabel()}”",
             preview = buildString {
                 appendLine(
@@ -276,14 +305,14 @@ class RevertOrientationPacketAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
-        val task = scope.proposal(params.uuid("task_id"), context.projectId) ?: return TASK_NOT_HERE
+    override fun recheckParams(params: RevertOrientationPacketParams, context: TeamToolContext): String? {
+        val task = scope.proposal(params.taskId, context.projectId) ?: return TASK_NOT_HERE
         val now = currentPacket(taskOrientationService, task.id, context.projectId).version()
-        return PACKET_CHANGED.takeIf { now != params.text("base_version") }
+        return PACKET_CHANGED.takeIf { now != params.baseVersion }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        taskOrientationService.revertToAi(requireNotNull(params.uuid("task_id")), context.projectId)
+    override suspend fun performParams(params: RevertOrientationPacketParams, context: TeamToolContext): String {
+        taskOrientationService.revertToAi(params.taskId, context.projectId)
         return "Dropped. The next hire gets a packet assembled from the docs."
     }
 }

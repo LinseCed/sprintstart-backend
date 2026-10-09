@@ -3,16 +3,20 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
+
+/** The arrival step, by key, that a confirmed deletion removes. */
+@Serializable
+data class DeleteArrivalStepParams(
+    val key: String,
+)
 
 /** Offers to take a step off the project's arrival list. */
 @Component
 class DeleteArrivalStepAction(
     private val arrivalStepService: ArrivalStepService,
-) : TeamActionHandler {
+) : TypedTeamAction<DeleteArrivalStepParams>(DeleteArrivalStepParams.serializer()) {
     override val area = TeamArea.ARRIVAL
     override val risk = BuddyProposalRisk.DESTRUCTIVE
     override val spec = BuddyToolSpecDto(
@@ -33,8 +37,8 @@ class DeleteArrivalStepAction(
         // Deleting a project step lets the company step of the same key back onto every hire's list.
         val restored = arrivalStepService.listForAuthoring(null).firstOrNull { it.key == key }
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject { put("key", key) },
+        return proposed(
+            params = DeleteArrivalStepParams(key),
             label = "Remove arrival step: ${step.title.forLabel()}",
             preview = buildString {
                 appendLine("Remove “${step.title}” [key: $key] from this project's arrival list.")
@@ -55,11 +59,11 @@ class DeleteArrivalStepAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        STEP_GONE_SINCE.takeIf { arrivalStepService.stepOn(params.text("key"), context.projectId) == null }
+    override fun recheckParams(params: DeleteArrivalStepParams, context: TeamToolContext): String? =
+        STEP_GONE_SINCE.takeIf { arrivalStepService.stepOn(params.key, context.projectId) == null }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val key = params.text("key")
+    override suspend fun performParams(params: DeleteArrivalStepParams, context: TeamToolContext): String {
+        val key = params.key
         arrivalStepService.delete(key, context.projectId)
         return "Removed. '$key' is off this project's arrival list, and hires' records of it are kept."
     }

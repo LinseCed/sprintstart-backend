@@ -177,7 +177,14 @@ class OrientationTeamActionsTest {
 
             f.task(linked = false).let { unlinked ->
                 assertThat(
-                    action.recheck(f.json("task_id" to unlinked.id), f.context),
+                    action.recheck(
+                        f.json(
+                            "task_id" to unlinked.id,
+                            "base_version" to "",
+                            "packet" to JsonObject(mapOf("sections" to JsonArray(emptyList()))),
+                        ),
+                        f.context,
+                    ),
                 ).contains("not from a repository linked")
             }
         }
@@ -290,7 +297,7 @@ class OrientationTeamActionsTest {
             runTest {
                 val task = f.task()
 
-                action.perform(f.json("task_id" to task.id), f.context)
+                action.perform(f.json("task_id" to task.id, "base_version" to ""), f.context)
 
                 verify { service.revertToAi(task.id, f.projectId) }
             }

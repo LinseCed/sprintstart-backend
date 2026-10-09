@@ -6,7 +6,8 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -14,11 +15,27 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import org.springframework.stereotype.Component
 
+/**
+ * The edits a confirmed update applies to the step [key] names.
+ *
+ * A null field is left alone. A blank [description] or [href] is a field the manager confirmed taking off,
+ * which is why presence, not emptiness, decides.
+ */
+@Serializable
+data class UpdateArrivalStepParams(
+    val key: String,
+    val title: String? = null,
+    val description: String? = null,
+    val href: String? = null,
+    val position: Int? = null,
+    @SerialName("settled_by") val settledBy: Rigor? = null,
+)
+
 /** Offers to change a step's wording, link, place or how it gets settled — never its key. */
 @Component
 class UpdateArrivalStepAction(
     private val arrivalStepService: ArrivalStepService,
-) : TeamActionHandler {
+) : TypedTeamAction<UpdateArrivalStepParams>(UpdateArrivalStepParams.serializer()) {
     override val area = TeamArea.ARRIVAL
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -189,15 +206,15 @@ class UpdateArrivalStepAction(
 
     private fun propose(step: ArrivalStep, key: String, changes: Read.Changes): TeamActionDraft {
         val lines = lines(step, changes)
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("key", key)
-                changes.title?.let { put("title", it) }
-                changes.description?.let { put("description", it) }
-                changes.href?.let { put("href", it) }
-                changes.position?.let { put("position", it) }
-                changes.rigor?.let { put("settled_by", it.name) }
-            },
+        return proposed(
+            params = UpdateArrivalStepParams(
+                key,
+                changes.title,
+                changes.description,
+                changes.href,
+                changes.position,
+                changes.rigor,
+            ),
             label = "Update arrival step: ${step.title.forLabel()}",
             preview = buildString {
                 appendLine("Change “${step.title}” [key: $key] on this project's arrival list:")
@@ -210,10 +227,10 @@ class UpdateArrivalStepAction(
     }
 
     /** The step is still here and its place is still free: [perform] sets the position unconditionally. */
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
+    override fun recheckParams(params: UpdateArrivalStepParams, context: TeamToolContext): String? {
         val steps = arrivalStepService.listForAuthoring(context.projectId)
-        val step = steps.firstOrNull { it.key == params.text("key") } ?: return STEP_GONE_SINCE
-        val position = params.text("position").toIntOrNull() ?: return null
+        val step = steps.firstOrNull { it.key == params.key } ?: return STEP_GONE_SINCE
+        val position = params.position ?: return null
 
         val occupant = occupantOf(position, step.key, steps)
         if (occupant != null) {
@@ -228,17 +245,15 @@ class UpdateArrivalStepAction(
         }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val key = params.text("key")
+    override suspend fun performParams(params: UpdateArrivalStepParams, context: TeamToolContext): String {
         arrivalStepService.update(
-            key = key,
+            key = params.key,
             projectId = context.projectId,
-            title = params.text("title").ifBlank { null },
-            // Presence, not emptiness, decides these: blank means the manager confirmed taking the field off.
-            description = params.textIfPresent("description"),
-            href = params.textIfPresent("href"),
-            position = params.text("position").toIntOrNull(),
-            settledBy = rigorOrNull(params.text("settled_by")),
+            title = params.title,
+            description = params.description,
+            href = params.href,
+            position = params.position,
+            settledBy = params.settledBy,
         )
         return "Updated. That step now reads as proposed on this project's arrival list."
     }
