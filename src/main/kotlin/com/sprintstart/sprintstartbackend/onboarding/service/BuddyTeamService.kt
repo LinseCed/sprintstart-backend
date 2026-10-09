@@ -4,11 +4,13 @@ import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCitationDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyVocabularyDto
 import com.sprintstart.sprintstartbackend.onboarding.model.ContributionWording
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySessionFilters
@@ -32,7 +34,6 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
-import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Team mode: a project manager's buddy conversation about one project's team.
@@ -105,29 +106,43 @@ class BuddyTeamService(
 
         return flow {
             val streamed = StringBuilder()
-            var opening: BuddyOpenStreamEvent? = null
-            try {
-                onboardingAiClient
-                    .streamBuddyOpen(
-                        BuddyOpenRequest(memory = session.summary, recent = recent, state = state, teamMode = true),
-                    ).collect { event ->
-                        when (event.type) {
-                            BuddyOpenStreamEvent.TOKEN -> event.content?.let {
-                                streamed.append(it)
-                                emit(BuddyStreamEvent(type = BuddyService.TOKEN, content = it))
-                            }
-
-                            BuddyOpenStreamEvent.DONE -> opening = event
-                        }
-                    }
-            } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
-                // Opening the buddy must never fail the page.
-                logger.warn("Team buddy open stream failed: {}", e.message)
-            }
-
+            val opening = relayOpening(
+                BuddyOpenRequest(memory = session.summary, recent = recent, state = state, teamMode = true),
+                streamed,
+            )
             finishOpen(session, streamed.toString(), opening)
             compactInBackground(userId, projectId)
         }
+    }
+
+    /**
+     * Forwards the greeting's words to the manager as they are written.
+     *
+     * Opening the buddy must never fail the page, so a broken stream ends the read early and keeps what
+     * [streamed] already holds.
+     *
+     * @return The AI's closing event, or `null` when the stream broke or never finished.
+     */
+    private suspend fun FlowCollector<BuddyStreamEvent>.relayOpening(
+        request: BuddyOpenRequest,
+        streamed: StringBuilder,
+    ): BuddyOpenStreamEvent? {
+        var opening: BuddyOpenStreamEvent? = null
+        try {
+            onboardingAiClient.streamBuddyOpen(request).collect { event ->
+                when (event.type) {
+                    BuddyOpenStreamEvent.TOKEN -> event.content?.let {
+                        streamed.append(it)
+                        emit(BuddyStreamEvent(type = BuddyService.TOKEN, content = it))
+                    }
+
+                    BuddyOpenStreamEvent.DONE -> opening = event
+                }
+            }
+        } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
+            logger.warn("Team buddy open stream failed: {}", e.message)
+        }
+        return opening
     }
 
     /**
@@ -161,108 +176,33 @@ class BuddyTeamService(
             BuddyTeamMessage(session = session, role = BuddyMessageRole.USER, content = content),
         )
 
-        val context = TeamToolContext(
-            userId = userId,
-            authId = authId,
-            projectId = projectId,
-            currentPage = currentPage,
-        )
-
         return flow {
-            var messages = history + BuddyAgentMessageDto(role = "user", content = content)
-            var citations: List<BuddyCitationDto> = emptyList()
-            // Everything the manager has been shown of the reply, across every hop of the loop.
-            val emittedContent = StringBuilder()
-            var answer: String? = null
-            var step = 0
-            val areas = OpenAreas(carriedOver)
+            val turn = AgentTurn(
+                context = TeamToolContext(
+                    userId = userId,
+                    authId = authId,
+                    projectId = projectId,
+                    currentPage = currentPage,
+                ),
+                capabilitiesEnabled = capabilitiesEnabled,
+                filters = filters,
+                priorSummary = session.summary,
+                messages = history + BuddyAgentMessageDto(role = BuddyAgentMessageDto.ROLE_USER, content = content),
+                areas = OpenAreas(carriedOver),
+            )
 
             // The whole loop is guarded, not only the last emission: the words now leave while the
             // loop runs, so a stop or a failure at any hop leaves a partial reply worth keeping —
-            // the same guard, and the same reason, as the hire's buddy has.
+            // the same guard, and the same reason, as the hire's buddy has. A cancellation is caught
+            // here too, and rethrown.
             try {
-                while (answer == null && step < BuddyService.MAX_AGENT_STEPS) {
-                    step++
-                    // Per hop, not per turn: an area opened on the previous hop is mounted from this one, and
-                    // one the latest replies opened or used is mounted from the first.
-                    val tools = if (capabilitiesEnabled) buddyTeamTools.toolSpecs(areas.mounted) else emptyList()
-                    val response = relayAgentTurn(
-                        onboardingAiClient.buddyAgentTurnStream(
-                            BuddyAgentRequest(
-                                messages = messages,
-                                backendTools = tools,
-                                priorSummary = if (step == 1) session.summary else null,
-                                vocabulary = VOCABULARY,
-                                // Retrieval is scoped to the one project this conversation is about.
-                                projectIds = listOf(projectId.toString()),
-                                capabilitiesEnabled = capabilitiesEnabled,
-                                teamMode = true,
-                                filters = filters,
-                            ),
-                        ),
-                        emittedContent,
-                    )
-                    citations = response.citations
-                    if (response.final && response.text.writesOutAToolCall()) {
-                        // Not an answer: shown, it would read as a reply to the manager. Sent back once per hop,
-                        // and if the budget runs out the reply is the fallback, never the raw call.
-                        //
-                        // The words were already streamed while the model wrote them, so the client is told to
-                        // take back what it has shown, and the stored reply starts over with the next ask.
-                        logger.warn("Team buddy wrote a tool call out as its reply; asking again")
-                        emit(BuddyStreamEvent(type = BuddyService.RESET))
-                        emittedContent.setLength(0)
-                        val retry = openAreasWrittenOut(response.text, tools.map { it.name }.toSet(), areas)
-                        messages = response.messages.ifEmpty {
-                            messages + BuddyAgentMessageDto(role = "assistant", content = response.text)
-                        } + BuddyAgentMessageDto(role = "user", content = retry)
-                    } else if (response.final) {
-                        answer = response.text
-                    } else {
-                        val mounted = tools.map { it.name }.toSet()
-                        val next = response.messages.toMutableList()
-                        for (call in response.pendingToolCalls) {
-                            next.add(
-                                BuddyAgentMessageDto(
-                                    role = "tool",
-                                    content = runToolCall(call, context, mounted, areas),
-                                    toolCallId = call.id,
-                                ),
-                            )
-                        }
-                        messages = next
-                    }
+                while (!turn.isFinished) {
+                    runHop(turn)
                 }
-
-                completeReply(answer, emittedContent)
-
-                val resolvedCitations = citations.mapNotNull { citation ->
-                    val artifactId = citation.artifactId?.let(::parseUuidOrNull)
-                    val resolved = artifactId?.let(artifactLookupService::resolve)
-
-                    if (artifactId == null || resolved == null) {
-                        logger.warn(
-                            "Could not resolve artifact {} for buddy citation",
-                            citation.artifactId,
-                        )
-                        null
-                    } else {
-                        ResolvedBuddyCitation(
-                            artifactId = artifactId,
-                            filename = resolved.filename,
-                            sourceUrl = resolved.sourceUrl,
-                            startLine = citation.startLine,
-                            startPage = citation.startPage,
-                        )
-                    }
-                }
-
-                emitCitationsAndDone(resolvedCitations)
-            } catch (e: CancellationException) {
-                saveIncompleteReply(session, emittedContent.toString(), areas)
-                throw e
+                completeReply(turn.answer, turn.emittedContent)
+                emitCitationsAndDone(resolveCitations(turn.citations))
             } catch (e: Exception) {
-                saveIncompleteReply(session, emittedContent.toString(), areas)
+                saveIncompleteReply(session, turn.emittedContent.toString(), turn.areas)
                 throw e
             }
 
@@ -270,14 +210,108 @@ class BuddyTeamService(
                 BuddyTeamMessage(
                     session = session,
                     role = BuddyMessageRole.ASSISTANT,
-                    content = emittedContent.toString(),
+                    content = turn.emittedContent.toString(),
                     // What this reply opened or used; the next message reads the latest replies' back.
-                    openedAreas = areas.activeThisTurn.encoded(),
+                    openedAreas = turn.areas.activeThisTurn.encoded(),
                 ),
             )
             compactInBackground(userId, projectId)
         }.endFailureWithErrorEvent()
     }
+
+    /**
+     * Runs one hop of the agent loop: asks the AI for a step, then either takes its answer, sends a
+     * written-out tool call back, or runs the tools it asked for.
+     */
+    private suspend fun FlowCollector<BuddyStreamEvent>.runHop(turn: AgentTurn) {
+        turn.step++
+        // Per hop, not per turn: an area opened on the previous hop is mounted from this one, and
+        // one the latest replies opened or used is mounted from the first.
+        val tools = if (turn.capabilitiesEnabled) buddyTeamTools.toolSpecs(turn.areas.mounted) else emptyList()
+        val response = relayAgentTurn(
+            onboardingAiClient.buddyAgentTurnStream(agentRequest(turn, tools)),
+            turn.emittedContent,
+        )
+        turn.citations = response.citations
+
+        when {
+            response.final && response.text.writesOutAToolCall() -> askAgainAfterWrittenOutCall(turn, response, tools)
+            response.final -> turn.answer = response.text
+            else -> turn.messages = answerToolCalls(turn, response, tools)
+        }
+    }
+
+    private fun agentRequest(turn: AgentTurn, tools: List<BuddyToolSpecDto>): BuddyAgentRequest =
+        BuddyAgentRequest(
+            messages = turn.messages,
+            backendTools = tools,
+            priorSummary = if (turn.step == 1) turn.priorSummary else null,
+            vocabulary = VOCABULARY,
+            // Retrieval is scoped to the one project this conversation is about.
+            projectIds = listOf(turn.context.projectId.toString()),
+            capabilitiesEnabled = turn.capabilitiesEnabled,
+            teamMode = true,
+            filters = turn.filters,
+        )
+
+    /**
+     * Handles a reply that was a tool call written out as text, which is not an answer: shown, it would
+     * read as a reply to the manager. It is sent back once per hop, and if the budget runs out the
+     * reply is the fallback, never the raw call.
+     *
+     * The words were already streamed while the model wrote them, so the client is told to take back
+     * what it has shown, and the stored reply starts over with the next ask.
+     */
+    private suspend fun FlowCollector<BuddyStreamEvent>.askAgainAfterWrittenOutCall(
+        turn: AgentTurn,
+        response: BuddyAgentResponse,
+        tools: List<BuddyToolSpecDto>,
+    ) {
+        logger.warn("Team buddy wrote a tool call out as its reply; asking again")
+        emit(BuddyStreamEvent(type = BuddyService.RESET))
+        turn.emittedContent.setLength(0)
+        val retry = openAreasWrittenOut(response.text, tools.map { it.name }.toSet(), turn.areas)
+        turn.messages = response.messages.ifEmpty {
+            turn.messages + BuddyAgentMessageDto(role = BuddyAgentMessageDto.ROLE_ASSISTANT, content = response.text)
+        } + BuddyAgentMessageDto(role = BuddyAgentMessageDto.ROLE_USER, content = retry)
+    }
+
+    /** Runs every tool the AI asked for on this hop, and returns the conversation with their results. */
+    private suspend fun FlowCollector<BuddyStreamEvent>.answerToolCalls(
+        turn: AgentTurn,
+        response: BuddyAgentResponse,
+        tools: List<BuddyToolSpecDto>,
+    ): List<BuddyAgentMessageDto> {
+        val mounted = tools.map { it.name }.toSet()
+        val results = response.pendingToolCalls.map { call ->
+            BuddyAgentMessageDto(
+                role = BuddyAgentMessageDto.ROLE_TOOL,
+                content = runToolCall(call, turn.context, mounted, turn.areas),
+                toolCallId = call.id,
+            )
+        }
+        return response.messages + results
+    }
+
+    /** The sources the reply drew on that still resolve to an artifact; the rest are logged and dropped. */
+    private fun resolveCitations(citations: List<BuddyCitationDto>): List<ResolvedBuddyCitation> =
+        citations.mapNotNull { citation ->
+            val artifactId = citation.artifactId?.let(::parseUuidOrNull)
+            val resolved = artifactId?.let(artifactLookupService::resolve)
+
+            if (artifactId == null || resolved == null) {
+                logger.warn("Could not resolve artifact {} for buddy citation", citation.artifactId)
+                null
+            } else {
+                ResolvedBuddyCitation(
+                    artifactId = artifactId,
+                    filename = resolved.filename,
+                    sourceUrl = resolved.sourceUrl,
+                    startLine = citation.startLine,
+                    startPage = citation.startPage,
+                )
+            }
+        }
 
     /**
      * Keeps a turn that was cut short — stopped or failed mid-answer — as an incomplete reply, the
@@ -324,7 +358,7 @@ class BuddyTeamService(
             outcome.proposal?.let { proposal ->
                 emit(
                     BuddyStreamEvent(
-                        type = "action_proposal",
+                        type = BuddyService.ACTION_PROPOSAL,
                         action = proposal.action,
                         label = proposal.label,
                         proposalId = proposal.id.toString(),
@@ -335,7 +369,7 @@ class BuddyTeamService(
             }
             return outcome.toolResult
         }
-        emit(BuddyStreamEvent(type = "tool_use", name = call.name, kind = "tool"))
+        emit(toolUseEvent(call.name))
         if (call.name == BuddyTeamTools.OPEN_AREA && call.name in mountedToolNames) {
             val outcome = buddyTeamTools.openArea(call)
             outcome.area?.let { areas.open(it) }
@@ -365,7 +399,7 @@ class BuddyTeamService(
         }
         val area = buddyTeamTools.areaOf(call.name) ?: return null
         logger.info("Team buddy called {} before opening its area; opening {}", call.name, area)
-        emit(BuddyStreamEvent(type = "tool_use", name = BuddyTeamTools.OPEN_AREA, kind = "tool"))
+        emit(toolUseEvent(BuddyTeamTools.OPEN_AREA))
         areas.open(area)
         return "${call.name} belongs to the ${area.name.lowercase()} area, which was not open. It is open now: " +
             "call ${call.name} again on your next step. Nothing has been done or offered yet."
@@ -395,7 +429,7 @@ class BuddyTeamService(
         if (opened.isEmpty()) {
             return TOOL_CALL_WRITTEN_OUT
         }
-        emit(BuddyStreamEvent(type = "tool_use", name = BuddyTeamTools.OPEN_AREA, kind = "tool"))
+        emit(toolUseEvent(BuddyTeamTools.OPEN_AREA))
         opened.forEach { (_, area) -> areas.open(area) }
         val names = opened.joinToString(", ") { it.first }
         return "That reply was a tool call written out as text, so nothing ran and the manager has not seen an " +
@@ -459,6 +493,26 @@ class BuddyTeamService(
             )
         }
         return userId
+    }
+
+    /** What one manager message carries from hop to hop of the agent loop. */
+    private class AgentTurn(
+        val context: TeamToolContext,
+        val capabilitiesEnabled: Boolean,
+        val filters: BuddySessionFilters?,
+        val priorSummary: String?,
+        var messages: List<BuddyAgentMessageDto>,
+        val areas: OpenAreas,
+    ) {
+        var citations: List<BuddyCitationDto> = emptyList()
+
+        /** Everything the manager has been shown of the reply, across every hop of the loop. */
+        val emittedContent = StringBuilder()
+        var answer: String? = null
+        var step = 0
+
+        val isFinished: Boolean
+            get() = answer != null || step >= BuddyService.MAX_AGENT_STEPS
     }
 
     private companion object {

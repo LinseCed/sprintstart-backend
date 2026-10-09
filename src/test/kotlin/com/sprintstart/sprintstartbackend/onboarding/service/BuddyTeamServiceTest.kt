@@ -83,7 +83,7 @@ class BuddyTeamServiceTest {
         every { buddyTeamSessionRepository.findByUserIdAndProjectId(userId, projectId) } returns session
         every { buddyTeamMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
         every { buddyTeamMessageRepository.save(any()) } answers { firstArg() }
-        every { buddyTeamTools.toolSpecs(any()) } returns listOf(spec(BuddyTeamTools.GET_TEAM_ATTENTION))
+        every { buddyTeamTools.toolSpecs(any()) } returns listOf(spec(TeamReadTools.GET_TEAM_ATTENTION))
         every { buddyProposalService.isAction(any()) } returns false
         every { buddyTeamTools.areaOf(any()) } returns null
     }
@@ -160,7 +160,7 @@ class BuddyTeamServiceTest {
             BuddyAgentResponse(
                 final = false,
                 messages = listOf(BuddyAgentMessageDto(role = "assistant")),
-                pendingToolCalls = listOf(BuddyToolCallDto(id = "c1", name = BuddyTeamTools.GET_TEAM_ATTENTION)),
+                pendingToolCalls = listOf(BuddyToolCallDto(id = "c1", name = TeamReadTools.GET_TEAM_ATTENTION)),
             ),
             finalReply("Sam is waiting on a review."),
         )
@@ -185,7 +185,7 @@ class BuddyTeamServiceTest {
             BuddyAgentResponse(
                 final = false,
                 messages = listOf(BuddyAgentMessageDto(role = "assistant")),
-                pendingToolCalls = listOf(BuddyToolCallDto(id = "c1", name = BuddyTeamTools.GET_TEAM_ATTENTION)),
+                pendingToolCalls = listOf(BuddyToolCallDto(id = "c1", name = TeamReadTools.GET_TEAM_ATTENTION)),
             ),
             finalReply("Sam is waiting on a review."),
         )
@@ -529,7 +529,7 @@ class BuddyTeamServiceTest {
         val mountedSets = mutableListOf<Set<TeamArea>>()
         every { buddyTeamTools.toolSpecs(any()) } answers {
             mountedSets.add(firstArg<Set<TeamArea>>().toSet())
-            listOf(spec(BuddyTeamTools.GET_TEAM_ATTENTION))
+            listOf(spec(TeamReadTools.GET_TEAM_ATTENTION))
         }
         every { buddyTeamTools.areaOf("answer_escalation") } returns TeamArea.KNOWLEDGE
         every { buddyTeamTools.execute(any(), any(), any()) } returns "The tool answer_escalation is not available."
@@ -652,7 +652,7 @@ class BuddyTeamServiceTest {
     @Test
     fun `stores everything the manager was shown, and sets the hops apart`() = runTest {
         val saved = savedReplies()
-        val call = BuddyToolCallDto(id = "c1", name = BuddyTeamTools.GET_TEAM_ATTENTION)
+        val call = BuddyToolCallDto(id = "c1", name = TeamReadTools.GET_TEAM_ATTENTION)
         coEvery { onboardingAiClient.buddyAgentTurnStream(any()) } returnsMany listOf(
             streamOf(
                 token("Let me look. "),
@@ -697,7 +697,7 @@ class BuddyTeamServiceTest {
 
     @Test
     fun `keeps what was shown when the turn is stopped between hops`() = runTest {
-        val call = BuddyToolCallDto(id = "c1", name = BuddyTeamTools.GET_TEAM_ATTENTION)
+        val call = BuddyToolCallDto(id = "c1", name = TeamReadTools.GET_TEAM_ATTENTION)
         coEvery { onboardingAiClient.buddyAgentTurnStream(any()) } returns streamOf(
             token("Let me look. "),
             toolUse("search_docs"),
@@ -785,7 +785,7 @@ class BuddyTeamServiceTest {
             buddyTeamTools.execute(
                 match { it.name == "list_open_escalations" },
                 match { it.projectId == projectId && it.userId == userId },
-                setOf(BuddyTeamTools.GET_TEAM_ATTENTION),
+                setOf(TeamReadTools.GET_TEAM_ATTENTION),
             )
         }
     }

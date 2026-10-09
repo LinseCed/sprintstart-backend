@@ -447,7 +447,7 @@ class BuddyService(
         }
 
         return flow {
-            var messages = history + BuddyAgentMessageDto(role = "user", content = content)
+            var messages = history + BuddyAgentMessageDto(role = BuddyAgentMessageDto.ROLE_USER, content = content)
             val citations = mutableListOf<BuddyCitationDto>()
             // Everything the hire has been shown of the reply, across every hop of the loop.
             val emittedContent = StringBuilder()
@@ -485,7 +485,7 @@ class BuddyService(
                         for (call in response.pendingToolCalls) {
                             next.add(
                                 BuddyAgentMessageDto(
-                                    role = "tool",
+                                    role = BuddyAgentMessageDto.ROLE_TOOL,
                                     content = runToolCall(call, userId, currentPage),
                                     toolCallId = call.id,
                                 ),
@@ -655,7 +655,7 @@ class BuddyService(
             outcome.proposal?.let { proposal ->
                 emit(
                     BuddyStreamEvent(
-                        type = "action_proposal",
+                        type = ACTION_PROPOSAL,
                         action = proposal.action,
                         label = proposal.label,
                         question = proposal.question,
@@ -694,7 +694,7 @@ class BuddyService(
             }
             outcome.toolResult
         } else {
-            emit(BuddyStreamEvent(type = "tool_use", name = call.name, kind = "tool"))
+            emit(toolUseEvent(call.name))
             buddyToolExecutor.execute(call, userId, currentPage)
         }
 
@@ -749,6 +749,11 @@ class BuddyService(
         // Team mode only: the words shown so far were not the answer after all and are to be dropped.
         const val RESET = "reset"
         const val OPENING_ACTION = "opening_action"
+
+        // A change offered for the user's confirmation, and the notice that a tool is running.
+        const val ACTION_PROPOSAL = "action_proposal"
+        const val TOOL_USE = "tool_use"
+        const val TOOL_KIND = "tool"
 
         // Split after each space, keeping the space on the preceding chunk, so concatenating every
         // emitted token reproduces the answer exactly (newlines and punctuation preserved).

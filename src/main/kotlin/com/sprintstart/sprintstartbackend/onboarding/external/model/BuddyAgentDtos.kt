@@ -38,7 +38,13 @@ data class BuddyAgentMessageDto(
      */
     val reasoning: String? = null,
     @SerialName("reasoning_details") val reasoningDetails: List<JsonObject> = emptyList(),
-)
+) {
+    companion object {
+        const val ROLE_USER = "user"
+        const val ROLE_ASSISTANT = "assistant"
+        const val ROLE_TOOL = "tool"
+    }
+}
 
 @Serializable
 data class BuddyToolSpecDto(
