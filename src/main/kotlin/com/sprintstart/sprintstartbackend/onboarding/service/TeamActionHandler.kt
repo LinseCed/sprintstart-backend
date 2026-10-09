@@ -3,7 +3,11 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import org.springframework.http.HttpStatus
+import org.springframework.web.server.ResponseStatusException
 
 /**
  * One action the team-mode buddy may offer a project's manager, in three steps that never blur.
@@ -58,4 +62,48 @@ sealed interface TeamActionDraft {
     data class Refused(
         val reason: String,
     ) : TeamActionDraft
+}
+
+/**
+ * A [TeamActionHandler] whose stored proposal is a typed [P] rather than a raw [JsonObject].
+ *
+ * [P] is written to JSON when the proposal is stored and read back when it is confirmed, so an action names
+ * each of its fields once, in one class, and the compiler checks every use. The stored JSON is the same shape
+ * a hand-built [JsonObject] had, and keeps whatever names [P] gives its fields with `@SerialName`.
+ *
+ * Params that cannot be read back are refused at the recheck, never run.
+ */
+abstract class TypedTeamAction<P : Any>(
+    private val paramsSerializer: KSerializer<P>,
+) : TeamActionHandler {
+    /** A proposal carrying [params], for [draft] to return. */
+    protected fun proposed(params: P, label: String, preview: String): TeamActionDraft.Proposed =
+        TeamActionDraft.Proposed(
+            params = StoredParams.json.encodeToJsonElement(paramsSerializer, params).jsonObject,
+            label = label,
+            preview = preview,
+        )
+
+    /** The typed form of [TeamActionHandler.recheck]. */
+    open fun recheckParams(params: P, context: TeamToolContext): String? = null
+
+    /** The typed form of [TeamActionHandler.perform]. */
+    abstract suspend fun performParams(params: P, context: TeamToolContext): String
+
+    final override fun recheck(params: JsonObject, context: TeamToolContext): String? {
+        val typed = read(params) ?: return UNREADABLE
+        return recheckParams(typed, context)
+    }
+
+    final override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
+        val typed = read(params) ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, UNREADABLE)
+        return performParams(typed, context)
+    }
+
+    private fun read(params: JsonObject): P? =
+        runCatching { StoredParams.json.decodeFromJsonElement(paramsSerializer, params) }.getOrNull()
+
+    private companion object {
+        const val UNREADABLE = "This proposal could not be read back, so nothing was changed."
+    }
 }

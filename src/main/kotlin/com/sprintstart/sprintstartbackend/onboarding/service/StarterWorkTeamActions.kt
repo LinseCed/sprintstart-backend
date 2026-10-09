@@ -9,6 +9,8 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpe
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.PromoteStarterWorkCandidateRequest
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
@@ -39,12 +41,39 @@ private fun StarterWorkTaskProposalRepository.liveOn(
         ?.let { findById(it).orElse(null) }
         ?.takeIf { it.status == ProposalStatus.LIVE && scope.covers(it.sourceId, projectId) }
 
+/** The pool task a confirmed review marks as reviewed. */
+@Serializable
+data class MarkStarterWorkReviewedParams(
+    @SerialName("task_id") @Serializable(with = UuidSerializer::class) val taskId: UUID,
+)
+
+/** The pool task to remove for good, and the reason the manager gave, blank when none. */
+@Serializable
+data class RejectStarterWorkParams(
+    @SerialName("task_id") @Serializable(with = UuidSerializer::class) val taskId: UUID,
+    val reason: String,
+)
+
+/** The open issue to put in the pool, and the summary shown with it, blank when none. */
+@Serializable
+data class PromoteCandidateParams(
+    @SerialName("source_id") val sourceId: String,
+    val summary: String,
+)
+
+/** The pool task to flag or unflag as a Task 0 candidate. */
+@Serializable
+data class SetTaskZeroEligibleParams(
+    @SerialName("task_id") @Serializable(with = UuidSerializer::class) val taskId: UUID,
+    val eligible: Boolean,
+)
+
 /** The refusal for a stored proposal whose task is no longer live on [TeamToolContext.projectId]. */
 private fun StarterWorkTaskProposalRepository.goneSince(
-    params: JsonObject,
+    taskId: UUID,
     context: TeamToolContext,
     scope: StarterWorkScope,
-): String? = TASK_GONE_SINCE.takeIf { liveOn(params.uuid("task_id"), context.projectId, scope) == null }
+): String? = TASK_GONE_SINCE.takeIf { liveOn(taskId, context.projectId, scope) == null }
 
 private fun StarterWorkTaskProposal.named(): String = "“$title” (${githubRepositoryOf(sourceId)})"
 
@@ -67,7 +96,7 @@ class MarkStarterWorkReviewedAction(
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val starterWorkScope: StarterWorkScope,
-) : TeamActionHandler {
+) : TypedTeamAction<MarkStarterWorkReviewedParams>(MarkStarterWorkReviewedParams.serializer()) {
     override val area = TeamArea.STARTER_WORK
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -87,19 +116,19 @@ class MarkStarterWorkReviewedAction(
         if (task.reviewed) {
             return TeamActionDraft.Refused("That task is already reviewed, so there is nothing to confirm.")
         }
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject { put("task_id", task.id.toString()) },
+        return proposed(
+            params = MarkStarterWorkReviewedParams(task.id),
             label = "Mark reviewed: ${task.title.forLabel()}",
             preview = "Mark ${task.named()} reviewed.\n\nIt stays in the pool as it is; hires' suggestions stop " +
                 "ranking it lower for being unreviewed.",
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        starterWorkTaskProposalRepository.goneSince(params, context, starterWorkScope)
+    override fun recheckParams(params: MarkStarterWorkReviewedParams, context: TeamToolContext): String? =
+        starterWorkTaskProposalRepository.goneSince(params.taskId, context, starterWorkScope)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        starterWorkTaskProposalService.markReviewed(requireNotNull(params.uuid("task_id")))
+    override suspend fun performParams(params: MarkStarterWorkReviewedParams, context: TeamToolContext): String {
+        starterWorkTaskProposalService.markReviewed(params.taskId)
         return "Marked reviewed. Hires' suggestions no longer rank it lower for being unreviewed."
     }
 }
@@ -110,7 +139,7 @@ class RejectStarterWorkAction(
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val starterWorkScope: StarterWorkScope,
-) : TeamActionHandler {
+) : TypedTeamAction<RejectStarterWorkParams>(RejectStarterWorkParams.serializer()) {
     override val area = TeamArea.STARTER_WORK
     override val risk = BuddyProposalRisk.DESTRUCTIVE
     override val spec = BuddyToolSpecDto(
@@ -132,11 +161,8 @@ class RejectStarterWorkAction(
             starterWorkScope,
         ) ?: return TeamActionDraft.Refused(NOT_IN_POOL_HERE)
         val reason = call.textArgument("reason")
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("task_id", task.id.toString())
-                put("reason", reason)
-            },
+        return proposed(
+            params = RejectStarterWorkParams(task.id, reason),
             label = "Remove from pool: ${task.title.forLabel()}",
             preview = buildString {
                 append("Remove ${task.named()} from the starter-work pool for good.\n\n")
@@ -148,13 +174,13 @@ class RejectStarterWorkAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        starterWorkTaskProposalRepository.goneSince(params, context, starterWorkScope)
+    override fun recheckParams(params: RejectStarterWorkParams, context: TeamToolContext): String? =
+        starterWorkTaskProposalRepository.goneSince(params.taskId, context, starterWorkScope)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
+    override suspend fun performParams(params: RejectStarterWorkParams, context: TeamToolContext): String {
         starterWorkTaskProposalService.reject(
-            requireNotNull(params.uuid("task_id")),
-            params.text("reason").ifBlank { null },
+            params.taskId,
+            params.reason.ifBlank { null },
         )
         return "Removed from the starter-work pool for good."
     }
@@ -172,7 +198,7 @@ class PromoteCandidateAction(
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val starterWorkScope: StarterWorkScope,
-) : TeamActionHandler {
+) : TypedTeamAction<PromoteCandidateParams>(PromoteCandidateParams.serializer()) {
     override val area = TeamArea.STARTER_WORK
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -198,11 +224,8 @@ class PromoteCandidateAction(
         val title = issue.title.orEmpty()
         val summary = call.textArgument("summary")
         val repository = githubRepositoryOf(sourceId)
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("source_id", sourceId)
-                put("summary", summary)
-            },
+        return proposed(
+            params = PromoteCandidateParams(sourceId, summary),
             label = "Add to pool: ${title.forLabel()}",
             preview = buildString {
                 append("Put the issue “$title” ($repository) into the starter-work pool as a reviewed task.\n\n")
@@ -213,20 +236,19 @@ class PromoteCandidateAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
-        val sourceId = params.text("source_id")
-        if (openIssueOn(sourceId, context.projectId) == null) {
+    override fun recheckParams(params: PromoteCandidateParams, context: TeamToolContext): String? {
+        if (openIssueOn(params.sourceId, context.projectId) == null) {
             return "That issue was closed, or its repository is no longer linked to this project, so nothing was added."
         }
-        return poolRefusal(sourceId)?.let { "$it Nothing was added." }
+        return poolRefusal(params.sourceId)?.let { "$it Nothing was added." }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
+    override suspend fun performParams(params: PromoteCandidateParams, context: TeamToolContext): String {
         val added = try {
             starterWorkTaskProposalService.promoteCandidate(
                 PromoteStarterWorkCandidateRequest(
-                    sourceId = params.text("source_id"),
-                    summary = params.text("summary").ifBlank { null },
+                    sourceId = params.sourceId,
+                    summary = params.summary.ifBlank { null },
                 ),
             )
         } catch (_: DataIntegrityViolationException) {
@@ -267,7 +289,7 @@ class SetTaskZeroEligibleAction(
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val starterWorkScope: StarterWorkScope,
-) : TeamActionHandler {
+) : TypedTeamAction<SetTaskZeroEligibleParams>(SetTaskZeroEligibleParams.serializer()) {
     override val area = TeamArea.STARTER_WORK
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -308,11 +330,8 @@ class SetTaskZeroEligibleAction(
             val state = if (eligible) "already a Task 0 candidate" else "not a Task 0 candidate"
             return TeamActionDraft.Refused("Nothing would change: that task is $state.")
         }
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("task_id", task.id.toString())
-                put("eligible", eligible)
-            },
+        return proposed(
+            params = SetTaskZeroEligibleParams(task.id, eligible),
             label = (if (eligible) "Flag for Task 0: " else "Unflag Task 0: ") + task.title.forLabel(),
             preview = if (eligible) {
                 "Flag ${task.named()} as a Task 0 candidate.\n\nIt is a label on the pool, not an assignment: " +
@@ -325,13 +344,12 @@ class SetTaskZeroEligibleAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        starterWorkTaskProposalRepository.goneSince(params, context, starterWorkScope)
+    override fun recheckParams(params: SetTaskZeroEligibleParams, context: TeamToolContext): String? =
+        starterWorkTaskProposalRepository.goneSince(params.taskId, context, starterWorkScope)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val eligible = requireNotNull(params.boolean("eligible"))
-        starterWorkTaskProposalService.setTaskZeroEligibility(requireNotNull(params.uuid("task_id")), eligible)
-        return if (eligible) "Flagged as a Task 0 candidate." else "The Task 0 flag is off."
+    override suspend fun performParams(params: SetTaskZeroEligibleParams, context: TeamToolContext): String {
+        starterWorkTaskProposalService.setTaskZeroEligibility(params.taskId, params.eligible)
+        return if (params.eligible) "Flagged as a Task 0 candidate." else "The Task 0 flag is off."
     }
 }
 

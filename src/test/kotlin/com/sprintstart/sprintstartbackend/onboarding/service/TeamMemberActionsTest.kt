@@ -374,8 +374,13 @@ class TeamMemberActionsTest {
         fun `somebody who left between preview and confirm stops the confirm`() {
             onProject()
 
-            assertThat(action.recheck(buildJsonObject { put("member_id", "$memberId") }, context))
-                .contains("no longer on this project")
+            val params = buildJsonObject {
+                put("member_id", "$memberId")
+                put("role_id", "${role.id}")
+                put("role_name", "Reviewer")
+            }
+
+            assertThat(action.recheck(params, context)).contains("no longer on this project")
         }
 
         @Test
