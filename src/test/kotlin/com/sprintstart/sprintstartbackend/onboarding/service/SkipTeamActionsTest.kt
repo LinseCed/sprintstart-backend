@@ -72,7 +72,9 @@ class SkipTeamActionsTest {
 
             assertThat(f.refusal(action.draft(f.call("accept_skip", "skip_id" to skipId), f.context)))
                 .contains("already been answered")
-            assertThat(action.recheck(f.json("skip_id" to skipId), f.context)).contains("already been answered")
+            assertThat(
+                action.recheck(f.json("skip_id" to skipId, "review_comment" to ""), f.context),
+            ).contains("already been answered")
         }
 
         @Test
@@ -93,7 +95,9 @@ class SkipTeamActionsTest {
             f.element(PathElementKind.SKIP, skipId)
             every { skipService.getSkipById(skipId) } throws ResponseStatusException(HttpStatus.NOT_FOUND)
 
-            assertThat(action.recheck(f.json("skip_id" to skipId), f.context)).contains("is gone")
+            assertThat(
+                action.recheck(f.json("skip_id" to skipId, "review_comment" to ""), f.context),
+            ).contains("is gone")
         }
 
         @Test

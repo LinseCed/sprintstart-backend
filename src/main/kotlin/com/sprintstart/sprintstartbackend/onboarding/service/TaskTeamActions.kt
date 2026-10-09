@@ -6,10 +6,10 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCal
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.request.task.CreateOnboardingTaskRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.task.UpdateOnboardingTaskRequest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
+import java.util.UUID
 
 /*
  * The task actions of team mode's content area.
@@ -23,12 +23,37 @@ private const val STEP_FINISHED_SINCE =
     "The step was finished since this was proposed, and adding a task would reopen it — which the offer did not " +
         "say — so nothing was changed. Offer it again."
 
+/** The task to add, where it goes, and whether the preview announced that it reopens a finished step. */
+@Serializable
+data class AddTaskParams(
+    @SerialName("step_id") @Serializable(with = UuidSerializer::class) val stepId: UUID,
+    val title: String,
+    val description: String,
+    val position: Int,
+    val reopens: Boolean,
+)
+
+/** The edits a confirmed task update applies; a null field is left as the task has it by then. */
+@Serializable
+data class UpdateTaskParams(
+    @SerialName("task_id") @Serializable(with = UuidSerializer::class) val taskId: UUID,
+    val title: String? = null,
+    val description: String? = null,
+    val position: Int? = null,
+)
+
+/** The task a confirmed deletion removes. */
+@Serializable
+data class DeleteTaskParams(
+    @SerialName("task_id") @Serializable(with = UuidSerializer::class) val taskId: UUID,
+)
+
 /** Offers to add a task to a step of a member's path. */
 @Component
 class AddTaskAction(
     private val scope: ContentScope,
     private val onboardingTaskService: OnboardingTaskService,
-) : TeamActionHandler {
+) : TypedTeamAction<AddTaskParams>(AddTaskParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -58,15 +83,8 @@ class AddTaskAction(
         val description = call.textArgument("description")
         val reopens = target.element.stepStatus == StepStatus.FINISHED
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("step_id", target.element.id.toString())
-                put("title", title)
-                put("description", description)
-                put("position", position)
-                // Whether the preview announced the reopening, so a confirm can tell it became true since.
-                put("reopens", reopens)
-            },
+        return proposed(
+            params = AddTaskParams(target.element.id, title, description, position, reopens),
             label = "Add task “${title.forLabel()}”",
             preview = buildString {
                 appendLine("Add a task to “${target.element.title}” on ${target.owner.displayName}'s path:")
@@ -88,29 +106,28 @@ class AddTaskAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
-        val target = scope.element(PathElementKind.STEP, params.uuid("step_id"), context.projectId)
+    override fun recheckParams(params: AddTaskParams, context: TeamToolContext): String? {
+        val target = scope.element(PathElementKind.STEP, params.stepId, context.projectId)
             ?: return goneSince(PathElementKind.STEP)
-        val position = params.text("position").toIntOrNull() ?: return "That offer is malformed."
-        if (position !in 0..target.element.children) {
+        if (params.position !in 0..target.element.children) {
             return "The step has fewer tasks than it had — that place is gone — so nothing was changed. Offer it again."
         }
         // Finished since the preview: the service would reopen it, which this offer never said.
         return STEP_FINISHED_SINCE.takeIf {
-            target.element.stepStatus == StepStatus.FINISHED && params.boolean("reopens") != true
+            target.element.stepStatus == StepStatus.FINISHED && !params.reopens
         }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
+    override suspend fun performParams(params: AddTaskParams, context: TeamToolContext): String {
         onboardingTaskService.createOnboardingTaskForStepId(
-            requireNotNull(params.uuid("step_id")),
+            params.stepId,
             CreateOnboardingTaskRequest(
-                position = requireNotNull(params.text("position").toIntOrNull()),
-                title = params.text("title"),
-                description = params.text("description"),
+                position = params.position,
+                title = params.title,
+                description = params.description,
             ),
         )
-        return "Added. “${params.text("title")}” is on the step now, unfinished."
+        return "Added. “${params.title}” is on the step now, unfinished."
     }
 }
 
@@ -119,7 +136,7 @@ class AddTaskAction(
 class UpdateTaskAction(
     private val scope: ContentScope,
     private val onboardingTaskService: OnboardingTaskService,
-) : TeamActionHandler {
+) : TypedTeamAction<UpdateTaskParams>(UpdateTaskParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -147,20 +164,17 @@ class UpdateTaskAction(
         val requested = if (placeText.isEmpty()) current.position else placeToPosition(placeText, siblings)
         if (requested == null) return TeamActionDraft.Refused("Place must be a number from 1 to $siblings.")
 
-        val changes = ChangeSet("task_id", current.id)
-        changes.add("title", call.changedText("title", current.title, allowBlank = false)) {
-            "Title: “${current.title}” becomes “$it”"
-        }
-        changes.add("description", call.changedText("description", current.description)) {
-            "Description becomes: ${it.ifEmpty { "(empty)" }}"
-        }
-        changes.add("position", requested.takeIf { it != current.position }?.toString()) {
-            "Place: ${placeOf(current.position, siblings)} becomes ${placeOf(it.toInt(), siblings)}"
-        }
+        val newTitle = call.changedText("title", current.title, allowBlank = false)
+        val newDescription = call.changedText("description", current.description)
+        val newPosition = requested.takeIf { it != current.position }
+        val changes = ChangeLines()
+        changes.add(newTitle) { "Title: “${current.title}” becomes “$it”" }
+        changes.add(newDescription) { "Description becomes: ${it.ifEmpty { "(empty)" }}" }
+        changes.add(newPosition) { "Place: ${placeOf(current.position, siblings)} becomes ${placeOf(it, siblings)}" }
         if (changes.isEmpty) return TeamActionDraft.Refused("Nothing would change: that is already how the task is.")
 
-        return TeamActionDraft.Proposed(
-            params = changes.params(),
+        return proposed(
+            params = UpdateTaskParams(current.id, newTitle, newDescription, newPosition),
             label = "Change task “${current.title.forLabel()}”",
             preview = "Change the task “${current.title}” on ${target.owner.displayName}'s path:\n" +
                 changes.preview() + "\n" +
@@ -169,27 +183,20 @@ class UpdateTaskAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        scope.missing(PathElementKind.TASK, params.uuid("task_id"), context.projectId)
+    override fun recheckParams(params: UpdateTaskParams, context: TeamToolContext): String? =
+        scope.missing(PathElementKind.TASK, params.taskId, context.projectId)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val id = requireNotNull(params.uuid("task_id"))
+    override suspend fun performParams(params: UpdateTaskParams, context: TeamToolContext): String {
+        val id = params.taskId
         // `finished` is read now and passed back unchanged: the request carries it, and it must never
         // be the thing an edit from here decides.
         val current = onboardingTaskService.getOnboardingTaskById(id)
         onboardingTaskService.updateOnboardingTaskById(
             id,
             UpdateOnboardingTaskRequest(
-                position = params.text("position").toIntOrNull() ?: current.position,
-                title = params.text("title").ifEmpty { current.title },
-                description = if (params.containsKey(
-                        "description",
-                    )
-                ) {
-                    params.text("description")
-                } else {
-                    current.description
-                },
+                position = params.position ?: current.position,
+                title = params.title ?: current.title,
+                description = params.description ?: current.description,
                 finished = current.finished,
             ),
         )
@@ -202,7 +209,7 @@ class UpdateTaskAction(
 class DeleteTaskAction(
     private val scope: ContentScope,
     private val onboardingTaskService: OnboardingTaskService,
-) : TeamActionHandler {
+) : TypedTeamAction<DeleteTaskParams>(DeleteTaskParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
     override val spec = BuddyToolSpecDto(
@@ -217,8 +224,8 @@ class DeleteTaskAction(
             ?: return TeamActionDraft.Refused(notInScope(PathElementKind.TASK))
         val task = target.element
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject { put("task_id", task.id.toString()) },
+        return proposed(
+            params = DeleteTaskParams(task.id),
             label = "Delete task “${task.title.forLabel()}”",
             preview = buildString {
                 appendLine("Delete the task “${task.title}” from ${target.owner.displayName}'s onboarding path.")
@@ -229,11 +236,11 @@ class DeleteTaskAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        scope.missing(PathElementKind.TASK, params.uuid("task_id"), context.projectId)
+    override fun recheckParams(params: DeleteTaskParams, context: TeamToolContext): String? =
+        scope.missing(PathElementKind.TASK, params.taskId, context.projectId)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        onboardingTaskService.deleteOnboardingTaskById(requireNotNull(params.uuid("task_id")))
+    override suspend fun performParams(params: DeleteTaskParams, context: TeamToolContext): String {
+        onboardingTaskService.deleteOnboardingTaskById(params.taskId)
         return "Deleted. The task is gone."
     }
 }

@@ -5,10 +5,10 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCal
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.request.phase.CreateOnboardingPhaseRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.phase.UpdateOnboardingPhaseRequest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
+import java.util.UUID
 
 /*
  * The phase actions of team mode's content area.
@@ -28,7 +28,7 @@ class AddPhaseAction(
     private val scope: ContentScope,
     private val pathElements: PathElements,
     private val onboardingPhaseService: OnboardingPhaseService,
-) : TeamActionHandler {
+) : TypedTeamAction<AddPhaseParams>(AddPhaseParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -57,13 +57,8 @@ class AddPhaseAction(
         if (position == null) return TeamActionDraft.Refused("Place must be a number from 1 to ${phases + 1}.")
         val description = call.textArgument("description")
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("member_id", owner.userId.toString())
-                put("title", title)
-                put("description", description)
-                put("position", position)
-            },
+        return proposed(
+            params = AddPhaseParams(owner.userId, title, description, position),
             label = "Add phase “${title.forLabel()}” for ${owner.displayName.forLabel()}",
             preview = buildString {
                 appendLine("Add a phase to ${owner.displayName}'s onboarding path:")
@@ -77,33 +72,56 @@ class AddPhaseAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
-        val owner = scope.member(params.uuid("member_id"), context.projectId) ?: return LEFT_SINCE_HERE
+    override fun recheckParams(params: AddPhaseParams, context: TeamToolContext): String? {
+        val owner = scope.member(params.memberId, context.projectId) ?: return LEFT_SINCE_HERE
         val phases = pathElements.pathOf(owner.userId)?.phases ?: return NO_PATH_YET
-        val position = params.text("position").toIntOrNull() ?: return "That offer is malformed."
         return "The path has fewer phases than it had — that place is gone — so nothing was changed. Offer it again."
-            .takeIf { position !in 0..phases }
+            .takeIf { params.position !in 0..phases }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
+    override suspend fun performParams(params: AddPhaseParams, context: TeamToolContext): String {
         onboardingPhaseService.createOnboardingPhaseForUserId(
-            requireNotNull(params.uuid("member_id")),
+            params.memberId,
             CreateOnboardingPhaseRequest(
-                position = requireNotNull(params.text("position").toIntOrNull()),
-                title = params.text("title"),
-                description = params.text("description"),
+                position = params.position,
+                title = params.title,
+                description = params.description,
             ),
         )
-        return "Added. “${params.text("title")}” is on the path now, with no steps yet."
+        return "Added. “${params.title}” is on the path now, with no steps yet."
     }
 }
+
+/** The phase to add to a member's path, and where it goes. */
+@Serializable
+data class AddPhaseParams(
+    @SerialName("member_id") @Serializable(with = UuidSerializer::class) val memberId: UUID,
+    val title: String,
+    val description: String,
+    val position: Int,
+)
+
+/** The edits a confirmed phase update applies; a null field is left as the phase has it by then. */
+@Serializable
+data class UpdatePhaseParams(
+    @SerialName("phase_id") @Serializable(with = UuidSerializer::class) val phaseId: UUID,
+    val title: String? = null,
+    val description: String? = null,
+    val position: Int? = null,
+)
+
+/** The phase a confirmed deletion removes. */
+@Serializable
+data class DeletePhaseParams(
+    @SerialName("phase_id") @Serializable(with = UuidSerializer::class) val phaseId: UUID,
+)
 
 /** Offers to rename, redescribe or move a phase. */
 @Component
 class UpdatePhaseAction(
     private val scope: ContentScope,
     private val onboardingPhaseService: OnboardingPhaseService,
-) : TeamActionHandler {
+) : TypedTeamAction<UpdatePhaseParams>(UpdatePhaseParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -130,21 +148,21 @@ class UpdatePhaseAction(
         val requested = if (placeText.isEmpty()) current.position else placeToPosition(placeText, siblings)
         if (requested == null) return TeamActionDraft.Refused("Place must be a number from 1 to $siblings.")
 
-        val changes = ChangeSet("phase_id", target.element.id)
-        changes.add("title", call.changedText("title", current.title, allowBlank = false)) {
-            "Title: “${current.title}” becomes “$it”"
-        }
-        changes.add("description", call.changedText("description", current.description)) {
-            "Description becomes: ${it.ifEmpty { "(empty)" }}"
-        }
-        changes.add("position", requested.takeIf { it != current.position }?.toString()) {
-            "Place: ${placeOf(current.position, siblings)} becomes ${placeOf(it.toInt(), siblings)}\n" +
+        val newTitle = call.changedText("title", current.title, allowBlank = false)
+        val newDescription = call.changedText("description", current.description)
+        val newPosition = requested.takeIf { it != current.position }
+
+        val changes = ChangeLines()
+        changes.add(newTitle) { "Title: “${current.title}” becomes “$it”" }
+        changes.add(newDescription) { "Description becomes: ${it.ifEmpty { "(empty)" }}" }
+        changes.add(newPosition) {
+            "Place: ${placeOf(current.position, siblings)} becomes ${placeOf(it, siblings)}\n" +
                 "The phases in between move by one place."
         }
         if (changes.isEmpty) return TeamActionDraft.Refused("Nothing would change: that is already how the phase is.")
 
-        return TeamActionDraft.Proposed(
-            params = changes.params(),
+        return proposed(
+            params = UpdatePhaseParams(target.element.id, newTitle, newDescription, newPosition),
             label = "Change phase “${current.title.forLabel()}”",
             preview = "Change the phase “${current.title}” on ${target.owner.displayName}'s path:\n" +
                 changes.preview() +
@@ -152,27 +170,20 @@ class UpdatePhaseAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        scope.missing(PathElementKind.PHASE, params.uuid("phase_id"), context.projectId)
+    override fun recheckParams(params: UpdatePhaseParams, context: TeamToolContext): String? =
+        scope.missing(PathElementKind.PHASE, params.phaseId, context.projectId)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val id = requireNotNull(params.uuid("phase_id"))
+    override suspend fun performParams(params: UpdatePhaseParams, context: TeamToolContext): String {
+        val id = params.phaseId
         // Only what the manager saw is written. Everything else is read fresh, so a change made to the
         // other fields since the preview is not undone by a confirm.
         val current = onboardingPhaseService.getOnboardingPhaseById(id)
         onboardingPhaseService.updateOnboardingPhaseById(
             id,
             UpdateOnboardingPhaseRequest(
-                position = params.text("position").toIntOrNull() ?: current.position,
-                title = params.text("title").ifEmpty { current.title },
-                description = if (params.containsKey(
-                        "description",
-                    )
-                ) {
-                    params.text("description")
-                } else {
-                    current.description
-                },
+                position = params.position ?: current.position,
+                title = params.title ?: current.title,
+                description = params.description ?: current.description,
             ),
         )
         return "Done. The phase is updated."
@@ -184,7 +195,7 @@ class UpdatePhaseAction(
 class DeletePhaseAction(
     private val scope: ContentScope,
     private val onboardingPhaseService: OnboardingPhaseService,
-) : TeamActionHandler {
+) : TypedTeamAction<DeletePhaseParams>(DeletePhaseParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
     override val spec = BuddyToolSpecDto(
@@ -200,8 +211,8 @@ class DeletePhaseAction(
             ?: return TeamActionDraft.Refused(notInScope(PathElementKind.PHASE))
         val phase = target.element
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject { put("phase_id", phase.id.toString()) },
+        return proposed(
+            params = DeletePhaseParams(phase.id),
             label = "Delete phase “${phase.title.forLabel()}”",
             preview = buildString {
                 appendLine("Delete the phase “${phase.title}” from ${target.owner.displayName}'s onboarding path.")
@@ -219,11 +230,11 @@ class DeletePhaseAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        scope.missing(PathElementKind.PHASE, params.uuid("phase_id"), context.projectId)
+    override fun recheckParams(params: DeletePhaseParams, context: TeamToolContext): String? =
+        scope.missing(PathElementKind.PHASE, params.phaseId, context.projectId)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        onboardingPhaseService.deleteOnboardingPhaseById(requireNotNull(params.uuid("phase_id")))
+    override suspend fun performParams(params: DeletePhaseParams, context: TeamToolContext): String {
+        onboardingPhaseService.deleteOnboardingPhaseById(params.phaseId)
         return "Deleted. The phase and everything in it are gone."
     }
 }

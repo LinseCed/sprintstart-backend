@@ -87,8 +87,18 @@ class TaskTeamActionsTest {
         fun `a confirm after the step lost tasks is turned down`() {
             f.element(PathElementKind.STEP, stepId, children = 0)
 
-            assertThat(action.recheck(f.json("step_id" to stepId, "position" to 3), f.context))
-                .contains("fewer tasks")
+            assertThat(
+                action.recheck(
+                    f.json(
+                        "step_id" to stepId,
+                        "title" to "x",
+                        "description" to "",
+                        "position" to 3,
+                        "reopens" to false,
+                    ),
+                    f.context,
+                ),
+            ).contains("fewer tasks")
         }
 
         @Test
@@ -118,7 +128,13 @@ class TaskTeamActionsTest {
                     mockk(relaxed = true)
 
                 action.perform(
-                    f.json("step_id" to stepId, "title" to "Build", "description" to "d", "position" to 1),
+                    f.json(
+                        "step_id" to stepId,
+                        "title" to "Build",
+                        "description" to "d",
+                        "position" to 1,
+                        "reopens" to false,
+                    ),
                     f.context,
                 )
 

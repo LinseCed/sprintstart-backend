@@ -7,7 +7,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
-import java.util.UUID
 
 /**
  * One argument of a content tool.
@@ -63,33 +62,20 @@ internal fun BuddyToolCallDto.changedText(name: String, now: String, allowBlank:
     textArgument(name).takeIf { arguments.containsKey(name) && (allowBlank || it.isNotEmpty()) && it != now }
 
 /**
- * The edits one update call asks for, collected once and read two ways: what a confirm stores, and
- * what the manager is shown.
+ * What the manager is shown of the edits one update call asks for, one line per field that changes.
  *
- * Only what actually changes goes in. What a confirm stores is applied over the element as it is
- * *then*, so a change made to any other field since the preview is not undone by it.
+ * Only what actually changes is recorded, and the stored params keep the same fields: a confirm applies
+ * them over the element as it is *then*, so a change made to any other field since the preview is not undone.
  */
-internal class ChangeSet(
-    private val idName: String,
-    private val id: UUID,
-) {
-    private val stored = linkedMapOf<String, String>()
+internal class ChangeLines {
     private val lines = mutableListOf<String>()
 
-    val isEmpty: Boolean get() = stored.isEmpty()
+    val isEmpty: Boolean get() = lines.isEmpty()
 
-    /** Records [value] under [name] and the line describing it, unless it is null — no change. */
-    fun add(name: String, value: String?, line: (String) -> String) {
-        if (value == null) return
-        stored[name] = value
-        lines += line(value)
+    /** Records the line describing [value], unless it is null: no change. */
+    fun <T : Any> add(value: T?, line: (T) -> String) {
+        if (value != null) lines += line(value)
     }
-
-    fun params(): JsonObject =
-        buildJsonObject {
-            put(idName, id.toString())
-            stored.forEach { (name, value) -> put(name, value) }
-        }
 
     fun preview(): String = lines.joinToString("\n")
 }

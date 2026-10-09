@@ -152,7 +152,7 @@ class PhaseTeamActionsTest {
 
         @Test
         fun `a confirm for somebody who left is turned down`() {
-            val params = f.json("member_id" to f.outsiderId, "title" to "x", "position" to 0)
+            val params = f.json("member_id" to f.outsiderId, "title" to "x", "description" to "", "position" to 0)
 
             assertThat(action.recheck(params, f.context)).contains("no longer on this project")
         }
@@ -160,7 +160,7 @@ class PhaseTeamActionsTest {
         @Test
         fun `a confirm for a place that has gone is turned down`() {
             pathOf(1)
-            val params = f.json("member_id" to f.memberId, "title" to "x", "position" to 5)
+            val params = f.json("member_id" to f.memberId, "title" to "x", "description" to "", "position" to 5)
 
             assertThat(action.recheck(params, f.context)).contains("fewer phases")
         }
