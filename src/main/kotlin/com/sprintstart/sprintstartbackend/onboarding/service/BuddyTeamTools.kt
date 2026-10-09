@@ -14,18 +14,14 @@ import java.util.UUID
 /**
  * The tools the buddy may call in team mode, and the rule for which of them are mounted.
  *
- * The hire's buddy reads only the caller ([BuddyToolExecutor]). Team mode is the one deliberate
- * exception: a project's manager asks about *other people* on that project. Two checks make that safe,
- * and neither lives in the prompt:
+ * Unlike the hire's buddy ([BuddyToolExecutor]), these tools read *other people* on the project. That is
+ * safe because [BuddyTeamService] confirms the caller manages the project before every turn, and because
+ * every tool checks that what it reads belongs to that project: a member id from the model is a pointer,
+ * never an authorisation.
  *
- * - [BuddyTeamService] confirms the caller manages the project before every turn, so nobody else is
- *   ever handed these tools.
- * - Every tool checks that the person or thing it reads belongs to that project. A member id the
- *   model passes is a pointer, never an authorisation.
- *
- * The team reads ([TeamReadTools]) are always mounted. Everything else arrives by area: `open_area` is mounted only
- * when some area has tools at all ("absent, never empty"), and an area's tools only once it has been
- * opened. [execute] refuses any tool that was not mounted for the hop it was called on.
+ * The team reads ([TeamReadTools]) are always mounted. `open_area` is mounted only when some area has
+ * tools, and an area's tools only once it has been opened. [execute] refuses any tool that was not
+ * mounted for the hop it was called on.
  */
 @Component
 class BuddyTeamTools(
@@ -34,15 +30,13 @@ class BuddyTeamTools(
     private val buddyProposalService: BuddyProposalService,
     private val buddyAppGuideTools: BuddyAppGuideTools,
 ) {
-    // Resolved lazily: an area's tools may themselves depend on services that depend on this one.
+    // Lazy: an area's tools may depend on services that depend on this one.
     private val areaTools: Map<TeamArea, TeamAreaTools> by lazy {
         areaToolsProvider.orderedStream().toList().associateBy { it.area }
     }
 
-    /** Every area with something behind it: read tools, actions, or both. */
     private val openableAreas: Set<TeamArea> by lazy { areaTools.keys + buddyProposalService.actionAreas() }
 
-    // Built once: which area each action belongs to does not change while the application runs.
     private val actionAreaByName: Map<String, TeamArea> by lazy {
         TeamArea.entries
             .flatMap { area ->
@@ -60,8 +54,7 @@ class BuddyTeamTools(
     fun toolSpecs(openedAreas: Set<TeamArea>): List<BuddyToolSpecDto> =
         buildList {
             addAll(teamReadTools.toolSpecs())
-            // A read about the app, not about the team, so outside the areas: "where do I set up
-            // roles?" has to be answerable before anything is opened.
+            // Outside the areas, so "where do I set up roles?" is answerable before anything is opened.
             add(BuddyAppGuideTools.GET_APP_GUIDE_SPEC)
             if (openableAreas.isNotEmpty()) {
                 add(openAreaSpec())
@@ -72,19 +65,12 @@ class BuddyTeamTools(
             addAll(buddyProposalService.actionSpecs(openedAreas))
         }
 
-    /**
-     * The area [toolName] belongs to, whether a read tool or an action; `null` for the team reads,
-     * `open_area` and names that are no tool at all.
-     */
+    /** The area [toolName] belongs to, as a read tool or an action; `null` for everything else. */
     fun areaOf(toolName: String): TeamArea? =
         areaTools.values.firstOrNull { it.handles(toolName) }?.area
             ?: actionAreaByName[toolName]
 
-    /**
-     * Opens the area the model named, so its tools are mounted from the next hop on.
-     *
-     * @return The area opened, or `null` with the reason when no such area has tools.
-     */
+    /** Opens the area the model named; its tools are mounted from the next hop on. */
     fun openArea(call: BuddyToolCallDto): OpenAreaOutcome {
         val requested = call.textArgument("area")
         val area = TeamArea.entries
@@ -104,15 +90,14 @@ class BuddyTeamTools(
         )
     }
 
-    /** The read tools and actions an opened [area] mounts, by name. */
     private fun toolNamesIn(area: TeamArea): List<String> =
         (areaTools[area]?.toolSpecs().orEmpty() + buddyProposalService.actionSpecs(setOf(area))).map { it.name }
 
     /**
-     * Runs one team-mode tool for [context], refusing any tool that was not mounted for this hop.
+     * Runs one team-mode tool for [context].
      *
      * @param mountedToolNames The names handed to the model on the hop this call came from.
-     * @return A plain-text result for the model.
+     * @return A plain-text result for the model; a tool not in [mountedToolNames] is refused.
      */
     fun execute(call: BuddyToolCallDto, context: TeamToolContext, mountedToolNames: Set<String>): String {
         if (call.name !in mountedToolNames) {
@@ -126,12 +111,7 @@ class BuddyTeamTools(
             ?: "Unknown tool: ${call.name}."
     }
 
-    /**
-     * A plain-text snapshot of the project's team for a team-mode greeting to ground itself in.
-     *
-     * Reuses the same read as the `get_team_attention` tool, so the greeting and the tool can never
-     * describe different states.
-     */
+    /** The text a greeting grounds itself in; the same read as `get_team_attention`, so they cannot differ. */
     fun teamSnapshot(projectId: UUID): String = teamReadTools.teamSnapshot(projectId)
 
     private fun openAreaSpec(): BuddyToolSpecDto =

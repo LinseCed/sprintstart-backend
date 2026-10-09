@@ -21,15 +21,12 @@ import java.util.UUID
 /*
  * The actions of team mode's team area: who is on the project, and what they do here.
  *
- * The services behind these take an id and act on it. `assignUsers` and `removeUser` sit behind
- * every `/api/v1/admin/projects` route, which is `hasRole('ADMIN')` — a manager cannot reach them
- * through REST, and reaches them here only because the turn already proved they manage this
- * project. So every target is resolved against this project's membership first, at draft and again
- * at confirm, and the project is always the turn's.
+ * The services behind these take an id and act on it, and sit behind admin-only routes. A manager reaches
+ * them here only because the turn already proved they manage this project, so every target is resolved
+ * against this project's membership first, at draft and again at confirm.
  *
- * Roles are scoped to the membership rather than to the person. The project-less overloads of
- * `assignRoleToUser` and `unassignRoleFromUser` apply a role across every project somebody belongs
- * to; they are never called from here, and the three-argument forms always are.
+ * Roles are scoped to the membership: the project-less overloads of `assignRoleToUser` and
+ * `unassignRoleFromUser` apply across every project somebody belongs to and are never called from here.
  */
 
 /** The member [memberId] names on [projectId], or null. Shared with [TeamMemberTools]. */
@@ -37,11 +34,9 @@ internal fun ProjectMembershipApi.memberOn(memberId: UUID?, projectId: UUID): Pr
     memberId?.let { id -> getProjectMembers(projectId).firstOrNull { it.userId == id } }
 
 /**
- * The roles [userId] holds on [projectId], and an empty list when they hold none.
+ * The roles [userId] holds on [projectId]; empty when they hold none.
  *
- * `getRolesOnProject` answers 404 for somebody who is not on the project, which every caller here
- * has already ruled out by resolving the member first. Anything else is a real failure and is
- * rethrown rather than read as "no roles".
+ * Only the 404 for a non-member is read as "no roles"; anything else is rethrown.
  */
 private fun ProjectRoleApi.rolesHeldOn(userId: UUID, projectId: UUID): List<ProjectRoleShortDto> =
     runCatching { getRolesOnProject(userId, projectId) }
@@ -56,8 +51,7 @@ private const val LEFT_SINCE = "That person is no longer on this project, so not
 /**
  * Offers to put one or more people on the project.
  *
- * The ids come from `find_user_to_add`, which resolves exactly one person from an identifier the
- * manager already has — so a model cannot assemble this call by guessing.
+ * The ids come from `find_user_to_add`, which resolves exactly one person, so a model cannot guess them.
  */
 @Component
 class AddMembersAction(
@@ -105,8 +99,6 @@ class AddMembersAction(
                 "Somebody in that list is already on this project. Call find_member to see who is here.",
             )
         }
-        // Resolved for the preview, in one read: a manager confirming "add two people" has to be
-        // told which two.
         val found = userApi.getUsersByIds(wanted).associateBy { it.id }
         val people = wanted.map { id ->
             val person = found[id]
@@ -157,9 +149,8 @@ class AddMembersAction(
 /**
  * Offers to take somebody off the project.
  *
- * Destructive for a reason the preview has to carry: the membership is what the person's roles here
- * hang off, so removing it drops them, and putting the person back later gives them a fresh
- * membership with none.
+ * Destructive because the membership carries the person's roles here: removing it drops them, and adding
+ * the person back starts with none.
  */
 @Component
 class RemoveMemberAction(
@@ -195,8 +186,6 @@ class RemoveMemberAction(
                 appendLine()
                 appendLine("They lose access to this project's material, board and onboarding.")
                 if (roles.isNotEmpty()) {
-                    // The roles live on the membership row, so deleting it deletes them. Putting the
-                    // person back later creates a new membership, which starts with none.
                     appendLine(
                         "The ${roles.size} role${if (roles.size == 1) "" else "s"} they hold here " +
                             "(${roles.joinToString(", ")}) go with the membership. Adding them back later " +
@@ -221,7 +210,6 @@ class RemoveMemberAction(
         return "Removed. They are off this project, and the roles they held here went with the membership."
     }
 
-    /** Why this member cannot be removed, or null. */
     private fun managerRefusal(member: ProjectMember, context: TeamToolContext): String? {
         val managerId = projectMembershipApi.getProjectManagerId(context.projectId).orElse(null)
         return if (managerId == member.userId) {
@@ -283,12 +271,7 @@ class AssignProjectRoleAction(
         )
     }
 
-    /**
-     * They are still here, and still without the role.
-     *
-     * Assigning a role twice is not an error, so a stale confirm would otherwise report as its own
-     * a change that had already happened elsewhere.
-     */
+    /** They are still here and still without the role: assigning twice: a repeat is no error. */
     override fun recheck(params: JsonObject, context: TeamToolContext): String? {
         val member = projectMembershipApi.memberOn(params.uuid("member_id"), context.projectId)
             ?: return LEFT_SINCE
@@ -331,8 +314,7 @@ class UnassignProjectRoleAction(
         val member = projectMembershipApi.memberOn(call.uuidArgument("member_id"), context.projectId)
             ?: return TeamActionDraft.Refused(NOT_A_MEMBER)
         val roleId = call.uuidArgument("role_id")
-        // The service removes by id without complaining when nothing matches, so a role they do not
-        // hold would confirm as a change and change nothing. Checked here instead.
+        // The service removes by id silently, so a role they do not hold would confirm as a change.
         val held = projectRoleApi.rolesHeldOn(member.userId, context.projectId)
         val role = held.firstOrNull { it.id == roleId }
             ?: return TeamActionDraft.Refused(
@@ -353,7 +335,6 @@ class UnassignProjectRoleAction(
         )
     }
 
-    /** What they are left holding here, said as a person would say it. */
     private fun remaining(heldNow: Int): String =
         when (heldNow) {
             1 -> " with no role here"
@@ -361,12 +342,7 @@ class UnassignProjectRoleAction(
             else -> " and keep their other ${heldNow - 1} roles here"
         }
 
-    /**
-     * They are still here, and still hold the role.
-     *
-     * The same reason the draft checks it: the service removes by id without complaining, so a role
-     * taken off in the meantime would confirm as a change that had already happened.
-     */
+    /** They are still here and still hold the role: the service removes by id silently. */
     override fun recheck(params: JsonObject, context: TeamToolContext): String? {
         val member = projectMembershipApi.memberOn(params.uuid("member_id"), context.projectId)
             ?: return LEFT_SINCE

@@ -19,21 +19,12 @@ import java.util.UUID
 /*
  * The actions of team mode's arrival area.
  *
- * Every arrival service method takes a nullable `projectId`, and `null` is the organisation-wide
- * default list. Everything here writes with `context.projectId`, so a key a model invents names a
- * step in this project's scope or names nothing: that list is never written from team mode.
+ * Everything here writes with `context.projectId`, never the organisation-wide default list (a null
+ * project). That list is read only to keep previews honest: a project step wins its key outright, so
+ * creating one replaces the company step of that key for everybody here, and deleting one lets it back.
  *
- * It is read, twice, and only to keep a preview honest. A project step wins its key outright —
- * `resolve` drops the company step of the same key — so creating one silently replaces a company
- * step for everybody here, and deleting one lets that step back onto every hire's list. Neither
- * preview could say what confirming does without looking. Nothing of that list reaches the model
- * beyond the title of a step the manager's own call collided with, which is already on the arrival
- * list they are looking at.
- *
- * Keys are the identity here, not ids, and the service will not rename one: state is recorded
- * against the key, so changing it would orphan every hire's record of having done the step while
- * leaving the row looking healthy. Renaming is therefore delete plus create, and the tools say so
- * rather than quietly doing half of it.
+ * Keys are the identity, not ids, and the service will not rename one, since state is recorded against
+ * the key. Renaming is therefore delete plus create, and the tools say so.
  */
 
 /** The step [key] names on [projectId], or null. */
@@ -55,12 +46,7 @@ private fun occupantOf(position: Int, key: String, steps: List<ArrivalStep>): Ar
 /** A model-supplied key, lower-cased and trimmed the way the service will store it. */
 private fun normalizeKey(raw: String): String = raw.trim().lowercase()
 
-/**
- * What a step with this key will actually be settled by, whatever was asked for.
- *
- * A key the system knows how to check is forced to [Rigor.OBSERVED] on create. The preview has to
- * show that rather than the request, or the manager confirms one thing and gets another.
- */
+/** What a step with this key will actually be settled by: a key the system checks is forced to [Rigor.OBSERVED]. */
 private fun effectiveRigor(key: String, requested: Rigor): Rigor =
     if (ArrivalDerivation.forStepKey(key) != null) Rigor.OBSERVED else requested
 
@@ -84,9 +70,7 @@ private const val RIGOR_VALUES = "Must be one of observed, attested or declared.
 /**
  * Offers to add one or more steps to the project's arrival list.
  *
- * A batch is one proposal and one confirm, because a manager writing an arrival list is agreeing to
- * a list rather than to each line of it. The service applies the batch in one transaction, so a key
- * that turns out to be taken takes the whole batch down rather than leaving a partial list.
+ * A batch is one proposal and one confirm, applied in one transaction, so a taken key fails the whole batch.
  */
 @Component
 class CreateArrivalStepsAction(
@@ -157,12 +141,7 @@ class CreateArrivalStepsAction(
         }
 
         val taken = arrivalStepService.listForAuthoring(context.projectId).map { it.key }.toSet()
-        // The company-wide list, read to warn rather than to offer. A project-scoped step wins its
-        // key outright -- `resolve` drops the company step of the same key from the hire's list --
-        // so a manager adding "vpn" over a company "vpn" silently replaces it for everybody here.
-        // That is the manager's own decision to make, but only if the preview says it is being made.
-        // Nothing of this list reaches the model except the title of a step it collided with, which
-        // the manager already sees on their own arrival list.
+        // Read to warn, not to offer: a project step replaces the company step of the same key for everybody.
         val companyTitles = arrivalStepService.listForAuthoring(null).associate { it.key to it.title }
         val drafted = mutableListOf<DraftedStep>()
         for (entry in requested) {
@@ -358,7 +337,6 @@ class UpdateArrivalStepAction(
         }
     }
 
-    /** The fields the call actually changes, or the first reason it cannot be offered. */
     private fun read(call: BuddyToolCallDto, step: ArrivalStep, context: TeamToolContext): Read {
         val position = when (val parsed = readPosition(call, step, context)) {
             is Parsed.Bad -> return Read.Refused(parsed.reason)
@@ -391,12 +369,8 @@ class UpdateArrivalStepAction(
     }
 
     /**
-     * A place in the list, refused when another step holds it or the list does not run that far.
-     *
-     * Two steps on one position order arbitrarily against each other, and a manager who confirmed a
-     * place would not be able to tell that is what happened; a place past the end leaves a gap in
-     * the sequence that only a later reorder tidies. Reordering is the operation that keeps the list
-     * coherent, so both point there instead of being created quietly.
+     * A place in the list, refused when another step holds it or it lies past the end. Both leave an
+     * ambiguous or gapped order, so they point to reorder_arrival_steps instead.
      */
     private fun readPosition(call: BuddyToolCallDto, step: ArrivalStep, context: TeamToolContext): Parsed<Int?> {
         val text = call.textArgument("position")
@@ -424,9 +398,7 @@ class UpdateArrivalStepAction(
     /**
      * An optional field that can also be taken off: the new text, "" for taken off, or null for kept.
      *
-     * The service reads a blank value as "leave this step with none", but a model passing an empty
-     * string means "I am not changing this" far more often than it means "remove it". So removing is
-     * its own flag, and the two together are refused rather than one of them quietly winning.
+     * Removing is its own flag, because a model passing an empty string usually means "unchanged".
      */
     private fun readClearable(call: BuddyToolCallDto, field: String, current: String?): Parsed<String?> {
         val given = call.textArgument(field)
@@ -452,8 +424,6 @@ class UpdateArrivalStepAction(
 
         val rigor = rigorOrNull(text)
             ?: return Parsed.Bad("That is not a way of settling a step. $RIGOR_VALUES")
-        // The same rule create applies: a key the system checks is observed, and a manager confirming
-        // "declared" on one would be agreeing to something that cannot hold.
         if (ArrivalDerivation.forStepKey(key) != null && rigor != Rigor.OBSERVED) {
             return Parsed.Bad(
                 "That step is one the system checks itself, so it is always settled by observing it. Leave " +
@@ -463,7 +433,6 @@ class UpdateArrivalStepAction(
         return Parsed.Value(rigor)
     }
 
-    /** What the manager is agreeing to, one line per field the call changes. */
     private fun lines(step: ArrivalStep, changes: Read.Changes): List<String> = buildList {
         changes.title?.let { add("Title: “${step.title}” becomes “$it”") }
         changes.description?.let { add(fieldLine("Description", step.description, it) { text -> "“$text”" }) }
@@ -494,12 +463,7 @@ class UpdateArrivalStepAction(
         )
     }
 
-    /**
-     * The step is still here, and the place it was given is still one it can take.
-     *
-     * [perform] sets the position unconditionally, so a reorder or another update confirmed in
-     * between would let this confirm create exactly the collision [readPosition] refused to draft.
-     */
+    /** The step is still here and its place is still free: [perform] sets the position unconditionally. */
     override fun recheck(params: JsonObject, context: TeamToolContext): String? {
         val steps = arrivalStepService.listForAuthoring(context.projectId)
         val step = steps.firstOrNull { it.key == params.text("key") } ?: return GONE_SINCE
@@ -524,8 +488,7 @@ class UpdateArrivalStepAction(
             key = key,
             projectId = context.projectId,
             title = params.text("title").ifBlank { null },
-            // Present but blank is a taking-off the manager confirmed, so presence decides these two
-            // rather than emptiness: the service reads blank as "leave this step with none".
+            // Presence, not emptiness, decides these: blank means the manager confirmed taking the field off.
             description = params.textIfPresent("description"),
             href = params.textIfPresent("href"),
             position = params.text("position").toIntOrNull(),
@@ -534,7 +497,6 @@ class UpdateArrivalStepAction(
         return "Updated. That step now reads as proposed on this project's arrival list."
     }
 
-    /** One optional field, read or refused. */
     private sealed interface Parsed<out T> {
         data class Value<T>(
             val value: T,
@@ -565,9 +527,7 @@ class UpdateArrivalStepAction(
 /**
  * Offers a whole new order for the project's arrival list.
  *
- * The complete list, never a move: the service takes the full ordering so two people reordering
- * concurrently cannot interleave into an order neither chose, and a partial list would leave the
- * steps nobody named sitting on positions that now collide.
+ * Always the complete list, never a move, so concurrent reorders cannot interleave into an order nobody chose.
  */
 @Component
 class ReorderArrivalStepsAction(
@@ -679,10 +639,7 @@ class DeleteArrivalStepAction(
         val step = arrivalStepService.stepOn(key, context.projectId)
             ?: return TeamActionDraft.Refused(NO_SUCH_STEP)
 
-        // Removing a project step does not always remove a step. The project's definition was
-        // winning this key outright, so deleting it lets the company-wide one of the same key back
-        // onto every hire's list here -- a different step, with different wording and possibly a
-        // different way of settling. "It stops appearing" would be untrue in exactly that case.
+        // Deleting a project step lets the company step of the same key back onto every hire's list.
         val restored = arrivalStepService.listForAuthoring(null).firstOrNull { it.key == key }
 
         return TeamActionDraft.Proposed(

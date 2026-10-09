@@ -14,12 +14,10 @@ import org.springframework.stereotype.Component
 import java.util.UUID
 
 /**
- * The three reads about the team that team mode always mounts: who needs attention, who is on the
- * project, and how one member is getting on.
+ * The three team reads that are always mounted: who needs attention, who is on the project, and how one
+ * member is getting on.
  *
- * Every read checks that the person it describes belongs to the turn's project. A member id the model
- * passes is a pointer, never an authorisation. Which tools are mounted on a hop is not decided here but
- * by [BuddyTeamTools], which delegates to this class for the reads.
+ * Every read checks that the person it describes belongs to the turn's project.
  */
 @Component
 class TeamReadTools(
@@ -29,18 +27,13 @@ class TeamReadTools(
     private val arrivalStepService: ArrivalStepService,
     private val projectMembershipApi: ProjectMembershipApi,
 ) {
-    /** The definitions of the team reads, in the order the model is shown them. */
     fun toolSpecs(): List<BuddyToolSpecDto> = listOf(
         GET_TEAM_ATTENTION_SPEC,
         FIND_MEMBER_SPEC,
         GET_MEMBER_PROGRESS_SPEC,
     )
 
-    /**
-     * Runs [call] if it is one of the team reads.
-     *
-     * @return A plain-text result for the model, or `null` when [call] is not a team read.
-     */
+    /** @return A plain-text result for the model, or `null` when [call] is not a team read. */
     fun execute(call: BuddyToolCallDto, context: TeamToolContext): String? =
         when (call.name) {
             GET_TEAM_ATTENTION -> teamAttention(context.projectId)
@@ -49,20 +42,10 @@ class TeamReadTools(
             else -> null
         }
 
-    /**
-     * A plain-text snapshot of the project's team for a team-mode greeting to ground itself in.
-     *
-     * Reuses [teamAttention] exactly, so the greeting and the tool can never describe different states.
-     */
+    /** The text a greeting grounds itself in; the same read as `get_team_attention`, so they cannot differ. */
     fun teamSnapshot(projectId: UUID): String = "Who needs attention:\n" + teamAttention(projectId)
 
-    /**
-     * Who on the project is waiting or has stalled, most pressing first.
-     *
-     * Each line keeps the reason [ProjectAttentionService] wrote and says whose move it is. A pull
-     * request waiting on review is the reviewer's move, and a manager told otherwise chases the one
-     * person who cannot fix it.
-     */
+    /** Each line says whose move it is: a pull request waiting on review is the reviewer's, not the author's. */
     private fun teamAttention(projectId: UUID): String {
         val attention = projectAttentionService.getAttention(projectId)
         if (attention.items.isEmpty()) {
@@ -85,7 +68,6 @@ class TeamReadTools(
             AttentionSeverity.DRIFTING -> "no progress we can see yet"
         }
 
-    /** The project's members matching [query] by name or account, or everyone when it is blank. */
     private fun findMember(projectId: UUID, query: String): String {
         val members = projectMembershipApi.getProjectMembers(projectId)
         if (members.isEmpty()) {
@@ -114,12 +96,7 @@ class TeamReadTools(
         }.trim()
     }
 
-    /**
-     * One member's onboarding on this project: arrival, contributions, competencies.
-     *
-     * Refuses anybody who is not a member of the project — the check that makes a model-supplied id
-     * safe to accept at all.
-     */
+    /** Refuses anybody who is not a member of the project: the check that makes a model-supplied id safe. */
     private fun memberProgress(projectId: UUID, rawMemberId: String): String {
         val memberId = runCatching { UUID.fromString(rawMemberId.trim()) }.getOrNull()
             ?: return "No valid member_id was given. Call find_member first and pass the member_id it returns."
@@ -135,12 +112,9 @@ class TeamReadTools(
     }
 
     /**
-     * The member's arrival steps that apply on this project, outstanding and settled.
-     *
-     * Read with [ArrivalStepService.forHireOn], never by filtering the member's full list: that list
-     * lets another of their projects override a company step, and narrowing it afterwards would hide
-     * a step that still applies here. Same two refusals as the hire's own tool: no total, and nothing
-     * described as blocking.
+     * Read with [ArrivalStepService.forHireOn], not by filtering the member's full list: another of their
+     * projects can override a company step there, which would hide a step that still applies here.
+     * Like the hire's own tool, it gives no total and never calls a step blocking.
      */
     private fun arrivalFor(memberId: UUID, projectId: UUID): String {
         val steps = arrivalStepService.forHireOn(memberId, projectId)
@@ -189,7 +163,7 @@ class TeamReadTools(
         }.trim()
     }
 
-    /** Level-0 rows are placed-but-unknown, not evidence, and are excluded as on the hire's own tool. */
+    /** Level-0 rows are placed-but-unknown, not evidence, so they are excluded as on the hire's own tool. */
     private fun competenciesFor(memberId: UUID): String {
         val ledger = myCompetencyService.getCompetenciesForUser(memberId).filter { it.level > 0 }
         if (ledger.isEmpty()) {

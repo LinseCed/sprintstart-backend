@@ -24,12 +24,9 @@ import java.util.UUID
 /*
  * The actions of team mode's starter-work area.
  *
- * The pool has no project, and the services behind these actions load a task by id alone. So every
- * action resolves its target through StarterWorkScope — the task's repository must be linked to the
- * turn's project — when drafting and again when the manager confirms.
- *
- * A repository can be linked to several projects, and they all draw from the same rows. The previews
- * say so wherever that reaches past this project.
+ * The pool has no project, and the services behind these actions load a task by id alone. So every action
+ * resolves its target through StarterWorkScope, at draft and again at confirm. A repository can be linked
+ * to several projects that share the same rows, and the previews say so where that reaches past this one.
  */
 
 /** The live pool task [taskId] names, if its repository is linked to [projectId]. */
@@ -262,9 +259,8 @@ class PromoteCandidateAction(
 /**
  * Offers to flag a task as a Task 0 candidate, or to take the flag off.
  *
- * Since #311 the flag is a label and nothing more: the PM vouching that a task is small and safe
- * enough to start on. Nothing assigns a flagged task to anybody. The pool is shared by every project
- * its repository is linked to, so the label shows there too — the preview says so.
+ * Since #311 the flag is only a label: the PM vouching that the task is small and safe to start on. The
+ * pool is shared by every project its repository is linked to, so the label shows there too.
  */
 @Component
 class SetTaskZeroEligibleAction(
@@ -342,9 +338,8 @@ class SetTaskZeroEligibleAction(
 /**
  * Offers to bring the pool in line with its trackers now.
  *
- * The reconciler has no project either and checks every row. It only ever writes what the ingested
- * trackers already say, and never touches a removed task, so a manager running it early changes
- * nothing that the next scheduled pass would not — the preview says it covers the whole pool.
+ * The reconciler checks every row and only writes what the trackers already say, so running it early
+ * changes nothing the next scheduled pass would not. The preview says it covers the whole pool.
  */
 @Component
 class ReconcileStarterWorkAction(

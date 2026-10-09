@@ -38,17 +38,10 @@ import java.util.UUID
 /**
  * Team mode: a project manager's buddy conversation about one project's team.
  *
- * The same visit model as the hire's buddy ([BuddyService]) — a durable transcript, a memory note
- * folded in the background, a greeting that opens a visit — with three differences that are the
- * point of it:
- *
- * - **Authorisation per turn.** Every entry point confirms the caller manages the project, through
- *   [UserApi.canManageProject], before anything is read. Losing the assignment refuses the next
- *   turn rather than leaving a manager with tools for a team that is no longer theirs.
- * - **Its own conversation per project.** Team talk never lands in the manager's own onboarding
- *   memory, and one project's note never grounds a turn about another.
- * - **Tools resolved per hop.** `open_area` changes what the next hop may call, so the tool list is
- *   rebuilt on every step of the agent loop instead of once per turn.
+ * Follows the hire's buddy ([BuddyService]) with three differences:
+ * - Every entry point confirms through [UserApi.canManageProject] that the caller manages the project.
+ * - Each project has its own conversation, separate from the manager's onboarding memory.
+ * - The tool list is rebuilt on every hop, because `open_area` changes what the next hop may call.
  */
 @Service
 @Suppress("TooManyFunctions") // The same surface as BuddyService — open, read, speak — plus its loop helpers.
@@ -83,8 +76,8 @@ class BuddyTeamService(
     /**
      * Opens a team-mode visit, streaming a greeting grounded in the team's attention list.
      *
-     * Follows [BuddyService.streamOpenForMe] rule for rule: an existing greeting is replayed whole, a
-     * stream that broke keeps what was read, one that produced nothing persists nothing.
+     * Behaves like [BuddyService.streamOpenForMe]: an existing greeting is replayed, a broken stream
+     * keeps what was read, and an empty one persists nothing.
      *
      * @throws ResponseStatusException 404 if the user does not exist; 403 if they do not manage the project.
      */
@@ -115,14 +108,7 @@ class BuddyTeamService(
         }
     }
 
-    /**
-     * Forwards the greeting's words to the manager as they are written.
-     *
-     * Opening the buddy must never fail the page, so a broken stream ends the read early and keeps what
-     * [streamed] already holds.
-     *
-     * @return The AI's closing event, or `null` when the stream broke or never finished.
-     */
+    /** Forwards the greeting as it is written; a broken stream keeps what [streamed] holds so far. */
     private suspend fun FlowCollector<BuddyStreamEvent>.relayOpening(
         request: BuddyOpenRequest,
         streamed: StringBuilder,
@@ -148,9 +134,8 @@ class BuddyTeamService(
     /**
      * Sends the manager's message in team mode and streams the reply.
      *
-     * With [capabilitiesEnabled] false no tools are mounted, exactly as for the hire's buddy. The [filters]
-     * narrow retrieval by source system and time range; they are sent on every hop, because the AI service
-     * applies them on whichever hop the model chooses to search.
+     * With [capabilitiesEnabled] false no tools are mounted. The [filters] are sent on every hop, because
+     * the AI service applies them on whichever hop the model searches.
      *
      * @throws ResponseStatusException 404 if the user does not exist; 403 if they do not manage the project.
      */
@@ -168,8 +153,7 @@ class BuddyTeamService(
         // Read before saving the new message so it is not sent to the AI twice.
         val transcript = buddyTeamMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
         val history = transcript.drop(session.summarizedCount).map { it.toAgentMessage() }
-        // What the latest replies opened or used, from the whole transcript rather than the unfolded part: a
-        // fold must not close an area the manager is still working in.
+        // From the whole transcript, not the unfolded part: a fold must not close an area still in use.
         val carriedOver = transcript.areasStillOpen()
 
         buddyTeamMessageRepository.save(
@@ -191,10 +175,8 @@ class BuddyTeamService(
                 areas = OpenAreas(carriedOver),
             )
 
-            // The whole loop is guarded, not only the last emission: the words now leave while the
-            // loop runs, so a stop or a failure at any hop leaves a partial reply worth keeping —
-            // the same guard, and the same reason, as the hire's buddy has. A cancellation is caught
-            // here too, and rethrown.
+            // Words are streamed while the loop runs, so a stop or failure at any hop leaves a partial reply
+            // worth keeping. This also catches cancellation, which is rethrown.
             try {
                 while (!turn.isFinished) {
                     runHop(turn)
@@ -211,7 +193,6 @@ class BuddyTeamService(
                     session = session,
                     role = BuddyMessageRole.ASSISTANT,
                     content = turn.emittedContent.toString(),
-                    // What this reply opened or used; the next message reads the latest replies' back.
                     openedAreas = turn.areas.activeThisTurn.encoded(),
                 ),
             )
@@ -219,14 +200,9 @@ class BuddyTeamService(
         }.endFailureWithErrorEvent()
     }
 
-    /**
-     * Runs one hop of the agent loop: asks the AI for a step, then either takes its answer, sends a
-     * written-out tool call back, or runs the tools it asked for.
-     */
     private suspend fun FlowCollector<BuddyStreamEvent>.runHop(turn: AgentTurn) {
         turn.step++
-        // Per hop, not per turn: an area opened on the previous hop is mounted from this one, and
-        // one the latest replies opened or used is mounted from the first.
+        // Per hop, because an area opened on the previous hop is mounted from this one.
         val tools = if (turn.capabilitiesEnabled) buddyTeamTools.toolSpecs(turn.areas.mounted) else emptyList()
         val response = relayAgentTurn(
             onboardingAiClient.buddyAgentTurnStream(agentRequest(turn, tools)),
@@ -247,7 +223,6 @@ class BuddyTeamService(
             backendTools = tools,
             priorSummary = if (turn.step == 1) turn.priorSummary else null,
             vocabulary = VOCABULARY,
-            // Retrieval is scoped to the one project this conversation is about.
             projectIds = listOf(turn.context.projectId.toString()),
             capabilitiesEnabled = turn.capabilitiesEnabled,
             teamMode = true,
@@ -255,12 +230,9 @@ class BuddyTeamService(
         )
 
     /**
-     * Handles a reply that was a tool call written out as text, which is not an answer: shown, it would
-     * read as a reply to the manager. It is sent back once per hop, and if the budget runs out the
-     * reply is the fallback, never the raw call.
+     * Treats a tool call written out as text as a failed step, not an answer.
      *
-     * The words were already streamed while the model wrote them, so the client is told to take back
-     * what it has shown, and the stored reply starts over with the next ask.
+     * Its words were already streamed, so the client is told to take them back and the stored reply starts over.
      */
     private suspend fun FlowCollector<BuddyStreamEvent>.askAgainAfterWrittenOutCall(
         turn: AgentTurn,
@@ -276,7 +248,6 @@ class BuddyTeamService(
         } + BuddyAgentMessageDto(role = BuddyAgentMessageDto.ROLE_USER, content = retry)
     }
 
-    /** Runs every tool the AI asked for on this hop, and returns the conversation with their results. */
     private suspend fun FlowCollector<BuddyStreamEvent>.answerToolCalls(
         turn: AgentTurn,
         response: BuddyAgentResponse,
@@ -293,7 +264,6 @@ class BuddyTeamService(
         return response.messages + results
     }
 
-    /** The sources the reply drew on that still resolve to an artifact; the rest are logged and dropped. */
     private fun resolveCitations(citations: List<BuddyCitationDto>): List<ResolvedBuddyCitation> =
         citations.mapNotNull { citation ->
             val artifactId = citation.artifactId?.let(::parseUuidOrNull)
@@ -313,12 +283,7 @@ class BuddyTeamService(
             }
         }
 
-    /**
-     * Keeps a turn that was cut short — stopped or failed mid-answer — as an incomplete reply, the
-     * same way the hire's buddy does, so the manager's read shows what they saw. The areas the turn
-     * had opened are stored with it, exactly as a finished reply's are: the tools it used stay
-     * mounted for the reply that comes next.
-     */
+    /** Keeps a turn that was stopped or failed mid-answer, so the manager's read shows what they saw. */
     private fun saveIncompleteReply(session: BuddyTeamSession, content: String, areas: OpenAreas) {
         if (content.isBlank()) {
             return
@@ -336,12 +301,10 @@ class BuddyTeamService(
     }
 
     /**
-     * Runs one tool the AI asked for in team mode.
+     * Runs one tool the AI asked for.
      *
-     * A mounted action never runs here: it becomes a stored proposal and an `action_proposal` event the
-     * manager confirms or dismisses, and the model is told it was offered, not done. `open_area` changes
-     * what later hops mount. Every other tool is executed by [BuddyTeamTools], which refuses anything not
-     * mounted on this hop — an action name that was not mounted ends up there too, and is refused.
+     * An action never runs here: it becomes a stored proposal the manager confirms, and the model is told
+     * it was offered, not done. Anything not mounted on this hop is refused by [BuddyTeamTools].
      */
     private suspend fun FlowCollector<BuddyStreamEvent>.runToolCall(
         call: BuddyToolCallDto,
@@ -381,11 +344,7 @@ class BuddyTeamService(
     /**
      * Opens the area of a tool the model called before it was mounted, and asks it to call again.
      *
-     * The model is told to open an area first, but that is an instruction, not a guarantee: a draft written
-     * without opening the knowledge area leaves "yes, send it" with nothing to call. The backend knows which
-     * area every tool belongs to, so it opens it itself. The call is not run on this hop: its arguments
-     * were written without the tool's description, and nothing runs that was not mounted for the hop it was
-     * called on. Only when `open_area` is mounted, so never with capabilities off.
+     * The call itself is not run: its arguments were written without the tool's description.
      *
      * @return What to tell the model, or `null` when the call is not for an unopened area.
      */
@@ -406,11 +365,7 @@ class BuddyTeamService(
     }
 
     /**
-     * Opens the areas of tools the model wrote out as text instead of calling, and says what to do instead.
-     *
-     * Writing a call out is the small model's usual way of failing to make one, and the tool it names is often
-     * in an area that is not open, the same case [openAreaOf] handles for a call that was made. Without this,
-     * the model is only told to open the area itself, which costs a step of a short budget.
+     * Opens the areas of tools the model wrote out as text, the same case [openAreaOf] handles for a real call.
      *
      * @return What to tell the model in place of the reply it wrote.
      */
@@ -444,8 +399,7 @@ class BuddyTeamService(
         val greeting = opening?.greeting?.takeIf { it.isNotBlank() } ?: streamed
 
         if (greeting.isBlank()) {
-            // Nothing reached the manager, so nothing is persisted: a stored fallback would become
-            // this visit's permanent greeting.
+            // Not persisted: a stored fallback would become this visit's permanent greeting.
             emit(BuddyStreamEvent(type = BuddyService.TOKEN, content = FALLBACK_TEAM_OPENING))
             emit(BuddyStreamEvent(type = BuddyService.DONE))
             return
@@ -470,18 +424,13 @@ class BuddyTeamService(
         buddyTeamSessionRepository.findByUserIdAndProjectId(userId, projectId)
             ?: buddyTeamSessionRepository.save(BuddyTeamSession(userId = userId, projectId = projectId))
 
-    /** Fire-and-forget, for the same reason as [BuddyService]: nobody may wait on a fold. */
     private fun compactInBackground(userId: UUID, projectId: UUID) {
         applicationScope.launch {
             buddyCompactionService.compactTeamIfNeeded(userId, projectId)
         }
     }
 
-    /**
-     * Resolves the caller and confirms they manage [projectId].
-     *
-     * @throws ResponseStatusException 404 if the user does not exist; 403 if they do not manage the project.
-     */
+    /** @throws ResponseStatusException 404 if the user does not exist; 403 if they do not manage the project. */
     private fun authorize(authId: String, projectId: UUID): UUID {
         val userId = userApi
             .getUserIdByAuthId(authId)
@@ -495,7 +444,6 @@ class BuddyTeamService(
         return userId
     }
 
-    /** What one manager message carries from hop to hop of the agent loop. */
     private class AgentTurn(
         val context: TeamToolContext,
         val capabilitiesEnabled: Boolean,
@@ -506,7 +454,6 @@ class BuddyTeamService(
     ) {
         var citations: List<BuddyCitationDto> = emptyList()
 
-        /** Everything the manager has been shown of the reply, across every hop of the loop. */
         val emittedContent = StringBuilder()
         var answer: String? = null
         var step = 0
