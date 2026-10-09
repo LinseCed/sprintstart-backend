@@ -246,8 +246,6 @@ class RefreshFaqAction(
                 "questions, replacing the current groups. It asks the AI service and can take a while.",
         )
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? = null
-
     override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
         val groups = insightsRefreshApi.refreshFaq(context.projectId)
         return "Refreshed the FAQ: $groups recurring-question groups."
@@ -275,8 +273,6 @@ class RefreshKnowledgeGapsAction(
             preview = "Rescan this project's components for missing documentation, replacing the current list " +
                 "of gaps. It asks the AI service and can take a while.",
         )
-
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? = null
 
     override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
         val refresh = insightsRefreshApi.refreshKnowledgeGaps(context.projectId)

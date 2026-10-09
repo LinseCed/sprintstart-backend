@@ -25,8 +25,11 @@ interface TeamActionHandler {
 
     fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft
 
-    /** @return `null` when the stored proposal can still run, otherwise the reason it cannot. */
-    fun recheck(params: JsonObject, context: TeamToolContext): String?
+    /**
+     * @return `null` when the stored proposal can still run, otherwise the reason it cannot. An action
+     * with nothing that can change between the preview and the confirm needs no override.
+     */
+    fun recheck(params: JsonObject, context: TeamToolContext): String? = null
 
     /**
      * Makes the change and returns the line to show the manager.

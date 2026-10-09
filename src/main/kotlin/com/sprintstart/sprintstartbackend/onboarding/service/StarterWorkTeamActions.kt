@@ -365,8 +365,6 @@ class ReconcileStarterWorkAction(
                 "anyway.",
         )
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? = null
-
     override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
         val outcome = starterWorkPoolReconciler.reconcile()
         return buildString {

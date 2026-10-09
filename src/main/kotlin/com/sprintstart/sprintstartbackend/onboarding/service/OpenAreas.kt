@@ -19,7 +19,7 @@ internal const val AREA_OPEN_FOR_REPLIES = 3
  * Each reply stores what it opened or used ([activeThisTurn]). An area in use stays open; one left alone
  * closes after [AREA_OPEN_FOR_REPLIES] replies.
  */
-internal class OpenAreas(
+class OpenAreas(
     carriedOver: Set<TeamArea> = emptySet(),
 ) {
     val mounted: MutableSet<TeamArea> = carriedOver.toMutableSet()

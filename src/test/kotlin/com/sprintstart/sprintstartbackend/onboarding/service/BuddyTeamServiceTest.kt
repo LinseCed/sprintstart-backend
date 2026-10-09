@@ -59,11 +59,15 @@ class BuddyTeamServiceTest {
         buddyTeamMessageRepository,
         onboardingAiClient,
         buddyTeamTools,
-        buddyProposalService,
+        TeamAgentLoop(
+            onboardingAiClient,
+            buddyTeamTools,
+            TeamToolRunner(buddyTeamTools, buddyProposalService),
+            artifactLookupService,
+        ),
         userApi,
         buddyCompactionService,
         CoroutineScope(Dispatchers.Unconfined),
-        artifactLookupService,
     )
 
     private val authId = "auth|pm"
