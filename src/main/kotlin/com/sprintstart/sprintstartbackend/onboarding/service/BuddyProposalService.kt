@@ -57,7 +57,7 @@ class BuddyProposalService(
     /**
      * Turns an action call into a stored proposal, or into the reason it cannot be offered.
      *
-     * Returns what to tell the model, and the stored proposal when there is one to show.
+     * @return What to tell the model, and the stored proposal when there is one to show.
      */
     fun propose(call: BuddyToolCallDto, context: TeamToolContext): ProposeOutcome {
         val handler = handlers[call.name] ?: return ProposeOutcome("Unknown action: ${call.name}.", null)
@@ -90,8 +90,8 @@ class BuddyProposalService(
     /**
      * Runs a proposal the manager confirmed, if it may still run.
      *
-     * Returns the line to show; a refusal or a handled failure is `ok = false`, not an error. Throws a
-     * [ResponseStatusException] with 404 when the caller does not exist or the proposal is not theirs.
+     * @return The line to show; a refusal or a handled failure is `ok = false`, not an error.
+     * @throws ResponseStatusException 404 when the caller does not exist or the proposal is not theirs.
      */
     suspend fun confirm(authId: String, proposalId: UUID): BuddyActionResponse {
         val proposal = ownProposal(authId, proposalId)
@@ -121,8 +121,9 @@ class BuddyProposalService(
     }
 
     /**
-     * Declines a proposal. Nothing changes but the proposal itself. Throws a [ResponseStatusException]
-     * with 404 when the caller does not exist or the proposal is not theirs.
+     * Declines a proposal. Nothing changes but the proposal itself.
+     *
+     * @throws ResponseStatusException 404 when the caller does not exist or the proposal is not theirs.
      */
     fun dismiss(authId: String, proposalId: UUID): BuddyActionResponse {
         val proposal = ownProposal(authId, proposalId)

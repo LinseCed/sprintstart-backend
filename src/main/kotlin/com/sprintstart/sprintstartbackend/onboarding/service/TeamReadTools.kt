@@ -33,7 +33,7 @@ class TeamReadTools(
         GET_MEMBER_PROGRESS_SPEC,
     )
 
-    /** Returns a plain-text result for the model, or `null` when [call] is not a team read. */
+    /** @return A plain-text result for the model, or `null` when [call] is not a team read. */
     fun execute(call: BuddyToolCallDto, context: TeamToolContext): String? =
         when (call.name) {
             GET_TEAM_ATTENTION -> teamAttention(context.projectId)

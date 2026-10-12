@@ -30,7 +30,7 @@ interface TeamActionHandler {
     fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft
 
     /**
-     * Returns `null` when the stored proposal can still run, otherwise the reason it cannot. An action
+     * @return `null` when the stored proposal can still run, otherwise the reason it cannot. An action
      * with nothing that can change between the preview and the confirm needs no override.
      */
     fun recheck(params: JsonObject, context: TeamToolContext): String? = null
