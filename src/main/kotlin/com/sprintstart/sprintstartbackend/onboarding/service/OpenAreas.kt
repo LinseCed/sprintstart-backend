@@ -22,18 +22,21 @@ internal const val AREA_OPEN_FOR_REPLIES = 3
 class OpenAreas(
     carriedOver: Set<TeamArea> = emptySet(),
 ) {
-    val mounted: MutableSet<TeamArea> = carriedOver.toMutableSet()
+    private val _mounted: MutableSet<TeamArea> = carriedOver.toMutableSet()
+    private val _activeThisTurn: MutableSet<TeamArea> = mutableSetOf()
 
-    val activeThisTurn: MutableSet<TeamArea> = mutableSetOf()
+    val mounted: Set<TeamArea> get() = _mounted
+
+    val activeThisTurn: Set<TeamArea> get() = _activeThisTurn
 
     fun open(area: TeamArea) {
-        mounted.add(area)
-        activeThisTurn.add(area)
+        _mounted.add(area)
+        _activeThisTurn.add(area)
     }
 
     fun use(area: TeamArea) {
-        if (area in mounted) {
-            activeThisTurn.add(area)
+        if (area in _mounted) {
+            _activeThisTurn.add(area)
         }
     }
 }

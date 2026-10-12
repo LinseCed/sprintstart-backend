@@ -46,9 +46,8 @@ class BuddyTeamTools(
     /**
      * The tools mounted for one hop, given the areas opened so far this turn.
      *
-     * @param openedAreas Areas `open_area` has opened on earlier hops of this turn.
-     * @return The team reads, `open_area` when any area has tools, and each opened area's read tools
-     * and actions.
+     * [openedAreas] are the areas `open_area` has opened on earlier hops of this turn. Returns the team
+     * reads, `open_area` when any area has tools, and each opened area's read tools and actions.
      */
     fun toolSpecs(openedAreas: Set<TeamArea>): List<BuddyToolSpecDto> =
         buildList {
@@ -94,8 +93,8 @@ class BuddyTeamTools(
     /**
      * Runs one team-mode tool for [context].
      *
-     * @param mountedToolNames The names handed to the model on the hop this call came from.
-     * @return A plain-text result for the model; a tool not in [mountedToolNames] is refused.
+     * [mountedToolNames] are the names handed to the model on the hop this call came from. Returns a
+     * plain-text result for the model; a tool not in [mountedToolNames] is refused.
      */
     fun execute(call: BuddyToolCallDto, context: TeamToolContext, mountedToolNames: Set<String>): String {
         if (call.name !in mountedToolNames) {

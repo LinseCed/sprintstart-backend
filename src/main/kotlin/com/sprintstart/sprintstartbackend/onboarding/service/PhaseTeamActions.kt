@@ -75,8 +75,10 @@ class AddPhaseAction(
     override fun recheckParams(params: AddPhaseParams, context: TeamToolContext): String? {
         val owner = scope.member(params.memberId, context.projectId) ?: return LEFT_SINCE_HERE
         val phases = pathElements.pathOf(owner.userId)?.phases ?: return NO_PATH_YET
-        return "The path has fewer phases than it had — that place is gone — so nothing was changed. Offer it again."
-            .takeIf { params.position !in 0..phases }
+        return (
+            "The path has fewer phases than it had — that place is gone — so nothing was changed. " +
+                "Offer it again."
+        ).takeIf { params.position !in 0..phases }
     }
 
     override suspend fun performParams(params: AddPhaseParams, context: TeamToolContext): String {

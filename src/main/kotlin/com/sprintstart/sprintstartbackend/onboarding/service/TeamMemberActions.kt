@@ -340,8 +340,8 @@ class UnassignProjectRoleAction(
             params = ProjectRoleParams(member.userId, role.id, role.name),
             label = "Take “${role.name}” off ${member.displayName.forLabel()}",
             preview = "Take the role “${role.name}” off ${member.displayName} on this project.\n\n" +
-                "They stay on the project" + remaining(held.size) +
-                ". Any role they hold on another project is untouched.",
+                "They stay on the project${remaining(held.size)}. " +
+                "Any role they hold on another project is untouched.",
         )
     }
 

@@ -131,8 +131,10 @@ class AddStepAction(
     override fun recheckParams(params: AddStepParams, context: TeamToolContext): String? {
         val target = scope.element(PathElementKind.PHASE, params.phaseId, context.projectId)
             ?: return goneSince(PathElementKind.PHASE)
-        return "The phase has fewer steps than it had — that place is gone — so nothing was changed. Offer it again."
-            .takeIf { params.position !in 0..target.element.children }
+        return (
+            "The phase has fewer steps than it had — that place is gone — so nothing was changed. " +
+                "Offer it again."
+        ).takeIf { params.position !in 0..target.element.children }
     }
 
     override suspend fun performParams(params: AddStepParams, context: TeamToolContext): String {
@@ -212,10 +214,12 @@ class UpdateStepAction(
                 newPosition,
             ),
             label = "Change step “${current.title.forLabel()}”",
-            preview = "Change the step “${current.title}” on ${target.owner.displayName}'s path:\n" +
-                changes.preview() + "\n" +
-                "Its status stays ${current.status.name.lowercase().replace('_', ' ')}." +
-                scope.sharedNote(target.owner, context.projectId).let { if (it.isEmpty()) "" else "\n\n$it" },
+            preview = buildString {
+                appendLine("Change the step “${current.title}” on ${target.owner.displayName}'s path:")
+                appendLine(changes.preview())
+                append("Its status stays ${current.status.name.lowercase().replace('_', ' ')}.")
+                scope.sharedNote(target.owner, context.projectId).takeIf { it.isNotEmpty() }?.let { append("\n\n$it") }
+            },
         )
     }
 

@@ -110,7 +110,8 @@ class AddTaskAction(
         val target = scope.element(PathElementKind.STEP, params.stepId, context.projectId)
             ?: return goneSince(PathElementKind.STEP)
         if (params.position !in 0..target.element.children) {
-            return "The step has fewer tasks than it had — that place is gone — so nothing was changed. Offer it again."
+            return "The step has fewer tasks than it had — that place is gone — so nothing was changed. " +
+                "Offer it again."
         }
         // Finished since the preview: the service would reopen it, which this offer never said.
         return STEP_FINISHED_SINCE.takeIf {
@@ -176,10 +177,12 @@ class UpdateTaskAction(
         return proposed(
             params = UpdateTaskParams(current.id, newTitle, newDescription, newPosition),
             label = "Change task “${current.title.forLabel()}”",
-            preview = "Change the task “${current.title}” on ${target.owner.displayName}'s path:\n" +
-                changes.preview() + "\n" +
-                "Whether it is ticked off stays as it is (${if (current.finished) "done" else "not done"})." +
-                scope.sharedNote(target.owner, context.projectId).let { if (it.isEmpty()) "" else "\n\n$it" },
+            preview = buildString {
+                appendLine("Change the task “${current.title}” on ${target.owner.displayName}'s path:")
+                appendLine(changes.preview())
+                append("Whether it is ticked off stays as it is (${if (current.finished) "done" else "not done"}).")
+                scope.sharedNote(target.owner, context.projectId).takeIf { it.isNotEmpty() }?.let { append("\n\n$it") }
+            },
         )
     }
 

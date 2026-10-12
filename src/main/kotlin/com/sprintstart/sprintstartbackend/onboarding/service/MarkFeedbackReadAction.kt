@@ -53,9 +53,8 @@ class MarkFeedbackReadAction(
             label = "Mark ${scoped.owner.displayName.forLabel()}'s feedback read",
             preview = buildString {
                 appendLine("Mark this feedback from ${scoped.owner.displayName} as read:")
-                appendLine(
-                    "On ${feedback.stepTitle?.let { "“$it”" } ?: "their path as a whole"}: “${feedback.message}”",
-                )
+                val where = feedback.stepTitle?.let { "“$it”" } ?: "their path as a whole"
+                appendLine("On $where: “${feedback.message}”")
                 appendLine()
                 append("It only leaves the unread list. They are not told, and nothing else changes.")
             }.trim(),

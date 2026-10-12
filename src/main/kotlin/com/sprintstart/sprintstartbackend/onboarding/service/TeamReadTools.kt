@@ -33,7 +33,7 @@ class TeamReadTools(
         GET_MEMBER_PROGRESS_SPEC,
     )
 
-    /** @return A plain-text result for the model, or `null` when [call] is not a team read. */
+    /** Returns a plain-text result for the model, or `null` when [call] is not a team read. */
     fun execute(call: BuddyToolCallDto, context: TeamToolContext): String? =
         when (call.name) {
             GET_TEAM_ATTENTION -> teamAttention(context.projectId)
@@ -43,7 +43,7 @@ class TeamReadTools(
         }
 
     /** The text a greeting grounds itself in; the same read as `get_team_attention`, so they cannot differ. */
-    fun teamSnapshot(projectId: UUID): String = "Who needs attention:\n" + teamAttention(projectId)
+    fun teamSnapshot(projectId: UUID): String = "Who needs attention:\n${teamAttention(projectId)}"
 
     /** Each line says whose move it is: a pull request waiting on review is the reviewer's, not the author's. */
     private fun teamAttention(projectId: UUID): String {
@@ -87,7 +87,9 @@ class TeamReadTools(
             return "Nobody on this project matches “$needle”. Call find_member without a query to list everyone."
         }
         return buildString {
-            appendLine(if (needle.isBlank()) "Everyone on this project:" else "On this project, matching “$needle”:")
+            appendLine(
+                if (needle.isBlank()) "Everyone on this project:" else "On this project, matching “$needle”:",
+            )
             matches.forEach { member ->
                 append("- ${member.displayName} [member_id: ${member.userId}]")
                 member.githubLogin?.let { append(" (GitHub: $it)") }
@@ -105,9 +107,9 @@ class TeamReadTools(
 
         return listOf(
             "Member: ${member.displayName}",
-            "Before they can work:\n" + arrivalFor(memberId, projectId),
-            "Contributions on this project:\n" + contributionsFor(memberId, projectId),
-            "Competencies:\n" + competenciesFor(memberId),
+            "Before they can work:\n${arrivalFor(memberId, projectId)}",
+            "Contributions on this project:\n${contributionsFor(memberId, projectId)}",
+            "Competencies:\n${competenciesFor(memberId)}",
         ).joinToString("\n\n")
     }
 
@@ -157,7 +159,7 @@ class TeamReadTools(
             timeline.hoursToFirstResponse?.let {
                 appendLine("- Time from their first pull request to its first response: $it hours")
             }
-            val stall = if (timeline.stalled) "yes" + (timeline.stalledReason?.let { " ($it)" } ?: "") else "no"
+            val stall = if (timeline.stalled) "yes${timeline.stalledReason?.let { " ($it)" }.orEmpty()}" else "no"
             appendLine("- Stalled: $stall")
             appendLine("- Pull requests sent back for changes: ${timeline.returnedContributionCount}")
         }.trim()
