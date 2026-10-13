@@ -5,11 +5,11 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCal
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.request.resource.CreateOnboardingResourceRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.resource.UpdateOnboardingResourceRequest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
 import java.net.URI
+import java.util.UUID
 
 /*
  * The resource actions of team mode's content area.
@@ -27,12 +27,36 @@ internal fun isWebLink(text: String): Boolean =
         (it.scheme == "http" || it.scheme == "https") && !it.host.isNullOrBlank()
     } ?: false
 
+/** The link to attach to a step. */
+@Serializable
+data class AddResourceParams(
+    @SerialName("step_id") @Serializable(with = UuidSerializer::class) val stepId: UUID,
+    val title: String,
+    val url: String,
+    val description: String,
+)
+
+/** The edits a confirmed link update applies; a null field is left as the link has it by then. */
+@Serializable
+data class UpdateResourceParams(
+    @SerialName("resource_id") @Serializable(with = UuidSerializer::class) val resourceId: UUID,
+    val title: String? = null,
+    val url: String? = null,
+    val description: String? = null,
+)
+
+/** The link a confirmed removal deletes. */
+@Serializable
+data class DeleteResourceParams(
+    @SerialName("resource_id") @Serializable(with = UuidSerializer::class) val resourceId: UUID,
+)
+
 /** Offers to attach a link to a step of a member's path. */
 @Component
 class AddResourceAction(
     private val scope: ContentScope,
     private val onboardingResourceService: OnboardingResourceService,
-) : TeamActionHandler {
+) : TypedTeamAction<AddResourceParams>(AddResourceParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -57,13 +81,8 @@ class AddResourceAction(
         if (!isWebLink(url)) return TeamActionDraft.Refused(NOT_A_WEB_LINK)
         val description = call.textArgument("description")
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("step_id", target.element.id.toString())
-                put("title", title)
-                put("url", url)
-                put("description", description)
-            },
+        return proposed(
+            params = AddResourceParams(target.element.id, title, url, description),
             label = "Add link “${title.forLabel()}”",
             preview = buildString {
                 appendLine("Attach a link to “${target.element.title}” on ${target.owner.displayName}'s path:")
@@ -74,19 +93,19 @@ class AddResourceAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        scope.missing(PathElementKind.STEP, params.uuid("step_id"), context.projectId)
+    override fun recheckParams(params: AddResourceParams, context: TeamToolContext): String? =
+        scope.missing(PathElementKind.STEP, params.stepId, context.projectId)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
+    override suspend fun performParams(params: AddResourceParams, context: TeamToolContext): String {
         onboardingResourceService.createOnboardingResourceForStepId(
-            requireNotNull(params.uuid("step_id")),
+            params.stepId,
             CreateOnboardingResourceRequest(
-                title = params.text("title"),
-                description = params.text("description"),
-                url = params.text("url"),
+                title = params.title,
+                description = params.description,
+                url = params.url,
             ),
         )
-        return "Added. “${params.text("title")}” is on the step now."
+        return "Added. “${params.title}” is on the step now."
     }
 }
 
@@ -95,7 +114,7 @@ class AddResourceAction(
 class UpdateResourceAction(
     private val scope: ContentScope,
     private val onboardingResourceService: OnboardingResourceService,
-) : TeamActionHandler {
+) : TypedTeamAction<UpdateResourceParams>(UpdateResourceParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -120,18 +139,17 @@ class UpdateResourceAction(
         val url = call.changedText("url", current.url, allowBlank = false)
         if (url != null && !isWebLink(url)) return TeamActionDraft.Refused(NOT_A_WEB_LINK)
 
-        val changes = ChangeSet("resource_id", current.id)
-        changes.add("title", call.changedText("title", current.title, allowBlank = false)) {
-            "Title: “${current.title}” becomes “$it”"
-        }
-        changes.add("url", url) { "Address: ${current.url} becomes $it" }
-        changes.add("description", call.changedText("description", current.description)) {
-            "Description becomes: ${it.ifEmpty { "(empty)" }}"
-        }
+        val newTitle = call.changedText("title", current.title, allowBlank = false)
+        val newDescription = call.changedText("description", current.description)
+
+        val changes = ChangeLines()
+        changes.add(newTitle) { "Title: “${current.title}” becomes “$it”" }
+        changes.add(url) { "Address: ${current.url} becomes $it" }
+        changes.add(newDescription) { "Description becomes: ${it.ifEmpty { "(empty)" }}" }
         if (changes.isEmpty) return TeamActionDraft.Refused("Nothing would change: that is already how the link is.")
 
-        return TeamActionDraft.Proposed(
-            params = changes.params(),
+        return proposed(
+            params = UpdateResourceParams(current.id, newTitle, url, newDescription),
             label = "Change link “${current.title.forLabel()}”",
             preview = "Change the link “${current.title}” on ${target.owner.displayName}'s path:\n" +
                 changes.preview() +
@@ -139,25 +157,18 @@ class UpdateResourceAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        scope.missing(PathElementKind.RESOURCE, params.uuid("resource_id"), context.projectId)
+    override fun recheckParams(params: UpdateResourceParams, context: TeamToolContext): String? =
+        scope.missing(PathElementKind.RESOURCE, params.resourceId, context.projectId)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val id = requireNotNull(params.uuid("resource_id"))
+    override suspend fun performParams(params: UpdateResourceParams, context: TeamToolContext): String {
+        val id = params.resourceId
         val current = onboardingResourceService.getOnboardingResourceById(id)
         onboardingResourceService.updateOnboardingResourceById(
             id,
             UpdateOnboardingResourceRequest(
-                title = params.text("title").ifEmpty { current.title },
-                description = if (params.containsKey(
-                        "description",
-                    )
-                ) {
-                    params.text("description")
-                } else {
-                    current.description
-                },
-                url = params.text("url").ifEmpty { current.url },
+                title = params.title ?: current.title,
+                description = params.description ?: current.description,
+                url = params.url ?: current.url,
             ),
         )
         return "Done. The link is updated."
@@ -169,7 +180,7 @@ class UpdateResourceAction(
 class DeleteResourceAction(
     private val scope: ContentScope,
     private val onboardingResourceService: OnboardingResourceService,
-) : TeamActionHandler {
+) : TypedTeamAction<DeleteResourceParams>(DeleteResourceParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
     override val spec = BuddyToolSpecDto(
@@ -187,8 +198,8 @@ class DeleteResourceAction(
             ?: return TeamActionDraft.Refused(notInScope(PathElementKind.RESOURCE))
         val resource = target.element
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject { put("resource_id", resource.id.toString()) },
+        return proposed(
+            params = DeleteResourceParams(resource.id),
             label = "Remove link “${resource.title.forLabel()}”",
             preview = buildString {
                 append("Remove the link “${resource.title}” from ${target.owner.displayName}'s onboarding path. ")
@@ -198,11 +209,11 @@ class DeleteResourceAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        scope.missing(PathElementKind.RESOURCE, params.uuid("resource_id"), context.projectId)
+    override fun recheckParams(params: DeleteResourceParams, context: TeamToolContext): String? =
+        scope.missing(PathElementKind.RESOURCE, params.resourceId, context.projectId)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        onboardingResourceService.deleteOnboardingResourceById(requireNotNull(params.uuid("resource_id")))
+    override suspend fun performParams(params: DeleteResourceParams, context: TeamToolContext): String {
+        onboardingResourceService.deleteOnboardingResourceById(params.resourceId)
         return "Removed. The link is gone."
     }
 }

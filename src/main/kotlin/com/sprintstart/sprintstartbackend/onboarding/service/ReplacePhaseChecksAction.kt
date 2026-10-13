@@ -8,9 +8,10 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.question.Upda
 import com.sprintstart.sprintstartbackend.onboarding.model.request.question.UpdatePhaseQuestionsRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.question.UpdateQuestionRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.question.QuestionForAdminResponse
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -172,12 +173,28 @@ private fun UpdateQuestionRequest.described(number: Int, kept: Boolean): String 
         explanation?.let { append("\n   Explanation: $it") }
     }
 
+/**
+ * The phase whose checks a confirmed replacement rewrites.
+ *
+ * [baseIds] are the questions the phase had when the preview was written, so a confirm can tell it changed
+ * since. [questions] stays raw JSON: it is the model's list, read again against the phase as it is then.
+ */
+@Serializable
+data class ReplacePhaseChecksParams(
+    @SerialName("phase_id") @Serializable(with = UuidSerializer::class) val phaseId: UUID,
+    @SerialName("base_ids") val baseIds: List<
+        @Serializable(with = UuidSerializer::class)
+        UUID,
+    >,
+    val questions: JsonArray,
+)
+
 /** Offers to replace the knowledge-check questions of a phase on a member's path. */
 @Component
 class ReplacePhaseChecksAction(
     private val scope: ContentScope,
     private val questionAttemptService: QuestionAttemptService,
-) : TeamActionHandler {
+) : TypedTeamAction<ReplacePhaseChecksParams>(ReplacePhaseChecksParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -259,13 +276,12 @@ class ReplacePhaseChecksAction(
             return TeamActionDraft.Refused("The phase has no questions and none were given, so nothing would change.")
         }
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("phase_id", target.element.id.toString())
-                // What the phase had when this was written, so a confirm can tell it changed since.
-                putJsonArray("base_ids") { current.forEach { add(it.id.toString()) } }
-                putJsonArray("questions") { questions.forEach { add(it.stored()) } }
-            },
+        return proposed(
+            params = ReplacePhaseChecksParams(
+                target.element.id,
+                current.map { it.id },
+                JsonArray(questions.map { it.stored() }),
+            ),
             label = "Replace the checks of “${target.element.title.forLabel()}”",
             preview = previewOf(target, questions, current, scope.sharedNote(target.owner, context.projectId)),
         )
@@ -293,19 +309,16 @@ class ReplacePhaseChecksAction(
             if (sharedNote.isNotEmpty()) append("\n$sharedNote")
         }.trim()
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
-        val phaseId = params.uuid("phase_id")
-        scope.missing(PathElementKind.PHASE, phaseId, context.projectId)?.let { return it }
-        val base = (params["base_ids"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.content }.toSet()
-        val now = questionAttemptService.getPhaseQuestions(requireNotNull(phaseId)).questions.map { it.id.toString() }
-        return CHECKS_CHANGED.takeIf { now.toSet() != base }
+    override fun recheckParams(params: ReplacePhaseChecksParams, context: TeamToolContext): String? {
+        scope.missing(PathElementKind.PHASE, params.phaseId, context.projectId)?.let { return it }
+        val now = questionAttemptService.getPhaseQuestions(params.phaseId).questions.map { it.id }
+        return CHECKS_CHANGED.takeIf { now.toSet() != params.baseIds.toSet() }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val phaseId: UUID = requireNotNull(params.uuid("phase_id"))
+    override suspend fun performParams(params: ReplacePhaseChecksParams, context: TeamToolContext): String {
+        val phaseId = params.phaseId
         val current = questionAttemptService.getPhaseQuestions(phaseId).questions
-        val stored = params["questions"] as? JsonArray ?: JsonArray(emptyList())
-        val questions = when (val read = readChecks(stored, current)) {
+        val questions = when (val read = readChecks(params.questions, current)) {
             is Checks.Invalid -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, read.reason)
             is Checks.Valid -> read.questions
         }

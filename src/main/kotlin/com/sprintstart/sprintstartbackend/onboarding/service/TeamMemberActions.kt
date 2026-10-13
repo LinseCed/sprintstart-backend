@@ -8,7 +8,8 @@ import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.ProjectRoleApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectRoleShortDto
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -21,27 +22,45 @@ import java.util.UUID
 /*
  * The actions of team mode's team area: who is on the project, and what they do here.
  *
- * The services behind these take an id and act on it. `assignUsers` and `removeUser` sit behind
- * every `/api/v1/admin/projects` route, which is `hasRole('ADMIN')` — a manager cannot reach them
- * through REST, and reaches them here only because the turn already proved they manage this
- * project. So every target is resolved against this project's membership first, at draft and again
- * at confirm, and the project is always the turn's.
+ * The services behind these take an id and act on it, and sit behind admin-only routes. A manager reaches
+ * them here only because the turn already proved they manage this project, so every target is resolved
+ * against this project's membership first, at draft and again at confirm.
  *
- * Roles are scoped to the membership rather than to the person. The project-less overloads of
- * `assignRoleToUser` and `unassignRoleFromUser` apply a role across every project somebody belongs
- * to; they are never called from here, and the three-argument forms always are.
+ * Roles are scoped to the membership: the project-less overloads of `assignRoleToUser` and
+ * `unassignRoleFromUser` apply across every project somebody belongs to and are never called from here.
  */
+
+/** The people a confirmed add puts on the project. */
+@Serializable
+data class AddMembersParams(
+    @SerialName("user_ids") val userIds: List<
+        @Serializable(with = UuidSerializer::class)
+        UUID,
+    >,
+)
+
+/** The member a confirmed removal takes off the project. */
+@Serializable
+data class RemoveMemberParams(
+    @SerialName("member_id") @Serializable(with = UuidSerializer::class) val memberId: UUID,
+)
+
+/** The member and the role a confirmed role change applies to; [roleName] is only for the message. */
+@Serializable
+data class ProjectRoleParams(
+    @SerialName("member_id") @Serializable(with = UuidSerializer::class) val memberId: UUID,
+    @SerialName("role_id") @Serializable(with = UuidSerializer::class) val roleId: UUID,
+    @SerialName("role_name") val roleName: String,
+)
 
 /** The member [memberId] names on [projectId], or null. Shared with [TeamMemberTools]. */
 internal fun ProjectMembershipApi.memberOn(memberId: UUID?, projectId: UUID): ProjectMember? =
     memberId?.let { id -> getProjectMembers(projectId).firstOrNull { it.userId == id } }
 
 /**
- * The roles [userId] holds on [projectId], and an empty list when they hold none.
+ * The roles [userId] holds on [projectId]; empty when they hold none.
  *
- * `getRolesOnProject` answers 404 for somebody who is not on the project, which every caller here
- * has already ruled out by resolving the member first. Anything else is a real failure and is
- * rethrown rather than read as "no roles".
+ * Only the 404 for a non-member is read as "no roles"; anything else is rethrown.
  */
 private fun ProjectRoleApi.rolesHeldOn(userId: UUID, projectId: UUID): List<ProjectRoleShortDto> =
     runCatching { getRolesOnProject(userId, projectId) }
@@ -56,14 +75,13 @@ private const val LEFT_SINCE = "That person is no longer on this project, so not
 /**
  * Offers to put one or more people on the project.
  *
- * The ids come from `find_user_to_add`, which resolves exactly one person from an identifier the
- * manager already has — so a model cannot assemble this call by guessing.
+ * The ids come from `find_user_to_add`, which resolves exactly one person, so a model cannot guess them.
  */
 @Component
 class AddMembersAction(
     private val projectMembershipApi: ProjectMembershipApi,
     private val userApi: UserApi,
-) : TeamActionHandler {
+) : TypedTeamAction<AddMembersParams>(AddMembersParams.serializer()) {
     override val area = TeamArea.TEAM
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -105,8 +123,6 @@ class AddMembersAction(
                 "Somebody in that list is already on this project. Call find_member to see who is here.",
             )
         }
-        // Resolved for the preview, in one read: a manager confirming "add two people" has to be
-        // told which two.
         val found = userApi.getUsersByIds(wanted).associateBy { it.id }
         val people = wanted.map { id ->
             val person = found[id]
@@ -116,8 +132,8 @@ class AddMembersAction(
             id to "${person.firstname} ${person.lastname}".trim().ifBlank { person.username }
         }
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject { putJsonArray("user_ids") { people.forEach { add(it.first.toString()) } } },
+        return proposed(
+            params = AddMembersParams(people.map { it.first }),
             label = if (people.size == 1) "Add ${people.single().second.forLabel()}" else "Add ${people.size} people",
             preview = buildString {
                 appendLine(if (people.size == 1) "Put this person on the project:" else "Put these people on it:")
@@ -131,9 +147,9 @@ class AddMembersAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
+    override fun recheckParams(params: AddMembersParams, context: TeamToolContext): String? {
         val alreadyHere = projectMembershipApi.getProjectMembers(context.projectId).map { it.userId }.toSet()
-        val ids = params.textArray("user_ids").mapNotNull { runCatching { UUID.fromString(it) }.getOrNull() }
+        val ids = params.userIds
         if (ids.any { it in alreadyHere }) {
             return "Somebody in that list joined this project since, so nothing was changed."
         }
@@ -143,8 +159,8 @@ class AddMembersAction(
             .takeIf { ids.any { id -> id !in found } }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val ids = params.textArray("user_ids").mapNotNull { runCatching { UUID.fromString(it) }.getOrNull() }
+    override suspend fun performParams(params: AddMembersParams, context: TeamToolContext): String {
+        val ids = params.userIds
         projectMembershipApi.addMembers(context.projectId, ids.toSet())
         return if (ids.size == 1) {
             "Added. They are on this project now, with no role here yet."
@@ -157,15 +173,14 @@ class AddMembersAction(
 /**
  * Offers to take somebody off the project.
  *
- * Destructive for a reason the preview has to carry: the membership is what the person's roles here
- * hang off, so removing it drops them, and putting the person back later gives them a fresh
- * membership with none.
+ * Destructive because the membership carries the person's roles here: removing it drops them, and adding
+ * the person back starts with none.
  */
 @Component
 class RemoveMemberAction(
     private val projectMembershipApi: ProjectMembershipApi,
     private val projectRoleApi: ProjectRoleApi,
-) : TeamActionHandler {
+) : TypedTeamAction<RemoveMemberParams>(RemoveMemberParams.serializer()) {
     override val area = TeamArea.TEAM
     override val risk = BuddyProposalRisk.DESTRUCTIVE
     override val spec = BuddyToolSpecDto(
@@ -187,16 +202,14 @@ class RemoveMemberAction(
         managerRefusal(member, context)?.let { return TeamActionDraft.Refused(it) }
 
         val roles = rolesOf(member.userId, context.projectId)
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject { put("member_id", member.userId.toString()) },
+        return proposed(
+            params = RemoveMemberParams(member.userId),
             label = "Remove ${member.displayName.forLabel()} from the project",
             preview = buildString {
                 appendLine("Take ${member.displayName} off this project.")
                 appendLine()
                 appendLine("They lose access to this project's material, board and onboarding.")
                 if (roles.isNotEmpty()) {
-                    // The roles live on the membership row, so deleting it deletes them. Putting the
-                    // person back later creates a new membership, which starts with none.
                     appendLine(
                         "The ${roles.size} role${if (roles.size == 1) "" else "s"} they hold here " +
                             "(${roles.joinToString(", ")}) go with the membership. Adding them back later " +
@@ -208,20 +221,18 @@ class RemoveMemberAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
-        val member = projectMembershipApi.memberOn(params.uuid("member_id"), context.projectId)
+    override fun recheckParams(params: RemoveMemberParams, context: TeamToolContext): String? {
+        val member = projectMembershipApi.memberOn(params.memberId, context.projectId)
             ?: return LEFT_SINCE
         // They may have been made manager between the preview and the confirm.
         return managerRefusal(member, context)
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val memberId = requireNotNull(params.uuid("member_id"))
-        projectMembershipApi.removeMember(context.projectId, memberId)
+    override suspend fun performParams(params: RemoveMemberParams, context: TeamToolContext): String {
+        projectMembershipApi.removeMember(context.projectId, params.memberId)
         return "Removed. They are off this project, and the roles they held here went with the membership."
     }
 
-    /** Why this member cannot be removed, or null. */
     private fun managerRefusal(member: ProjectMember, context: TeamToolContext): String? {
         val managerId = projectMembershipApi.getProjectManagerId(context.projectId).orElse(null)
         return if (managerId == member.userId) {
@@ -241,7 +252,7 @@ class RemoveMemberAction(
 class AssignProjectRoleAction(
     private val projectRoleApi: ProjectRoleApi,
     private val projectMembershipApi: ProjectMembershipApi,
-) : TeamActionHandler {
+) : TypedTeamAction<ProjectRoleParams>(ProjectRoleParams.serializer()) {
     override val area = TeamArea.TEAM
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -271,39 +282,25 @@ class AssignProjectRoleAction(
             )
         }
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("member_id", member.userId.toString())
-                put("role_id", role.id.toString())
-                put("role_name", role.name)
-            },
+        return proposed(
+            params = ProjectRoleParams(member.userId, role.id, role.name),
             label = "Make ${member.displayName.forLabel()} ${role.name}",
             preview = "Give ${member.displayName} the role “${role.name}” on this project.\n\n" +
                 "It applies here only — any role they hold on another project is untouched.",
         )
     }
 
-    /**
-     * They are still here, and still without the role.
-     *
-     * Assigning a role twice is not an error, so a stale confirm would otherwise report as its own
-     * a change that had already happened elsewhere.
-     */
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
-        val member = projectMembershipApi.memberOn(params.uuid("member_id"), context.projectId)
+    /** They are still here and still without the role: a repeated assignment is no error, so it must be checked. */
+    override fun recheckParams(params: ProjectRoleParams, context: TeamToolContext): String? {
+        val member = projectMembershipApi.memberOn(params.memberId, context.projectId)
             ?: return LEFT_SINCE
-        val roleId = params.uuid("role_id")
-        return "They were given “${params.text("role_name")}” on this project since, so nothing was changed."
-            .takeIf { projectRoleApi.rolesHeldOn(member.userId, context.projectId).any { it.id == roleId } }
+        return "They were given “${params.roleName}” on this project since, so nothing was changed."
+            .takeIf { projectRoleApi.rolesHeldOn(member.userId, context.projectId).any { it.id == params.roleId } }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        projectRoleApi.assignRoleOnProject(
-            requireNotNull(params.uuid("member_id")),
-            context.projectId,
-            requireNotNull(params.uuid("role_id")),
-        )
-        return "Done. They hold “${params.text("role_name")}” on this project now."
+    override suspend fun performParams(params: ProjectRoleParams, context: TeamToolContext): String {
+        projectRoleApi.assignRoleOnProject(params.memberId, context.projectId, params.roleId)
+        return "Done. They hold “${params.roleName}” on this project now."
     }
 }
 
@@ -312,7 +309,7 @@ class AssignProjectRoleAction(
 class UnassignProjectRoleAction(
     private val projectRoleApi: ProjectRoleApi,
     private val projectMembershipApi: ProjectMembershipApi,
-) : TeamActionHandler {
+) : TypedTeamAction<ProjectRoleParams>(ProjectRoleParams.serializer()) {
     override val area = TeamArea.TEAM
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -331,8 +328,7 @@ class UnassignProjectRoleAction(
         val member = projectMembershipApi.memberOn(call.uuidArgument("member_id"), context.projectId)
             ?: return TeamActionDraft.Refused(NOT_A_MEMBER)
         val roleId = call.uuidArgument("role_id")
-        // The service removes by id without complaining when nothing matches, so a role they do not
-        // hold would confirm as a change and change nothing. Checked here instead.
+        // The service removes by id silently, so a role they do not hold would confirm as a change.
         val held = projectRoleApi.rolesHeldOn(member.userId, context.projectId)
         val role = held.firstOrNull { it.id == roleId }
             ?: return TeamActionDraft.Refused(
@@ -340,20 +336,15 @@ class UnassignProjectRoleAction(
                     "the ones they do.",
             )
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("member_id", member.userId.toString())
-                put("role_id", role.id.toString())
-                put("role_name", role.name)
-            },
+        return proposed(
+            params = ProjectRoleParams(member.userId, role.id, role.name),
             label = "Take “${role.name}” off ${member.displayName.forLabel()}",
             preview = "Take the role “${role.name}” off ${member.displayName} on this project.\n\n" +
-                "They stay on the project" + remaining(held.size) +
-                ". Any role they hold on another project is untouched.",
+                "They stay on the project${remaining(held.size)}. " +
+                "Any role they hold on another project is untouched.",
         )
     }
 
-    /** What they are left holding here, said as a person would say it. */
     private fun remaining(heldNow: Int): String =
         when (heldNow) {
             1 -> " with no role here"
@@ -361,26 +352,16 @@ class UnassignProjectRoleAction(
             else -> " and keep their other ${heldNow - 1} roles here"
         }
 
-    /**
-     * They are still here, and still hold the role.
-     *
-     * The same reason the draft checks it: the service removes by id without complaining, so a role
-     * taken off in the meantime would confirm as a change that had already happened.
-     */
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
-        val member = projectMembershipApi.memberOn(params.uuid("member_id"), context.projectId)
+    /** They are still here and still hold the role: the service removes by id silently. */
+    override fun recheckParams(params: ProjectRoleParams, context: TeamToolContext): String? {
+        val member = projectMembershipApi.memberOn(params.memberId, context.projectId)
             ?: return LEFT_SINCE
-        val roleId = params.uuid("role_id")
-        return "“${params.text("role_name")}” is already off them on this project, so nothing was changed."
-            .takeIf { projectRoleApi.rolesHeldOn(member.userId, context.projectId).none { it.id == roleId } }
+        return "“${params.roleName}” is already off them on this project, so nothing was changed."
+            .takeIf { projectRoleApi.rolesHeldOn(member.userId, context.projectId).none { it.id == params.roleId } }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        projectRoleApi.unassignRoleOnProject(
-            requireNotNull(params.uuid("member_id")),
-            context.projectId,
-            requireNotNull(params.uuid("role_id")),
-        )
-        return "Done. “${params.text("role_name")}” is off them on this project."
+    override suspend fun performParams(params: ProjectRoleParams, context: TeamToolContext): String {
+        projectRoleApi.unassignRoleOnProject(params.memberId, context.projectId, params.roleId)
+        return "Done. “${params.roleName}” is off them on this project."
     }
 }

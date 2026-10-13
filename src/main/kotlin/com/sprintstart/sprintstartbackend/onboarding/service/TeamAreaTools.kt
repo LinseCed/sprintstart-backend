@@ -7,8 +7,8 @@ import java.util.UUID
 /**
  * A part of the manager's surface the team-mode buddy can open, each with its own tools.
  *
- * @property summary What is inside, in the manager's words. The model chooses an area from its name and
- * this alone, and a name is not enough: "knowledge" does not say that hires' escalated questions live there.
+ * @property summary What is inside, in the manager's words. The model picks an area from its name and
+ * this alone.
  */
 enum class TeamArea(
     val summary: String,
@@ -24,26 +24,24 @@ enum class TeamArea(
     SOURCES("where the project's material comes from: repositories, other connected sources and uploads"),
 }
 
-/** Who a team-mode tool runs for, and on which project. Resolved and authorised before any tool runs. */
+/** Who a team-mode tool runs for, and on which project; authorised before any tool runs. */
 data class TeamToolContext(
     val userId: UUID,
     val authId: String,
     val projectId: UUID,
-    /** The app path the manager was on when they spoke, for the app guide; null when not sent. */
+    /** The app path the manager was on when they spoke; null when not sent. */
     val currentPage: String? = null,
 )
 
 /**
  * The tools one [TeamArea] contributes to team mode.
  *
- * Areas exist because a manager's whole surface is far more tools than a small model chooses
- * between reliably. The reasoner starts with the team reads and `open_area`, and an area's tools are
- * mounted only once it has been opened — so a tool from an unopened area is one the model was never
- * handed and cannot call.
+ * Areas exist because a manager's whole surface is more tools than a small model chooses between reliably.
+ * An area's tools are mounted only once it has been opened, so the model cannot call a tool it was never
+ * handed.
  *
- * Every implementation must check that each target belongs to [TeamToolContext.projectId]. The
- * caller has already been confirmed as that project's manager; a model-supplied id is a pointer, never
- * an authorisation.
+ * Every implementation must check that each target belongs to [TeamToolContext.projectId]: a
+ * model-supplied id is a pointer, never an authorisation.
  */
 interface TeamAreaTools {
     val area: TeamArea

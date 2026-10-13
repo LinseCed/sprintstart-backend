@@ -3,10 +3,16 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
+import java.util.UUID
+
+/** The member whose path a confirmed reset deletes. */
+@Serializable
+data class ResetMemberPathParams(
+    @SerialName("member_id") @Serializable(with = UuidSerializer::class) val memberId: UUID,
+)
 
 /**
  * Offers to delete a member's whole onboarding path.
@@ -20,7 +26,7 @@ class ResetMemberPathAction(
     private val scope: ContentScope,
     private val pathElements: PathElements,
     private val onboardingPathService: OnboardingPathService,
-) : TeamActionHandler {
+) : TypedTeamAction<ResetMemberPathParams>(ResetMemberPathParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
     override val spec = BuddyToolSpecDto(
@@ -40,8 +46,8 @@ class ResetMemberPathAction(
                 "${owner.displayName} has no onboarding path, so there is nothing to delete.",
             )
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject { put("member_id", owner.userId.toString()) },
+        return proposed(
+            params = ResetMemberPathParams(owner.userId),
             label = "Delete ${owner.displayName.forLabel()}'s whole path",
             preview = buildString {
                 appendLine("Delete ${owner.displayName}'s whole onboarding path.")
@@ -64,14 +70,14 @@ class ResetMemberPathAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
-        val owner = scope.member(params.uuid("member_id"), context.projectId) ?: return LEFT_SINCE_HERE
+    override fun recheckParams(params: ResetMemberPathParams, context: TeamToolContext): String? {
+        val owner = scope.member(params.memberId, context.projectId) ?: return LEFT_SINCE_HERE
         return "That person's path is already gone, so nothing was changed."
             .takeIf { pathElements.pathOf(owner.userId) == null }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        onboardingPathService.deleteOnboardingPathByUserId(requireNotNull(params.uuid("member_id")))
+    override suspend fun performParams(params: ResetMemberPathParams, context: TeamToolContext): String {
+        onboardingPathService.deleteOnboardingPathByUserId(params.memberId)
         return "Deleted. The path and everything on it are gone."
     }
 }

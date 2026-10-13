@@ -51,11 +51,13 @@ class BuddyTeamToolsTest {
             actions.filter { it.area in opened }.map { it.spec }
         }
         return BuddyTeamTools(
-            projectAttentionService,
-            onboardingMetricsService,
-            myCompetencyService,
-            arrivalStepService,
-            projectMembershipApi,
+            TeamReadTools(
+                projectAttentionService,
+                onboardingMetricsService,
+                myCompetencyService,
+                arrivalStepService,
+                projectMembershipApi,
+            ),
             areaToolsProvider,
             buddyProposalService,
             buddyAppGuideTools,
@@ -110,9 +112,9 @@ class BuddyTeamToolsTest {
         val names = tools().toolSpecs(emptySet()).map { it.name }
 
         assertThat(names).containsExactly(
-            BuddyTeamTools.GET_TEAM_ATTENTION,
-            BuddyTeamTools.FIND_MEMBER,
-            BuddyTeamTools.GET_MEMBER_PROGRESS,
+            TeamReadTools.GET_TEAM_ATTENTION,
+            TeamReadTools.FIND_MEMBER,
+            TeamReadTools.GET_MEMBER_PROGRESS,
             BuddyAppGuideTools.GET_APP_GUIDE,
         )
     }
@@ -164,7 +166,7 @@ class BuddyTeamToolsTest {
         val result = tools(knowledgeArea).execute(
             call("list_open_escalations"),
             context,
-            mountedToolNames = setOf(BuddyTeamTools.GET_TEAM_ATTENTION),
+            mountedToolNames = setOf(TeamReadTools.GET_TEAM_ATTENTION),
         )
 
         assertThat(result).contains("not available")
@@ -198,9 +200,9 @@ class BuddyTeamToolsTest {
         )
 
         val result = tools().execute(
-            call(BuddyTeamTools.GET_TEAM_ATTENTION),
+            call(TeamReadTools.GET_TEAM_ATTENTION),
             context,
-            setOf(BuddyTeamTools.GET_TEAM_ATTENTION),
+            setOf(TeamReadTools.GET_TEAM_ATTENTION),
         )
 
         assertThat(result)
@@ -216,10 +218,10 @@ class BuddyTeamToolsTest {
             member(UUID.randomUUID(), "Alex Chen"),
         )
         val tools = tools()
-        val mounted = setOf(BuddyTeamTools.FIND_MEMBER)
+        val mounted = setOf(TeamReadTools.FIND_MEMBER)
 
-        val matched = tools.execute(call(BuddyTeamTools.FIND_MEMBER, "query" to "sam"), context, mounted)
-        val everyone = tools.execute(call(BuddyTeamTools.FIND_MEMBER), context, mounted)
+        val matched = tools.execute(call(TeamReadTools.FIND_MEMBER, "query" to "sam"), context, mounted)
+        val everyone = tools.execute(call(TeamReadTools.FIND_MEMBER), context, mounted)
 
         assertThat(matched).contains("Sam Rivera [member_id: $memberId]").doesNotContain("Alex Chen")
         assertThat(everyone).contains("Sam Rivera").contains("Alex Chen")
@@ -234,9 +236,9 @@ class BuddyTeamToolsTest {
         every { projectMembershipApi.getProjectMembers(projectId) } returns listOf(member(UUID.randomUUID(), "Alex"))
 
         val result = tools().execute(
-            call(BuddyTeamTools.GET_MEMBER_PROGRESS, "member_id" to memberId.toString()),
+            call(TeamReadTools.GET_MEMBER_PROGRESS, "member_id" to memberId.toString()),
             context,
-            setOf(BuddyTeamTools.GET_MEMBER_PROGRESS),
+            setOf(TeamReadTools.GET_MEMBER_PROGRESS),
         )
 
         assertThat(result).contains("not on this project")
@@ -248,9 +250,9 @@ class BuddyTeamToolsTest {
     @Test
     fun `member progress refuses an id that is not an id`() {
         val result = tools().execute(
-            call(BuddyTeamTools.GET_MEMBER_PROGRESS, "member_id" to "Sam"),
+            call(TeamReadTools.GET_MEMBER_PROGRESS, "member_id" to "Sam"),
             context,
-            setOf(BuddyTeamTools.GET_MEMBER_PROGRESS),
+            setOf(TeamReadTools.GET_MEMBER_PROGRESS),
         )
 
         assertThat(result).contains("find_member")
@@ -272,9 +274,9 @@ class BuddyTeamToolsTest {
         every { myCompetencyService.getCompetenciesForUser(memberId) } returns emptyList()
 
         val result = tools().execute(
-            call(BuddyTeamTools.GET_MEMBER_PROGRESS, "member_id" to memberId.toString()),
+            call(TeamReadTools.GET_MEMBER_PROGRESS, "member_id" to memberId.toString()),
             context,
-            setOf(BuddyTeamTools.GET_MEMBER_PROGRESS),
+            setOf(TeamReadTools.GET_MEMBER_PROGRESS),
         )
 
         assertThat(result).contains("Get staging access").contains("Sign the handbook")
@@ -300,9 +302,9 @@ class BuddyTeamToolsTest {
         )
 
         val result = tools().execute(
-            call(BuddyTeamTools.GET_MEMBER_PROGRESS, "member_id" to memberId.toString()),
+            call(TeamReadTools.GET_MEMBER_PROGRESS, "member_id" to memberId.toString()),
             context,
-            setOf(BuddyTeamTools.GET_MEMBER_PROGRESS),
+            setOf(TeamReadTools.GET_MEMBER_PROGRESS),
         )
 
         assertThat(result)
@@ -353,9 +355,9 @@ class BuddyTeamToolsTest {
         every { myCompetencyService.getCompetenciesForUser(memberId) } returns emptyList()
 
         val result = tools().execute(
-            call(BuddyTeamTools.GET_MEMBER_PROGRESS, "member_id" to memberId.toString()),
+            call(TeamReadTools.GET_MEMBER_PROGRESS, "member_id" to memberId.toString()),
             context,
-            setOf(BuddyTeamTools.GET_MEMBER_PROGRESS),
+            setOf(TeamReadTools.GET_MEMBER_PROGRESS),
         )
 
         assertThat(result)
@@ -444,7 +446,7 @@ class BuddyTeamToolsTest {
 
         assertThat(tools.areaOf("list_open_escalations")).isEqualTo(TeamArea.KNOWLEDGE)
         assertThat(tools.areaOf("create_arrival_steps")).isEqualTo(TeamArea.ARRIVAL)
-        assertThat(tools.areaOf(BuddyTeamTools.FIND_MEMBER)).isNull()
+        assertThat(tools.areaOf(TeamReadTools.FIND_MEMBER)).isNull()
         assertThat(tools.areaOf(BuddyTeamTools.OPEN_AREA)).isNull()
         assertThat(tools.areaOf("not_a_tool")).isNull()
     }

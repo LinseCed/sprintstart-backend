@@ -7,10 +7,10 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCal
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.request.step.CreateOnboardingStepRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.step.UpdateOnboardingStepRequest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
+import java.util.UUID
 
 /*
  * The step actions of team mode's content area.
@@ -37,12 +37,42 @@ private fun StepStatus?.aboutProgress(name: String): String? =
         else -> null
     }
 
+/** The step to add to a phase, and where it goes. */
+@Serializable
+data class AddStepParams(
+    @SerialName("phase_id") @Serializable(with = UuidSerializer::class) val phaseId: UUID,
+    val title: String,
+    val description: String,
+    val type: StepType,
+    @SerialName("estimated_minutes") val estimatedMinutes: Int,
+    @SerialName("expected_outcome") val expectedOutcome: String,
+    val position: Int,
+)
+
+/** The edits a confirmed step update applies; a null field is left as the step has it by then. */
+@Serializable
+data class UpdateStepParams(
+    @SerialName("step_id") @Serializable(with = UuidSerializer::class) val stepId: UUID,
+    val title: String? = null,
+    val description: String? = null,
+    val type: StepType? = null,
+    @SerialName("estimated_minutes") val estimatedMinutes: Int? = null,
+    @SerialName("expected_outcome") val expectedOutcome: String? = null,
+    val position: Int? = null,
+)
+
+/** The step a confirmed deletion removes. */
+@Serializable
+data class DeleteStepParams(
+    @SerialName("step_id") @Serializable(with = UuidSerializer::class) val stepId: UUID,
+)
+
 /** Offers to add a step to a phase of a member's path. */
 @Component
 class AddStepAction(
     private val scope: ContentScope,
     private val onboardingStepService: OnboardingStepService,
-) : TeamActionHandler {
+) : TypedTeamAction<AddStepParams>(AddStepParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -82,16 +112,8 @@ class AddStepAction(
         val description = call.textArgument("description")
         val outcome = call.textArgument("expected_outcome")
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject {
-                put("phase_id", target.element.id.toString())
-                put("title", title)
-                put("description", description)
-                put("type", type.name)
-                put("estimated_minutes", minutes)
-                put("expected_outcome", outcome)
-                put("position", position)
-            },
+        return proposed(
+            params = AddStepParams(target.element.id, title, description, type, minutes, outcome, position),
             label = "Add step “${title.forLabel()}”",
             preview = buildString {
                 appendLine("Add a step to “${target.element.title}” on ${target.owner.displayName}'s path:")
@@ -106,27 +128,28 @@ class AddStepAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? {
-        val target = scope.element(PathElementKind.PHASE, params.uuid("phase_id"), context.projectId)
+    override fun recheckParams(params: AddStepParams, context: TeamToolContext): String? {
+        val target = scope.element(PathElementKind.PHASE, params.phaseId, context.projectId)
             ?: return goneSince(PathElementKind.PHASE)
-        val position = params.text("position").toIntOrNull() ?: return "That offer is malformed."
-        return "The phase has fewer steps than it had — that place is gone — so nothing was changed. Offer it again."
-            .takeIf { position !in 0..target.element.children }
+        return (
+            "The phase has fewer steps than it had — that place is gone — so nothing was changed. " +
+                "Offer it again."
+        ).takeIf { params.position !in 0..target.element.children }
     }
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
+    override suspend fun performParams(params: AddStepParams, context: TeamToolContext): String {
         onboardingStepService.createOnboardingStepForPhaseId(
-            requireNotNull(params.uuid("phase_id")),
+            params.phaseId,
             CreateOnboardingStepRequest(
-                position = requireNotNull(params.text("position").toIntOrNull()),
-                title = params.text("title"),
-                description = params.text("description"),
-                type = requireNotNull(stepTypeOf(params.text("type"))),
-                estimatedMinutes = params.text("estimated_minutes").toIntOrNull() ?: DEFAULT_MINUTES,
-                expectedOutcome = params.text("expected_outcome"),
+                position = params.position,
+                title = params.title,
+                description = params.description,
+                type = params.type,
+                estimatedMinutes = params.estimatedMinutes,
+                expectedOutcome = params.expectedOutcome,
             ),
         )
-        return "Added. “${params.text("title")}” is on the path now, waiting."
+        return "Added. “${params.title}” is on the path now, waiting."
     }
 }
 
@@ -135,7 +158,7 @@ class AddStepAction(
 class UpdateStepAction(
     private val scope: ContentScope,
     private val onboardingStepService: OnboardingStepService,
-) : TeamActionHandler {
+) : TypedTeamAction<UpdateStepParams>(UpdateStepParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -164,39 +187,39 @@ class UpdateStepAction(
 
         badArgument(call, siblings)?.let { return TeamActionDraft.Refused(it) }
 
-        val changes = ChangeSet("step_id", current.id)
-        changes.add("title", call.changedText("title", current.title, allowBlank = false)) {
-            "Title: “${current.title}” becomes “$it”"
-        }
-        changes.add("description", call.changedText("description", current.description)) {
-            "Description becomes: ${it.ifEmpty { "(empty)" }}"
-        }
-        changes.add("type", stepTypeOf(call.textArgument("type"))?.takeIf { it != current.type }?.name) {
-            "Type: ${current.type.name.lowercase()} becomes ${it.lowercase()}"
-        }
-        val minutes = call.textArgument("estimated_minutes").toIntOrNull()?.takeIf { it != current.estimatedMinutes }
-        changes.add("estimated_minutes", minutes?.toString()) {
-            "Length: ${current.estimatedMinutes} min becomes $it min"
-        }
-        changes.add(
-            "expected_outcome",
-            call.changedText("expected_outcome", current.expectedOutcomes.firstOrNull().orEmpty()),
-        ) {
-            "Expected outcome becomes: ${it.ifEmpty { "(empty)" }}"
-        }
-        val position = placeToPosition(call.textArgument("place"), siblings)?.takeIf { it != current.position }
-        changes.add("position", position?.toString()) {
-            "Place: ${placeOf(current.position, siblings)} becomes ${placeOf(it.toInt(), siblings)}"
-        }
+        val newTitle = call.changedText("title", current.title, allowBlank = false)
+        val newDescription = call.changedText("description", current.description)
+        val newType = stepTypeOf(call.textArgument("type"))?.takeIf { it != current.type }
+        val newMinutes = call.textArgument("estimated_minutes").toIntOrNull()?.takeIf { it != current.estimatedMinutes }
+        val newOutcome = call.changedText("expected_outcome", current.expectedOutcomes.firstOrNull().orEmpty())
+        val newPosition = placeToPosition(call.textArgument("place"), siblings)?.takeIf { it != current.position }
+
+        val changes = ChangeLines()
+        changes.add(newTitle) { "Title: “${current.title}” becomes “$it”" }
+        changes.add(newDescription) { "Description becomes: ${it.ifEmpty { "(empty)" }}" }
+        changes.add(newType) { "Type: ${current.type.name.lowercase()} becomes ${it.name.lowercase()}" }
+        changes.add(newMinutes) { "Length: ${current.estimatedMinutes} min becomes $it min" }
+        changes.add(newOutcome) { "Expected outcome becomes: ${it.ifEmpty { "(empty)" }}" }
+        changes.add(newPosition) { "Place: ${placeOf(current.position, siblings)} becomes ${placeOf(it, siblings)}" }
         if (changes.isEmpty) return TeamActionDraft.Refused("Nothing would change: that is already how the step is.")
 
-        return TeamActionDraft.Proposed(
-            params = changes.params(),
+        return proposed(
+            params = UpdateStepParams(
+                current.id,
+                newTitle,
+                newDescription,
+                newType,
+                newMinutes,
+                newOutcome,
+                newPosition,
+            ),
             label = "Change step “${current.title.forLabel()}”",
-            preview = "Change the step “${current.title}” on ${target.owner.displayName}'s path:\n" +
-                changes.preview() + "\n" +
-                "Its status stays ${current.status.name.lowercase().replace('_', ' ')}." +
-                scope.sharedNote(target.owner, context.projectId).let { if (it.isEmpty()) "" else "\n\n$it" },
+            preview = buildString {
+                appendLine("Change the step “${current.title}” on ${target.owner.displayName}'s path:")
+                appendLine(changes.preview())
+                append("Its status stays ${current.status.name.lowercase().replace('_', ' ')}.")
+                scope.sharedNote(target.owner, context.projectId).takeIf { it.isNotEmpty() }?.let { append("\n\n$it") }
+            },
         )
     }
 
@@ -215,33 +238,22 @@ class UpdateStepAction(
             else -> null
         }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        scope.missing(PathElementKind.STEP, params.uuid("step_id"), context.projectId)
+    override fun recheckParams(params: UpdateStepParams, context: TeamToolContext): String? =
+        scope.missing(PathElementKind.STEP, params.stepId, context.projectId)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val id = requireNotNull(params.uuid("step_id"))
+    override suspend fun performParams(params: UpdateStepParams, context: TeamToolContext): String {
+        val id = params.stepId
         // Only what the manager saw is written; the rest is read fresh.
         val current = onboardingStepService.getOnboardingStepById(id)
         onboardingStepService.updateOnboardingStepById(
             id,
             UpdateOnboardingStepRequest(
-                position = params.text("position").toIntOrNull() ?: current.position,
-                title = params.text("title").ifEmpty { current.title },
-                description = if (params.containsKey(
-                        "description",
-                    )
-                ) {
-                    params.text("description")
-                } else {
-                    current.description
-                },
-                type = stepTypeOf(params.text("type")) ?: current.type,
-                estimatedMinutes = params.text("estimated_minutes").toIntOrNull() ?: current.estimatedMinutes,
-                expectedOutcome = if (params.containsKey("expected_outcome")) {
-                    params.text("expected_outcome")
-                } else {
-                    current.expectedOutcomes.firstOrNull().orEmpty()
-                },
+                position = params.position ?: current.position,
+                title = params.title ?: current.title,
+                description = params.description ?: current.description,
+                type = params.type ?: current.type,
+                estimatedMinutes = params.estimatedMinutes ?: current.estimatedMinutes,
+                expectedOutcome = params.expectedOutcome ?: current.expectedOutcomes.firstOrNull().orEmpty(),
             ),
         )
         return "Done. The step is updated; its status is as it was."
@@ -253,7 +265,7 @@ class UpdateStepAction(
 class DeleteStepAction(
     private val scope: ContentScope,
     private val onboardingStepService: OnboardingStepService,
-) : TeamActionHandler {
+) : TypedTeamAction<DeleteStepParams>(DeleteStepParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
     override val spec = BuddyToolSpecDto(
@@ -269,8 +281,8 @@ class DeleteStepAction(
             ?: return TeamActionDraft.Refused(notInScope(PathElementKind.STEP))
         val step = target.element
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject { put("step_id", step.id.toString()) },
+        return proposed(
+            params = DeleteStepParams(step.id),
             label = "Delete step “${step.title.forLabel()}”",
             preview = buildString {
                 appendLine("Delete the step “${step.title}” from ${target.owner.displayName}'s onboarding path.")
@@ -283,11 +295,11 @@ class DeleteStepAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        scope.missing(PathElementKind.STEP, params.uuid("step_id"), context.projectId)
+    override fun recheckParams(params: DeleteStepParams, context: TeamToolContext): String? =
+        scope.missing(PathElementKind.STEP, params.stepId, context.projectId)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        onboardingStepService.deleteOnboardingStepById(requireNotNull(params.uuid("step_id")))
+    override suspend fun performParams(params: DeleteStepParams, context: TeamToolContext): String {
+        onboardingStepService.deleteOnboardingStepById(params.stepId)
         return "Deleted. The step and what was in it are gone."
     }
 }

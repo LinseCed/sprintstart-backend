@@ -7,9 +7,8 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCal
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.request.skip.ReviewOnboardingSkipRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.skip.GetOnboardingSkipResponse
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
@@ -76,11 +75,18 @@ private fun SkipLookup.pendingOrNull(): PendingSkip? = (this as? SkipLookup.Foun
 
 private fun SkipLookup.reason(): String = (this as? SkipLookup.Refused)?.reason.orEmpty()
 
-private fun reviewParams(pending: PendingSkip, comment: String): JsonObject =
-    buildJsonObject {
-        put("skip_id", pending.skip.id.toString())
-        put("review_comment", comment)
-    }
+/** The skip request an accept or a denial answers, and the comment that goes with the answer. */
+@Serializable
+data class SkipReviewParams(
+    @SerialName("skip_id") @Serializable(with = UuidSerializer::class) val skipId: UUID,
+    @SerialName("review_comment") val reviewComment: String,
+)
+
+/** The skip request a confirmed deletion removes. */
+@Serializable
+data class DeleteSkipParams(
+    @SerialName("skip_id") @Serializable(with = UuidSerializer::class) val skipId: UUID,
+)
 
 /** The comment, quoted in full, or a sentence saying there is none. */
 private fun commentLine(comment: String): String =
@@ -91,7 +97,7 @@ private fun commentLine(comment: String): String =
 class AcceptSkipAction(
     private val scope: ContentScope,
     private val onboardingSkipService: OnboardingSkipService,
-) : TeamActionHandler {
+) : TypedTeamAction<SkipReviewParams>(SkipReviewParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -113,8 +119,8 @@ class AcceptSkipAction(
         val owner = pending.scoped.owner.displayName
         val step = pending.scoped.element
 
-        return TeamActionDraft.Proposed(
-            params = reviewParams(pending, comment),
+        return proposed(
+            params = SkipReviewParams(pending.skip.id, comment),
             label = "Let $owner skip “${step.title.forLabel()}”",
             preview = buildString {
                 appendLine("Accept $owner's request to skip the step “${step.title}”.")
@@ -133,13 +139,13 @@ class AcceptSkipAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        recheckPending(scope, onboardingSkipService, params, context)
+    override fun recheckParams(params: SkipReviewParams, context: TeamToolContext): String? =
+        recheckPending(scope, onboardingSkipService, params.skipId, context)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
+    override suspend fun performParams(params: SkipReviewParams, context: TeamToolContext): String {
         onboardingSkipService.acceptSkipById(
-            requireNotNull(params.uuid("skip_id")),
-            ReviewOnboardingSkipRequest(reviewComment = params.text("review_comment")),
+            params.skipId,
+            ReviewOnboardingSkipRequest(reviewComment = params.reviewComment),
         )
         return "Accepted. The step is skipped, and it counts as done for them."
     }
@@ -150,7 +156,7 @@ class AcceptSkipAction(
 class DenySkipAction(
     private val scope: ContentScope,
     private val onboardingSkipService: OnboardingSkipService,
-) : TeamActionHandler {
+) : TypedTeamAction<SkipReviewParams>(SkipReviewParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
     override val spec = BuddyToolSpecDto(
@@ -177,8 +183,8 @@ class DenySkipAction(
         val owner = pending.scoped.owner.displayName
         val step = pending.scoped.element
 
-        return TeamActionDraft.Proposed(
-            params = reviewParams(pending, comment),
+        return proposed(
+            params = SkipReviewParams(pending.skip.id, comment),
             label = "Deny $owner's skip of “${step.title.forLabel()}”",
             preview = buildString {
                 appendLine("Deny $owner's request to skip the step “${step.title}”.")
@@ -195,13 +201,13 @@ class DenySkipAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        recheckPending(scope, onboardingSkipService, params, context)
+    override fun recheckParams(params: SkipReviewParams, context: TeamToolContext): String? =
+        recheckPending(scope, onboardingSkipService, params.skipId, context)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
+    override suspend fun performParams(params: SkipReviewParams, context: TeamToolContext): String {
         onboardingSkipService.denySkipById(
-            requireNotNull(params.uuid("skip_id")),
-            ReviewOnboardingSkipRequest(reviewComment = params.text("review_comment")),
+            params.skipId,
+            ReviewOnboardingSkipRequest(reviewComment = params.reviewComment),
         )
         return "Denied. They have your comment, and the step is theirs to do."
     }
@@ -212,7 +218,7 @@ class DenySkipAction(
 class DeleteSkipAction(
     private val scope: ContentScope,
     private val onboardingSkipService: OnboardingSkipService,
-) : TeamActionHandler {
+) : TypedTeamAction<DeleteSkipParams>(DeleteSkipParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
     override val spec = BuddyToolSpecDto(
@@ -229,8 +235,8 @@ class DeleteSkipAction(
         val owner = pending.scoped.owner.displayName
         val step = pending.scoped.element
 
-        return TeamActionDraft.Proposed(
-            params = buildJsonObject { put("skip_id", pending.skip.id.toString()) },
+        return proposed(
+            params = DeleteSkipParams(pending.skip.id),
             label = "Delete $owner's skip request",
             preview = buildString {
                 appendLine("Delete $owner's request to skip “${step.title}”, without answering it.")
@@ -244,11 +250,11 @@ class DeleteSkipAction(
         )
     }
 
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? =
-        recheckPending(scope, onboardingSkipService, params, context)
+    override fun recheckParams(params: DeleteSkipParams, context: TeamToolContext): String? =
+        recheckPending(scope, onboardingSkipService, params.skipId, context)
 
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        onboardingSkipService.deleteSkipById(requireNotNull(params.uuid("skip_id")))
+    override suspend fun performParams(params: DeleteSkipParams, context: TeamToolContext): String {
+        onboardingSkipService.deleteSkipById(params.skipId)
         return "Deleted. The request is gone; they were not told."
     }
 }
@@ -257,10 +263,10 @@ class DeleteSkipAction(
 private fun recheckPending(
     scope: ContentScope,
     skips: OnboardingSkipService,
-    params: JsonObject,
+    skipId: UUID,
     context: TeamToolContext,
 ): String? =
-    when (val found = lookUpPendingSkip(scope, skips, params.uuid("skip_id"), context.projectId)) {
+    when (val found = lookUpPendingSkip(scope, skips, skipId, context.projectId)) {
         is SkipLookup.Refused -> found.reason
         is SkipLookup.Found -> null
     }

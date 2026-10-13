@@ -53,7 +53,7 @@ internal suspend fun FlowCollector<BuddyStreamEvent>.relayAgentTurn(
             }
 
             BuddyAgentStreamEvent.TOOL_USE ->
-                emit(BuddyStreamEvent(type = "tool_use", name = event.name, kind = "tool"))
+                emit(toolUseEvent(event.name))
 
             BuddyAgentStreamEvent.RESULT -> result = event.toResponse()
 
@@ -171,6 +171,10 @@ private const val TURN_FAILED_MESSAGE = "The buddy could not finish this reply."
 private val logger = LoggerFactory.getLogger(
     "com.sprintstart.sprintstartbackend.onboarding.service.BuddyReplyStream",
 )
+
+/** The stream event that tells the client the buddy is running the tool [name]. */
+internal fun toolUseEvent(name: String?): BuddyStreamEvent =
+    BuddyStreamEvent(type = BuddyService.TOOL_USE, name = name, kind = BuddyService.TOOL_KIND)
 
 internal data class ResolvedBuddyCitation(
     val artifactId: UUID,

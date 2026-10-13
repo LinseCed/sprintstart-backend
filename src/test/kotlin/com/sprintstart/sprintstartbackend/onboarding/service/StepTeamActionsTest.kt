@@ -112,7 +112,18 @@ class StepTeamActionsTest {
         fun `a confirm after the phase lost steps is turned down`() {
             inPhaseOf(1)
 
-            val reason = action.recheck(f.json("phase_id" to phaseId, "position" to 4), f.context)
+            val reason = action.recheck(
+                f.json(
+                    "phase_id" to phaseId,
+                    "title" to "x",
+                    "description" to "",
+                    "type" to "VIDEO",
+                    "estimated_minutes" to 10,
+                    "expected_outcome" to "",
+                    "position" to 4,
+                ),
+                f.context,
+            )
 
             assertThat(reason).contains("fewer steps")
         }
