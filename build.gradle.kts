@@ -121,7 +121,14 @@ pitest {
     // name cannot hold a tab; CI never sets it, so the gate there always runs against the whole suite.
     val localExclusions = providers.gradleProperty("pitLocalExcludedTests").map { it.split(",") }.orElse(emptyList())
     excludedTestClasses.set(
-        localExclusions.map { listOf("*IntegrationTest", "*ApplicationTests", "*.architecture.*", "*.contracts.*") + it },
+        localExclusions.map {
+            listOf(
+                "*IntegrationTest",
+                "*ApplicationTests",
+                "*.architecture.*",
+                "*.contracts.*",
+            ) + it
+        },
     )
     threads.set(Runtime.getRuntime().availableProcessors())
     outputFormats.set(listOf("XML", "HTML"))
