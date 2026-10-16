@@ -8,6 +8,7 @@ plugins {
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("dev.detekt") version "2.0.0-alpha.1"
     id("jacoco")
+    id("info.solidsoft.pitest") version "1.19.0"
 }
 
 group = "com.sprintstart"
@@ -19,6 +20,14 @@ java {
     }
 }
 
+// The module API declarations (`package-info.java` with @NamedInterface/@ApplicationModule) sit
+// next to the Kotlin code. Without this, javac never compiles them and Spring Modulith sees none.
+sourceSets {
+    main {
+        java.srcDir("src/main/kotlin")
+    }
+}
+
 repositories {
     mavenCentral()
 }
@@ -26,6 +35,7 @@ repositories {
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(files("$rootDir/detekt.yml"))
+    baseline = file("$rootDir/detekt-baseline.xml")
 }
 
 extra["springModulithVersion"] = "2.0.6"
@@ -55,6 +65,10 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-websocket-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testImplementation("org.springframework.modulith:spring-modulith-starter-test")
+    testImplementation("com.lemonappdev:konsist:0.18.1")
+    testImplementation("com.networknt:json-schema-validator:1.5.9")
+    // PIT's JUnit plugin would bring launcher 1.x, which cannot run Spring Boot 4's JUnit 6 engine.
+    pitest("org.junit.platform:junit-platform-launcher:6.0.3")
     testImplementation("com.h2database:h2")
     testImplementation("io.mockk:mockk:1.14.6")
     testImplementation("org.assertj:assertj-core:3.27.4")
@@ -89,6 +103,23 @@ allOpen {
 tasks.withType<Test> {
     useJUnitPlatform()
     maxHeapSize = "2g"
+}
+
+// Mutation testing (AI_RULES R25): `bash scripts/quality/mutation.sh` runs it on the classes a branch
+// changed and fails below MUTATION_MIN. Run it directly with -PpitTargets=com.example.Foo,com.example.Bar.
+pitest {
+    pitestVersion.set("1.30.0")
+    junit5PluginVersion.set("1.2.3")
+    addJUnitPlatformLauncher.set(false)
+    targetClasses.set(
+        providers.gradleProperty("pitTargets").map { it.split(",") }.orElse(listOf("com.sprintstart.*")),
+    )
+    excludedTestClasses.set(listOf("*IntegrationTest", "*ApplicationTests", "*.architecture.*"))
+    threads.set(Runtime.getRuntime().availableProcessors())
+    outputFormats.set(listOf("XML", "HTML"))
+    timestampedReports.set(false)
+    verbose.set(providers.gradleProperty("pitVerbose").map { it.toBoolean() }.orElse(false))
+    exportLineCoverage.set(false)
 }
 
 tasks.jacocoTestReport {
