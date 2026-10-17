@@ -113,17 +113,14 @@ class BoardService(
         val diagrams = boardDiagramRepository
             .findAllByCardIdIn(cards.filter { it.kind == BoardCardKind.DIAGRAM }.map { it.id })
             .associateBy { it.cardId }
-        // Same reasoning as [diagrams]: one read for every PATH_STEP card on the board, not one per
-        // card, and skipped entirely when the board holds none.
+        // One read for every PATH_STEP card, skipped when the board holds none.
         val pathSteps = if (cards.any { it.kind == BoardCardKind.PATH_STEP }) {
             pathStepReader.stepsById(userId)
         } else {
             emptyMap()
         }
-        // One ranking per read, shared by the suggestions card and the pool card: it is a pass over
-        // the whole live pool plus a responsiveness read, and the pool card is baseline, so every
-        // board would otherwise pay for it twice. Sharing it also means the two cannot disagree.
-        // Lazy, so a board with neither card does not pay for it at all.
+        // One ranking per read, shared by the suggestions and pool cards so they agree and the board pays
+        // once; lazy, so a board with neither pays nothing.
         val matches by lazy { starterWorkTaskProposalService.matchForUserId(userId, projectId) }
 
         return BoardResponse(

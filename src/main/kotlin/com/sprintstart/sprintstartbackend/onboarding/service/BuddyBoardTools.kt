@@ -145,9 +145,6 @@ class BuddyBoardTools(
                     "something else.",
             )
 
-            // Inline rather than appenders of their own: this class is one function away from
-            // detekt's ceiling on how many it may have, and these two are a condition and a line
-            // each where the lists below are a dozen.
             if (pinned.isNotEmpty()) {
                 append(NEWLINE + NEWLINE)
                 append("Kept at the top of their board, which is them saying these matter now: ")
@@ -172,10 +169,6 @@ class BuddyBoardTools(
                 }
             }
 
-            // One call rather than a condition and a loop: `readBoard` is at detekt's ceiling on
-            // how much deciding one function may do, and it earned that ceiling honestly — a board
-            // read is the kind of function that grows a branch per release. See
-            // `BoardReading.cardsSection` for why ids appear in that section and nowhere else.
             append(BoardReading.cardsSection(cards, LIST_LIMIT))
 
             append(NEWLINE + NEWLINE)
