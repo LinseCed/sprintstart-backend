@@ -41,8 +41,6 @@ class OnboardingStepService(
     private val onboardingCompletionService: OnboardingCompletionService,
     private val userApi: UserApi,
 ) {
-//  ========================== Methods for users ==========================
-
     /**
      * Returns all steps for one phase in the authenticated user's onboarding path.
      *
@@ -101,7 +99,6 @@ class OnboardingStepService(
             phase.generationStatus = GenerationStatus.GENERATED
         }
 
-        // Shift right
         shiftStepsRight(phase, request)
 
         val onboardingStep = OnboardingStep(
@@ -302,8 +299,6 @@ class OnboardingStepService(
         onboardingStepRepository.delete(step)
     }
 
-//  ========================== Methods for admins ==========================
-
     /**
      * Returns all steps belonging to the specified phase.
      *
@@ -339,7 +334,6 @@ class OnboardingStepService(
             .findById(phaseId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No phase found with id: $phaseId") }
 
-        // Shift right
         shiftStepsRight(phase, request)
 
         val onboardingStep = OnboardingStep(
@@ -418,7 +412,6 @@ class OnboardingStepService(
             .findById(stepId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No step found with id: $stepId") }
 
-        // Shift left
         val stepsToShift = onboardingStepRepository
             .findAllByPhaseIdAndPositionGreaterThan(step.phase.id, step.position)
         stepsToShift.forEach { it.position -= 1 }
@@ -426,8 +419,6 @@ class OnboardingStepService(
         bridgeOverInGraph(step)
         onboardingStepRepository.delete(step)
     }
-
-//  ========================== Helper Methods ==========================
 
     /**
      * Takes a step out of its phase's dependency graph before it is deleted, joining up what it sat

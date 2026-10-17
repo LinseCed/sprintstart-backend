@@ -36,8 +36,6 @@ class OnboardingPhaseService(
     private val onboardingPhaseRepository: OnboardingPhaseRepository,
     private val userApi: UserApi,
 ) {
-//  ========================== Methods for users ==========================
-
     /**
      * Returns all phases for the authenticated user's onboarding path.
      *
@@ -106,7 +104,6 @@ class OnboardingPhaseService(
             .findOnboardingPathByUserId(userId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Onboarding path not found") }
 
-        // shift all the phases after the new one to make space
         shiftPhasesRight(path, request)
 
         val onboardingPhase = OnboardingPhase(
@@ -178,7 +175,6 @@ class OnboardingPhaseService(
             .findByIdAndPathUserId(phaseId, userId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No phase found with id: $phaseId") }
 
-        // Shift left
         val phasesToShift = onboardingPhaseRepository
             .findAllByPathIdAndPositionGreaterThan(phase.path.id, phase.position)
         phasesToShift.forEach { it.position -= 1 }
@@ -186,8 +182,6 @@ class OnboardingPhaseService(
 
         onboardingPhaseRepository.delete(phase)
     }
-
-//  ========================== Methods for admins ==========================
 
     /**
      * Returns all phases for the given user.
@@ -221,7 +215,6 @@ class OnboardingPhaseService(
             .findByUserId(userId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No path found for user $userId") }
 
-        // Shift all phases at or after the new position up by one
         shiftPhasesRight(path, request)
 
         val onboardingPhase = OnboardingPhase(
@@ -295,7 +288,6 @@ class OnboardingPhaseService(
             .findById(phaseId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No phase found with id: $phaseId") }
 
-        // Shift left
         val phasesToShift = onboardingPhaseRepository
             .findAllByPathIdAndPositionGreaterThan(phase.path.id, phase.position)
         phasesToShift.forEach { it.position -= 1 }
@@ -303,8 +295,6 @@ class OnboardingPhaseService(
 
         onboardingPhaseRepository.delete(phase)
     }
-
-//  ========================== Helper Methods ==========================
 
     /**
      * Makes room for a new phase at the requested position by shifting all existing

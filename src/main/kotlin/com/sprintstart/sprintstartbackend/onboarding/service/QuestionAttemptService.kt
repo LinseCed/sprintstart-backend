@@ -79,8 +79,6 @@ class QuestionAttemptService(
         val explanation: String?,
     )
 
-//  ========================== Methods for users ==========================
-
     /**
      * Grades and stores one answer to a question in the authenticated user's path.
      *
@@ -165,8 +163,6 @@ class QuestionAttemptService(
             onboardingCompleted = onboardingCompleted,
         )
     }
-
-//  ========================== Methods for admins ==========================
 
     /**
      * Returns the questions of a phase including correct answers, for admin-facing
@@ -255,8 +251,6 @@ class QuestionAttemptService(
             attempts = attempts.map { it.toResponse() },
         )
     }
-
-//  ========================== Helper Methods ==========================
 
     /**
      * Drops the blocker edges pointing at questions that are about to be deleted.

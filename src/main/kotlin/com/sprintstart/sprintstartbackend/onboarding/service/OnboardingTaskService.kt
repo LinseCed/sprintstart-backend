@@ -38,8 +38,6 @@ class OnboardingTaskService(
     private val onboardingStepRepository: OnboardingStepRepository,
     private val userApi: UserApi,
 ) {
-//  ========================== Methods for users ==========================
-
     /**
      * Returns all tasks for one step in the authenticated user's onboarding path.
      *
@@ -179,8 +177,6 @@ class OnboardingTaskService(
         onboardingTaskRepository.delete(task)
     }
 
-//  ========================== Methods for admins ==========================
-
     /**
      * Retrieves all onboarding tasks belonging to the specified step.
      *
@@ -318,8 +314,6 @@ class OnboardingTaskService(
 
         task.finished = finished
     }
-
-//  ========================== Helper Methods ==========================
 
     /**
      * Reopens a completed step when new work is added to it.

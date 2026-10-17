@@ -51,8 +51,6 @@ class OnboardingSkipService(
     private val onboardingCompletionService: OnboardingCompletionService,
     private val userApi: UserApi,
 ) {
-//  ========================== Methods for users ==========================
-
     /**
      * Returns every skip request belonging to the authenticated user.
      *
@@ -218,8 +216,6 @@ class OnboardingSkipService(
         }
     }
 
-//  ========================== Methods for admins ==========================
-
     /**
      * Returns every skip request in the system.
      *
@@ -373,8 +369,6 @@ class OnboardingSkipService(
         ensurePending(skip, "deleted")
         deleteSkip(skip)
     }
-
-//  ========================== Helper methods ==========================
 
     private fun getUserId(authId: String): UUID {
         return userApi
