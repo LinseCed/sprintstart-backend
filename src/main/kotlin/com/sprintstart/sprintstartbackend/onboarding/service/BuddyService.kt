@@ -190,7 +190,6 @@ class BuddyService(
             buddySessionRepository.save(session)
         }
 
-        // Check if title has to be generated
         if (session.title.isBlank()) {
             try {
                 val generatedTitle = buddyAiClient.getSessionTitle(AiGenerateSessionTitleRequest(content))
@@ -230,12 +229,9 @@ class BuddyService(
             )
         }
 
-        // The AI reasoner sees the read-only tools *and* the action tools it may propose. An action
-        // tool call never mutates here — it produces a proposal the hire must confirm out-of-band.
-        //
-        // With capabilities off the list is empty, which is the whole mechanism: a tool the model
-        // was never given is one it cannot call, so the mode is enforced here rather than asked for
-        // in the prompt. Retrieval is untouched — `search_docs` runs AI-side, not as a backend tool.
+        // The reasoner gets the read-only tools and the action tools it may propose; an action never mutates
+        // here. With capabilities off the list is empty, so the mode is enforced by what the model is given,
+        // not asked for in the prompt.
         val tools = if (capabilitiesEnabled) {
             buddyToolExecutor.toolSpecs(userId) + buddyActionService.actionSpecs(userId)
         } else {
@@ -247,10 +243,8 @@ class BuddyService(
         val vocabulary = vocabulary()
         val projectIds = session.projectId?.let { listOf(it.toString()) } ?: memberProjects
 
-        // A hire on no project has no scope the AI may retrieve from — it fails closed on an empty
-        // list — so a turn would search nothing and answer as though the project had no material on
-        // the subject. Refuse the turn here instead, and say the one thing that resolves it. The
-        // user's message is already persisted above, so the transcript still shows what they asked.
+        // A hire on no project has no retrieval scope, and the AI fails closed on an empty one, so the turn
+        // is refused here with the one thing that resolves it. The message is already persisted.
         if (projectIds.isEmpty()) {
             return flow {
                 emitAgentReply(NO_PROJECT_REPLY, emptyList(), StringBuilder())
@@ -361,8 +355,7 @@ class BuddyService(
             }
 
             buddyCitationRepository.saveAll(citationEntities)
-            // Only now, with the reply persisted and the hire reading it. Folding before this point
-            // is what the whole change exists to stop.
+            // Only now, with the reply persisted: folding must never delay the answer.
             compactionScheduler.foldHireConversation(UserId(userId), BuddySessionId(session.id))
         }.endFailureWithErrorEvent()
     }
@@ -518,28 +511,25 @@ class BuddyService(
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
 
     companion object {
-        // How many agent round-trips (AI reason -> backend tool -> AI reason) before we stop and
-        // answer with what we have. The AI service has its own internal search budget; this bounds
-        // only the backend-tool hops so a loop can never run unbounded.
-        //
-        // Visible to BuddyTeamService, whose loop is bounded by the same budget.
+        /**
+         * How many backend-tool round trips a turn may take before it answers with what it has; the team
+         * buddy's loop shares the budget.
+         */
         const val MAX_AGENT_STEPS = 5
 
-        // The most messages (user + assistant) the AI is ever sent; older turns reach it only
-        // through the session's running summary. 20 keeps ~10 exchanges verbatim.
-        //
-        // Visible to BuddyCompactionService, which folds back down to it. One constant, not two:
-        // a fold target disagreeing with the window it feeds leaves the prompt over budget.
+        /**
+         * The most messages the AI is ever sent; older turns reach it only through the running summary.
+         * Compaction folds back down to the same number, so the prompt stays within budget.
+         */
         const val WINDOW = 20
 
         const val FALLBACK_REPLY =
             "I wasn't able to finish answering that one — could you rephrase or add a little detail?"
 
-        // Shown when the hire is on no project. Retrieval fails closed on an empty scope, so a
-        // turn would search nothing and answer as though the project had no material — the worst
-        // possible moment to sound confident. The turn is refused instead, and the hire is told the
-        // state and the one thing that resolves it, the same way `BuddyBoardTools` tells them there
-        // is no board to put a card on.
+        /**
+         * Shown when the hire is on no project: retrieval fails closed on an empty scope, so the turn is
+         * refused rather than answered from nothing.
+         */
         const val NO_PROJECT_REPLY =
             "I can't look through your project's material yet — you're not on a project, so " +
                 "there's nothing for me to search. Once you're added to one, I'll be able to find " +
@@ -552,10 +542,10 @@ class BuddyService(
         const val TOKEN = "token"
         const val DONE = "done"
 
-        // Terminal like DONE: the turn failed after its stream had started.
+        /** Terminal like DONE: the turn failed after its stream had started. */
         const val ERROR = "error"
 
-        // Team mode only: the words shown so far were not the answer after all and are to be dropped.
+        /** Team mode only: the words shown so far were not the answer and are to be dropped. */
         const val RESET = "reset"
         const val OPENING_ACTION = "opening_action"
 
@@ -564,8 +554,10 @@ class BuddyService(
         const val TOOL_USE = "tool_use"
         const val TOOL_KIND = "tool"
 
-        // Split after each space, keeping the space on the preceding chunk, so concatenating every
-        // emitted token reproduces the answer exactly (newlines and punctuation preserved).
+        /**
+         * Splits after each space, keeping the space on the preceding chunk, so the concatenated tokens
+         * reproduce the answer exactly.
+         */
         val TOKEN_CHUNK = Regex("(?<= )")
     }
 
