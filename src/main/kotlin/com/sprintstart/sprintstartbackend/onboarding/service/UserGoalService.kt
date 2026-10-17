@@ -54,10 +54,8 @@ class UserGoalService(
         val proposal = starterWorkTaskProposalRepository.findById(proposalId).orElseThrow {
             ResponseStatusException(HttpStatus.NOT_FOUND, "No starter-work task found with id: $proposalId")
         }
-        // Checked against the source before the status is trusted, not only against what the pool
-        // last believed. Reconciliation runs on a clock and on ingestion, so a task closed since
-        // the last pass still reads as live here — and this is the one moment where acting on that
-        // stale answer costs somebody real work. One local read, at the point of commitment.
+        // Checked against the source first: reconciliation runs on a clock, and claiming is the one moment a
+        // stale answer costs somebody real work.
         starterWorkPoolReconciler.reconcileOne(proposal)
         if (proposal.status != ProposalStatus.LIVE) {
             throw ResponseStatusException(
@@ -76,10 +74,8 @@ class UserGoalService(
             sourceProposalId = proposal.id,
         )
         userGoalRepository.save(goal)
-        // Pinned the moment it becomes theirs, whichever way it was grabbed — from the buddy's
-        // confirm or by hand from the pool card. The current-task card is mentor-placed, so without
-        // this a hire who grabbed by hand would have a task and no card saying so. Revived if they
-        // dismissed it before: grabbing a task is them saying this is what they are working on.
+        // Pinned however the task was claimed, and revived if dismissed: claiming a task says this is what
+        // they are working on.
         boardService.placeOrRevive(userId, projectId, BoardCardKind.CURRENT_TASK, by)
 
         return GoalView(
