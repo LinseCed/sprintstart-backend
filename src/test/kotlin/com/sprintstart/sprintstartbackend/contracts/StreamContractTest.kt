@@ -24,7 +24,7 @@ import java.io.File
 import java.util.UUID
 
 /**
- * Both stream contracts of the buddy (AI_RULES R12), checked from this side.
+ * Both stream contracts of the buddy, checked from this side.
  *
  * - `agent-stream-events`: produced by sprintstart-ai, consumed here. Every shared example must decode with
  *   the parser production uses — a chunk that does not is skipped silently at runtime.

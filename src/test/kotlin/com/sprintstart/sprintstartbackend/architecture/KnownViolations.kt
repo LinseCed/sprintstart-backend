@@ -11,7 +11,7 @@ import java.io.File
  * [assertMatches] fails on a violation that is not listed (new code broke the rule) and on a listed one
  * that no longer occurs (it was fixed, so the entry must go). The current state is always written to
  * `build/architecture/<rule>.txt`; after a fix, copy it over the list and check the diff only removes lines.
- * The quality ratchet fails a PR whose list has more entries than its base branch (AI_RULES R3).
+ * The quality ratchet fails a PR whose list has more entries than its base branch.
  */
 internal class KnownViolations(
     private val rule: String,

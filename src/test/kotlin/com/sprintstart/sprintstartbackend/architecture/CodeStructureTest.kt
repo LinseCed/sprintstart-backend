@@ -6,7 +6,7 @@ import com.lemonappdev.konsist.api.declaration.KoFunctionDeclaration
 import org.junit.jupiter.api.Test
 
 /**
- * Turns the design rules of AI_RULES.md into checks on the production code, each against its own list of
+ * Turns the design rules into checks on the production code, each against its own list of
  * known violations (see [KnownViolations]).
  */
 class CodeStructureTest {

@@ -105,7 +105,7 @@ tasks.withType<Test> {
     maxHeapSize = "2g"
 }
 
-// Mutation testing (AI_RULES R25): `bash scripts/quality/mutation.sh` runs it on the classes a branch
+// Mutation testing: `bash scripts/quality/mutation.sh` runs it on the classes a branch
 // changed and fails below MUTATION_MIN. Run it directly with -PpitTargets=com.example.Foo,com.example.Bar.
 pitest {
     pitestVersion.set("1.30.0")
