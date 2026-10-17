@@ -47,8 +47,6 @@ import java.util.UUID
  * mentor cannot know it either.
  */
 @Component
-// One function per section of what a path has to say, plus the two entry points. The count tracks
-// the shape of the text, not a class doing unrelated things.
 @Suppress("TooManyFunctions")
 class BuddyPathTools(
     private val onboardingPathService: OnboardingPathService,
@@ -359,9 +357,8 @@ class BuddyPathTools(
         phases: List<GetOnboardingPhaseForUserResponse>,
         current: GetOnboardingPhaseForUserResponse,
     ): String {
-        // Phases behind them, never a percentage. A path mixes steps they ticked, questions they
-        // answered and phases that came back empty; one number over those is a figure the mentor
-        // would repeat and nobody could act on -- the same rule the arrival tool states at length.
+        // Phases behind them, never a percentage: one number over ticked steps, answered questions and empty
+        // phases is nothing anybody could act on.
         val finished = phases.count { !it.isOpen() }
         val behind = when (finished) {
             0 -> "Nothing is behind them yet."
@@ -524,8 +521,8 @@ class BuddyPathTools(
         if (!phase.locked && openNow.isNotEmpty()) {
             appendLine("Open right now: " + openNow.joinToString(", ") { "#${numbers[it]}" })
         }
-        // The two halves of "add a step as the next thing", worked out rather than described: told
-        // how to place a step, the mentor passed what it unlocks and left out what it comes after.
+        // Both halves of "add a step as the next thing" are worked out, so the mentor passes what the step
+        // comes after as well as what it unlocks.
         PathStepPlacement.anchorOf(phase)?.let { anchor ->
             val done = steps
                 .filter { it.status == StepStatus.FINISHED || it.status == StepStatus.SKIPPED }
@@ -646,8 +643,7 @@ class BuddyPathTools(
         val options = question.options.sortedBy { it.position }
         if (options.isNotEmpty()) {
             appendLine("    · the options they see: " + options.joinToString("; ") { it.label })
-            // Hinting is answering. Testing had the mentor say one option "matches the title of #1
-            // word for word" -- no answer stated, and the question given away all the same.
+            // Hinting is answering: matching an option to a title gives the question away just the same.
             appendLine(
                 "    · never narrow these down for them: not by pointing at an option that matches a " +
                     "title or wording elsewhere, not by ruling any out, and not by saying how close a " +
