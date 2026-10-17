@@ -119,8 +119,8 @@ internal class BitbucketWorkspaceService(
                 )
             }
         } catch (e: CancellationException) {
-            // Never swallow cancellation: the run is abandoned, not failed, and reporting a fetch
-            // that did not happen would close a phase whose work never ran.
+            // Cancellation abandons the run; reporting it as a failure would close a fetch that never
+            // happened.
             throw e
         } catch (e: Exception) {
             eventPublisher.publishEvent(BitbucketWorkspaceMetadataFetchingFailedEvent(transactionId, e.message))

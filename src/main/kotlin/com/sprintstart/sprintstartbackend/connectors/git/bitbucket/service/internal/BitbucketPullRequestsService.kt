@@ -87,8 +87,8 @@ internal class BitbucketPullRequestsService(
                 connectionRepository.updatePullRequestsCursor(connection.id, syncStartedAt)
             }
         } catch (e: CancellationException) {
-            // Never swallow cancellation: the run is abandoned, not failed, and publishing a
-            // terminal failure here would report a fetch that did not happen.
+            // Cancellation abandons the run; reporting it as a failure would close a fetch that never
+            // happened.
             throw e
         } catch (e: Exception) {
             eventPublisher.publishEvent(BitbucketPullRequestsFetchingFailedEvent(transactionId, e.message))

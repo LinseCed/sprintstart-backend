@@ -297,9 +297,8 @@ internal class BitbucketConnectionService(
 
         connectionStateService.markUpdating(connection.id)
 
-        // Launched collectors, finalized like an update: the connection reads UPDATING while its
-        // first ingest runs and settles to UP_TO_DATE or FAILED after, instead of sitting on the
-        // default it was stored with through the ingest and any failure.
+        // The collectors finalize like an update, so the connection reads UPDATING during its first ingest
+        // and settles to UP_TO_DATE or FAILED.
         val collectors = listOf(
             applicationScope.async {
                 fileService.fetchAndIngestFilesOfRepository(connection.id, transactionId)

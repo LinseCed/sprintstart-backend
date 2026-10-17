@@ -156,9 +156,8 @@ internal class JiraIssueService(
         instanceUrl: String,
         transactionId: UUID,
     ): List<JiraIssueResponse> {
-        // Eagerly fetch the lazy collections: this runs on a background coroutine with no
-        // Hibernate session, so reading jiraProjectKeys below on a detached instance would throw
-        // LazyInitializationException.
+        // The collections are fetched eagerly: this runs on a background coroutine without a Hibernate
+        // session.
         val instance = instanceRepository.findByInstanceUrlWithCollections(instanceUrl) ?: return emptyList()
         val credentials = fetchCredentials(
             instance.updateCredentialAuthId,

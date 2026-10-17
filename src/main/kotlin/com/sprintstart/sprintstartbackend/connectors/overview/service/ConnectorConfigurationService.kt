@@ -54,7 +54,6 @@ class ConnectorConfigurationService(
         val insertables = connectorIds - savedConnectorIds
         val deletables = savedConnectorIds - connectorIds
 
-        // Insert all connectors that are defined via the `IConnector` interface but have no db entry
         insertables.forEach { connectorId ->
             repository.findById(connectorId).orElseGet {
                 logger.info("Found missing connector db entry '$connectorId' - inserting")
@@ -62,7 +61,6 @@ class ConnectorConfigurationService(
             }
         }
 
-        // Delete all connector db entries that are not defined via the `IConnector` interface anymore
         deletables.forEach { connectorId ->
             logger.info("Found deprecated connector db entry '$connectorId' - deleting")
             repository.deleteById(connectorId)
