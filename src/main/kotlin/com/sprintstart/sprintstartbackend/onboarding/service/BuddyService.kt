@@ -7,7 +7,6 @@ import com.sprintstart.sprintstartbackend.onboarding.external.event.QuestionAske
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCitationDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
@@ -32,11 +31,9 @@ import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
-import com.sprintstart.sprintstartbackend.user.service.SessionActivityService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
 import org.slf4j.LoggerFactory
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
@@ -59,8 +56,6 @@ import kotlin.coroutines.cancellation.CancellationException
  * the hire's own onboarding are answered by [BuddyToolExecutor].
  */
 @Service
-// One method per thing a visit can do -- open it, stream it open, read it, speak into it -- plus the
-// agent loop's helpers. The count tracks the conversation's surface, not a class doing two jobs.
 @Suppress("TooManyFunctions")
 class BuddyService(
     private val buddySessionRepository: BuddySessionRepository,
@@ -71,9 +66,7 @@ class BuddyService(
     private val buddyActionService: BuddyActionService,
     private val userApi: UserApi,
     private val artifactLookupService: ArtifactLookupService,
-    private val sessionActivityService: SessionActivityService,
     private val compactionScheduler: BuddyCompactionScheduler,
-    private val openingStream: BuddyOpeningStream,
     private val buddyAiClient: BuddyAiClient,
     private val eventPublisher: ApplicationEventPublisher,
     private val clock: Clock,
@@ -131,65 +124,6 @@ class BuddyService(
         buddySessionRepository.save(session)
         return CreateSessionResponse(session.id)
     }
-
-    /**
-     * Opens a visit, streaming the greeting as the mentor writes it.
-     *
-     * The greeting is persisted as the visit's opening message. No transcript is replayed.
-     *
-     * A broken stream is two rules, not one:
-     * - Nothing arrived — the fallback greeting is emitted and nothing is persisted, so a
-     *   reload tries the model again.
-     * - Some arrived — what the hire already read is persisted, so a reload shows the same
-     *   words. Memory and cursor are untouched either way.
-     *
-     * @throws ResponseStatusException 404 if the authenticated user doesn't exist.
-     */
-    fun streamOpenForMe(
-        authId: String,
-        sessionId: UUID?,
-    ): Flow<BuddyStreamEvent> {
-        val userId = resolveUserId(authId)
-        if (sessionId == null) throw ResponseStatusException(HttpStatus.BAD_REQUEST, "sessionId required")
-        val session = buddySessionRepository.findByIdAndUserId(sessionId, userId)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found for current user")
-        val messages = buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
-        val longAbsence = sessionActivityService.recordActivityAndReturnLongAbsence(userId)
-        val firstConversation = buddySessionRepository.countByUserId(userId) == 1L
-        val latestOpening = messages.lastOrNull()?.takeIf { it.opening }
-
-        return when {
-            !longAbsence && latestOpening != null -> openingStream.replay(latestOpening.content)
-            !longAbsence && !firstConversation -> flowOf(BuddyStreamEvent(type = DONE))
-            else -> openingStream.open(
-                openRequest(session, messages, UserId(userId)),
-                openingOf(session, UserId(userId)),
-            )
-        }
-    }
-
-    private fun openRequest(session: BuddySession, messages: List<BuddyMessage>, user: UserId): BuddyOpenRequest =
-        BuddyOpenRequest(
-            memory = session.summary,
-            recent = messages.drop(session.summarizedCount).map { it.toAgentMessage() },
-            state = buddyToolExecutor.stateSnapshot(user.value),
-        )
-
-    private fun openingOf(session: BuddySession, user: UserId): OpeningConversation =
-        OpeningConversation(
-            fallbackGreeting = FALLBACK_OPENING,
-            saveOpening = { greeting ->
-                buddyMessageRepository.save(
-                    BuddyMessage(
-                        session = session,
-                        role = BuddyMessageRole.ASSISTANT,
-                        content = greeting,
-                        opening = true,
-                    ),
-                )
-            },
-            afterOpening = { compactionScheduler.foldHireConversation(user, BuddySessionId(session.id)) },
-        )
 
     /**
      * Sends the authenticated user's message to the buddy and streams the reply.
@@ -611,11 +545,6 @@ class BuddyService(
                 "there's nothing for me to search. Once you're added to one, I'll be able to find " +
                 "its docs, code and conventions for you. If you expected to be on a project " +
                 "already, ask your project manager to add you."
-
-        // Shown when opening a visit can't reach the AI: a plain, warm welcome so the page still
-        // works and the hire can start talking.
-        const val FALLBACK_OPENING =
-            "Welcome back! How can I help with your onboarding today?"
 
         // The stream vocabulary the client switches on, plus one for the opening's suggested next
         // step. OPENING_ACTION is NOT `action_proposal`: that type is gated on the hire

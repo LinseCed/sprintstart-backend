@@ -13,9 +13,12 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyM
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddySuggestionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.CreateSessionResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService
+import com.sprintstart.sprintstartbackend.onboarding.service.BuddyOpeningService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddySuggestionService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyTeamService
+import com.sprintstart.sprintstartbackend.shared.ids.AuthId
+import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
 import com.sprintstart.sprintstartbackend.user.external.security.ProjectAuthorization
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -64,6 +67,9 @@ class BuddyControllerTest(
     // BuddyControllerTeamModeTest's.
     @MockkBean
     private lateinit var buddyTeamService: BuddyTeamService
+
+    @MockkBean
+    private lateinit var buddyOpeningService: BuddyOpeningService
 
     @MockkBean
     private lateinit var buddyActionService: BuddyActionService
@@ -241,7 +247,7 @@ class BuddyControllerTest(
         val sessionId = UUID.randomUUID()
 
         coEvery {
-            buddyService.streamOpenForMe(authId, sessionId)
+            buddyOpeningService.streamOpenForMe(AuthId(authId), BuddySessionId(sessionId))
         } returns flowOf(*events.toTypedArray())
 
         val asyncResult = mockMvc
@@ -265,7 +271,7 @@ class BuddyControllerTest(
     @Test
     fun `streamOpenForMe without a sessionId should return 400`() {
         coEvery {
-            buddyService.streamOpenForMe(authId, null)
+            buddyOpeningService.streamOpenForMe(AuthId(authId), null)
         } throws ResponseStatusException(
             HttpStatus.BAD_REQUEST,
             "sessionId required",

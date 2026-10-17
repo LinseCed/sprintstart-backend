@@ -51,7 +51,6 @@
     <ID>LargeClass:BuddyActionService.kt:BuddyActionService</ID>
     <ID>LargeClass:BuddyPathActions.kt:BuddyPathActions</ID>
     <ID>LargeClass:BuddyPathTools.kt:BuddyPathTools</ID>
-    <ID>LargeClass:BuddyService.kt:BuddyService</ID>
     <ID>LargeClass:OnboardingPersonalizationService.kt:OnboardingPersonalizationService</ID>
     <ID>LongMethod:AiFaqGroupMapper.kt:AiFaqGroupMapper$fun toEntity( aiGroup: AiFaqGroup, projectId: UUID, askedAtByQuestionId: Map&lt;String, Instant&gt;, ): FaqGroup</ID>
     <ID>LongMethod:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$private fun buildPredicates( cb: CriteriaBuilder, root: Root&lt;Artifact&gt;, projectJoin: Join&lt;Artifact, UUID&gt;, projectId: UUID, criteria: ArtifactFilterCriteria, exclude: FacetKind?, ): List&lt;Predicate&gt;</ID>
