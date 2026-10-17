@@ -33,6 +33,8 @@ class OnboardingResourceService(
     private val onboardingStepRepository: OnboardingStepRepository,
     private val userApi: UserApi,
 ) {
+//  ========================== Methods for users ==========================
+
     /**
      * Returns all resources for one step in the authenticated user's onboarding path.
      *
@@ -164,6 +166,8 @@ class OnboardingResourceService(
 
         onboardingResourceRepository.delete(resource)
     }
+
+//  ========================== Methods for admins ==========================
 
     /**
      * Creates a new onboarding resource (reference link) attached to the specified step.

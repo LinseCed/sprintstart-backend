@@ -41,6 +41,8 @@ class OnboardingStepService(
     private val onboardingCompletionService: OnboardingCompletionService,
     private val userApi: UserApi,
 ) {
+//  ========================== Methods for users ==========================
+
     /**
      * Returns all steps for one phase in the authenticated user's onboarding path.
      *
@@ -299,6 +301,8 @@ class OnboardingStepService(
         onboardingStepRepository.delete(step)
     }
 
+//  ========================== Methods for admins ==========================
+
     /**
      * Returns all steps belonging to the specified phase.
      *
@@ -419,6 +423,8 @@ class OnboardingStepService(
         bridgeOverInGraph(step)
         onboardingStepRepository.delete(step)
     }
+
+//  ========================== Helper Methods ==========================
 
     /**
      * Takes a step out of its phase's dependency graph before it is deleted, joining up what it sat
