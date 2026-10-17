@@ -26,7 +26,7 @@ class BlueprintCheckQuestion(
     var question: String,
     @Column(nullable = true, columnDefinition = "TEXT")
     var explanation: String? = null,
-    // Expected answer for SHORT_TEXT questions, null for MULTIPLE_CHOICE
+    /** The expected answer of a SHORT_TEXT question; null for MULTIPLE_CHOICE. */
     @Column(nullable = true, columnDefinition = "TEXT")
     var correctAnswer: String? = null,
     @OneToMany(
