@@ -26,7 +26,7 @@ class PhaseCheckQuestion(
     title: String = question,
     @Column(nullable = true, columnDefinition = "TEXT")
     var explanation: String? = null,
-    /** The expected answer of a SHORT_TEXT question; null for MULTIPLE_CHOICE. */
+    // Expected answer for SHORT_TEXT questions, null for MULTIPLE_CHOICE
     @Column(nullable = true, columnDefinition = "TEXT")
     var correctAnswer: String? = null,
     @OneToMany(
