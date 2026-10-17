@@ -87,10 +87,10 @@ class BuddyServiceTest {
         buddyToolExecutor,
         buddyActionService,
         userApi,
-        buddyCompactionService,
         artifactLookupService,
         sessionActivityService,
-        CoroutineScope(Dispatchers.Unconfined),
+        BuddyCompactionScheduler(buddyCompactionService, CoroutineScope(Dispatchers.Unconfined)),
+        BuddyOpeningStream(onboardingAiClient),
         buddyAiClient,
         eventPublisher,
         clock,
@@ -2365,6 +2365,82 @@ class BuddyServiceTest {
                 buddyCitationRepository.saveAll(any<Iterable<BuddyCitation>>())
             }
         }
+
+        /** One turn in which the AI calls [actionCall] and the action service answers with [outcome]. */
+        private suspend fun eventsForAction(
+            actionCall: BuddyToolCallDto,
+            outcome: BuddyActionService.ProposeOutcome,
+        ): List<BuddyStreamEvent> {
+            val session = BuddySession(userId = userId, title = "session")
+            stageConversation(session)
+            every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
+            val paused = BuddyAgentResponse(
+                final = false,
+                messages = listOf(
+                    BuddyAgentMessageDto(role = "assistant", content = "", toolCalls = listOf(actionCall)),
+                ),
+                pendingToolCalls = listOf(actionCall),
+            )
+            coEvery { onboardingAiClient.buddyAgentTurnStream(any()) } returnsStreams
+                listOf(paused, finalReply("Done."))
+            every { buddyActionService.isAction(actionCall.name) } returns true
+            every { buddyActionService.propose(actionCall, userId) } returns outcome
+            return service.sendMessageForMe(authId, session.id, "please", true, null).toList()
+        }
+
+        @Test
+        fun `a proposal's id lists reach the client as strings`() =
+            runTest {
+                val call = BuddyToolCallDto(id = "call_0", name = "add_path_step")
+                val ids = List(3) { UUID.randomUUID() }
+                val proposal = BuddyActionService.BuddyActionProposal(
+                    action = "add_path_step",
+                    label = "Add this step to your path",
+                    question = null,
+                    optionIds = listOf(ids[0]),
+                    waitsOnIds = listOf(ids[1]),
+                    unlocksIds = listOf(ids[2]),
+                )
+
+                val event = eventsForAction(call, BuddyActionService.ProposeOutcome("Proposed.", proposal))
+                    .single { it.type == "action_proposal" }
+
+                assertThat(event.optionIds).containsExactly(ids[0].toString())
+                assertThat(event.waitsOnIds).containsExactly(ids[1].toString())
+                assertThat(event.unlocksIds).containsExactly(ids[2].toString())
+            }
+
+        @Test
+        fun `a proposal leaves out the id lists it does not use`() =
+            runTest {
+                val call = BuddyToolCallDto(id = "call_0", name = "flag_to_pm")
+                val proposal = BuddyActionService.BuddyActionProposal(
+                    action = "flag_to_pm",
+                    label = "Flag this to your PM",
+                    question = "When is the freeze?",
+                )
+
+                val event = eventsForAction(call, BuddyActionService.ProposeOutcome("Proposed.", proposal))
+                    .single { it.type == "action_proposal" }
+
+                assertThat(event.optionIds).isNull()
+                assertThat(event.waitsOnIds).isNull()
+                assertThat(event.unlocksIds).isNull()
+            }
+
+        @Test
+        fun `an action that cannot be proposed shows no proposal and the turn still answers`() =
+            runTest {
+                val call = BuddyToolCallDto(id = "call_0", name = "flag_to_pm")
+                val refused = BuddyActionService.ProposeOutcome("No question was provided to flag.", null)
+
+                val events = eventsForAction(call, refused)
+
+                assertThat(events.map { it.type }).doesNotContain("action_proposal")
+                assertThat(
+                    events.filter { it.type == "token" }.joinToString("") { it.content.orEmpty() },
+                ).isEqualTo("Done.")
+            }
     }
 
     @Nested
