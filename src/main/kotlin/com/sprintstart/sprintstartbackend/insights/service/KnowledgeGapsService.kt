@@ -48,12 +48,8 @@ class KnowledgeGapsService(
     private val refreshTracker: InsightsRefreshTracker,
     transactionManager: PlatformTransactionManager,
 ) {
-    // The cache swap below deletes and re-saves in one go. Derived delete queries carry no
-    // transaction of their own — unlike the inherited deleteAll() — so without this the delete
-    // threw TransactionRequiredException as soon as there was anything to delete, which is why
-    // the first refresh of a project appeared to work and every later one failed. Wrapping both
-    // also makes the swap atomic: a failure in between would otherwise leave the panel empty.
-    // @Transactional cannot be used here, the method is suspend.
+    // The cache swap deletes and re-saves in one transaction: derived delete queries carry none of their own,
+    // and the swap must be atomic. @Transactional does not apply to suspend functions.
     private val txTemplate = TransactionTemplate(transactionManager)
 
     /**
@@ -161,8 +157,8 @@ class KnowledgeGapsService(
 
         txTemplate.executeWithoutResult {
             knowledgeGapRepository.deleteAllByProjectId(projectId)
-            // Rows from before insights were project-scoped belong to no project and would
-            // otherwise linger forever, since every read is now scoped.
+            // Rows from before insights were project-scoped belong to no project; every read is scoped, so
+            // they would linger.
             knowledgeGapRepository.deleteAllByProjectIdIsNull()
             knowledgeGapRepository.saveAll(gaps)
             // Written in the same transaction as the gaps, and unconditionally: a scan that found
@@ -171,8 +167,7 @@ class KnowledgeGapsService(
             knowledgeGapsScanRepository.save(KnowledgeGapsScan(projectId = projectId))
         }
 
-        // Split deliberately: every component now yields a row, so the row count no longer says
-        // whether anything is wrong. Callers that report "nothing to fix" need the gap count.
+        // Every component yields a row, so callers that report "nothing to fix" need the gap count.
         return RefreshKnowledgeGapsResponse(
             gapCount = gaps.count { it.severity != KnowledgeGapSeverity.COVERED },
             componentCount = gaps.size,
