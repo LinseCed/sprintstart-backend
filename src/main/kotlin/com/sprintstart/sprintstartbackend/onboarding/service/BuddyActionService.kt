@@ -89,25 +89,18 @@ class BuddyActionService(
         val type = BuddyActionType.fromToolName(call.name)
             ?: return ProposeOutcome("Unknown action: ${call.name}.", null)
 
-        // Before the project gate, deliberately. A GitHub login is a fact about a *person*, not
-        // about a project -- the same reason `GET /me/arrival` is not project-scoped. Gating it
-        // would refuse exactly the hire most likely to be setting one: somebody on day one who has
-        // not been added to anything yet. A test pins that.
+        // Before the project gate: a GitHub login is a fact about a person, and a hire on day one may be on
+        // no project yet.
         if (type == BuddyActionType.SET_GITHUB_LOGIN) {
             return proposeGithubLogin(call, type)
         }
 
-        // Also before the project gate, and for the same reason: the competency ledger is global,
-        // so a placement is a fact about the person. Gating it would refuse the assessment to
-        // somebody on day one, who is exactly the hire it exists for.
+        // Before the project gate as well: the competency ledger is global.
         if (type == BuddyActionType.RECORD_ASSESSMENT) {
             return proposeAssessment(call, type)
         }
 
-        // Also before the project gate, and for a reason worth stating: an onboarding path belongs
-        // to a *person*. It is generated from one project's blueprint, but the path itself is not
-        // project-scoped, so gating these would refuse a hire onboarding on two projects — and they
-        // still have exactly one path, sitting on the page they are looking at.
+        // Before the project gate as well: an onboarding path belongs to a person, not to a project.
         if (buddyPathActions.handles(type)) {
             return buddyPathActions.propose(call, type, userId)
         }
@@ -633,20 +626,14 @@ class BuddyActionService(
             BuddyActionType.OPEN_ORIENTATION -> "open a task packet"
             BuddyActionType.CLAIM_GOAL -> "claim a goal"
             BuddyActionType.REQUEST_ATTESTATION -> "ask somebody to confirm your work"
-            // Unused in practice -- the gerund only appears in the no-project reason lines, which
-            // this action never reaches. Present because the enum is exhaustive, which is what
-            // made the compiler point at both of these when it was added.
+            // The next three never reach the no-project reason lines: they are not project-scoped.
             BuddyActionType.SET_GITHUB_LOGIN -> "save a GitHub username"
-            // Unused for the same reason: not project-scoped, so it never reaches the no-project
-            // reason lines.
             BuddyActionType.RECORD_ASSESSMENT -> "record where a chat placed you"
-            // Unused for the same reason again: a path is not project-scoped either.
             BuddyActionType.COMPLETE_STEP -> "tick a step off your path"
             BuddyActionType.COMPLETE_TASK -> "tick a line off your checklist"
             BuddyActionType.ANSWER_QUESTION -> "send an answer to a question"
             BuddyActionType.ADD_PATH_STEP -> "add a step to your path"
             BuddyActionType.REQUEST_SKIP -> "ask your PM to skip a step"
-            // The board writes: a table rather than eleven branches of the same shape.
             else -> BOARD_WRITE_GERUNDS.getValue(this)
         }
 
@@ -661,9 +648,10 @@ class BuddyActionService(
         val action: String,
         val label: String,
         val question: String?,
-        // Confirm payloads for the actions that carry one: the client echoes them back verbatim,
-        // so the target of a confirmed action is the one the buddy proposed, never one the client
-        // picked.
+        /**
+         * The goal-claim target. This and the confirm payloads below are echoed back verbatim by the client,
+         * so a confirmed action targets what the buddy proposed.
+         */
         val taskId: UUID? = null,
         val title: String? = null,
         val attesterId: String? = null,

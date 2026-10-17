@@ -60,8 +60,7 @@ class BoardDiagramService(
     transactionManager: PlatformTransactionManager,
     private val clock: Clock = Clock.systemUTC(),
 ) {
-    // The AI call is a long-running suspend operation, so it must not run inside a transaction --
-    // the same read-tx -> AI -> write-tx split TaskOrientationService uses.
+    // The AI call is long-running, so it must not run inside a transaction.
     private val txTemplate = TransactionTemplate(transactionManager)
     private val readTxTemplate = TransactionTemplate(transactionManager).apply { isReadOnly = true }
     private val logger = LoggerFactory.getLogger(javaClass)

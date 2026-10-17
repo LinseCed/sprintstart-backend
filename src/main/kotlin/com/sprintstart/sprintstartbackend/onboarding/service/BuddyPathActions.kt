@@ -54,8 +54,6 @@ import java.util.UUID
  * projects, who still has exactly one path, on the page they are looking at.
  */
 @Component
-// One propose and one perform per action, plus the argument readers. The count tracks how many
-// actions there are.
 @Suppress("TooManyFunctions")
 class BuddyPathActions(
     private val buddyPathTools: BuddyPathTools,
@@ -702,9 +700,7 @@ class BuddyPathActions(
                 // will leave somebody able to do, and the mentor is not in a position to make one.
                 expectedOutcome = "",
             ),
-            // Theirs, but not their idea, and the card says so. Without this the step arrived
-            // labelled "Custom step by PM" -- a thing their team requires -- when it was something
-            // they agreed to in a chat.
+            // Theirs, but not their idea: the card says it came from the buddy, not from their team.
             origin = StepOrigin.BUDDY,
             waitsOn = placement.waitsOn,
             unlocks = placement.unlocks,
