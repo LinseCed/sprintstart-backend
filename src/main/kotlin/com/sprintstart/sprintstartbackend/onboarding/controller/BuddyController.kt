@@ -210,7 +210,7 @@ class BuddyController(
     @ResponseStatus(HttpStatus.OK)
     @PostMapping("/open/stream", produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
     @PreAuthorize("hasRole('USER')")
-    suspend fun streamOpenForMe(
+    fun streamOpenForMe(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
         @Parameter(description = "The session to open")

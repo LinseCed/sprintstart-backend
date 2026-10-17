@@ -271,15 +271,8 @@ class BuddyControllerTest(
             "sessionId required",
         )
 
-        val asyncResult = mockMvc
-            .perform(
-                post("/api/v1/onboarding/me/buddy/open/stream")
-                    .with(userJwt),
-            ).andExpect(request().asyncStarted())
-            .andReturn()
-
         mockMvc
-            .perform(asyncDispatch(asyncResult))
+            .perform(post("/api/v1/onboarding/me/buddy/open/stream").with(userJwt))
             .andExpect(status().isBadRequest)
     }
 
@@ -290,13 +283,8 @@ class BuddyControllerTest(
      */
     @Test
     fun `streamOpenForMe should return 403 for a non-USER role`() {
-        val asyncResult = mockMvc
-            .perform(post("/api/v1/onboarding/me/buddy/open/stream").with(noUserRoleJwt))
-            .andExpect(request().asyncStarted())
-            .andReturn()
-
         mockMvc
-            .perform(asyncDispatch(asyncResult))
+            .perform(post("/api/v1/onboarding/me/buddy/open/stream").with(noUserRoleJwt))
             .andExpect(status().isForbidden)
     }
 
