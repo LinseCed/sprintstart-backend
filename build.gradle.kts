@@ -114,7 +114,22 @@ pitest {
     targetClasses.set(
         providers.gradleProperty("pitTargets").map { it.split(",") }.orElse(listOf("com.sprintstart.*")),
     )
-    excludedTestClasses.set(listOf("*IntegrationTest", "*ApplicationTests", "*.architecture.*"))
+    // Every test may kill a mutant; PIT picks the ones that cover it. The default would only run tests
+    // whose names match the mutated classes, and miss e.g. a controller test exercising a service.
+    targetTests.set(listOf("com.sprintstart.*"))
+    // -PpitLocalExcludedTests=... is for local runs only, e.g. GitChangeSetTest on Windows, where a file
+    // name cannot hold a tab; CI never sets it, so the gate there always runs against the whole suite.
+    val localExclusions = providers.gradleProperty("pitLocalExcludedTests").map { it.split(",") }.orElse(emptyList())
+    excludedTestClasses.set(
+        localExclusions.map {
+            listOf(
+                "*IntegrationTest",
+                "*ApplicationTests",
+                "*.architecture.*",
+                "*.contracts.*",
+            ) + it
+        },
+    )
     threads.set(Runtime.getRuntime().availableProcessors())
     outputFormats.set(listOf("XML", "HTML"))
     timestampedReports.set(false)
