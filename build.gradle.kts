@@ -40,6 +40,9 @@ detekt {
 
 extra["springModulithVersion"] = "2.0.6"
 
+val pitVersion = "1.30.0"
+val pitPlugins by sourceSets.creating
+
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-security")
@@ -69,6 +72,10 @@ dependencies {
     testImplementation("com.networknt:json-schema-validator:1.5.9")
     // PIT's JUnit plugin would bring launcher 1.x, which cannot run Spring Boot 4's JUnit 6 engine.
     pitest("org.junit.platform:junit-platform-launcher:6.0.3")
+    "pitPluginsCompileOnly"("org.pitest:pitest-entry:$pitVersion")
+    pitest(pitPlugins.output)
+    testImplementation(pitPlugins.output)
+    testImplementation("org.pitest:pitest-entry:$pitVersion")
     testImplementation("com.h2database:h2")
     testImplementation("io.mockk:mockk:1.14.6")
     testImplementation("org.assertj:assertj-core:3.27.4")
@@ -108,7 +115,7 @@ tasks.withType<Test> {
 // Mutation testing: `bash scripts/quality/mutation.sh` runs it on the classes a branch
 // changed and fails below MUTATION_MIN. Run it directly with -PpitTargets=com.example.Foo,com.example.Bar.
 pitest {
-    pitestVersion.set("1.30.0")
+    pitestVersion.set(pitVersion)
     junit5PluginVersion.set("1.2.3")
     addJUnitPlatformLauncher.set(false)
     targetClasses.set(
