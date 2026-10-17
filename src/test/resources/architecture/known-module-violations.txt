@@ -1,4 +1,4 @@
-# Module boundary violations that existed when ModuleBoundariesTest was introduced (AI_RULES R26).
+# Module boundary violations that existed when ModuleBoundariesTest was introduced.
 # This list may only shrink; see KnownViolations for how to update it.
 Module 'ingestion' depends on module 'connectors' via com.sprintstart.sprintstartbackend.ingestion.model.mapper.JiraArtifactMapper -> com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraIssueDescription
 Module 'ingestion' depends on module 'connectors' via com.sprintstart.sprintstartbackend.ingestion.model.mapper.JiraArtifactMapper -> com.sprintstart.sprintstartbackend.connectors.jira.model.api.response.JiraIssueFields

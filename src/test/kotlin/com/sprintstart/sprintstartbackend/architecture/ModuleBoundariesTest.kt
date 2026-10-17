@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.modulith.core.ApplicationModules
 
 /**
- * Verifies the Spring Modulith module boundaries (AI_RULES R26) against the known violations.
+ * Verifies the Spring Modulith module boundaries against the known violations.
  *
  * A module may use another module only through its `external` package (declared with `@NamedInterface`
  * in `package-info.java`) or through events; `shared` is open to everyone. Cycles between modules are
