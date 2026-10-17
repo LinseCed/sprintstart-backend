@@ -315,7 +315,9 @@ fails on a new violation and on a fixed one still listed, and writes the current
 
 **Coverage and mutation (R25):** Jacoco writes `build/reports/jacoco/test/jacocoTestReport.xml`;
 PIT runs on the classes a branch changed (`./gradlew pitest -PpitTargets=...`, report in
-`build/reports/pitest/`). **Contracts (R12):** `contracts/` holds the buddy stream contract this
+`build/reports/pitest/`). Mutants on calls the Kotlin compiler generates (`Intrinsics` null checks,
+`ResultKt.throwOnFailure`) are dropped by `KotlinGeneratedCodeFilter` in `src/pitPlugins/` and do
+not count. **Contracts (R12):** `contracts/` holds the buddy stream contract this
 repository owns and a copy of the AI's agent stream contract; `StreamContractTest` checks both.
 
 **Limits.** Function length is detekt `LongMethod` at 30 lines of code; the rest of the table
