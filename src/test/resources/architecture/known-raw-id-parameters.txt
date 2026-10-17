@@ -618,8 +618,6 @@ BuddyQuestionApiService.kt: BuddyQuestionApiService.countUserQuestionsForProject
 BuddyQuestionApiService.kt: BuddyQuestionApiService.getUserQuestionsForProject(projectId: UUID)
 BuddyService.kt: BuddyService.binSession(authId: String)
 BuddyService.kt: BuddyService.binSession(sessionId: UUID)
-BuddyService.kt: BuddyService.compactInBackground(sessionId: UUID)
-BuddyService.kt: BuddyService.compactInBackground(userId: UUID)
 BuddyService.kt: BuddyService.createSession(authId: String)
 BuddyService.kt: BuddyService.createSession(projectId: UUID)
 BuddyService.kt: BuddyService.deleteMessage(authId: String)

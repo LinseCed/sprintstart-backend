@@ -92,7 +92,6 @@
     <ID>LongMethod:BuddyReplyStream.kt:internal suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.relayAgentTurn( events: Flow&lt;BuddyAgentStreamEvent&gt;, emittedContent: StringBuilder, ): BuddyAgentResponse</ID>
     <ID>LongMethod:BuddyService.kt:BuddyService$@Suppress("CyclomaticComplexMethod", "ThrowsCount") suspend fun sendMessageForMe( authId: String, sessionId: UUID?, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters?, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>LongMethod:BuddyService.kt:BuddyService$private suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.runToolCall( call: BuddyToolCallDto, userId: UUID, currentPage: String?, ): String</ID>
-    <ID>LongMethod:BuddyService.kt:BuddyService$suspend fun streamOpenForMe( authId: String, sessionId: UUID?, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>LongMethod:BuddyTeamService.kt:BuddyTeamService$suspend fun sendMessageForMe( authId: String, projectId: UUID, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters? = null, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>LongMethod:BuddyToolExecutor.kt:BuddyToolExecutor$private fun getArrivalSteps(userId: UUID): String</ID>
     <ID>LongMethod:BuddyToolExecutor.kt:BuddyToolExecutor$private fun getSuggestedTasks(userId: UUID): String</ID>
