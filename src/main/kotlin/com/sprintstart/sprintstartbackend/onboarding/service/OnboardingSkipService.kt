@@ -51,6 +51,8 @@ class OnboardingSkipService(
     private val onboardingCompletionService: OnboardingCompletionService,
     private val userApi: UserApi,
 ) {
+//  ========================== Methods for users ==========================
+
     /**
      * Returns every skip request belonging to the authenticated user.
      *
