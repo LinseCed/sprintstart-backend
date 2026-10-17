@@ -36,12 +36,8 @@ class RunArtifactsIngestionService(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    // The reads below run on a fire-and-forget coroutine after the ingestion run''s own
-    // transaction has already committed, so there is no session bound to this thread.
-    // `Artifact.projectIds` is a lazy @ElementCollection, and reading it for the AI payload
-    // therefore threw LazyInitializationException — which failed the whole sync and left the
-    // AI index empty. @Transactional does not apply to suspend functions, so the reads are
-    // wrapped explicitly, the same way BlueprintService does it.
+    // These reads run after the run's transaction committed, so they open their own: `Artifact.projectIds` is
+    // lazy, and `@Transactional` does not apply to suspend functions.
     private val readTxTemplate =
         TransactionTemplate(transactionManager).apply { isReadOnly = true }
 
@@ -65,9 +61,8 @@ class RunArtifactsIngestionService(
                     .getOrElse { throw IngestionRunNotFoundException(runId) }
 
                 val storedByThisRun = artifactRepository.findAllByIngestionRunId(runId)
-                // Artifacts an earlier run stored and this one changed keep pointing at that
-                // earlier run, so the query above cannot see them. Without them a content update
-                // or a newly linked project would never reach the index.
+                // Artifacts an earlier run stored and this one changed point at that run, so the query above
+                // cannot see them.
                 val alreadyListed = storedByThisRun.mapTo(mutableSetOf()) { it.id }
                 val touchedAgain = artifactRepository.findAllById(
                     run.artifactIdsToReingest.filterNot { it in alreadyListed },

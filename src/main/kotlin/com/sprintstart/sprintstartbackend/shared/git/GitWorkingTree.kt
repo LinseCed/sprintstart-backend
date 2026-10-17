@@ -145,7 +145,6 @@ class GitWorkingTree(
 
         /** File types that are skipped without being read. */
         val BINARY_EXTENSIONS = setOf(
-            // images
             "png",
             "jpg",
             "jpeg",
@@ -154,27 +153,22 @@ class GitWorkingTree(
             "ico",
             "svg",
             "webp",
-            // compiled
             "class",
             "jar",
             "war",
             "ear",
-            // archives
             "zip",
             "tar",
             "gz",
             "rar",
-            // binaries
             "exe",
             "dll",
             "so",
             "dylib",
-            // media
             "mp3",
             "mp4",
             "wav",
             "avi",
-            // documents
             "pdf",
             "doc",
             "docx",

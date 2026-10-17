@@ -368,7 +368,6 @@ class GithubConnectorService(
      * @return Returns the transaction ID associated with the repository connection process.
      */
     private suspend fun connectRepository(repository: GithubRepositoryConnection, transactionId: UUID): UUID {
-        // Save an initial snapshot of the repository
         val repoSnapshot = GithubRepositorySnapshot(
             repository = repository,
         )
@@ -392,7 +391,6 @@ class GithubConnectorService(
             ),
         )
 
-        // Launch data collectors/processors
         applicationScope.launch {
             fileService.fetchAndIngestAllFiles(
                 repository.id,

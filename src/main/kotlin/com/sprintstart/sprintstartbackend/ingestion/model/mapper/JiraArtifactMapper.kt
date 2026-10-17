@@ -40,10 +40,8 @@ class JiraArtifactMapper {
             comments = event.getComments(),
             statusName = event.issue.fields.status.name,
             statusDescription = event.issue.fields.status.description,
-            // Jira's category *key* ("new" / "indeterminate" / "done"), not its name: the name is
-            // display text Jira localizes, so a German instance reports "Fertig" and an English
-            // one "Done" for the same category. Falling back to the status name when a response
-            // carries no category at all keeps the English case working, which is all it ever did.
+            // The category key, not its name: Jira localizes the name ("Fertig", "Done"). Without a category,
+            // the status name stands in.
             statusCategory = event.issue.fields.status.category
                 ?.key
                 ?: event.issue.fields.status.name,

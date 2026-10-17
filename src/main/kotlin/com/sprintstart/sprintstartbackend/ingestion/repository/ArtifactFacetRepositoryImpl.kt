@@ -75,8 +75,6 @@ internal fun languageFacetOptions(
 
 @Repository
 @Transactional(readOnly = true)
-// One function per facet dimension plus the shared predicate/order builders; splitting them would
-// scatter the own-dimension exclusion rule that must stay identical across list and facets.
 @Suppress("TooManyFunctions")
 class ArtifactFacetRepositoryImpl(
     @PersistenceContext private val entityManager: EntityManager,
@@ -89,7 +87,6 @@ class ArtifactFacetRepositoryImpl(
     ): Page<ArtifactResponse> {
         val cb = entityManager.criteriaBuilder
 
-        // 1. Data Query (Projection - D3: does not hydrate content TEXT column)
         val query = cb.createQuery(ArtifactResponse::class.java)
         val root = query.from(Artifact::class.java)
         val projectJoin = root.join<Artifact, UUID>("projectIdsInternal")
@@ -99,7 +96,6 @@ class ArtifactFacetRepositoryImpl(
         val predicates = buildPredicates(cb, root, projectJoin, projectId, criteria, null)
         query.where(*predicates.toTypedArray())
 
-        // D2: Deterministic sort -- the requested key, then id ASC as the tie-break.
         query.orderBy(orderFor(cb, root, sort))
 
         val typedQuery = entityManager.createQuery(query)
@@ -107,7 +103,6 @@ class ArtifactFacetRepositoryImpl(
         typedQuery.maxResults = pageable.pageSize
         val items = typedQuery.resultList
 
-        // 2. Count Query
         val countQuery = cb.createQuery(Long::class.java)
         val countRoot = countQuery.from(Artifact::class.java)
         val countJoin = countRoot.join<Artifact, UUID>("projectIdsInternal")
@@ -488,11 +483,8 @@ class ArtifactFacetRepositoryImpl(
         root: Root<Artifact>,
         format: UploadFormat,
     ): Predicate {
-        // Nullable columns fold to "" exactly as `classifyUploadFormat` does, so this predicate
-        // and the Kotlin classifier that produces the facet counts can never disagree. Without
-        // the coalesce, `NOT(OR(...))` — the OTHER bucket — evaluates to NULL rather than TRUE
-        // for a row whose mime, language and title are unset, and an upload the facet counts as
-        // OTHER would come back from the filter as nothing at all.
+        // Nullable columns fold to "" exactly as `classifyUploadFormat` does. Without the coalesce,
+        // `NOT(OR(...))` is NULL for a row with unset columns, and the OTHER bucket would match nothing.
         val titleLower = cb.coalesce(cb.lower(root.get("title")), "")
         val sourceUrlLower = cb.coalesce(cb.lower(root.get("sourceUrl")), "")
         val sourceIdLower = cb.lower(root.get("sourceId"))

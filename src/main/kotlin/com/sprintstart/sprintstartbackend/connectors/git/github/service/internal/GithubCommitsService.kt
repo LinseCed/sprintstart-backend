@@ -62,15 +62,15 @@ class GithubCommitsService(
                 sinceRevision = githubRepository.lastCommitsSyncedSha,
                 sink = GithubCommitSink(eventPublisher, githubRepository, transactionId),
             )
-            // Inside the try so that a failed cursor write still ends the run with a terminal
-            // event. Only the cursor column is written: saving the whole connection would carry
-            // this copy's stale file cursor and snapshot into the row.
+            // Inside the try, so a failed cursor write still ends the run with a terminal event. Only the
+            // cursor column is written; saving the whole connection would carry this copy's stale file
+            // cursor.
             withContext(Dispatchers.IO) {
                 repoConnectionRepository.updateCommitsCursor(githubRepository.id, ingested.revision)
             }
         } catch (e: CancellationException) {
-            // Never swallow cancellation: the run is abandoned, not failed, and publishing a
-            // terminal failure here would report a fetch that did not happen.
+            // Cancellation abandons the run; reporting it as a failure would close a fetch that never
+            // happened.
             throw e
         } catch (e: Exception) {
             eventPublisher.publishEvent(
