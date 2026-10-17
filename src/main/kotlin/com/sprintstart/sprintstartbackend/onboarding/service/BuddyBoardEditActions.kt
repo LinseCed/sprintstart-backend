@@ -105,8 +105,6 @@ class BuddyBoardEditActions(
             BuddyActionResponse(ok = false, message = ex.reason ?: "That change could not be made.")
         }
 
-    // -- Proposing ---------------------------------------------------------------------------------
-
     private fun proposeLink(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
         val url = call.stringArg("url").trim()
         val label = call
@@ -306,8 +304,6 @@ class BuddyBoardEditActions(
         }
     }
 
-    // -- Performing --------------------------------------------------------------------------------
-
     private fun placeLink(userId: UUID, projectId: UUID, payload: BoardWritePayload): BuddyActionResponse {
         val url = payload.linkUrl?.trim().orEmpty()
         if (!url.isWebAddress()) return BuddyActionResponse(ok = false, message = "There was no link left to keep.")
@@ -404,8 +400,6 @@ class BuddyBoardEditActions(
         }
     }
 
-    // -- Reading the board -------------------------------------------------------------------------
-
     /** What is on the hire's board, without creating one for somebody who has never opened it. */
     private fun cardsOn(scope: Scope): List<BoardCardResponse>? = cardsOn(scope.userId, scope.projectId)
 
@@ -484,8 +478,6 @@ class BuddyBoardEditActions(
             val reason: String,
         ) : Found<Nothing>
     }
-
-    // -- Shared ------------------------------------------------------------------------------------
 
     private fun offer(type: BuddyActionType, scope: Scope, proposal: BuddyActionProposal): ProposeOutcome =
         ProposeOutcome(toolResult = offeredOnBoard(type, scope.projectName), proposal = proposal)

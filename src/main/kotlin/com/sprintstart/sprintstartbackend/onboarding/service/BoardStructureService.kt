@@ -57,9 +57,7 @@ class BoardStructureService(
         val stored = boardStructureRepository.findByBoardId(board.id)
             ?: return BoardStructureResponse(BoardStructurePayload(), null)
 
-        // A row this version cannot read answers exactly as an unarranged board does, `updatedAt`
-        // included. Reporting "nothing is stored" alongside the moment it was last stored is two
-        // answers to one question, and the client acts on the first of them.
+        // An unreadable row answers exactly like an unarranged board, `updatedAt` included.
         val decoded = decode(stored) ?: return BoardStructureResponse(BoardStructurePayload(), null)
 
         return BoardStructureResponse(decoded, stored.updatedAt)
@@ -95,9 +93,8 @@ class BoardStructureService(
         val board = boardRepository.findByUserIdAndProjectId(userId, projectId)
             ?: boardRepository.save(Board(userId = userId, projectId = projectId))
 
-        // One statement, so that two tabs arranging the same board for the first time cannot both
-        // insert. See [BoardStructureRepository.upsert]; `now` is what the row will carry, which is
-        // why it is read here rather than taken from an entity this no longer loads.
+        // One statement, so two tabs arranging a new board cannot both insert (see
+        // [BoardStructureRepository.upsert]).
         val now = Instant.now()
         boardStructureRepository.upsert(
             id = UUID.randomUUID(),
