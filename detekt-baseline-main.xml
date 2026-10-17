@@ -448,7 +448,6 @@
     <ID>UseOrEmpty:GithubIssuesService.kt:GithubIssuesService$this.comments?.nodes?.map { node -&gt; GithubIssueComment( body = node.body, author = node.author?.login, createdAt = node.createdAt, ) } ?: emptyList()</ID>
     <ID>UseOrEmpty:GithubIssuesService.kt:GithubIssuesService$this.labels?.nodes?.map { it.name } ?: emptyList()</ID>
     <ID>UseOrEmpty:GithubOrgArtifactSyncService.kt:GithubOrgArtifactSyncService$failed.firstNotNullOfOrNull { it.errorMessage }?.let { " (first reported cause: $it)" } ?: ""</ID>
-    <ID>UseOrEmpty:GithubPrResponse.kt:GithubPrResponse$data?.repository?.pullRequests?.nodes ?: emptyList()</ID>
     <ID>UseOrEmpty:GithubPrSearchResponse.kt:GithubPrSearchResponse$data?.search?.nodes ?: emptyList()</ID>
     <ID>UseOrEmpty:GithubPullRequestsService.kt:GithubPullRequestsService$reviewThread.comments?.nodes?.map { GithubPullRequestReviewThreadComment( it.body, it.author?.login, it.path, ) } ?: emptyList()</ID>
     <ID>UseOrEmpty:JiraArtifactMapper.kt:JiraArtifactMapper$event.issue.fields.description ?.content ?: ""</ID>
