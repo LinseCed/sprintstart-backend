@@ -8,11 +8,8 @@ import kotlinx.coroutines.launch
 import org.springframework.stereotype.Component
 
 /**
- * Folds a conversation's backlog into the buddy's memory without anybody waiting on it.
- *
- * Fire-and-forget on the application scope, matching `CorpusIndexedListener`: the fold is a prompt-shaping
- * device, so one that dies costs a longer prompt on the next turn and nothing else. It must never be awaited
- * by a reply or an opening, and [BuddyCompactionService] never throws.
+ * Folds a conversation's backlog into the buddy's memory in the background. Nobody waits on the fold; one
+ * that fails costs a longer prompt on the next turn and nothing else.
  */
 @Component
 class BuddyCompactionScheduler(

@@ -105,7 +105,6 @@ class BuddyService(
         }
         val session = buddySessionRepository.findByIdAndUserId(sessionId, userId)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Buddy session not found for current user")
-        // No marker anywhere falls back to showing *everything*, never nothing.
         return buddyMessageRepository
             .findAllBySessionIdOrderByCreatedAtAsc(session.id)
             .sinceLastOpening { it.opening }
@@ -155,12 +154,10 @@ class BuddyService(
         val session = buddySessionRepository.findByIdAndUserId(sessionId, userId)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found for current user")
         val messages = buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
-        // The current request counts as activity; whether it ends a long absence is read from the previous one.
         val longAbsence = sessionActivityService.recordActivityAndReturnLongAbsence(userId)
         val firstConversation = buddySessionRepository.countByUserId(userId) == 1L
         val latestOpening = messages.lastOrNull()?.takeIf { it.opening }
 
-        // Opening the same conversation again without the hire saying anything replays its opening.
         return when {
             !longAbsence && latestOpening != null -> openingStream.replay(latestOpening.content)
             !longAbsence && !firstConversation -> flowOf(BuddyStreamEvent(type = DONE))
