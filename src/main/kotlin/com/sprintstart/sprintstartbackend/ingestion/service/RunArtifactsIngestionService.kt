@@ -55,7 +55,7 @@ class RunArtifactsIngestionService(
     @Tracked("Dispatching AI sync for run")
     suspend fun ingestRunArtifacts(runId: UUID) {
         val request = withContext(Dispatchers.IO) {
-            readTxTemplate.execute {
+            readTxTemplate.execute { _ ->
                 val run = ingestionRunRepository
                     .findWithAiSyncArtifactIdsById(runId)
                     .getOrElse { throw IngestionRunNotFoundException(runId) }

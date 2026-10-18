@@ -314,7 +314,7 @@ class UploadService(
         }
 
         val artifact = UploadedArtifact(
-            filename = file.originalFilename!!,
+            filename = file.originalFilename ?: "unknown",
             hash = hash,
             mime = file.contentType ?: "application/octet-stream",
             storagePath = "",
