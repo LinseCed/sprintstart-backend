@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.security.MessageDigest
+import java.util.Locale
 
 /**
  * The result of reading one tracked file from a clone.
@@ -137,7 +138,7 @@ class GitWorkingTree(
         }.getOrElse { e -> if (e is CharacterCodingException) null else throw e }
 
     private fun sha256(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(Locale.ROOT, it) }
 
     private companion object {
         /** Terminator used by `git ls-files -z`, which makes any file name representable. */

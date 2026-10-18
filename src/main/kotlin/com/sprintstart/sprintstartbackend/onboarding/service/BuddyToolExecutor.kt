@@ -285,7 +285,7 @@ class BuddyToolExecutor(
             appendLine("- Time from your first pull request to its first response: $it hours")
         }
         val stall = if (timeline.stalled) {
-            "yes" + (timeline.stalledReason?.let { " ($it)" } ?: "")
+            "yes" + (timeline.stalledReason?.let { " ($it)" }.orEmpty())
         } else {
             "no"
         }

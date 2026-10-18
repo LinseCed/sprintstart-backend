@@ -26,7 +26,7 @@ class KnowledgeGapResponseMapper {
             gaps = gaps.map {
                 toResponse(
                     it,
-                    ownersByComponent[it.component] ?: emptyList(),
+                    ownersByComponent[it.component].orEmpty(),
                     firstIngestedByComponent[it.component],
                 )
             },

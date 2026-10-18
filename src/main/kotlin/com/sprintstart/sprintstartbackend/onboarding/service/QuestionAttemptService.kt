@@ -110,11 +110,11 @@ class QuestionAttemptService(
     ): SubmitQuestionAttemptResponse {
         val userId = resolveUserId(authId)
         val question = readTxTemplate.execute { findQuestionSnapshot(questionId, userId) }
-            ?: throw IllegalStateException("Question lookup returned no result")
+            ?: error("Question lookup returned no result")
         val graded = gradeQuestion(question, request)
         return txTemplate.execute {
             persistAttempt(userId, question, request, graded)
-        } ?: throw IllegalStateException("Attempt persistence returned no result")
+        } ?: error("Attempt persistence returned no result")
     }
 
     /**

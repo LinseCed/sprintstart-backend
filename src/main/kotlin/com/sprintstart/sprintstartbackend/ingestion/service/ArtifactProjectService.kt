@@ -112,7 +112,8 @@ class ArtifactProjectService(
         is ArtifactSourceRef.BitbucketWorkspace -> {
             artifactProjectRepository
                 .findBySourceId(buildBitbucketWorkspaceSourceId(source.workspace))
-                ?.let(::listOf) ?: emptyList()
+                ?.let(::listOf)
+                .orEmpty()
         }
 
         is ArtifactSourceRef.JiraInstance -> {
@@ -176,7 +177,7 @@ class ArtifactProjectService(
         throw IngestionResponseException(
             "Project $projectId was stored for $source but ${failed.size} artifact(s) " +
                 "kept their old membership in the AI index" +
-                (failed.firstNotNullOfOrNull { it.errorMessage }?.let { " (first reported cause: $it)" } ?: ""),
+                (failed.firstNotNullOfOrNull { it.errorMessage }?.let { " (first reported cause: $it)" }.orEmpty()),
         )
     }
 }

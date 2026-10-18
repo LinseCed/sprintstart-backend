@@ -181,13 +181,13 @@ class GithubPullRequestsService(
             },
             reviewThreads = this.reviewThreads?.nodes?.map { reviewThread ->
                 GithubPullRequestReviewThread(
-                    reviewThread.comments?.nodes?.map {
+                    reviewThread.comments?.nodes.orEmpty().map {
                         GithubPullRequestReviewThreadComment(
                             it.body,
                             it.author?.login,
                             it.path,
                         )
-                    } ?: emptyList(),
+                    },
                 )
             },
         )

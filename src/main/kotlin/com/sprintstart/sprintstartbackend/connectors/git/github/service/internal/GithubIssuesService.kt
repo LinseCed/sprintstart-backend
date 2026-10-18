@@ -129,15 +129,15 @@ class GithubIssuesService(
             closedAt = this.closedAt,
             url = this.url,
             author = this.author?.login,
-            labels = this.labels?.nodes?.map { it.name } ?: emptyList(),
-            assignees = this.assignees?.nodes?.map { it.login } ?: emptyList(),
-            comments = this.comments?.nodes?.map { node ->
+            labels = labels?.nodes.orEmpty().map { it.name },
+            assignees = assignees?.nodes.orEmpty().map { it.login },
+            comments = comments?.nodes.orEmpty().map { node ->
                 GithubIssueComment(
                     body = node.body,
                     author = node.author?.login,
                     createdAt = node.createdAt,
                 )
-            } ?: emptyList(),
+            },
         )
     }
 }

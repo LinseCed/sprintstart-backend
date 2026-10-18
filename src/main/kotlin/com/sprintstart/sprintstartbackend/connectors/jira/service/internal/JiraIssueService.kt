@@ -172,7 +172,7 @@ internal class JiraIssueService(
             append("OR updated >= \"${formatJqlDate(instance.lastUpdate)}\") ")
         }
 
-        return fetchIssues(instanceUrl, credentials, jql, transactionId) ?: emptyList()
+        return fetchIssues(instanceUrl, credentials, jql, transactionId).orEmpty()
     }
 
     /**
