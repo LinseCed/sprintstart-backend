@@ -205,7 +205,7 @@ Narrate what you are doing as you go. Do not work silently and present a result 
 * Do not rename packages unnecessarily.
 * Do not move large parts of the project without need.
 * Do not ignore failing tests.
-* Do not make unrelated cleanup changes. Extracting shared code instead of copying it is never "unrelated" (AI_RULES R14).
+* Do not make unrelated cleanup changes. Extracting shared code instead of copying it is never "unrelated".
 * Do not replace the existing architecture with a different pattern.
 * Do not mix DTOs and JPA entities.
 * Do not access another module's database repositories directly.
