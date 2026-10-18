@@ -54,8 +54,6 @@
     <ID>DoubleMutabilityForCollection:BlueprintTaskService.kt:BlueprintTaskService$var tasksToShift: MutableList&lt;BlueprintTask&gt; = mutableListOf()</ID>
     <ID>ImplicitDefaultLocale:BuddyPathTools.kt:BuddyPathTools$FINISHED_PATH.format(phases.size)</ID>
     <ID>ImplicitDefaultLocale:BuddyPathTools.kt:BuddyPathTools$FINISHED_VISIBLE.format(phases.size)</ID>
-    <ID>InjectDispatcher:ArrivalEvidenceService.kt:ArrivalEvidenceService$IO</ID>
-    <ID>InjectDispatcher:ArtifactProjectService.kt:ArtifactProjectService$IO</ID>
     <ID>InjectDispatcher:BitbucketCommitsService.kt:BitbucketCommitsService$IO</ID>
     <ID>InjectDispatcher:BitbucketConnectionController.kt:BitbucketConnectionController$IO</ID>
     <ID>InjectDispatcher:BitbucketConnectionService.kt:BitbucketConnectionService$IO</ID>
@@ -65,22 +63,15 @@
     <ID>InjectDispatcher:BitbucketRepositoryVisibilityService.kt:BitbucketRepositoryVisibilityService$IO</ID>
     <ID>InjectDispatcher:BitbucketUpdatesService.kt:BitbucketUpdatesService$IO</ID>
     <ID>InjectDispatcher:BitbucketWorkspaceService.kt:BitbucketWorkspaceService$IO</ID>
-    <ID>InjectDispatcher:BoardDiagramService.kt:BoardDiagramService$IO</ID>
     <ID>InjectDispatcher:BuddyActionService.kt:BuddyActionService$IO</ID>
     <ID>InjectDispatcher:ConnectorConfigurationService.kt:ConnectorConfigurationService$IO</ID>
     <ID>InjectDispatcher:CoroutineConfig.kt:CoroutineConfig$IO</ID>
-    <ID>InjectDispatcher:CustomOnDiskCache.kt:CustomOnDiskCache$IO</ID>
-    <ID>InjectDispatcher:GitChangeSet.kt:GitChangeSet$IO</ID>
     <ID>InjectDispatcher:GitIngestionEngine.kt:GitIngestionEngine$IO</ID>
-    <ID>InjectDispatcher:GitLog.kt:GitLog$IO</ID>
-    <ID>InjectDispatcher:GitRevisionState.kt:GitRevisionState$IO</ID>
-    <ID>InjectDispatcher:GitWorkingTree.kt:GitWorkingTree$IO</ID>
     <ID>InjectDispatcher:GithubCommitsService.kt:GithubCommitsService$IO</ID>
     <ID>InjectDispatcher:GithubConnectorService.kt:GithubConnectorService$IO</ID>
     <ID>InjectDispatcher:GithubFileService.kt:GithubFileService$IO</ID>
     <ID>InjectDispatcher:GithubFileSink.kt:GithubFileSink$IO</ID>
     <ID>InjectDispatcher:GithubIssuesService.kt:GithubIssuesService$IO</ID>
-    <ID>InjectDispatcher:GithubOrgArtifactSyncService.kt:GithubOrgArtifactSyncService$IO</ID>
     <ID>InjectDispatcher:GithubOrgService.kt:GithubOrgService$IO</ID>
     <ID>InjectDispatcher:GithubPullRequestsService.kt:GithubPullRequestsService$IO</ID>
     <ID>InjectDispatcher:GithubRepositoryVisibilityService.kt:GithubRepositoryVisibilityService$IO</ID>
@@ -89,8 +80,6 @@
     <ID>InjectDispatcher:NotionWorkspaceConnectionService.kt:NotionWorkspaceConnectionService$IO</ID>
     <ID>InjectDispatcher:NotionWorkspaceIngestionService.kt:NotionWorkspaceIngestionService$IO</ID>
     <ID>InjectDispatcher:OnboardingPersonalizationService.kt:OnboardingPersonalizationService$IO</ID>
-    <ID>InjectDispatcher:ProjectIndustryService.kt:ProjectIndustryService$IO</ID>
-    <ID>InjectDispatcher:RunArtifactsIngestionService.kt:RunArtifactsIngestionService$IO</ID>
     <ID>InjectDispatcher:StarterWorkTaskProposalService.kt:StarterWorkTaskProposalService$IO</ID>
     <ID>InjectDispatcher:StreamExecution.kt:StreamExecution$IO</ID>
     <ID>InjectDispatcher:SyncExecution.kt:SyncExecution$IO</ID>
@@ -388,7 +377,7 @@
     <ID>UseRequire:UploadValidationService.kt:UploadValidationService$throw IllegalArgumentException( "Unsupported file extension: $extension", )</ID>
     <ID>UseRequire:UploadValidationService.kt:UploadValidationService$throw IllegalArgumentException("File is empty")</ID>
     <ID>UseRequire:UploadValidationService.kt:UploadValidationService$throw IllegalArgumentException("Invalid filename")</ID>
-    <ID>UselessCallOnNotNull:ArtifactProjectService.kt:ArtifactProjectService$withContext(Dispatchers.IO) { transactionTemplate.execute { findArtifactsOf(source) .onEach { artifact -&gt; if (linked) artifact.addProjectId(projectId) else artifact.removeProjectId(projectId) }.map { artifact -&gt; ArtifactProjectsAiRequest( artifactId = artifact.id.toString(), projectIds = artifact.projectIds.map(UUID::toString), ) } } }.orEmpty()</ID>
+    <ID>UselessCallOnNotNull:ArtifactProjectService.kt:ArtifactProjectService$withContext(ioDispatcher) { transactionTemplate.execute { findArtifactsOf(source) .onEach { artifact -&gt; if (linked) artifact.addProjectId(projectId) else artifact.removeProjectId(projectId) }.map { artifact -&gt; ArtifactProjectsAiRequest( artifactId = artifact.id.toString(), projectIds = artifact.projectIds.map(UUID::toString), ) } } }.orEmpty()</ID>
     <ID>UselessCallOnNotNull:FaqConsolidationService.kt:FaqConsolidationService$txTemplate .execute { faqGroupRepository.findAllByProjectIdOrderByOccurrenceCountDesc(projectId) }.orEmpty()</ID>
     <ID>UselessCallOnNotNull:FaqLiveUpdateService.kt:FaqLiveUpdateService$txTemplate .execute { faqGroupRepository.findAllByProjectIdOrderByOccurrenceCountDesc(projectId) }.orEmpty()</ID>
   </CurrentIssues>

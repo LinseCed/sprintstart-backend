@@ -10,6 +10,7 @@ import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepositor
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.upload.model.exceptions.IngestionResponseException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -24,7 +25,7 @@ import kotlin.jvm.optionals.getOrElse
  *
  * The service builds one batch containing newly stored run artifacts and artifact ids that were
  * deleted during the same run and must be removed from the AI index. Database reads stay on
- * [Dispatchers.IO]; the HTTP call happens after the request is built.
+ * the IO dispatcher; the HTTP call happens after the request is built.
  */
 @Service
 class RunArtifactsIngestionService(
@@ -33,6 +34,7 @@ class RunArtifactsIngestionService(
     private val artifactAiMapper: ArtifactAiMapper,
     private val artifactIngestionClient: ArtifactIngestionClient,
     transactionManager: PlatformTransactionManager,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -45,7 +47,7 @@ class RunArtifactsIngestionService(
      * Loads the run output, skips empty runs, and dispatches the batched ingest/deindex request.
      *
      * Empty runs are intentionally ignored because there is nothing for the AI layer to index or
-     * remove. Repository reads are executed on [Dispatchers.IO] before the outbound HTTP call.
+     * remove. Repository reads are executed on the IO dispatcher before the outbound HTTP call.
      *
      * @param runId The completed ingestion run whose artifacts should be synced to AI.
      * @throws IngestionRunNotFoundException when the run id does not exist.
@@ -54,7 +56,7 @@ class RunArtifactsIngestionService(
      */
     @Tracked("Dispatching AI sync for run")
     suspend fun ingestRunArtifacts(runId: UUID) {
-        val request = withContext(Dispatchers.IO) {
+        val request = withContext(ioDispatcher) {
             readTxTemplate.execute { _ ->
                 val run = ingestionRunRepository
                     .findWithAiSyncArtifactIdsById(runId)

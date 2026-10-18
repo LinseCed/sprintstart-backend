@@ -21,6 +21,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BoardDiagramRepo
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -61,6 +62,7 @@ class BoardDiagramService(
     private val onboardingAiClient: OnboardingAiClient,
     transactionManager: PlatformTransactionManager,
     private val clock: Clock = Clock.systemUTC(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     // The AI call is long-running, so it must not run inside a transaction.
     private val txTemplate = TransactionTemplate(transactionManager)
@@ -99,7 +101,7 @@ class BoardDiagramService(
      *   belonging to somebody else and one that does not exist answer identically, on purpose.
      */
     suspend fun refresh(userId: UserId, cardId: BoardCardId): DiagramContent {
-        val context = withContext(Dispatchers.IO) {
+        val context = withContext(ioDispatcher) {
             readTxTemplate.execute { loadContext(userId, cardId) }
         } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No such diagram card on your board")
 
@@ -115,7 +117,7 @@ class BoardDiagramService(
             return context.served(UNAVAILABLE)
         }
 
-        return withContext(Dispatchers.IO) { txTemplate.execute { apply(context, outcome) }!! }
+        return withContext(ioDispatcher) { txTemplate.execute { apply(context, outcome) }!! }
     }
 
     private fun apply(context: DiagramContext, outcome: DiagramOutcome): DiagramContent {

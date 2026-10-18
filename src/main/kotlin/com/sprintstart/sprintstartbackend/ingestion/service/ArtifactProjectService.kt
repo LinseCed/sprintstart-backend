@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.ingestion.model.mapper.SourceIdFactory
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactProjectRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.upload.model.exceptions.IngestionResponseException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -37,6 +38,7 @@ class ArtifactProjectService(
     private val artifactProjectRepository: ArtifactProjectRepository,
     private val artifactIngestionClient: ArtifactIngestionClient,
     transactionManager: PlatformTransactionManager,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -61,7 +63,7 @@ class ArtifactProjectService(
      */
     @Tracked("Propagating a source's project link to its artifacts")
     suspend fun applyProjectLink(source: ArtifactSourceRef, projectId: UUID, linked: Boolean) {
-        val memberships = withContext(Dispatchers.IO) {
+        val memberships = withContext(ioDispatcher) {
             transactionTemplate.execute {
                 findArtifactsOf(source)
                     .onEach { artifact ->
@@ -146,7 +148,7 @@ class ArtifactProjectService(
         // deleted project, so a failed call must leave it intact for a retry.
         val response = artifactIngestionClient.deleteProjectMemberships(projectId)
 
-        val removedLinks = withContext(Dispatchers.IO) {
+        val removedLinks = withContext(ioDispatcher) {
             transactionTemplate.execute { artifactProjectRepository.deleteProjectLinks(projectId) }
         }
 
