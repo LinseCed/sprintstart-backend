@@ -109,7 +109,7 @@ class FaqLiveUpdateService(
     private fun apply(event: QuestionAskedEvent, classification: AiFaqClassifyResponse): Boolean {
         val matchedId = classification.groupId?.let(::parseUuidOrNull)
 
-        return txTemplate.execute {
+        return txTemplate.execute { _ ->
             // Re-read: the snapshot is detached and may be stale after the AI call.
             val matched = matchedId
                 ?.let { faqGroupRepository.findByIdAndProjectId(it, event.projectId).orElse(null) }
@@ -136,7 +136,7 @@ class FaqLiveUpdateService(
             matched == null
             // Defaults to "nothing new": a transaction that never ran cannot have opened an entry,
             // and claiming otherwise would trigger a pointless merge attempt.
-        } ?: false
+        }
     }
 
     private fun newGroup(event: QuestionAskedEvent, classification: AiFaqClassifyResponse): FaqGroup {

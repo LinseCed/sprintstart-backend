@@ -143,10 +143,10 @@ class GithubConnectorService(
      */
     @Tracked("Patching a GitHub repository from overview")
     fun patchSource(source: ConnectorSource, newStatus: Boolean) {
-        val source = getAllSources().find { "${it.owner}/${it.name}" == source.id }
+        val connection = getAllSources().find { "${it.owner}/${it.name}" == source.id }
             ?: throw SourceNotFoundException(source.id)
-        source.sourceEnabled = newStatus
-        repoConnectionRepository.save(source)
+        connection.sourceEnabled = newStatus
+        repoConnectionRepository.save(connection)
     }
 
     /**

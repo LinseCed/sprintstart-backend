@@ -148,7 +148,7 @@ class ArtifactProjectService(
 
         val removedLinks = withContext(Dispatchers.IO) {
             transactionTemplate.execute { artifactProjectRepository.deleteProjectLinks(projectId) }
-        } ?: 0
+        }
 
         logger.info(
             "Purged deleted project {}: {} artifact link(s) locally, {} chunk(s) in the AI index",

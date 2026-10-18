@@ -151,7 +151,7 @@ class GithubUpdatesService(
                 githubRepository.name,
                 transactionId,
                 false,
-                githubRepository.snapshot!!.lastIssuesSyncAt,
+                checkNotNull(githubRepository.snapshot).lastIssuesSyncAt,
             )
         }
         applicationScope.launch {
@@ -161,7 +161,7 @@ class GithubUpdatesService(
                 githubRepository.name,
                 transactionId,
                 false,
-                githubRepository.snapshot!!.lastPullRequestsSyncAt,
+                checkNotNull(githubRepository.snapshot).lastPullRequestsSyncAt,
             )
         }
         // Org metadata has no update management: this call aborts its fetch, which the ingestion run counts
@@ -201,7 +201,7 @@ class GithubUpdatesService(
                 githubRepository.name,
                 transactionId,
                 true,
-                githubRepository.snapshot!!.lastIssuesSyncAt,
+                checkNotNull(githubRepository.snapshot).lastIssuesSyncAt,
             )
         }
         applicationScope.launch {
@@ -211,7 +211,7 @@ class GithubUpdatesService(
                 githubRepository.name,
                 transactionId,
                 true,
-                githubRepository.snapshot!!.lastPullRequestsSyncAt,
+                checkNotNull(githubRepository.snapshot).lastPullRequestsSyncAt,
             )
         }
         // Org metadata has no update management: this call aborts its fetch, which the ingestion run counts

@@ -70,7 +70,7 @@ class ArrivalEvidenceService(
     suspend fun refresh(userId: UUID): List<ResolvedArrivalStep> {
         val pending =
             readTxTemplate
-                .execute {
+                .execute { _ ->
                     arrivalStepService
                         .forHire(userId)
                         .filterNot { it.settled }
@@ -84,7 +84,7 @@ class ArrivalEvidenceService(
         val observed = pending.filter { observes(userId, it) }
 
         return withContext(Dispatchers.IO) {
-            txTemplate.execute {
+            txTemplate.execute { _ ->
                 observed.forEach { settle(userId, it) }
                 arrivalStepService.forHire(userId)
             }
@@ -141,7 +141,7 @@ class ArrivalEvidenceService(
 
                 member != null && contributionService.forHire(member, projectId).isNotEmpty()
             }
-        } ?: false
+        }
 
     /**
      * Records that the system saw this step done. Idempotent, and never overwrites.

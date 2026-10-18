@@ -208,13 +208,12 @@ class ConnectorConfigurationService(
     ): PatchSourcesOfConnectorResponse {
         val result = connector
             .getSources()
-            .stream()
-            .filter { source ->
-                requestedSources.containsKey(source.id) && requestedSources[source.id] != null
-            }.map { source ->
-                connector.patchSource(source, requestedSources[source.id]!!)
-                PatchedSource(source.id, source.name, source.url, requestedSources[source.id]!!)
-            }.toList()
+            .mapNotNull { source ->
+                requestedSources[source.id]?.let { enabled ->
+                    connector.patchSource(source, enabled)
+                    PatchedSource(source.id, source.name, source.url, enabled)
+                }
+            }
 
         sourceClient.patchSources(connector.id, requestedSources)
 
