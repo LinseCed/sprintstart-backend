@@ -139,7 +139,10 @@ pitest {
             ) + it
         },
     )
-    threads.set(Runtime.getRuntime().availableProcessors())
+    // Every core on CI; a local run passes -PpitThreads=4 to keep the machine usable meanwhile.
+    threads.set(
+        providers.gradleProperty("pitThreads").map { it.toInt() }.orElse(Runtime.getRuntime().availableProcessors()),
+    )
     outputFormats.set(listOf("XML", "HTML"))
     timestampedReports.set(false)
     verbose.set(providers.gradleProperty("pitVerbose").map { it.toBoolean() }.orElse(false))
