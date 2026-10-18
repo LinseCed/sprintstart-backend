@@ -20,6 +20,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.OpenPu
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import org.springframework.stereotype.Component
 import java.util.UUID
@@ -38,24 +39,25 @@ class BoardCardHydrator(
     private val myCompetencyService: MyCompetencyService,
     private val buddySessionRepository: BuddySessionRepository,
     private val boardDiagramService: BoardDiagramService,
+    private val arrivalStepService: ArrivalStepService,
 ) {
     /**
      * One card as the board shows it, its content read live.
      *
      * A whole board passes what it read once for every card — the diagrams, the hire's arrival
      * steps and path steps, one starter-work ranking — so the board pays for each read once; a
-     * single card rendered on its own reads what it needs.
+     * single card rendered on its own reads its arrival steps and ranking itself.
      */
     fun render(
         card: BoardCard,
         member: ProjectMember,
-        projectId: UUID,
+        projectId: ProjectId,
         diagram: BoardDiagram? = null,
-        arrivalSteps: List<ResolvedArrivalStep> = emptyList(),
+        // A single card rendered on its own reads for itself; a whole board shares one read of each.
+        arrivalSteps: List<ResolvedArrivalStep> = arrivalStepService.forHire(member.userId),
         pathSteps: Map<UUID, ResolvedPathStep> = emptyMap(),
-        // A single card rendered on its own ranks for itself; a whole board shares one ranking.
         matches: () -> List<RankedStarterWorkTaskResponse> = {
-            starterWorkTaskProposalService.matchForUserId(member.userId, projectId)
+            starterWorkTaskProposalService.matchForUserId(member.userId, projectId.value)
         },
     ): BoardCardResponse = BoardCardResponse(
         id = card.id,
@@ -70,7 +72,7 @@ class BoardCardHydrator(
     private fun hydrate(
         card: BoardCard,
         member: ProjectMember,
-        projectId: UUID,
+        projectId: ProjectId,
         diagram: BoardDiagram?,
         arrivalSteps: List<ResolvedArrivalStep>,
         pathSteps: Map<UUID, ResolvedPathStep>,
@@ -78,14 +80,14 @@ class BoardCardHydrator(
     ): BoardCardContent = when (card.kind) {
         BoardCardKind.ARRIVAL_STEPS -> arrivalStepsContent(arrivalSteps)
         BoardCardKind.OPEN_PULL_REQUESTS -> openPullRequestsContent(member, projectId)
-        BoardCardKind.CURRENT_TASK -> currentTaskContent(member.userId, projectId)
+        BoardCardKind.CURRENT_TASK -> currentTaskContent(member, projectId)
         BoardCardKind.SUGGESTED_TASKS -> BoardTaskCards.suggested(matches())
         BoardCardKind.TASK_POOL -> BoardTaskCards.pool(
             matches(),
-            currentTaskId = currentTaskReader.currentTaskFor(member.userId, projectId)?.id,
+            currentTaskId = currentTaskReader.currentTaskFor(member.userId, projectId.value)?.id,
         )
-        BoardCardKind.COMPETENCY_PROGRESS -> competencyProgressContent(member.userId)
-        BoardCardKind.MEMORY_RECAP -> memoryRecapContent(member.userId)
+        BoardCardKind.COMPETENCY_PROGRESS -> competencyProgressContent(member)
+        BoardCardKind.MEMORY_RECAP -> memoryRecapContent(member)
         // The one card served from a cache: its content costs a model call.
         // [BoardDiagramService] owns whether that cache is still valid.
         BoardCardKind.DIAGRAM -> boardDiagramService.contentFor(card.subject.orEmpty(), diagram)
@@ -120,9 +122,9 @@ class BoardCardHydrator(
      * Level 0 means "asked, saw no evidence" — a placement, not a competency — so it is
      * filtered out here. The ledger is global, not per project.
      */
-    private fun competencyProgressContent(userId: UUID): CompetencyProgressContent {
+    private fun competencyProgressContent(member: ProjectMember): CompetencyProgressContent {
         val (held, inProgress) = myCompetencyService
-            .getCompetenciesForUser(userId)
+            .getCompetenciesForUser(member.userId)
             .filter { it.level > 0 }
             .partition { it.level >= it.targetLevel }
         return CompetencyProgressContent(
@@ -143,9 +145,9 @@ class BoardCardHydrator(
      *
      * Not [BuddyService.getOrCreateSession] — hydrating a card must not create a session.
      */
-    private fun memoryRecapContent(userId: UUID): MemoryRecapContent {
+    private fun memoryRecapContent(member: ProjectMember): MemoryRecapContent {
         val session = buddySessionRepository
-            .findByUserIdOrderByCreatedAtDesc(userId)
+            .findByUserIdOrderByCreatedAtDesc(member.userId)
             .firstOrNull()
 
         return MemoryRecapContent(
@@ -162,8 +164,8 @@ class BoardCardHydrator(
      *
      * A card with no task on it is a real state and says so.
      */
-    private fun currentTaskContent(userId: UUID, projectId: UUID): CurrentTaskContent {
-        val task = currentTaskReader.currentTaskFor(userId, projectId)
+    private fun currentTaskContent(member: ProjectMember, projectId: ProjectId): CurrentTaskContent {
+        val task = currentTaskReader.currentTaskFor(member.userId, projectId.value)
         return CurrentTaskContent(
             taskId = task?.id,
             title = task?.title,
@@ -177,10 +179,10 @@ class BoardCardHydrator(
 
     private fun openPullRequestsContent(
         member: ProjectMember,
-        projectId: UUID,
+        projectId: ProjectId,
     ): OpenPullRequestsContent {
         val login = member.githubLogin
-        val open = openPullRequestReader.openFor(projectId, login)
+        val open = openPullRequestReader.openFor(projectId.value, login)
         return OpenPullRequestsContent(
             pullRequests = open.map { pullRequest ->
                 BoardPullRequestResponse(
