@@ -89,7 +89,7 @@ class GithubOrgArtifactSyncService(
 
         throw IngestionResponseException(
             "Org artifact for $owner was updated locally but kept its old membership in the AI index" +
-                (failed.firstNotNullOfOrNull { it.errorMessage }?.let { " (first reported cause: $it)" } ?: ""),
+                (failed.firstNotNullOfOrNull { it.errorMessage }?.let { " (first reported cause: $it)" }.orEmpty()),
         )
     }
 }

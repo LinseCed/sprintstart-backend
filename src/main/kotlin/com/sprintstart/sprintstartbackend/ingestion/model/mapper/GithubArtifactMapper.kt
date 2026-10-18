@@ -136,7 +136,7 @@ class GithubArtifactMapper {
             buildString {
                 append(event.title)
                 append("|")
-                append(event.body ?: "")
+                append(event.body.orEmpty())
             }
         val hash = content.toByteArray().sha256()
         return GithubArtifactCommand(

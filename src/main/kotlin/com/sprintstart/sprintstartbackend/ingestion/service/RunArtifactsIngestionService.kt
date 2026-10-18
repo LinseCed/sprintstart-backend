@@ -117,7 +117,7 @@ class RunArtifactsIngestionService(
             "AI sync for run $runId did not fully apply: " +
                 "${failedArtifacts.size} artifact(s) failed to index, " +
                 "${failedDeindexes.size} failed to be removed" +
-                (firstReason?.let { " (first reported cause: $it)" } ?: ""),
+                (firstReason?.let { " (first reported cause: $it)" }.orEmpty()),
         )
     }
 }

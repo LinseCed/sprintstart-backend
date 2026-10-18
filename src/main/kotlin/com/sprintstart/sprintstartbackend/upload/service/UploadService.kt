@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.server.ResponseStatusException
 import java.security.MessageDigest
+import java.util.Locale
 import java.util.UUID
 
 /**
@@ -369,7 +370,7 @@ private fun sha256(bytes: ByteArray): String {
     return digest
         .digest(bytes)
         .joinToString("") {
-            "%02x".format(it)
+            "%02x".format(Locale.ROOT, it)
         }
 }
 

@@ -27,7 +27,8 @@ class JiraArtifactMapper {
             issueKey = event.issue.key,
             summary = event.issue.fields.summary,
             description = event.issue.fields.description
-                ?.content ?: "",
+                ?.content
+                .orEmpty(),
             createdBy = event.getCreator(),
             reportedBy = event.getReporter(),
             assignee = event.getAssignee(),
@@ -136,8 +137,8 @@ fun JiraIssueFetchedEvent.getChangelog(): JiraIssueHistory {
                     JiraIssueHistorySubitem(
                         field = it.field,
                         fieldtype = it.fieldtype,
-                        from = it.fromString ?: "",
-                        to = it.toString ?: "",
+                        from = it.fromString.orEmpty(),
+                        to = it.toString.orEmpty(),
                     )
                 },
             )

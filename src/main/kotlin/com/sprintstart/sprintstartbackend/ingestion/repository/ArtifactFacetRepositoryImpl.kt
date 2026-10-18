@@ -654,11 +654,11 @@ class ArtifactFacetRepositoryImpl(
             mime: String?,
             language: String?,
         ): UploadFormat {
-            val titleLower = title?.lowercase() ?: ""
-            val sourceUrlLower = sourceUrl?.lowercase() ?: ""
+            val titleLower = title?.lowercase().orEmpty()
+            val sourceUrlLower = sourceUrl?.lowercase().orEmpty()
             val sourceIdLower = sourceId.lowercase()
-            val mimeLower = mime?.lowercase() ?: ""
-            val languageLower = language?.lowercase() ?: ""
+            val mimeLower = mime?.lowercase().orEmpty()
+            val languageLower = language?.lowercase().orEmpty()
 
             return when {
                 isPdf(titleLower, sourceUrlLower, sourceIdLower, mimeLower) -> UploadFormat.PDF

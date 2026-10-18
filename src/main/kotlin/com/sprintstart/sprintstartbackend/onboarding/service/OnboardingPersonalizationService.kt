@@ -257,7 +257,7 @@ class OnboardingPersonalizationService(
                         },
                 )
             }
-        } ?: throw IllegalStateException("Blueprint selection returned no result")
+        } ?: error("Blueprint selection returned no result")
 
     private suspend fun persistPath(
         blueprint: BlueprintSelection,
@@ -292,7 +292,7 @@ class OnboardingPersonalizationService(
                 entityManager.persist(onboardingPath)
                 response
             }
-        } ?: throw IllegalStateException("Onboarding path transaction returned no result")
+        } ?: error("Onboarding path transaction returned no result")
 
     /**
      * Runs one phase's AI assembly under the concurrency and timeout bounds.

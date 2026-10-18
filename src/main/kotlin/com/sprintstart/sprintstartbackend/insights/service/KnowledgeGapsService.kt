@@ -111,7 +111,7 @@ class KnowledgeGapsService(
         val gap = knowledgeGapRepository.findByIdAndProjectId(gapId, projectId).orElseThrow {
             ResponseStatusException(HttpStatus.NOT_FOUND, "Knowledge gap with id $gapId not found")
         }
-        val owners = resolveOwners(listOf(gap.component))[gap.component] ?: emptyList()
+        val owners = resolveOwners(listOf(gap.component))[gap.component].orEmpty()
         val firstIngested = artifactIngestionApi.getFirstIngestedAt(gap.component)
         return knowledgeGapResponseMapper.toResponse(gap, owners, firstIngested)
     }
@@ -122,7 +122,7 @@ class KnowledgeGapsService(
     @Transactional(readOnly = true)
     @Tracked("Retrieving component owners")
     fun getComponentOwners(component: String): List<KnowledgeGapOwnerResponse> {
-        return resolveOwners(listOf(component))[component] ?: emptyList()
+        return resolveOwners(listOf(component))[component].orEmpty()
     }
 
     /**
@@ -136,7 +136,7 @@ class KnowledgeGapsService(
             .distinct()
             .map { ComponentOwner(component = request.component, userId = it) }
         componentOwnerRepository.saveAll(owners)
-        return resolveOwners(listOf(request.component))[request.component] ?: emptyList()
+        return resolveOwners(listOf(request.component))[request.component].orEmpty()
     }
 
     /**
