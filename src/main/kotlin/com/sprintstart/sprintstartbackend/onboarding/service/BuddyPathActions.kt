@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
@@ -9,21 +8,16 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.question.SubmitQuestionAttemptRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.skip.CreateOnboardingSkipRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.step.CreateOnboardingStepRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.task.UpdateOnboardingTaskRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.phase.GetOnboardingPhaseForUserResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.question.GetOnboardingQuestionForUserResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.question.QuestionOptionForUserResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.task.GetOnboardingTaskResponse
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -60,7 +54,7 @@ class BuddyPathActions(
     private val onboardingStepService: OnboardingStepService,
     private val onboardingStepPlacementService: OnboardingStepPlacementService,
     private val onboardingTaskService: OnboardingTaskService,
-    private val questionAttemptService: QuestionAttemptService,
+    private val questions: BuddyQuestionActions,
     private val onboardingSkipService: OnboardingSkipService,
     private val userApi: UserApi,
 ) {
@@ -77,7 +71,13 @@ class BuddyPathActions(
         if (!buddyPathTools.hasPath(userId)) {
             emptyList()
         } else {
-            listOf(COMPLETE_STEP_SPEC, COMPLETE_TASK_SPEC, ANSWER_QUESTION_SPEC, ADD_PATH_STEP_SPEC, REQUEST_SKIP_SPEC)
+            listOf(
+                COMPLETE_STEP_SPEC,
+                COMPLETE_TASK_SPEC,
+                BuddyQuestionActions.SPEC,
+                ADD_PATH_STEP_SPEC,
+                REQUEST_SKIP_SPEC,
+            )
         }
 
     /** Whether [type] is one of this component's actions. */
@@ -107,7 +107,7 @@ class BuddyPathActions(
         when (type) {
             BuddyActionType.COMPLETE_STEP -> proposeCompleteStep(call, type, userId)
             BuddyActionType.COMPLETE_TASK -> proposeCompleteTask(call, type, userId)
-            BuddyActionType.ANSWER_QUESTION -> proposeAnswer(call, type, userId)
+            BuddyActionType.ANSWER_QUESTION -> questions.propose(call, type, UserId(userId))
             BuddyActionType.REQUEST_SKIP -> proposeSkip(call, type, userId)
             BuddyActionType.ADD_PATH_STEP -> proposeAddPathStep(call, type, userId)
             else -> error("${type.toolName} is not a path action")
@@ -122,7 +122,7 @@ class BuddyPathActions(
         when (type) {
             BuddyActionType.COMPLETE_STEP -> completeStep(authId, request.stepId)
             BuddyActionType.COMPLETE_TASK -> completeTask(authId, request.onboardingTaskId)
-            BuddyActionType.ANSWER_QUESTION -> answerQuestion(authId, request)
+            BuddyActionType.ANSWER_QUESTION -> questions.perform(authId, UserId(resolveUserId(authId)), request)
             BuddyActionType.REQUEST_SKIP -> requestSkip(authId, request.stepId, request.reason)
             BuddyActionType.ADD_PATH_STEP -> addPathStep(authId, request)
             else -> error("${type.toolName} is not a path action")
@@ -141,12 +141,12 @@ class BuddyPathActions(
         userId: UUID,
     ): BuddyActionService.ProposeOutcome {
         val stepId = call.uuidArgument("step_id")
-            ?: return refused(
+            ?: return notProposed(
                 "No step_id was provided. Read get_my_onboarding_path and pass the step_id of the " +
                     "step they mean.",
             )
         val step = buddyPathTools.findStep(userId, stepId)
-            ?: return refused(
+            ?: return notProposed(
                 "No step of this hire's own path has that id. Read get_my_onboarding_path again — an " +
                     "id from anywhere else is not theirs to tick off.",
             )
@@ -163,7 +163,7 @@ class BuddyPathActions(
                     "waiting on rather than offering to tick it."
             else -> null
         }
-        if (refusal != null) return refused(refusal)
+        if (refusal != null) return notProposed(refusal)
 
         // Finishing a step withdraws a skip request still waiting on the PM. Allowed -- somebody who
         // did the step anyway should be able to close it -- but never without saying so, on the
@@ -194,97 +194,6 @@ class BuddyPathActions(
     }
 
     /**
-     * Offers to send the hire's own answer to a knowledge question.
-     *
-     * ### Why the mentor passes words and not option ids
-     *
-     * The mentor is not told which option is correct (see [BuddyPathTools]), so what it passes here
-     * is what the hire said — "the retro", or "Git" and "Docker" as two picks — and the match to
-     * options happens server-side in [matchOption]. An option id from the mentor would be the mentor
-     * choosing, and the point is that the hire chooses.
-     *
-     * ### Why the proposal carries option ids anyway
-     *
-     * Once matched, the *resolved* options go on the proposal next to the labels the button shows,
-     * and the confirm checks those instead of matching the words again. A PM can rename options
-     * without changing their ids, and a re-match after that could land on an option the hire never
-     * read.
-     *
-     * Multiple choice takes a set: an attempt is graded on the exact set picked, so a question with
-     * two right options can only be passed by sending both in one attempt.
-     *
-     * A match that cannot be made comes back naming the options, so the mentor asks again instead of
-     * guessing on the hire's behalf.
-     */
-    private fun proposeAnswer(
-        call: BuddyToolCallDto,
-        type: BuddyActionType,
-        userId: UUID,
-    ): BuddyActionService.ProposeOutcome {
-        val questionId = call.uuidArgument("question_id")
-            ?: return refused(
-                "No question_id was provided. Read get_my_onboarding_path and pass the question_id " +
-                    "of the question they are answering.",
-            )
-        val question = buddyPathTools.findQuestion(userId, questionId)
-            ?: return refused(
-                "No question of this hire's own path has that id. Read get_my_onboarding_path again.",
-            )
-        val answer = call.textArgument("answer")
-        val isChoice = question.type == CheckQuestionType.MULTIPLE_CHOICE
-        // Each option the hire picked, one per entry. A lone `answer` is one pick.
-        val picks = call.stringListArg("selected_options").ifEmpty { listOf(answer) }.filter { it.isNotBlank() }
-
-        val refusal = when {
-            (if (isChoice) picks.isEmpty() else answer.isBlank()) ->
-                "No answer was provided. This has to be the hire's own answer in their own words — " +
-                    "ask them what they want to send, and never answer it for them."
-            question.status == QuestionStatus.PASSED ->
-                "They have already passed “${question.question}”, so there is nothing to send. Tell " +
-                    "them it is behind them."
-            question.status == QuestionStatus.LOCKED ->
-                "“${question.question}” is locked: something it waits on is not finished yet. Say " +
-                    "what it is waiting on rather than offering to answer it."
-            else -> null
-        }
-        if (refusal != null) return refused(refusal)
-
-        val chosen = if (isChoice) {
-            val matched = picks
-                .map { pick ->
-                    matchOption(question, pick)
-                        ?: return refused(
-                            "“$pick” does not match exactly one of the options for that question. The " +
-                                "options are: ${question.options.joinToString("; ") { it.label }}. Ask the " +
-                                "hire which of them they mean and pass that back — if they picked more than " +
-                                "one, pass each as its own entry in selected_options.",
-                        )
-                }.toSet()
-            // In the question's own order, so the button reads the way the options are listed.
-            question.options.filter { it in matched }
-        } else {
-            emptyList()
-        }
-        val shown = if (isChoice) shownChoice(chosen) else answer
-
-        return BuddyActionService.ProposeOutcome(
-            toolResult = "Proposed to the hire: send “$shown” as their answer to " +
-                "“${question.question}”. They see a confirm button showing that answer, and nothing " +
-                "is recorded unless they click it. An attempt is kept whether it is right or not, so " +
-                "make sure it is the answer they meant — and do not tell them whether it is correct, " +
-                "because you have not been told either.",
-            proposal = BuddyActionService.BuddyActionProposal(
-                action = type.toolName,
-                label = "Send this answer: “${shown.take(ANSWER_LABEL_LIMIT)}”",
-                question = null,
-                questionId = question.id,
-                answer = shown,
-                optionIds = chosen.map { it.id },
-            ),
-        )
-    }
-
-    /**
      * Offers to send the hire's skip request for one step to their PM.
      *
      * The same request the step page files, reached from a conversation: the mentor's part is
@@ -301,12 +210,12 @@ class BuddyPathActions(
         userId: UUID,
     ): BuddyActionService.ProposeOutcome {
         val stepId = call.uuidArgument("step_id")
-            ?: return refused(
+            ?: return notProposed(
                 "No step_id was provided. Read get_my_onboarding_path and pass the step_id of the " +
                     "step they want to skip.",
             )
         val step = buddyPathTools.findStep(userId, stepId)
-            ?: return refused(
+            ?: return notProposed(
                 "No step of this hire's own path has that id. Read get_my_onboarding_path again.",
             )
         val reason = call.textArgument("reason")
@@ -327,7 +236,7 @@ class BuddyPathActions(
                     "that into a sentence or two before offering this again."
             else -> null
         }
-        if (refusal != null) return refused(refusal)
+        if (refusal != null) return notProposed(refusal)
 
         // A declined request can be asked again, and the PM said why the first time. The new reason
         // should answer that, or it will be declined for the same thing.
@@ -388,17 +297,21 @@ class BuddyPathActions(
         userId: UUID,
     ): BuddyActionService.ProposeOutcome {
         val phaseId = call.uuidArgument("phase_id")
-            ?: return refused(
+            ?: return notProposed(
                 "No phase_id was provided. Read get_my_onboarding_path and pass the phase_id of the " +
                     "phase the step belongs in.",
             )
         val phase = buddyPathTools.findPhase(userId, phaseId)
-            ?: return refused(
+            ?: return notProposed(
                 "No phase of this hire's own path has that id. Read get_my_onboarding_path again.",
             )
         val title = call.textArgument("title")
         val description = call.textArgument("description")
-        val placement = PathStepPlacement.inferred(phase, call.uuidListArg("waits_on"), call.uuidListArg("unlocks"))
+        val placement = PathStepPlacement.inferred(
+            phase,
+            call.lenientUuidSetArgument("waits_on"),
+            call.lenientUuidSetArgument("unlocks"),
+        )
 
         val refusal = when {
             title.isBlank() -> "No title was provided. Say what the step is, in a few words."
@@ -410,7 +323,7 @@ class BuddyPathActions(
                     "at the one that is there."
             else -> reopensFinishedPhase(userId, phase) ?: placement.problem()
         }
-        if (refusal != null) return refused(refusal)
+        if (refusal != null) return notProposed(refusal)
 
         val where = placement.describe()
         val connection = if (placement.isConnected) {
@@ -487,25 +400,25 @@ class BuddyPathActions(
         userId: UUID,
     ): BuddyActionService.ProposeOutcome {
         val taskId = call.uuidArgument("task_id")
-            ?: return refused(
+            ?: return notProposed(
                 "No task_id was provided. Read get_my_onboarding_path for the checklist of the step " +
                     "they are on and pass the task_id of the line they mean.",
             )
         val task = findTask(userId, taskId)
-            ?: return refused(
+            ?: return notProposed(
                 "No checklist line of this hire's own path has that id. Read get_my_onboarding_path " +
                     "again — it only carries the checklist of the step they are on, and a line of some " +
                     "other step is not in front of you.",
             )
         if (task.finished) {
-            return refused(
+            return notProposed(
                 "“${task.title}” is already ticked off. Tell them it is already done rather than " +
                     "offering it again.",
             )
         }
         // The task route does not check locks; the page does, by never opening a locked step.
         if (buddyPathTools.findStep(userId, task.stepId)?.locked == true) {
-            return refused(
+            return notProposed(
                 "The step that “${task.title}” belongs to is locked, so nothing on its checklist can be " +
                     "ticked yet. Say what the step is waiting on instead.",
             )
@@ -600,69 +513,6 @@ class BuddyPathActions(
         )
     }
 
-    /**
-     * Records the confirmed answer, and relays what came back.
-     *
-     * `ok` is true for a wrong answer too, and that is not an oversight: the action was to *send*
-     * their answer, and it was sent. Whether it was right is the message's job — a wrong attempt
-     * shown as a failed action would read as the buddy having broken rather than as the hire having
-     * missed, on the one surface where missing is supposed to be ordinary.
-     */
-    private fun answerQuestion(authId: String, request: BuddyActionRequest): BuddyActionResponse {
-        val questionId = request.questionId
-        val answer = request.answer
-        if (questionId == null || answer.isNullOrBlank()) {
-            return BuddyActionResponse(ok = false, message = "No answer was proposed to send.")
-        }
-        val question = buddyPathTools.findQuestion(resolveUserId(authId), questionId)
-            ?: return BuddyActionResponse(ok = false, message = "That question isn't on your path.")
-
-        // Checked again at confirm time, for the same reason [completeStep] checks the lock: the
-        // attempt route grades whatever it is sent, and a button left in the conversation can be
-        // clicked after the hire already passed the question on their page. A second attempt there
-        // would be kept for no reason, and a wrong one would read as having lost the pass.
-        when (question.status) {
-            QuestionStatus.PASSED ->
-                return BuddyActionResponse(ok = false, message = "You've already passed that one — nothing was sent.")
-            QuestionStatus.LOCKED ->
-                return BuddyActionResponse(
-                    ok = false,
-                    message = "That question is locked right now — something it waits on isn't finished yet.",
-                )
-            else -> Unit
-        }
-
-        val submission = if (question.type == CheckQuestionType.MULTIPLE_CHOICE) {
-            // The options the button stood for, still there and still reading the way it showed
-            // them. Anything else is a proposal about a question that has since changed.
-            val byId = question.options.associateBy { it.id }
-            val chosen = request.optionIds.mapNotNull { byId[it] }
-            if (chosen.isEmpty() || chosen.size != request.optionIds.size || shownChoice(chosen) != answer) {
-                return BuddyActionResponse(
-                    ok = false,
-                    message = "That question changed since this was suggested, so nothing was sent — ask me again.",
-                )
-            }
-            SubmitQuestionAttemptRequest(selectedOptionIds = chosen.map { it.id }.distinct())
-        } else {
-            SubmitQuestionAttemptRequest(textAnswer = answer)
-        }
-
-        val result = questionAttemptService.submitQuestionAttemptForMe(authId, questionId, submission)
-        // The submit response is the one user-facing place correct answers are revealed, and the
-        // hire's own page shows them there. Relaying the same thing keeps the two surfaces telling
-        // one story; withholding it here would make the conversation the worse place to answer.
-        val learning = listOfNotNull(result.feedback, result.explanation).joinToString(" ")
-        return BuddyActionResponse(
-            ok = true,
-            message = if (result.correct) {
-                "That was right — the question is passed. $learning".trim()
-            } else {
-                "Not quite. It stays open, so you can try again whenever you like. $learning".trim()
-            },
-        )
-    }
-
     private fun addPathStep(authId: String, request: BuddyActionRequest): BuddyActionResponse {
         val phaseId = request.phaseId
         val title = request.title
@@ -712,80 +562,12 @@ class BuddyPathActions(
         )
     }
 
-    /**
-     * Which option the hire meant, or null when that is not clear enough to act on.
-     *
-     * Three passes, loosening in a fixed order: the label exactly, then a label containing what they
-     * said, then what they said containing a label. Each pass only counts when it matches *one*
-     * option — "the first one" against two options that start alike is ambiguous, and guessing there
-     * would record an answer the hire did not give.
-     *
-     * Only called when proposing. The confirm checks the ids the proposal resolved instead of
-     * matching again (see [proposeAnswer]).
-     */
-    private fun matchOption(
-        question: GetOnboardingQuestionForUserResponse,
-        answer: String,
-    ): QuestionOptionForUserResponse? {
-        val needle = answer.trim()
-        if (needle.isBlank()) return null
-
-        val exact = question.options.filter { it.label.trim().equals(needle, ignoreCase = true) }
-        if (exact.size == 1) return exact.single()
-
-        val labelContains = question.options.filter { it.label.contains(needle, ignoreCase = true) }
-        if (labelContains.size == 1) return labelContains.single()
-
-        val answerContains = question.options.filter { needle.contains(it.label.trim(), ignoreCase = true) }
-        return answerContains.singleOrNull()
-    }
-
-    /**
-     * A reason and no button.
-     *
-     * Prefixed, and that prefix is load-bearing. A refusal phrased as ordinary guidance came back
-     * from testing as the mentor telling the hire to click a button that was never rendered: from the
-     * model's side a tool result is a tool result, and "say what doing it involves and offer it again"
-     * reads a lot like "offered". The prefix says the one thing it has to know -- that nothing is on
-     * screen -- before the advice it should act on.
-     */
-    private fun refused(reason: String) = BuddyActionService.ProposeOutcome(NOT_PROPOSED + reason, null)
-
     private fun resolveUserId(authId: String): UUID =
         userApi
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
 
-    /**
-     * Reads a list of UUIDs the model passed, tolerating a single string where a list was asked for.
-     * Anything that is not a UUID is dropped here and caught by the placement check as "not in this
-     * phase" only if it parsed -- an unparseable id is simply not a placement.
-     */
-    private fun BuddyToolCallDto.uuidListArg(name: String): Set<UUID> {
-        val raw = when (val value = arguments[name]) {
-            is JsonArray -> value.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
-            is JsonPrimitive -> listOfNotNull(value.contentOrNull)
-            else -> emptyList()
-        }
-        return raw.mapNotNull { runCatching { UUID.fromString(it.trim()) }.getOrNull() }.toSet()
-    }
-
-    /** What the confirm button shows for a set of options, and what the confirm checks it against. */
-    private fun shownChoice(options: List<QuestionOptionForUserResponse>): String =
-        options.joinToString(", ") { it.label.trim() }
-
-    /** Reads a list of strings the model passed, tolerating a single string where a list was asked for. */
-    private fun BuddyToolCallDto.stringListArg(name: String): List<String> =
-        when (val value = arguments[name]) {
-            is JsonArray -> value.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim() }
-            is JsonPrimitive -> listOfNotNull(value.contentOrNull?.trim())
-            else -> emptyList()
-        }.filter { it.isNotEmpty() }
-
     private companion object {
-        /** How many characters of an answer the confirm button shows before it is cut. */
-        const val ANSWER_LABEL_LIMIT = 60
-
         /**
          * The estimate a step the buddy added carries.
          *
@@ -817,16 +599,6 @@ class BuddyPathActions(
             },
         )
 
-        /**
-         * The prefix every refusal here carries.
-         *
-         * Testing found the mentor telling a hire to click a button that was never rendered: a
-         * refusal written as advice ("say what doing it involves and offer it again") reads, from
-         * inside the model, a lot like the offer having been made. This says the fact first.
-         */
-        const val NOT_PROPOSED = "NOT PROPOSED — no button was shown to the hire, so do not tell " +
-            "them to confirm anything. "
-
         val COMPLETE_TASK_SPEC = BuddyToolSpecDto(
             name = BuddyActionType.COMPLETE_TASK.toolName,
             description = "Offer to tick one line off the checklist of the step the hire is on. Read " +
@@ -845,54 +617,6 @@ class BuddyPathActions(
                     }
                 }
                 putJsonArray("required") { add("task_id") }
-            },
-        )
-
-        val ANSWER_QUESTION_SPEC = BuddyToolSpecDto(
-            name = BuddyActionType.ANSWER_QUESTION.toolName,
-            description = "Offer to send the hire's answer to one knowledge-check question on their " +
-                "path. Read get_my_onboarding_path for the question_id and the options they are " +
-                "looking at. Pass THEIR answer, in their words — for a multiple-choice question, " +
-                "whichever option they picked; it is matched to an option for you, and an answer " +
-                "that matches none comes back so you can ask again. If they picked MORE THAN ONE " +
-                "option, pass every one of them in selected_options: an attempt is graded on the " +
-                "whole set, so sending one at a time can never pass. This does NOT record anything " +
-                "by itself; they see a confirm button showing the answer that will be sent. An " +
-                "attempt is kept whether it is right or wrong. You are a tutor here, not an " +
-                "examiner and not a shortcut: explain the material the question is about, from the " +
-                "project's own documents, and let them answer it. You are not told which answer is " +
-                "correct — so never state one, never hint at one, and never pass an answer they did " +
-                "not give. If they ask you to just tell them, say plainly that you do not know it " +
-                "and offer to go through the material instead.",
-            parameters = buildJsonObject {
-                put("type", "object")
-                putJsonObject("properties") {
-                    putJsonObject("question_id") {
-                        put("type", "string")
-                        put("description", "The question_id from get_my_onboarding_path.")
-                    }
-                    putJsonObject("answer") {
-                        put("type", "string")
-                        put(
-                            "description",
-                            "The hire's own answer, in their own words. For multiple choice, the " +
-                                "option they picked — the label, or enough of it to identify it.",
-                        )
-                    }
-                    putJsonObject("selected_options") {
-                        put("type", "array")
-                        putJsonObject("items") { put("type", "string") }
-                        put(
-                            "description",
-                            "Multiple choice only, when they picked more than one option: each one " +
-                                "as its own entry, the label or enough of it to identify it. Takes " +
-                                "the place of answer.",
-                        )
-                    }
-                }
-                putJsonArray("required") {
-                    add("question_id")
-                }
             },
         )
 
