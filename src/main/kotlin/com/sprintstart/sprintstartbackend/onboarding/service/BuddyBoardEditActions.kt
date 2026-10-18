@@ -24,7 +24,6 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -106,10 +105,9 @@ class BuddyBoardEditActions(
         }
 
     private fun proposeLink(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
-        val url = call.stringArg("url").trim()
+        val url = call.textArgument("url")
         val label = call
-            .stringArg("label")
-            .trim()
+            .textArgument("label")
             .take(MAX_LABEL)
             .ifBlank { null }
         if (!url.isWebAddress()) return refused(NOT_A_WEB_ADDRESS)
@@ -129,7 +127,7 @@ class BuddyBoardEditActions(
     }
 
     private fun proposeNoteEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
-        val text = call.stringArg("text").trim().take(MAX_NOTE_LENGTH)
+        val text = call.textArgument("text").take(MAX_NOTE_LENGTH)
         val card = when (val found = ownCard(call, scope, BoardCardKind.NOTE)) {
             is Found.Refused -> return refused(found.reason)
             is Found.Ok -> found.value
@@ -160,10 +158,9 @@ class BuddyBoardEditActions(
     }
 
     private fun proposeLinkEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
-        val url = call.stringArg("url").trim()
+        val url = call.textArgument("url")
         val label = call
-            .stringArg("label")
-            .trim()
+            .textArgument("label")
             .take(MAX_LABEL)
             .ifBlank { null }
         val card = when (val found = ownCard(call, scope, BoardCardKind.LINK)) {
@@ -202,11 +199,10 @@ class BuddyBoardEditActions(
      */
     private fun proposeChecklistEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
         val title = call
-            .stringArg("title")
-            .trim()
+            .textArgument("title")
             .take(MAX_CHECKLIST_TITLE)
             .ifBlank { null }
-        val items = call.stringListArg("items").map { it.take(MAX_CHECKLIST_ITEM_LENGTH) }.take(MAX_CHECKLIST_ITEMS)
+        val items = call.textListArgument("items").map { it.take(MAX_CHECKLIST_ITEM_LENGTH) }.take(MAX_CHECKLIST_ITEMS)
         val card = when (val found = ownCard(call, scope, BoardCardKind.CHECKLIST)) {
             is Found.Refused -> return refused(found.reason)
             is Found.Ok -> found.value
@@ -408,7 +404,7 @@ class BuddyBoardEditActions(
 
     /** The one card of the hire's own of [kind] that the call's `card_id` names. */
     private fun ownCard(call: BuddyToolCallDto, scope: Scope, kind: BoardCardKind): Found<BoardCardResponse> {
-        val cardId = call.uuidArg("card_id") ?: return Found.Refused(NO_CARD_ID)
+        val cardId = call.uuidArgument("card_id") ?: return Found.Refused(NO_CARD_ID)
         val card = cardsOn(scope)
             ?.firstOrNull { it.id == cardId }
             ?.takeIf { it.kind == kind && it.owner == BoardCardOwner.HIRE }
@@ -495,17 +491,6 @@ class BuddyBoardEditActions(
     private fun String.isWebAddress(): Boolean =
         length <= MAX_URL_LENGTH &&
             (startsWith("https://", ignoreCase = true) || startsWith("http://", ignoreCase = true))
-
-    private fun BuddyToolCallDto.stringArg(name: String): String =
-        (arguments[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
-
-    private fun BuddyToolCallDto.stringListArg(name: String): List<String> =
-        (arguments[name] as? JsonArray)
-            .orEmpty()
-            .mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { line -> line.isNotBlank() } }
-
-    private fun BuddyToolCallDto.uuidArg(name: String): UUID? =
-        runCatching { UUID.fromString(stringArg(name).trim()) }.getOrNull()
 
     private companion object {
         val HANDLED = setOf(

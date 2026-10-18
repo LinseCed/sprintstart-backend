@@ -10,11 +10,8 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.board.NoteCar
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService.BuddyActionProposal
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService.ProposeOutcome
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -139,11 +136,10 @@ class BuddyBoardWriteActions(
         projectName: String,
     ): ProposeOutcome {
         val title = call
-            .stringArg("title")
-            .trim()
+            .textArgument("title")
             .take(MAX_CHECKLIST_TITLE)
             .ifBlank { null }
-        val items = call.stringListArg("items")
+        val items = call.textListArgument("items")
         return when {
             items.size < MIN_CHECKLIST_ITEMS ->
                 ProposeOutcome(
@@ -213,8 +209,8 @@ class BuddyBoardWriteActions(
         type: BuddyActionType,
         projectName: String,
     ): ProposeOutcome {
-        val cardId = call.uuidArg("card_id")
-        val items = call.stringListArg("items")
+        val cardId = call.uuidArgument("card_id")
+        val items = call.textListArgument("items")
         return when {
             cardId == null ->
                 ProposeOutcome(
@@ -246,8 +242,8 @@ class BuddyBoardWriteActions(
         type: BuddyActionType,
         projectName: String,
     ): ProposeOutcome {
-        val cardId = call.uuidArg("card_id")
-        val items = call.stringListArg("items")
+        val cardId = call.uuidArgument("card_id")
+        val items = call.textListArgument("items")
         return when {
             cardId == null ->
                 ProposeOutcome(
@@ -312,9 +308,9 @@ class BuddyBoardWriteActions(
         type: BuddyActionType,
         projectName: String,
     ): ProposeOutcome {
-        val cardId = call.uuidArg("card_id")
-        val before = call.stringArg("line").trim()
-        val after = call.stringArg("reworded").trim().take(MAX_CHECKLIST_ITEM_LENGTH)
+        val cardId = call.uuidArgument("card_id")
+        val before = call.textArgument("line")
+        val after = call.textArgument("reworded").take(MAX_CHECKLIST_ITEM_LENGTH)
         return when {
             cardId == null ->
                 ProposeOutcome(
@@ -373,7 +369,7 @@ class BuddyBoardWriteActions(
         type: BuddyActionType,
         projectName: String,
     ): ProposeOutcome {
-        val text = call.stringArg("text").trim()
+        val text = call.textArgument("text")
         return when {
             text.length < MIN_NOTE_LENGTH ->
                 ProposeOutcome(
@@ -459,18 +455,6 @@ class BuddyBoardWriteActions(
                 lineAfter = lineAfter,
             ),
         )
-
-    /** A list-of-strings argument, with anything that is not a usable line dropped. */
-    private fun BuddyToolCallDto.stringListArg(name: String): List<String> =
-        (arguments[name] as? JsonArray)
-            .orEmpty()
-            .mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { line -> line.isNotBlank() } }
-
-    private fun BuddyToolCallDto.stringArg(name: String): String =
-        (arguments[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
-
-    private fun BuddyToolCallDto.uuidArg(name: String): UUID? =
-        runCatching { UUID.fromString(stringArg(name)) }.getOrNull()
 
     private companion object {
         val HANDLED = setOf(
