@@ -28,7 +28,7 @@ class CodeStructureTest {
 
         KnownViolations("controller-repositories").assertMatches(
             violations,
-            "R11: a controller calls one service; the service owns the repository.",
+            "A controller calls one service; the service owns the repository.",
         )
     }
 
@@ -43,7 +43,7 @@ class CodeStructureTest {
 
         KnownViolations("controller-branching").assertMatches(
             violations,
-            "R11: two modes are two endpoints; a decision belongs in a service.",
+            "Two modes are two endpoints; a decision belongs in a service.",
         )
     }
 
@@ -56,7 +56,7 @@ class CodeStructureTest {
 
         KnownViolations("joined-function-names").assertMatches(
             violations,
-            "R10: a function whose name needs `And`/`Or` does two things; split it.",
+            "A function whose name needs `And`/`Or` does two things; split it.",
         )
     }
 
@@ -68,7 +68,7 @@ class CodeStructureTest {
 
         KnownViolations("raw-id-parameters").assertMatches(
             violations,
-            "R7: wrap the id in a value class (`@JvmInline value class ProjectId(val value: UUID)`).",
+            "Wrap the id in a value class (`@JvmInline value class ProjectId(val value: UUID)`).",
         )
     }
 

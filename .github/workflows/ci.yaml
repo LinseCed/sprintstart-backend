@@ -93,7 +93,7 @@ jobs:
       - name: Run tests with coverage
         run: ./gradlew check jacocoTestReport
 
-      - name: Coverage gate (AI_RULES R25)
+      - name: Coverage gate
         if: github.event_name == 'pull_request'
         run: bash scripts/quality/coverage-gate.sh "origin/${{ github.base_ref }}"
 

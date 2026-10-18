@@ -1,7 +1,7 @@
 # Size and complexity limits apply to production code only.
 # Existing violations live in detekt-baseline.xml (detekt) and detekt-baseline-main.xml
 # (detektMain, with type resolution), which may only shrink. Loosening anything here needs
-# the `quality-exception` label (R2, R5).
+# the `quality-exception` label.
 
 style:
   LoopWithTooManyJumpStatements:
