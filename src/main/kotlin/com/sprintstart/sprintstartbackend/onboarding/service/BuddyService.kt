@@ -193,8 +193,7 @@ class BuddyService(
         if (session.title.isBlank()) {
             try {
                 val generatedTitle = buddyAiClient.getSessionTitle(AiGenerateSessionTitleRequest(content))
-                session.title = generatedTitle.title
-                buddySessionRepository.save(session)
+                buddySessionRepository.nameIfUntitled(session.id, generatedTitle.title)
             } catch (e: AiResponseException) {
                 logger.warn("Could not generate buddy session title", e)
             }

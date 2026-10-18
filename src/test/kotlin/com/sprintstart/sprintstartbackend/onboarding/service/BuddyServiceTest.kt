@@ -872,7 +872,7 @@ class BuddyServiceTest {
             } returns emptyList()
             every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
 
-            every { buddySessionRepository.save(any()) } answers { firstArg() }
+            every { buddySessionRepository.nameIfUntitled(session.id, any()) } returns 1
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
 
@@ -893,15 +893,14 @@ class BuddyServiceTest {
                     null,
                 ).toList()
 
-            assertThat(session.title).isEqualTo("A new beginning")
-
             coVerify(exactly = 1) {
                 buddyAiClient.getSessionTitle(any())
             }
 
             verify {
-                buddySessionRepository.save(session)
+                buddySessionRepository.nameIfUntitled(session.id, "A new beginning")
             }
+            verify(exactly = 0) { buddySessionRepository.save(any()) }
         }
 
         @Test
@@ -1679,6 +1678,7 @@ class BuddyServiceTest {
             val session = BuddySession(userId = userId, projectId = UUID.randomUUID())
 
             every { buddySessionRepository.findByIdAndUserId(session.id, userId) } returns session
+            every { buddySessionRepository.nameIfUntitled(session.id, any()) } returns 1
             every {
                 buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
             } returns emptyList()
