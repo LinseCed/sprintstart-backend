@@ -22,8 +22,8 @@
     <ID>CyclomaticComplexMethod:BuddyActionService.kt:BuddyActionService$suspend fun perform(request: BuddyActionRequest, jwt: Jwt): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
     <ID>CyclomaticComplexMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UserId): String</ID>
-    <ID>CyclomaticComplexMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeAddPathStep( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>CyclomaticComplexMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeSkip( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
+    <ID>CyclomaticComplexMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>CyclomaticComplexMethod:BuddyPathTools.kt:BuddyPathTools$fun snapshotFor(userId: UUID): String?</ID>
     <ID>CyclomaticComplexMethod:BuddyPathTools.kt:BuddyPathTools$private fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
     <ID>CyclomaticComplexMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun perform(authId: String, userId: UserId, request: BuddyActionRequest): BuddyActionResponse</ID>
@@ -88,7 +88,6 @@
     <ID>LargeClass:BlueprintPathController.kt:BlueprintPathController</ID>
     <ID>LargeClass:BoardService.kt:BoardService</ID>
     <ID>LargeClass:BuddyActionService.kt:BuddyActionService</ID>
-    <ID>LargeClass:BuddyPathActions.kt:BuddyPathActions</ID>
     <ID>LargeClass:BuddyPathTools.kt:BuddyPathTools</ID>
     <ID>LargeClass:OnboardingPersonalizationService.kt:OnboardingPersonalizationService</ID>
     <ID>LongMethod:AiFaqGroupMapper.kt:AiFaqGroupMapper$fun toEntity( aiGroup: AiFaqGroup, projectId: UUID, askedAtByQuestionId: Map&lt;String, Instant&gt;, ): FaqGroup</ID>
@@ -115,11 +114,11 @@
     <ID>LongMethod:BuddyBoardEditActions.kt:BuddyBoardEditActions$private fun namedCards(call: BuddyToolCallDto, scope: Scope): Found&lt;List&lt;BoardCardResponse&gt;&gt;</ID>
     <ID>LongMethod:BuddyBoardEditActions.kt:BuddyBoardEditActions$private fun proposeChecklistEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome</ID>
     <ID>LongMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UserId): String</ID>
-    <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun addPathStep(authId: String, request: BuddyActionRequest): BuddyActionResponse</ID>
-    <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeAddPathStep( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeCompleteStep( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeCompleteTask( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeSkip( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
+    <ID>LongMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun perform(authId: String, user: UserId, request: BuddyActionRequest): BuddyActionResponse</ID>
+    <ID>LongMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyPathTools.kt:BuddyPathTools$fun execute(userId: UUID): String</ID>
     <ID>LongMethod:BuddyPathTools.kt:BuddyPathTools$fun snapshotFor(userId: UUID): String?</ID>
     <ID>LongMethod:BuddyPathTools.kt:BuddyPathTools$private fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
