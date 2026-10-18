@@ -61,7 +61,7 @@ class BuddyPathActionTest {
         onboardingStepService = onboardingStepService,
         onboardingStepPlacementService = onboardingStepPlacementService,
         onboardingTaskService = onboardingTaskService,
-        questionAttemptService = questionAttemptService,
+        questions = BuddyQuestionActions(buddyPathTools, questionAttemptService),
         onboardingSkipService = onboardingSkipService,
         userApi = userApi,
     )
