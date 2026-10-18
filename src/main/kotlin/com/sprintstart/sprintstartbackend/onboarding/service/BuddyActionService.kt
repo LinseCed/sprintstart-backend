@@ -11,10 +11,8 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -122,7 +120,7 @@ class BuddyActionService(
 
         return when (type) {
             BuddyActionType.FLAG_TO_PM -> {
-                val question = call.stringArg("question").trim()
+                val question = call.textArgument("question")
                 if (question.isBlank()) {
                     ProposeOutcome(
                         "No question was provided to flag. Ask the hire what they want answered first.",
@@ -133,7 +131,7 @@ class BuddyActionService(
                 }
             }
             BuddyActionType.CLAIM_GOAL -> {
-                val taskId = call.uuidArg("task_id")
+                val taskId = call.uuidArgument("task_id")
                 if (taskId == null) {
                     ProposeOutcome(
                         "No task_id was provided. Read the suggested tasks and offer to claim one " +
@@ -168,7 +166,7 @@ class BuddyActionService(
      * them to drift.
      */
     private fun proposeGithubLogin(call: BuddyToolCallDto, type: BuddyActionType): ProposeOutcome {
-        val login = call.stringArg("login").trim()
+        val login = call.textArgument("login")
         if (login.isBlank()) {
             return ProposeOutcome(
                 "No username was provided. Ask the hire for their GitHub username before offering " +
@@ -233,7 +231,7 @@ class BuddyActionService(
      * before it becomes a record.
      */
     private fun proposeAssessment(call: BuddyToolCallDto, type: BuddyActionType): ProposeOutcome {
-        val key = call.stringArg("competency_key").trim()
+        val key = call.textArgument("competency_key")
         val label = key.takeIf { it.isNotBlank() }?.let { competencyPlacementService.labelFor(it) }
             ?: return ProposeOutcome(
                 "No competency matched “$key”. Read get_competencies_to_assess and pass a " +
@@ -241,7 +239,7 @@ class BuddyActionService(
                 null,
             )
 
-        val level = ProficiencyLevel.fromWord(call.stringArg("level"))
+        val level = ProficiencyLevel.fromWord(call.textArgument("level"))
             ?: return ProposeOutcome(
                 "That is not a level I can record. Use one of: ${ProficiencyLevel.WORDS.joinToString(", ")}.",
                 null,
@@ -292,8 +290,8 @@ class BuddyActionService(
         type: BuddyActionType,
         projectName: String,
     ): ProposeOutcome {
-        val title = call.stringArg("title").trim()
-        val attesterId = call.uuidArg("attester_id")
+        val title = call.textArgument("title")
+        val attesterId = call.uuidArgument("attester_id")
         return when {
             title.isBlank() ->
                 ProposeOutcome("No title was provided. Ask the hire what work they want confirmed.", null)
@@ -609,14 +607,6 @@ class BuddyActionService(
         userApi
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
-
-    /** Reads a string argument the model passed to a tool, or "" when it is missing/non-text. */
-    private fun BuddyToolCallDto.stringArg(name: String): String =
-        (arguments[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
-
-    /** Reads a UUID argument the model passed to a tool, or null when it is missing/unparseable. */
-    private fun BuddyToolCallDto.uuidArg(name: String): UUID? =
-        runCatching { UUID.fromString(stringArg(name)) }.getOrNull()
 
     /** A verb phrase for the reason lines, e.g. "claim a goal", "flag this to a PM". */
     @Suppress("CyclomaticComplexMethod") // One flat branch per action type, and the enum is exhaustive.

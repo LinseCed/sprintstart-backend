@@ -14,7 +14,7 @@ import kotlinx.serialization.json.putJsonObject
 import java.util.UUID
 
 /*
- * Reading what the model passed to a team-mode tool.
+ * Reading what the model passed to a buddy tool.
  *
  * It is untrusted: a missing, blank or malformed value comes back empty or null, never as an exception,
  * so every tool can answer with a sentence the model can act on. What a confirmed proposal stores is not
@@ -29,6 +29,9 @@ internal fun BuddyToolCallDto.uuidArgument(name: String): UUID? = arguments.uuid
 
 /** A boolean argument of a tool call; null when missing or neither `true` nor `false`. */
 internal fun BuddyToolCallDto.booleanArgument(name: String): Boolean? = arguments.boolean(name)
+
+/** The text entries of an array argument, trimmed, with blanks dropped; empty when missing. */
+internal fun BuddyToolCallDto.textListArgument(name: String): List<String> = arguments.textArray(name)
 
 /** A text field, trimmed; empty when missing or not text. */
 internal fun JsonObject.text(name: String): String = (this[name] as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()

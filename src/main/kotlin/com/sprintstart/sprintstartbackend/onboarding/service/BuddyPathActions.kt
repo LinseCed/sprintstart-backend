@@ -140,7 +140,7 @@ class BuddyPathActions(
         type: BuddyActionType,
         userId: UUID,
     ): BuddyActionService.ProposeOutcome {
-        val stepId = call.uuidArg("step_id")
+        val stepId = call.uuidArgument("step_id")
             ?: return refused(
                 "No step_id was provided. Read get_my_onboarding_path and pass the step_id of the " +
                     "step they mean.",
@@ -221,7 +221,7 @@ class BuddyPathActions(
         type: BuddyActionType,
         userId: UUID,
     ): BuddyActionService.ProposeOutcome {
-        val questionId = call.uuidArg("question_id")
+        val questionId = call.uuidArgument("question_id")
             ?: return refused(
                 "No question_id was provided. Read get_my_onboarding_path and pass the question_id " +
                     "of the question they are answering.",
@@ -230,7 +230,7 @@ class BuddyPathActions(
             ?: return refused(
                 "No question of this hire's own path has that id. Read get_my_onboarding_path again.",
             )
-        val answer = call.stringArg("answer").trim()
+        val answer = call.textArgument("answer")
         val isChoice = question.type == CheckQuestionType.MULTIPLE_CHOICE
         // Each option the hire picked, one per entry. A lone `answer` is one pick.
         val picks = call.stringListArg("selected_options").ifEmpty { listOf(answer) }.filter { it.isNotBlank() }
@@ -300,7 +300,7 @@ class BuddyPathActions(
         type: BuddyActionType,
         userId: UUID,
     ): BuddyActionService.ProposeOutcome {
-        val stepId = call.uuidArg("step_id")
+        val stepId = call.uuidArgument("step_id")
             ?: return refused(
                 "No step_id was provided. Read get_my_onboarding_path and pass the step_id of the " +
                     "step they want to skip.",
@@ -309,7 +309,7 @@ class BuddyPathActions(
             ?: return refused(
                 "No step of this hire's own path has that id. Read get_my_onboarding_path again.",
             )
-        val reason = call.stringArg("reason").trim()
+        val reason = call.textArgument("reason")
         val previous = step.skip
 
         val refusal = when {
@@ -387,7 +387,7 @@ class BuddyPathActions(
         type: BuddyActionType,
         userId: UUID,
     ): BuddyActionService.ProposeOutcome {
-        val phaseId = call.uuidArg("phase_id")
+        val phaseId = call.uuidArgument("phase_id")
             ?: return refused(
                 "No phase_id was provided. Read get_my_onboarding_path and pass the phase_id of the " +
                     "phase the step belongs in.",
@@ -396,8 +396,8 @@ class BuddyPathActions(
             ?: return refused(
                 "No phase of this hire's own path has that id. Read get_my_onboarding_path again.",
             )
-        val title = call.stringArg("title").trim()
-        val description = call.stringArg("description").trim()
+        val title = call.textArgument("title")
+        val description = call.textArgument("description")
         val placement = PathStepPlacement.inferred(phase, call.uuidListArg("waits_on"), call.uuidListArg("unlocks"))
 
         val refusal = when {
@@ -486,7 +486,7 @@ class BuddyPathActions(
         type: BuddyActionType,
         userId: UUID,
     ): BuddyActionService.ProposeOutcome {
-        val taskId = call.uuidArg("task_id")
+        val taskId = call.uuidArgument("task_id")
             ?: return refused(
                 "No task_id was provided. Read get_my_onboarding_path for the checklist of the step " +
                     "they are on and pass the task_id of the line they mean.",
@@ -756,10 +756,6 @@ class BuddyPathActions(
             .getUserIdByAuthId(authId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
 
-    /** Reads a string argument the model passed to a tool, or "" when it is missing/non-text. */
-    private fun BuddyToolCallDto.stringArg(name: String): String =
-        (arguments[name] as? JsonPrimitive)?.contentOrNull.orEmpty()
-
     /**
      * Reads a list of UUIDs the model passed, tolerating a single string where a list was asked for.
      * Anything that is not a UUID is dropped here and caught by the placement check as "not in this
@@ -785,10 +781,6 @@ class BuddyPathActions(
             is JsonPrimitive -> listOfNotNull(value.contentOrNull?.trim())
             else -> emptyList()
         }.filter { it.isNotEmpty() }
-
-    /** Reads a UUID argument the model passed to a tool, or null when it is missing/unparseable. */
-    private fun BuddyToolCallDto.uuidArg(name: String): UUID? =
-        runCatching { UUID.fromString(stringArg(name)) }.getOrNull()
 
     private companion object {
         /** How many characters of an answer the confirm button shows before it is cut. */
