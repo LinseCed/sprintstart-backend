@@ -15,6 +15,7 @@ import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraInstanc
 import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraIssueRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
@@ -31,6 +32,7 @@ internal class JiraIssueService(
     private val atlassianCredentialApi: AtlassianCredentialApi,
     private val issueRepository: JiraIssueRepository,
     private val eventPublisher: ApplicationEventPublisher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val jqlDateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
 
@@ -93,7 +95,7 @@ internal class JiraIssueService(
      * @param transactionId A unique identifier for the transaction associated with the update-check process.
      */
     @Tracked("Fetching a Jira instance for updates without applying the updates")
-    suspend fun checkInstanceForUpdates(instance: JiraInstance, transactionId: UUID) = withContext(Dispatchers.IO) {
+    suspend fun checkInstanceForUpdates(instance: JiraInstance, transactionId: UUID) = withContext(ioDispatcher) {
         instance.status = ConnectionState.UPDATING
         instanceRepository.save(instance)
 
@@ -120,7 +122,7 @@ internal class JiraIssueService(
      * @param transactionId A unique identifier for the ongoing transaction.
      */
     @Tracked("Fetching & applying updates to a Jira instance")
-    suspend fun updateInstance(instance: JiraInstance, transactionId: UUID) = withContext(Dispatchers.IO) {
+    suspend fun updateInstance(instance: JiraInstance, transactionId: UUID) = withContext(ioDispatcher) {
         instance.status = ConnectionState.UPDATING
         instanceRepository.save(instance)
 

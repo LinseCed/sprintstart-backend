@@ -12,6 +12,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.utils.Bitbuck
 import com.sprintstart.sprintstartbackend.connectors.git.utils.GitIngestionEngine
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -33,6 +34,7 @@ internal class BitbucketFileService(
     private val provider: BitbucketGitProvider,
     private val ingestionEngine: GitIngestionEngine,
     private val eventPublisher: ApplicationEventPublisher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val logger = LoggerFactory.getLogger(BitbucketFileService::class.java)
 
@@ -60,7 +62,7 @@ internal class BitbucketFileService(
      */
     @Tracked("Fetching and ingesting files of Bitbucket repository")
     suspend fun fetchAndIngestFilesOfRepository(repositoryId: UUID, transactionId: UUID) {
-        val connection = withContext(Dispatchers.IO) {
+        val connection = withContext(ioDispatcher) {
             connectionRepository.findById(repositoryId)
         }.orElseThrow { BitbucketRepositoryNotConnectedException(repositoryId) }
 
@@ -112,7 +114,7 @@ internal class BitbucketFileService(
             )
         }
 
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             connectionRepository.updateFileCursor(connection.id, outcome.revision)
         }
 
@@ -128,7 +130,7 @@ internal class BitbucketFileService(
             )
         }
 
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             connectionRepository.updateFileCursor(connection.id, outcome.revision)
         }
 

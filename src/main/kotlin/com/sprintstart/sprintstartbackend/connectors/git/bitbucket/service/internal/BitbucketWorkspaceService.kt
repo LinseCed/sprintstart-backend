@@ -14,6 +14,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.model.entity.
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.repository.BitbucketWorkspaceRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -53,6 +54,7 @@ internal class BitbucketWorkspaceService(
     private val workspaceRepository: BitbucketWorkspaceRepository,
     private val credentialApi: AtlassianCredentialApi,
     private val eventPublisher: ApplicationEventPublisher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val workspaceLocks = ConcurrentHashMap<String, Mutex>()
 
@@ -76,7 +78,7 @@ internal class BitbucketWorkspaceService(
         eventPublisher.publishEvent(BitbucketWorkspaceMetadataFetchingStartedEvent(transactionId))
 
         workspaceLocks.computeIfAbsent(workspace) { Mutex() }.withLock {
-            val marker = withContext(Dispatchers.IO) { workspaceRepository.findById(workspace) }.orElse(null)
+            val marker = withContext(ioDispatcher) { workspaceRepository.findById(workspace) }.orElse(null)
             if (marker != null && !isStale(marker)) {
                 eventPublisher.publishEvent(BitbucketWorkspaceMetadataFetchingCompletedEvent(transactionId))
                 return@withLock
@@ -113,7 +115,7 @@ internal class BitbucketWorkspaceService(
 
             eventPublisher.publishEvent(buildFetchedEvent(transactionId, workspace, metadata, members))
 
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 workspaceRepository.save(
                     BitbucketWorkspace(slug = workspace, name = metadata.name, fetchedAt = Instant.now()),
                 )

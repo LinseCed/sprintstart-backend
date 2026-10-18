@@ -12,6 +12,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.utils.GitIngestionEngin
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.shared.git.GitCommit
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
@@ -35,6 +36,7 @@ class GithubCommitsService(
     private val coordinatesFactory: GithubRepositoryCoordinatesFactory,
     private val ingestionEngine: GitIngestionEngine,
     private val eventPublisher: ApplicationEventPublisher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /**
      * Fetches and ingests the commits of a connected GitHub repository.
@@ -65,7 +67,7 @@ class GithubCommitsService(
             // Inside the try, so a failed cursor write still ends the run with a terminal event. Only the
             // cursor column is written; saving the whole connection would carry this copy's stale file
             // cursor.
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 repoConnectionRepository.updateCommitsCursor(githubRepository.id, ingested.revision)
             }
         } catch (e: CancellationException) {
@@ -107,7 +109,7 @@ class GithubCommitsService(
         if (!ingestionEngine.isUpToDate(coordinatesFactory.of(githubRepository))) {
             githubRepository.connectionState = ConnectionState.OUT_OF_DATE
 
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 repoConnectionRepository.save(githubRepository)
             }
         }
