@@ -138,10 +138,7 @@ class BuddyBoardWriteActions(
         type: BuddyActionType,
         projectName: String,
     ): ProposeOutcome {
-        val title = call
-            .textArgument("title")
-            .take(MAX_CHECKLIST_TITLE)
-            .ifBlank { null }
+        val title = call.textArgument("title").take(MAX_CHECKLIST_TITLE).ifBlank { null }
         val items = call.textListArgument("items")
         return when {
             items.size < MIN_CHECKLIST_ITEMS ->

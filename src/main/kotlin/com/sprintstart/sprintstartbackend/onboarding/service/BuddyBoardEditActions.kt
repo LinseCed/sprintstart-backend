@@ -92,15 +92,13 @@ class BuddyBoardEditActions(
      */
     fun perform(type: BuddyActionType, userId: UUID, projectId: UUID, payload: BoardWritePayload): BuddyActionResponse =
         try {
-            val user = UserId(userId)
-            val project = ProjectId(projectId)
             when (type) {
-                BuddyActionType.PLACE_LINK -> placeLink(user, project, payload)
-                BuddyActionType.EDIT_NOTE -> editNote(user, project, payload)
-                BuddyActionType.EDIT_LINK -> editLink(user, project, payload)
-                BuddyActionType.EDIT_CHECKLIST -> editChecklist(user, project, payload)
-                BuddyActionType.DISMISS_CARDS -> dismissCards(user, project, payload.cardIds)
-                BuddyActionType.REORDER_CARDS -> reorderCards(user, project, payload.cardIds)
+                BuddyActionType.PLACE_LINK -> placeLink(UserId(userId), ProjectId(projectId), payload)
+                BuddyActionType.EDIT_NOTE -> editNote(UserId(userId), ProjectId(projectId), payload)
+                BuddyActionType.EDIT_LINK -> editLink(UserId(userId), ProjectId(projectId), payload)
+                BuddyActionType.EDIT_CHECKLIST -> editChecklist(UserId(userId), ProjectId(projectId), payload)
+                BuddyActionType.DISMISS_CARDS -> dismissCards(UserId(userId), ProjectId(projectId), payload.cardIds)
+                BuddyActionType.REORDER_CARDS -> reorderCards(UserId(userId), ProjectId(projectId), payload.cardIds)
                 else -> error("$type is not a board edit; handles() keeps it out of here")
             }
         } catch (ex: ResponseStatusException) {
@@ -111,10 +109,7 @@ class BuddyBoardEditActions(
 
     private fun proposeLink(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
         val url = call.textArgument("url")
-        val label = call
-            .textArgument("label")
-            .take(MAX_LABEL)
-            .ifBlank { null }
+        val label = call.textArgument("label").take(MAX_LABEL).ifBlank { null }
         if (!url.isWebAddress()) return refused(NOT_A_WEB_ADDRESS)
 
         return offer(
@@ -164,10 +159,7 @@ class BuddyBoardEditActions(
 
     private fun proposeLinkEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
         val url = call.textArgument("url")
-        val label = call
-            .textArgument("label")
-            .take(MAX_LABEL)
-            .ifBlank { null }
+        val label = call.textArgument("label").take(MAX_LABEL).ifBlank { null }
         val card = when (val found = ownCard(call, scope, BoardCardKind.LINK)) {
             is Found.Refused -> return refused(found.reason)
             is Found.Ok -> found.value
@@ -203,10 +195,7 @@ class BuddyBoardEditActions(
      * matches them back by their words.
      */
     private fun proposeChecklistEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
-        val title = call
-            .textArgument("title")
-            .take(MAX_CHECKLIST_TITLE)
-            .ifBlank { null }
+        val title = call.textArgument("title").take(MAX_CHECKLIST_TITLE).ifBlank { null }
         val items = call.textListArgument("items").map { it.take(MAX_CHECKLIST_ITEM_LENGTH) }.take(MAX_CHECKLIST_ITEMS)
         val card = when (val found = ownCard(call, scope, BoardCardKind.CHECKLIST)) {
             is Found.Refused -> return refused(found.reason)
@@ -402,13 +391,11 @@ class BuddyBoardEditActions(
     }
 
     /** What is on the hire's board, without creating one for somebody who has never opened it. */
-    private fun cardsOn(scope: Scope): List<BoardCardResponse>? = cardsOn(
-        UserId(scope.userId),
-        ProjectId(scope.projectId),
-    )
-
-    private fun cardsOn(userId: UserId, projectId: ProjectId): List<BoardCardResponse>? =
-        if (boardService.hasBoard(userId, projectId)) boardService.getBoard(userId, projectId)?.cards else null
+    private fun cardsOn(scope: Scope): List<BoardCardResponse>? {
+        val user = UserId(scope.userId)
+        val project = ProjectId(scope.projectId)
+        return if (boardService.hasBoard(user, project)) boardService.getBoard(user, project)?.cards else null
+    }
 
     /** The one card of the hire's own of [kind] that the call's `card_id` names. */
     private fun ownCard(call: BuddyToolCallDto, scope: Scope, kind: BoardCardKind): Found<BoardCardResponse> {
