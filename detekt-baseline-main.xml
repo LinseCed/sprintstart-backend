@@ -52,8 +52,6 @@
     <ID>DoubleMutabilityForCollection:BlueprintPhaseService.kt:BlueprintPhaseService$var phasesToShift: MutableList&lt;BlueprintPhase&gt; = mutableListOf()</ID>
     <ID>DoubleMutabilityForCollection:BlueprintStepService.kt:BlueprintStepService$var stepsToShift: MutableList&lt;BlueprintStep&gt; = mutableListOf()</ID>
     <ID>DoubleMutabilityForCollection:BlueprintTaskService.kt:BlueprintTaskService$var tasksToShift: MutableList&lt;BlueprintTask&gt; = mutableListOf()</ID>
-    <ID>ImplicitDefaultLocale:BuddyPathTools.kt:BuddyPathTools$FINISHED_PATH.format(phases.size)</ID>
-    <ID>ImplicitDefaultLocale:BuddyPathTools.kt:BuddyPathTools$FINISHED_VISIBLE.format(phases.size)</ID>
     <ID>InjectDispatcher:BuddyActionService.kt:BuddyActionService$IO</ID>
     <ID>InjectDispatcher:CoroutineConfig.kt:CoroutineConfig$IO</ID>
     <ID>InjectDispatcher:GithubConnectorService.kt:GithubConnectorService$IO</ID>
