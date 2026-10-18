@@ -13,7 +13,7 @@
     <ID>CognitiveComplexMethod:StarterWorkMatcher.kt:StarterWorkMatcher$@Suppress("CyclomaticComplexMethod") fun score( profile: HireProfile, task: TaskFeatures, responsiveness: Responsiveness?, ): Score</ID>
     <ID>CognitiveComplexMethod:StreamExecution.kt:StreamExecution$@Suppress("CyclomaticComplexMethod") inline fun &lt;reified T&gt; perform( terminationMarkers: Set&lt;String&gt; = setOf("[DONE]"), crossinline onChunkError: (raw: String, error: Throwable) -&gt; Boolean = { raw, err -&gt; System.err.println("WebClient stream: failed to deserialize chunk '$raw': ${err.message}") true // skip and continue by default }, ): Flow&lt;T&gt;</ID>
     <ID>CyclomaticComplexMethod:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$private fun buildPredicates( cb: CriteriaBuilder, root: Root&lt;Artifact&gt;, projectJoin: Join&lt;Artifact, UUID&gt;, projectId: UUID, criteria: ArtifactFilterCriteria, exclude: FacetKind?, ): List&lt;Predicate&gt;</ID>
-    <ID>CyclomaticComplexMethod:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$private fun computeRepositoryFacets( cb: CriteriaBuilder, projectId: UUID, criteria: ArtifactFilterCriteria, ): List&lt;FacetCountResponse&gt;</ID>
+    <ID>CyclomaticComplexMethod:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$private fun computeRepositoryFacets(projectId: UUID, criteria: ArtifactFilterCriteria): List&lt;FacetCountResponse&gt;</ID>
     <ID>CyclomaticComplexMethod:ArtifactService.kt:ArtifactService$@Transactional(readOnly = true) @Tracked("Retrieving content of artifact") fun getArtifactContent(projectId: UUID, artifactId: UUID, authId: String): ArtifactContentResult</ID>
     <ID>CyclomaticComplexMethod:BitbucketArtifactProviderService.kt:BitbucketArtifactProviderService$private fun applyChange(artifact: Artifact, command: BitbucketArtifactCommand): BitbucketArtifactChange</ID>
     <ID>CyclomaticComplexMethod:BoardCardHydrator.kt:BoardCardHydrator$private fun hydrate( card: BoardCard, member: ProjectMember, projectId: ProjectId, diagram: BoardDiagram?, arrivalSteps: List&lt;ResolvedArrivalStep&gt;, pathSteps: Map&lt;UUID, ResolvedPathStep&gt;, matches: () -&gt; List&lt;RankedStarterWorkTaskResponse&gt;, ): BoardCardContent</ID>
@@ -100,7 +100,6 @@
     <ID>InjectDispatcher:SyncExecution.kt:SyncExecution$IO</ID>
     <ID>InjectDispatcher:TaskOrientationService.kt:TaskOrientationService$IO</ID>
     <ID>InstanceOfCheckForException:NotionWorkspaceIngestionService.kt:NotionWorkspaceIngestionService$exception is NotionPageSyncException</ID>
-    <ID>LargeClass:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl : ArtifactFacetRepository</ID>
     <ID>LargeClass:BlueprintPathController.kt:BlueprintPathController</ID>
     <ID>LargeClass:BoardService.kt:BoardService</ID>
     <ID>LargeClass:BuddyActionService.kt:BuddyActionService</ID>
@@ -110,8 +109,7 @@
     <ID>LongMethod:AiFaqGroupMapper.kt:AiFaqGroupMapper$fun toEntity( aiGroup: AiFaqGroup, projectId: UUID, askedAtByQuestionId: Map&lt;String, Instant&gt;, ): FaqGroup</ID>
     <ID>LongMethod:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$private fun buildPredicates( cb: CriteriaBuilder, root: Root&lt;Artifact&gt;, projectJoin: Join&lt;Artifact, UUID&gt;, projectId: UUID, criteria: ArtifactFilterCriteria, exclude: FacetKind?, ): List&lt;Predicate&gt;</ID>
     <ID>LongMethod:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$private fun buildUploadFormatPredicate( cb: CriteriaBuilder, root: Root&lt;Artifact&gt;, format: UploadFormat, ): Predicate</ID>
-    <ID>LongMethod:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$private fun computeFormatFacets( cb: CriteriaBuilder, projectId: UUID, criteria: ArtifactFilterCriteria, ): List&lt;FacetCountResponse&gt;</ID>
-    <ID>LongMethod:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$private fun computeRepositoryFacets( cb: CriteriaBuilder, projectId: UUID, criteria: ArtifactFilterCriteria, ): List&lt;FacetCountResponse&gt;</ID>
+    <ID>LongMethod:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$private fun computeRepositoryFacets(projectId: UUID, criteria: ArtifactFilterCriteria): List&lt;FacetCountResponse&gt;</ID>
     <ID>LongMethod:ArtifactService.kt:ArtifactService$@Transactional(readOnly = true) @Tracked("Retrieving content of artifact") fun getArtifactContent(projectId: UUID, artifactId: UUID, authId: String): ArtifactContentResult</ID>
     <ID>LongMethod:BitbucketArtifactMapper.kt:BitbucketArtifactMapper$fun toCommand(event: BitbucketFileFetchedEvent): BitbucketArtifactCommand</ID>
     <ID>LongMethod:BitbucketArtifactMapper.kt:BitbucketArtifactMapper$fun toCommand(event: BitbucketWorkspaceMetadataFetchedEvent): BitbucketArtifactCommand</ID>
@@ -339,11 +337,11 @@
     <ID>RedundantSuspendModifier:GithubConnectorService.kt:GithubConnectorService$suspend</ID>
     <ID>RedundantSuspendModifier:JiraController.kt:JiraController$suspend</ID>
     <ID>SpreadOperator:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$( cb.like(mimeLower, "image/%"), *imageExtPredicates.toTypedArray(), )</ID>
-    <ID>SpreadOperator:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$(*(preds + cb.isNotNull(language)).toTypedArray())</ID>
+    <ID>SpreadOperator:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$(*(buildPredicates(cb, root, join, projectId, criteria, kind) + spec.conditions).toTypedArray())</ID>
     <ID>SpreadOperator:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$(*countPredicates.toTypedArray())</ID>
     <ID>SpreadOperator:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$(*predicates.toTypedArray())</ID>
-    <ID>SpreadOperator:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$(*preds.toTypedArray())</ID>
     <ID>SpreadOperator:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$(*repoPrefixPredicates.toTypedArray())</ID>
+    <ID>SpreadOperator:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$(*spec.columns.toTypedArray())</ID>
     <ID>SpreadOperator:IngestionRunService.kt:IngestionRunService$(*matches.toTypedArray())</ID>
     <ID>SpreadOperator:IngestionRunService.kt:IngestionRunService$(*predicates.toTypedArray())</ID>
     <ID>SpreadOperator:SprintStartBackendApplication.kt:(*args)</ID>
