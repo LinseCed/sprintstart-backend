@@ -98,6 +98,8 @@ dependencyManagement {
 kotlin {
     compilerOptions {
         freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
+        // A warning fails the build rather than joining a pile nobody reads.
+        allWarningsAsErrors.set(true)
     }
 }
 

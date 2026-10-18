@@ -470,8 +470,7 @@ class BuddyControllerTest(
                 "hi",
                 true,
                 match {
-                    it != null &&
-                        it.sourceSystems == listOf(SourceSystem.GITHUB, SourceSystem.JIRA) &&
+                    it.sourceSystems == listOf(SourceSystem.GITHUB, SourceSystem.JIRA) &&
                         it.from == "2026-10-01T00:00:00Z" &&
                         it.to == "2026-10-06T21:59:59.999Z"
                 },
