@@ -23,7 +23,6 @@
     <ID>CyclomaticComplexMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeSkip( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>CyclomaticComplexMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>CyclomaticComplexMethod:BuddyPathTools.kt:BuddyPathTools$fun snapshotFor(userId: UUID): String?</ID>
-    <ID>CyclomaticComplexMethod:BuddyPathTools.kt:BuddyPathTools$private fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
     <ID>CyclomaticComplexMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun perform(authId: String, userId: UserId, request: BuddyActionRequest): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, userId: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>CyclomaticComplexMethod:BuddyToolExecutor.kt:BuddyToolExecutor$fun execute(call: BuddyToolCallDto, userId: UUID, currentPage: String? = null): String</ID>
@@ -40,6 +39,7 @@
     <ID>CyclomaticComplexMethod:NotionCredentialPersistenceService.kt:NotionCredentialPersistenceService$private fun applyWorkspace(credential: NotionCredential, workspace: NotionTokenIdentity)</ID>
     <ID>CyclomaticComplexMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun GeneratedPhaseContent.copyInto(onboardingPhase: OnboardingPhase)</ID>
     <ID>CyclomaticComplexMethod:PathElements.kt:PathElements$private fun containedIn(steps: List&lt;OnboardingStep&gt;, checks: Int, includeSteps: Boolean = true): String</ID>
+    <ID>CyclomaticComplexMethod:PhaseText.kt:internal fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
     <ID>CyclomaticComplexMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Evaluating project industry automatically") override suspend fun evaluateIndustryAutomatically(projectId: UUID)</ID>
     <ID>CyclomaticComplexMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Getting or lazily evaluating project industry") override suspend fun getOrEvaluateIndustry(projectId: UUID): String?</ID>
     <ID>CyclomaticComplexMethod:StarterWorkPoolReconciler.kt:StarterWorkPoolReconciler$@Transactional fun reconcile(): Outcome</ID>
@@ -48,7 +48,6 @@
     <ID>LargeClass:BlueprintPathController.kt:BlueprintPathController</ID>
     <ID>LargeClass:BoardService.kt:BoardService</ID>
     <ID>LargeClass:BuddyActionService.kt:BuddyActionService</ID>
-    <ID>LargeClass:BuddyPathTools.kt:BuddyPathTools</ID>
     <ID>LargeClass:OnboardingPersonalizationService.kt:OnboardingPersonalizationService</ID>
     <ID>LongMethod:AiFaqGroupMapper.kt:AiFaqGroupMapper$fun toEntity( aiGroup: AiFaqGroup, projectId: UUID, askedAtByQuestionId: Map&lt;String, Instant&gt;, ): FaqGroup</ID>
     <ID>LongMethod:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$private fun buildPredicates( cb: CriteriaBuilder, root: Root&lt;Artifact&gt;, projectJoin: Join&lt;Artifact, UUID&gt;, projectId: UUID, criteria: ArtifactFilterCriteria, exclude: FacetKind?, ): List&lt;Predicate&gt;</ID>
@@ -81,7 +80,6 @@
     <ID>LongMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyPathTools.kt:BuddyPathTools$fun execute(userId: UUID): String</ID>
     <ID>LongMethod:BuddyPathTools.kt:BuddyPathTools$fun snapshotFor(userId: UUID): String?</ID>
-    <ID>LongMethod:BuddyPathTools.kt:BuddyPathTools$private fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
     <ID>LongMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun perform(authId: String, userId: UserId, request: BuddyActionRequest): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, userId: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyReplyStream.kt:internal suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.relayAgentTurn( events: Flow&lt;BuddyAgentStreamEvent&gt;, emittedContent: StringBuilder, ): BuddyAgentResponse</ID>
@@ -138,6 +136,7 @@
     <ID>LongMethod:OnboardingPersonalizationService.kt:OnboardingPersonalizationService$@Tracked("Creating onboarding path from blueprint") fun personalize(authId: String, projectId: UUID): Flow&lt;OnboardingSseEvent&gt;</ID>
     <ID>LongMethod:PathItemText.kt:internal fun StringBuilder.appendQuestion( question: GetOnboardingQuestionForUserResponse, phase: GetOnboardingPhaseForUserResponse, graph: PhaseGraph, lastAnswer: String?, )</ID>
     <ID>LongMethod:PhaseReadingOrder.kt:PhaseReadingOrder$fun of(nodes: List&lt;Pair&lt;UUID, Set&lt;UUID&gt;&gt;&gt;): List&lt;UUID&gt;</ID>
+    <ID>LongMethod:PhaseText.kt:internal fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
     <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Evaluating project industry automatically") override suspend fun evaluateIndustryAutomatically(projectId: UUID)</ID>
     <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Getting or lazily evaluating project industry") override suspend fun getOrEvaluateIndustry(projectId: UUID): String?</ID>
     <ID>LongMethod:ProjectRoleService.kt:ProjectRoleService$@Tracked("Suggesting skills for project role") suspend fun suggestSkillsForRole( roleId: UUID, request: SuggestSkillsRequest? = null, ): List&lt;SkillSuggestionItemResponse&gt;</ID>
