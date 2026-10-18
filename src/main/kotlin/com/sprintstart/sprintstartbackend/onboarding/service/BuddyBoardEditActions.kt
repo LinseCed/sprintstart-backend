@@ -20,6 +20,9 @@ import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService.
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService.ProposeOutcome
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyBoardWriteActions.BoardWritePayload
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyBoardWriteActions.Scope
+import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
@@ -90,12 +93,12 @@ class BuddyBoardEditActions(
     fun perform(type: BuddyActionType, userId: UUID, projectId: UUID, payload: BoardWritePayload): BuddyActionResponse =
         try {
             when (type) {
-                BuddyActionType.PLACE_LINK -> placeLink(userId, projectId, payload)
-                BuddyActionType.EDIT_NOTE -> editNote(userId, projectId, payload)
-                BuddyActionType.EDIT_LINK -> editLink(userId, projectId, payload)
-                BuddyActionType.EDIT_CHECKLIST -> editChecklist(userId, projectId, payload)
-                BuddyActionType.DISMISS_CARDS -> dismissCards(userId, projectId, payload.cardIds)
-                BuddyActionType.REORDER_CARDS -> reorderCards(userId, projectId, payload.cardIds)
+                BuddyActionType.PLACE_LINK -> placeLink(UserId(userId), ProjectId(projectId), payload)
+                BuddyActionType.EDIT_NOTE -> editNote(UserId(userId), ProjectId(projectId), payload)
+                BuddyActionType.EDIT_LINK -> editLink(UserId(userId), ProjectId(projectId), payload)
+                BuddyActionType.EDIT_CHECKLIST -> editChecklist(UserId(userId), ProjectId(projectId), payload)
+                BuddyActionType.DISMISS_CARDS -> dismissCards(UserId(userId), ProjectId(projectId), payload.cardIds)
+                BuddyActionType.REORDER_CARDS -> reorderCards(UserId(userId), ProjectId(projectId), payload.cardIds)
                 else -> error("$type is not a board edit; handles() keeps it out of here")
             }
         } catch (ex: ResponseStatusException) {
@@ -106,10 +109,7 @@ class BuddyBoardEditActions(
 
     private fun proposeLink(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
         val url = call.textArgument("url")
-        val label = call
-            .textArgument("label")
-            .take(MAX_LABEL)
-            .ifBlank { null }
+        val label = call.textArgument("label").take(MAX_LABEL).ifBlank { null }
         if (!url.isWebAddress()) return refused(NOT_A_WEB_ADDRESS)
 
         return offer(
@@ -159,10 +159,7 @@ class BuddyBoardEditActions(
 
     private fun proposeLinkEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
         val url = call.textArgument("url")
-        val label = call
-            .textArgument("label")
-            .take(MAX_LABEL)
-            .ifBlank { null }
+        val label = call.textArgument("label").take(MAX_LABEL).ifBlank { null }
         val card = when (val found = ownCard(call, scope, BoardCardKind.LINK)) {
             is Found.Refused -> return refused(found.reason)
             is Found.Ok -> found.value
@@ -198,10 +195,7 @@ class BuddyBoardEditActions(
      * matches them back by their words.
      */
     private fun proposeChecklistEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
-        val title = call
-            .textArgument("title")
-            .take(MAX_CHECKLIST_TITLE)
-            .ifBlank { null }
+        val title = call.textArgument("title").take(MAX_CHECKLIST_TITLE).ifBlank { null }
         val items = call.textListArgument("items").map { it.take(MAX_CHECKLIST_ITEM_LENGTH) }.take(MAX_CHECKLIST_ITEMS)
         val card = when (val found = ownCard(call, scope, BoardCardKind.CHECKLIST)) {
             is Found.Refused -> return refused(found.reason)
@@ -300,7 +294,7 @@ class BuddyBoardEditActions(
         }
     }
 
-    private fun placeLink(userId: UUID, projectId: UUID, payload: BoardWritePayload): BuddyActionResponse {
+    private fun placeLink(userId: UserId, projectId: ProjectId, payload: BoardWritePayload): BuddyActionResponse {
         val url = payload.linkUrl?.trim().orEmpty()
         if (!url.isWebAddress()) return BuddyActionResponse(ok = false, message = "There was no link left to keep.")
 
@@ -308,7 +302,7 @@ class BuddyBoardEditActions(
         return BuddyActionResponse(ok = true, message = "Kept on your board. It's yours — edit it as you like.")
     }
 
-    private fun editNote(userId: UUID, projectId: UUID, payload: BoardWritePayload): BuddyActionResponse {
+    private fun editNote(userId: UserId, projectId: ProjectId, payload: BoardWritePayload): BuddyActionResponse {
         val cardId = payload.cardId
         val text = payload.noteText
             ?.trim()
@@ -317,20 +311,20 @@ class BuddyBoardEditActions(
         if (cardId == null || text.isEmpty()) {
             return BuddyActionResponse(ok = false, message = "There was no note change to make.")
         }
-        return edited(userId, projectId, cardId, payload.basedOn, NoteCardRequest(text = text))
+        return edited(userId, projectId, BoardCardId(cardId), payload.basedOn, NoteCardRequest(text = text))
     }
 
-    private fun editLink(userId: UUID, projectId: UUID, payload: BoardWritePayload): BuddyActionResponse {
+    private fun editLink(userId: UserId, projectId: ProjectId, payload: BoardWritePayload): BuddyActionResponse {
         val cardId = payload.cardId
         val url = payload.linkUrl?.trim().orEmpty()
         if (cardId == null || !url.isWebAddress()) {
             return BuddyActionResponse(ok = false, message = "There was no link change to make.")
         }
-        return edited(userId, projectId, cardId, payload.basedOn, linkRequest(url, payload.linkLabel))
+        return edited(userId, projectId, BoardCardId(cardId), payload.basedOn, linkRequest(url, payload.linkLabel))
     }
 
     /** Re-capped here rather than trusted from the confirm, as every free-text payload is. */
-    private fun editChecklist(userId: UUID, projectId: UUID, payload: BoardWritePayload): BuddyActionResponse {
+    private fun editChecklist(userId: UserId, projectId: ProjectId, payload: BoardWritePayload): BuddyActionResponse {
         val cardId = payload.cardId
         val lines = payload.checklistItems
             .orEmpty()
@@ -347,7 +341,7 @@ class BuddyBoardEditActions(
                 ?.ifBlank { null },
             items = lines.map { ChecklistItemRequest(text = it) },
         )
-        return edited(userId, projectId, cardId, payload.basedOn, request)
+        return edited(userId, projectId, BoardCardId(cardId), payload.basedOn, request)
     }
 
     /**
@@ -360,9 +354,9 @@ class BuddyBoardEditActions(
      * that lock is taken. A confirm that carries no fingerprint is refused the same way.
      */
     private fun edited(
-        userId: UUID,
-        projectId: UUID,
-        cardId: UUID,
+        userId: UserId,
+        projectId: ProjectId,
+        cardId: BoardCardId,
         basedOn: String?,
         request: AuthoredCardRequest,
     ): BuddyActionResponse {
@@ -373,8 +367,8 @@ class BuddyBoardEditActions(
         )
     }
 
-    private fun dismissCards(userId: UUID, projectId: UUID, cardIds: List<UUID>?): BuddyActionResponse {
-        val ids = cardIds.orEmpty().take(MAX_CARDS)
+    private fun dismissCards(userId: UserId, projectId: ProjectId, cardIds: List<UUID>?): BuddyActionResponse {
+        val ids = cardIds.orEmpty().take(MAX_CARDS).map(::BoardCardId)
         if (ids.isEmpty()) return BuddyActionResponse(ok = false, message = "No cards were proposed to remove.")
 
         return when (val gone = boardService.dismissForBuddy(userId, projectId, ids)) {
@@ -386,8 +380,8 @@ class BuddyBoardEditActions(
         }
     }
 
-    private fun reorderCards(userId: UUID, projectId: UUID, cardIds: List<UUID>?): BuddyActionResponse {
-        val ids = cardIds.orEmpty().take(MAX_CARDS)
+    private fun reorderCards(userId: UserId, projectId: ProjectId, cardIds: List<UUID>?): BuddyActionResponse {
+        val ids = cardIds.orEmpty().take(MAX_CARDS).map(::BoardCardId)
         if (ids.isEmpty()) return BuddyActionResponse(ok = false, message = "No order was proposed.")
 
         return when (val moved = boardService.reorderForBuddy(userId, projectId, ids)) {
@@ -397,10 +391,11 @@ class BuddyBoardEditActions(
     }
 
     /** What is on the hire's board, without creating one for somebody who has never opened it. */
-    private fun cardsOn(scope: Scope): List<BoardCardResponse>? = cardsOn(scope.userId, scope.projectId)
-
-    private fun cardsOn(userId: UUID, projectId: UUID): List<BoardCardResponse>? =
-        if (boardService.hasBoard(userId, projectId)) boardService.getBoard(userId, projectId)?.cards else null
+    private fun cardsOn(scope: Scope): List<BoardCardResponse>? {
+        val user = UserId(scope.userId)
+        val project = ProjectId(scope.projectId)
+        return if (boardService.hasBoard(user, project)) boardService.getBoard(user, project)?.cards else null
+    }
 
     /** The one card of the hire's own of [kind] that the call's `card_id` names. */
     private fun ownCard(call: BuddyToolCallDto, scope: Scope, kind: BoardCardKind): Found<BoardCardResponse> {

@@ -7,6 +7,8 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGoal
 import com.sprintstart.sprintstartbackend.onboarding.model.response.goal.GoalView
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalRepository
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -76,7 +78,7 @@ class UserGoalService(
         userGoalRepository.save(goal)
         // Pinned however the task was claimed, and revived if dismissed: claiming a task says this is what
         // they are working on.
-        boardService.placeOrRevive(userId, projectId, BoardCardKind.CURRENT_TASK, by)
+        boardService.placeOrRevive(UserId(userId), ProjectId(projectId), BoardCardKind.CURRENT_TASK, by)
 
         return GoalView(
             proposalId = proposal.id,

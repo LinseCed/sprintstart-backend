@@ -2,7 +2,7 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>CognitiveComplexMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UUID): String</ID>
+    <ID>CognitiveComplexMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UserId): String</ID>
     <ID>CognitiveComplexMethod:BuddyService.kt:BuddyService$@Suppress("CyclomaticComplexMethod", "ThrowsCount") suspend fun sendMessageForMe( authId: String, sessionId: UUID?, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters?, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>CognitiveComplexMethod:IngestionRunLifeCycleService.kt:IngestionRunLifeCycleService$@Transactional @Tracked("Starting ingestion run") fun startOrUpdateRun( transactionId: UUID, sourceSystem: SourceSystem, status: IngestionRunStatus, failureReason: String? = null, sourceInstanceId: UUID? = null, sourceInstanceRef: String? = null, )</ID>
     <ID>CognitiveComplexMethod:OnboardingPersonalizationService.kt:OnboardingPersonalizationService$@Suppress("CyclomaticComplexMethod") private suspend fun streamPhaseContent( phase: PhaseAssemblyTarget, projectId: String, industry: String?, relay: suspend (detail: String) -&gt; Unit, ): PhaseGenerationResult</ID>
@@ -14,12 +14,12 @@
     <ID>CyclomaticComplexMethod:ArtifactFacetRepositoryImpl.kt:ArtifactFacetRepositoryImpl$private fun computeRepositoryFacets( cb: CriteriaBuilder, projectId: UUID, criteria: ArtifactFilterCriteria, ): List&lt;FacetCountResponse&gt;</ID>
     <ID>CyclomaticComplexMethod:ArtifactService.kt:ArtifactService$@Transactional(readOnly = true) @Tracked("Retrieving content of artifact") fun getArtifactContent(projectId: UUID, artifactId: UUID, authId: String): ArtifactContentResult</ID>
     <ID>CyclomaticComplexMethod:BitbucketArtifactProviderService.kt:BitbucketArtifactProviderService$private fun applyChange(artifact: Artifact, command: BitbucketArtifactCommand): BitbucketArtifactChange</ID>
-    <ID>CyclomaticComplexMethod:BoardCardHydrator.kt:BoardCardHydrator$private fun hydrate( card: BoardCard, member: ProjectMember, projectId: UUID, diagram: BoardDiagram?, arrivalSteps: List&lt;ResolvedArrivalStep&gt;, pathSteps: Map&lt;UUID, ResolvedPathStep&gt;, matches: () -&gt; List&lt;RankedStarterWorkTaskResponse&gt;, ): BoardCardContent</ID>
-    <ID>CyclomaticComplexMethod:BoardService.kt:BoardService$@Transactional fun place( userId: UUID, projectId: UUID, kind: BoardCardKind, subject: String? = null, by: BoardActor = BoardActor.BUDDY, ): PlacementOutcome</ID>
-    <ID>CyclomaticComplexMethod:BoardService.kt:BoardService$private fun editableCardOrThrow( userId: UUID, cardId: UUID, kind: BoardCardKind, ): Pair&lt;BoardCard, Board&gt;</ID>
+    <ID>CyclomaticComplexMethod:BoardCardHydrator.kt:BoardCardHydrator$private fun hydrate( card: BoardCard, member: ProjectMember, projectId: ProjectId, diagram: BoardDiagram?, arrivalSteps: List&lt;ResolvedArrivalStep&gt;, pathSteps: Map&lt;UUID, ResolvedPathStep&gt;, matches: () -&gt; List&lt;RankedStarterWorkTaskResponse&gt;, ): BoardCardContent</ID>
+    <ID>CyclomaticComplexMethod:BoardService.kt:BoardService$@Transactional fun place( userId: UserId, projectId: ProjectId, kind: BoardCardKind, subject: String? = null, by: BoardActor = BoardActor.BUDDY, ): PlacementOutcome</ID>
+    <ID>CyclomaticComplexMethod:BoardService.kt:BoardService$private fun editableCardOrThrow( userId: UserId, cardId: BoardCardId, kind: BoardCardKind, ): Pair&lt;BoardCard, Board&gt;</ID>
     <ID>CyclomaticComplexMethod:BuddyActionService.kt:BuddyActionService$suspend fun perform(request: BuddyActionRequest, jwt: Jwt): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
-    <ID>CyclomaticComplexMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UUID): String</ID>
+    <ID>CyclomaticComplexMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UserId): String</ID>
     <ID>CyclomaticComplexMethod:BuddyPathActions.kt:BuddyPathActions$private fun answerQuestion(authId: String, request: BuddyActionRequest): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeAddPathStep( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>CyclomaticComplexMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeAnswer( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
@@ -69,14 +69,14 @@
     <ID>LongMethod:BlueprintPathCopyFactory.kt:BlueprintPathCopyFactory$fun createCopyFrom( path: BlueprintPath, blueprintKey: UUID, projectId: UUID?, status: BlueprintStatus, version: Int, ): BlueprintPath</ID>
     <ID>LongMethod:BlueprintSeeder.kt:BlueprintSeeder$fun seed()</ID>
     <ID>LongMethod:BoardDiagramService.kt:BoardDiagramService$private fun store( context: DiagramContext, outcome: DiagramOutcome, schema: DiagramSchema, ): DiagramContent</ID>
-    <ID>LongMethod:BoardService.kt:BoardService$@Transactional fun place( userId: UUID, projectId: UUID, kind: BoardCardKind, subject: String? = null, by: BoardActor = BoardActor.BUDDY, ): PlacementOutcome</ID>
+    <ID>LongMethod:BoardService.kt:BoardService$@Transactional fun place( userId: UserId, projectId: ProjectId, kind: BoardCardKind, subject: String? = null, by: BoardActor = BoardActor.BUDDY, ): PlacementOutcome</ID>
     <ID>LongMethod:BuddyActionService.kt:BuddyActionService$@Suppress("CyclomaticComplexMethod") // The person-scoped gates first, then one branch per action. fun propose(call: BuddyToolCallDto, userId: UUID): ProposeOutcome</ID>
     <ID>LongMethod:BuddyActionService.kt:BuddyActionService$private suspend fun dispatch( type: BuddyActionType, resolved: CallerContext.Resolved, authId: String, request: BuddyActionRequest, ): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyActionService.kt:BuddyActionService$suspend fun perform(request: BuddyActionRequest, jwt: Jwt): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
     <ID>LongMethod:BuddyBoardEditActions.kt:BuddyBoardEditActions$private fun namedCards(call: BuddyToolCallDto, scope: Scope): Found&lt;List&lt;BoardCardResponse&gt;&gt;</ID>
     <ID>LongMethod:BuddyBoardEditActions.kt:BuddyBoardEditActions$private fun proposeChecklistEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome</ID>
-    <ID>LongMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UUID): String</ID>
+    <ID>LongMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UserId): String</ID>
     <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun addPathStep(authId: String, request: BuddyActionRequest): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun answerQuestion(authId: String, request: BuddyActionRequest): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeAddPathStep( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>

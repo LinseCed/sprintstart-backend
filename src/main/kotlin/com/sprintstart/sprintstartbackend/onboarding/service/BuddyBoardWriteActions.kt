@@ -10,6 +10,9 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.board.NoteCar
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService.BuddyActionProposal
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService.ProposeOutcome
+import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -83,14 +86,14 @@ class BuddyBoardWriteActions(
         payload: BoardWritePayload,
     ): BuddyActionResponse = when (type) {
         BuddyActionType.PLACE_CHECKLIST ->
-            placeChecklist(userId, projectId, payload.checklistTitle, payload.checklistItems)
+            placeChecklist(UserId(userId), ProjectId(projectId), payload.checklistTitle, payload.checklistItems)
         BuddyActionType.AMEND_CHECKLIST ->
-            amendChecklist(userId, projectId, payload.cardId, payload.checklistItems)
+            amendChecklist(UserId(userId), ProjectId(projectId), payload.cardId, payload.checklistItems)
         BuddyActionType.TICK_CHECKLIST_ITEMS ->
-            tickItems(userId, projectId, payload.cardId, payload.checklistItems)
+            tickItems(UserId(userId), ProjectId(projectId), payload.cardId, payload.checklistItems)
         BuddyActionType.REWORD_CHECKLIST_ITEM ->
-            rewordItem(userId, projectId, payload.cardId, payload.lineBefore, payload.lineAfter)
-        BuddyActionType.PLACE_NOTE -> placeNote(userId, projectId, payload.noteText)
+            rewordItem(UserId(userId), ProjectId(projectId), payload.cardId, payload.lineBefore, payload.lineAfter)
+        BuddyActionType.PLACE_NOTE -> placeNote(UserId(userId), ProjectId(projectId), payload.noteText)
         else -> edits.perform(type, userId, projectId, payload)
     }
 
@@ -135,10 +138,7 @@ class BuddyBoardWriteActions(
         type: BuddyActionType,
         projectName: String,
     ): ProposeOutcome {
-        val title = call
-            .textArgument("title")
-            .take(MAX_CHECKLIST_TITLE)
-            .ifBlank { null }
+        val title = call.textArgument("title").take(MAX_CHECKLIST_TITLE).ifBlank { null }
         val items = call.textListArgument("items")
         return when {
             items.size < MIN_CHECKLIST_ITEMS ->
@@ -163,8 +163,8 @@ class BuddyBoardWriteActions(
      * free text the client sends back, and a card is cheap to write and awkward to remove.
      */
     private fun placeChecklist(
-        userId: UUID,
-        projectId: UUID,
+        userId: UserId,
+        projectId: ProjectId,
         title: String?,
         items: List<String>?,
     ): BuddyActionResponse {
@@ -264,21 +264,20 @@ class BuddyBoardWriteActions(
 
     /** Ticks the named lines, and can do nothing else to the card. */
     private fun tickItems(
-        userId: UUID,
-        projectId: UUID,
+        userId: UserId,
+        projectId: ProjectId,
         cardId: UUID?,
         items: List<String>?,
     ): BuddyActionResponse {
-        if (cardId == null) {
-            return BuddyActionResponse(ok = false, message = "No card was proposed to tick off.")
-        }
+        val card = cardId?.let(::BoardCardId)
+            ?: return BuddyActionResponse(ok = false, message = "No card was proposed to tick off.")
         val lines = items.orEmpty().map { it.trim() }.filter { it.isNotBlank() }
         if (lines.isEmpty()) {
             return BuddyActionResponse(ok = false, message = "There was nothing left to tick off.")
         }
 
         return try {
-            when (val ticked = boardService.tickChecklistItems(userId, projectId, cardId, lines)) {
+            when (val ticked = boardService.tickChecklistItems(userId, projectId, card, lines)) {
                 0 -> BuddyActionResponse(
                     ok = false,
                     // Says which of the two it was, because they need different answers: one is
@@ -328,8 +327,8 @@ class BuddyBoardWriteActions(
 
     /** Rewrites the named line, and can do nothing else to the card. */
     private fun rewordItem(
-        userId: UUID,
-        projectId: UUID,
+        userId: UserId,
+        projectId: ProjectId,
         cardId: UUID?,
         before: String?,
         after: String?,
@@ -340,7 +339,7 @@ class BuddyBoardWriteActions(
         val reworded = after.take(MAX_CHECKLIST_ITEM_LENGTH)
 
         return try {
-            if (boardService.rewordChecklistItem(userId, projectId, cardId, before, reworded)) {
+            if (boardService.rewordChecklistItem(userId, projectId, BoardCardId(cardId), before, reworded)) {
                 BuddyActionResponse(
                     ok = true,
                     message = "Reworded. It keeps its place and its tick; nothing else changed.",
@@ -382,14 +381,13 @@ class BuddyBoardWriteActions(
 
     /** Adds the proposed lines to the hire's card, and can do nothing else to it. */
     private fun amendChecklist(
-        userId: UUID,
-        projectId: UUID,
+        userId: UserId,
+        projectId: ProjectId,
         cardId: UUID?,
         items: List<String>?,
     ): BuddyActionResponse {
-        if (cardId == null) {
-            return BuddyActionResponse(ok = false, message = "No card was proposed to add to.")
-        }
+        val card = cardId?.let(::BoardCardId)
+            ?: return BuddyActionResponse(ok = false, message = "No card was proposed to add to.")
         val lines = items
             .orEmpty()
             .map { it.trim().take(MAX_CHECKLIST_ITEM_LENGTH) }
@@ -400,7 +398,7 @@ class BuddyBoardWriteActions(
         }
 
         return try {
-            boardService.appendChecklistItems(userId, projectId, cardId, lines)
+            boardService.appendChecklistItems(userId, projectId, card, lines)
             BuddyActionResponse(
                 ok = true,
                 message = "Added ${lines.size} to that list. Nothing else on it changed.",
@@ -412,7 +410,7 @@ class BuddyBoardWriteActions(
         }
     }
 
-    private fun placeNote(userId: UUID, projectId: UUID, text: String?): BuddyActionResponse {
+    private fun placeNote(userId: UserId, projectId: ProjectId, text: String?): BuddyActionResponse {
         val body = text?.trim()?.take(MAX_NOTE_LENGTH).orEmpty()
         if (body.length < MIN_NOTE_LENGTH) {
             return BuddyActionResponse(ok = false, message = "There was no note left to keep.")
