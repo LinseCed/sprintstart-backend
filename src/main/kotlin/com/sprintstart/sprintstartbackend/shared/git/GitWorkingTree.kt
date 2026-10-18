@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.shared.git
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.springframework.stereotype.Service
@@ -67,6 +68,7 @@ class GitWorkingTree(
     private val onDiskOperations: OnDiskOperations,
     private val gitRunner: GitOperationRunner,
     private val config: GitConfig,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /**
      * Lists the repository-relative paths of every tracked file in a clone.
@@ -76,7 +78,7 @@ class GitWorkingTree(
      * @throws RuntimeException if the path is not a usable Git repository.
      */
     suspend fun trackedFiles(repositoryPath: Path): List<String> =
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             gitRunner
                 .exec(repositoryPath, onDiskOperations.gitListFiles())
                 .split(NUL)
@@ -94,7 +96,7 @@ class GitWorkingTree(
         if (isBinary(relativePath)) return GitFileRead.Binary
 
         val absolutePath = repositoryPath.resolve(relativePath)
-        return withContext(Dispatchers.IO) {
+        return withContext(ioDispatcher) {
             runCatching {
                 val sizeBytes = Files.size(absolutePath)
                 if (sizeBytes > config.ingest.maxFileSizeBytes) {
