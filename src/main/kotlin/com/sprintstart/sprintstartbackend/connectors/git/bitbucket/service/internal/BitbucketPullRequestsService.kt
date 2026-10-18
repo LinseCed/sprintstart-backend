@@ -17,6 +17,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.model.excepti
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.repository.BitbucketConnectionRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
@@ -37,6 +38,7 @@ internal class BitbucketPullRequestsService(
     private val credentialApi: AtlassianCredentialApi,
     private val bitbucketClient: BitbucketClient,
     private val eventPublisher: ApplicationEventPublisher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /**
      * Fetches the pull requests changed since the connection's cursor and publishes one event each.
@@ -64,7 +66,7 @@ internal class BitbucketPullRequestsService(
      */
     @Tracked("Fetching and ingesting PRs from a Bitbucket repository")
     suspend fun fetchAndIngestPullRequests(repositoryId: UUID, transactionId: UUID) {
-        val connection = withContext(Dispatchers.IO) {
+        val connection = withContext(ioDispatcher) {
             connectionRepository.findById(repositoryId)
         }.orElseThrow { BitbucketRepositoryNotConnectedException(repositoryId) }
 
@@ -83,7 +85,7 @@ internal class BitbucketPullRequestsService(
 
             fetchAndIngestPullRequests(connection, credential, transactionId)
 
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 connectionRepository.updatePullRequestsCursor(connection.id, syncStartedAt)
             }
         } catch (e: CancellationException) {

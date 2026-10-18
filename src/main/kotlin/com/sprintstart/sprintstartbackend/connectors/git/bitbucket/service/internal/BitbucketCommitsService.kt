@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.utils.Bitbuck
 import com.sprintstart.sprintstartbackend.connectors.git.utils.GitIngestionEngine
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
@@ -35,6 +36,7 @@ internal class BitbucketCommitsService(
     private val provider: BitbucketGitProvider,
     private val ingestionEngine: GitIngestionEngine,
     private val eventPublisher: ApplicationEventPublisher,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     /**
      * Fetches and ingests the commits of one connected Bitbucket repository.
@@ -46,7 +48,7 @@ internal class BitbucketCommitsService(
      */
     @Tracked("Fetching and ingesting commits of Bitbucket repository")
     suspend fun fetchAndIngestCommitsOfRepository(repositoryId: UUID, transactionId: UUID) {
-        val connection = withContext(Dispatchers.IO) {
+        val connection = withContext(ioDispatcher) {
             connectionRepository.findById(repositoryId)
         }.orElseThrow { BitbucketRepositoryNotConnectedException(repositoryId) }
 
@@ -67,7 +69,7 @@ internal class BitbucketCommitsService(
             throw e
         }
 
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             connectionRepository.updateCommitsCursor(connection.id, outcome.revision)
         }
 
