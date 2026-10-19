@@ -1,9 +1,9 @@
 package com.sprintstart.sprintstartbackend.user.service
 
-import com.sprintstart.sprintstartbackend.ApplicationConfig
-import com.sprintstart.sprintstartbackend.KeycloakAdminConfig
 import com.sprintstart.sprintstartbackend.config.KeycloakRoleMapper
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
+import com.sprintstart.sprintstartbackend.shared.config.KeycloakAdminConfig
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus

@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend
+package com.sprintstart.sprintstartbackend.shared.config
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import org.springframework.boot.context.properties.ConfigurationProperties

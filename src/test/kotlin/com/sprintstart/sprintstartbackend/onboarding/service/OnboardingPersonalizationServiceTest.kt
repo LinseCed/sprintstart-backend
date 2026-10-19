@@ -1,12 +1,5 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.AiConfig
-import com.sprintstart.sprintstartbackend.ApplicationConfig
-import com.sprintstart.sprintstartbackend.BitbucketConfig
-import com.sprintstart.sprintstartbackend.CryptoConfig
-import com.sprintstart.sprintstartbackend.GithubConfig
-import com.sprintstart.sprintstartbackend.OnboardingConfig
-import com.sprintstart.sprintstartbackend.UploadConfig
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintPhaseType
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.RequirementType
@@ -26,6 +19,13 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.PhaseResourc
 import com.sprintstart.sprintstartbackend.onboarding.external.model.PhaseStepDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.PhaseTaskDto
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
+import com.sprintstart.sprintstartbackend.shared.config.AiConfig
+import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
+import com.sprintstart.sprintstartbackend.shared.config.BitbucketConfig
+import com.sprintstart.sprintstartbackend.shared.config.CryptoConfig
+import com.sprintstart.sprintstartbackend.shared.config.GithubConfig
+import com.sprintstart.sprintstartbackend.shared.config.OnboardingConfig
+import com.sprintstart.sprintstartbackend.shared.config.UploadConfig
 import com.sprintstart.sprintstartbackend.user.external.ProjectIndustryApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile

@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintPhaseType
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.factory.GeneratedOption
@@ -24,6 +23,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnbo
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.OnboardingSseEvent
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
 import com.sprintstart.sprintstartbackend.user.external.ProjectIndustryApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import jakarta.persistence.EntityManager

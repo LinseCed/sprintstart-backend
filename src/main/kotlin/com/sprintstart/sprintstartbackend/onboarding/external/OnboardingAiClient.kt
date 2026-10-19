@@ -1,6 +1,5 @@
 ﻿package com.sprintstart.sprintstartbackend.onboarding.external
 
-import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssembleDiagramRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssembleOrientationRequest
@@ -17,6 +16,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.OrientationO
 import com.sprintstart.sprintstartbackend.onboarding.external.model.PhaseContentOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
+import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
 import kotlinx.coroutines.flow.Flow
