@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.repository.BlueprintPathRepository
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toGetForUserResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.CurrentPhaseDto
@@ -13,6 +13,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.phase.GetOnb
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.QuestionAttemptRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.shared.ids.BlueprintId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import org.springframework.data.domain.Page
@@ -37,7 +38,7 @@ class OnboardingPathService(
     private val questionAttemptRepository: QuestionAttemptRepository,
     private val userApi: UserApi,
     private val onboardingPositionReader: OnboardingPositionReader,
-    private val blueprintPathRepository: BlueprintPathRepository,
+    private val blueprintApi: BlueprintApi,
 ) {
     /**
      * Where an existing path came from.
@@ -94,9 +95,7 @@ class OnboardingPathService(
             .findByUserId(userId)
             .map { path ->
                 PathOrigin(
-                    builtFromProjectId = path.blueprintId
-                        ?.let { blueprintPathRepository.findById(it).orElse(null) }
-                        ?.projectId,
+                    builtFromProjectId = path.blueprintId?.let { blueprintApi.projectIdOf(BlueprintId(it))?.value },
                 )
             }.orElse(null)
 

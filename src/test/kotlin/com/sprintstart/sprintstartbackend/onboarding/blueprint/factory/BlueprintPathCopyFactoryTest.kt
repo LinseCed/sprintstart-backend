@@ -2,12 +2,12 @@ package com.sprintstart.sprintstartbackend.onboarding.blueprint.factory
 
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintPhaseType
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintStatus
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintCheckQuestion
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPath
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPhase
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintStep
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepType
 import org.junit.jupiter.api.Test
 import java.util.UUID
 import kotlin.test.assertEquals

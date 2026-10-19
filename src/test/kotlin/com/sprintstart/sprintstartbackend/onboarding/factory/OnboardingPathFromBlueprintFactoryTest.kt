@@ -1,7 +1,9 @@
-package com.sprintstart.sprintstartbackend.onboarding.blueprint.factory
+package com.sprintstart.sprintstartbackend.onboarding.factory
 
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintPhaseType
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.RequirementType
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintCheckOption
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintCheckQuestion
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPath
@@ -10,10 +12,16 @@ import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.Blue
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintResource
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintStep
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintTask
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.mapper.toSnapshot
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepType
+import com.sprintstart.sprintstartbackend.onboarding.factory.GeneratedOption
+import com.sprintstart.sprintstartbackend.onboarding.factory.GeneratedPhaseContent
+import com.sprintstart.sprintstartbackend.onboarding.factory.GeneratedQuestion
+import com.sprintstart.sprintstartbackend.onboarding.factory.GeneratedResource
+import com.sprintstart.sprintstartbackend.onboarding.factory.GeneratedStep
+import com.sprintstart.sprintstartbackend.onboarding.factory.GeneratedTask
+import com.sprintstart.sprintstartbackend.onboarding.factory.OnboardingPathFromBlueprintFactory
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toGetForUserResponse
 import org.junit.jupiter.api.Test
 import java.util.UUID
@@ -82,7 +90,7 @@ class OnboardingPathFromBlueprintFactoryTest {
         introduction.blueprintCheckQuestions += check
 
         val userId = UUID.randomUUID()
-        val result = factory.createFrom(blueprint, userId)
+        val result = factory.createFrom(blueprint.toSnapshot(), userId)
 
         assertEquals(userId, result.userId)
         assertEquals(blueprint.id, result.blueprintId)
@@ -130,9 +138,9 @@ class OnboardingPathFromBlueprintFactoryTest {
         rolePhase.blockedBy += publicPhase
         blueprint.blueprintPhases += listOf(publicPhase, rolePhase)
 
-        val withoutRole = factory.createFrom(blueprint, UUID.randomUUID())
+        val withoutRole = factory.createFrom(blueprint.toSnapshot(), UUID.randomUUID())
         val withRole = factory.createFrom(
-            blueprintPath = blueprint,
+            blueprint = blueprint.toSnapshot(),
             userId = UUID.randomUUID(),
             projectRoleIds = setOf(requiredRoleId),
         )
@@ -170,7 +178,7 @@ class OnboardingPathFromBlueprintFactoryTest {
         blueprint.blueprintPhases += listOf(foundation, unavailable, delivery)
 
         val result = factory.createFrom(
-            blueprintPath = blueprint,
+            blueprint = blueprint.toSnapshot(),
             userId = UUID.randomUUID(),
             generatedContentByBlueprintPhaseId = mapOf(unavailable.id to GeneratedPhaseContent()),
             generationStatusByBlueprintPhaseId = mapOf(unavailable.id to GenerationStatus.SKIPPED),
@@ -211,7 +219,7 @@ class OnboardingPathFromBlueprintFactoryTest {
         blueprint.blueprintPhases += listOf(foundation, timedOut, delivery)
 
         val result = factory.createFrom(
-            blueprintPath = blueprint,
+            blueprint = blueprint.toSnapshot(),
             userId = UUID.randomUUID(),
             generatedContentByBlueprintPhaseId = mapOf(timedOut.id to GeneratedPhaseContent()),
             generationStatusByBlueprintPhaseId = mapOf(timedOut.id to GenerationStatus.TIMED_OUT),
@@ -271,7 +279,7 @@ class OnboardingPathFromBlueprintFactoryTest {
         )
 
         val result = factory.createFrom(
-            blueprintPath = blueprint,
+            blueprint = blueprint.toSnapshot(),
             userId = UUID.randomUUID(),
             generatedContentByBlueprintPhaseId = mapOf(overview.id to generated),
         )
@@ -340,7 +348,7 @@ class OnboardingPathFromBlueprintFactoryTest {
         )
 
         val result = factory.createFrom(
-            blueprintPath = blueprint,
+            blueprint = blueprint.toSnapshot(),
             userId = UUID.randomUUID(),
             generatedContentByBlueprintPhaseId = mapOf(overview.id to generated),
         )
