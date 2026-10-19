@@ -15,4 +15,7 @@ interface OnboardingFeedbackRepository : JpaRepository<OnboardingFeedback, UUID>
     fun findAllByStepIdAndUserIdOrderByCreatedAtAsc(stepId: UUID, userId: UUID): MutableList<OnboardingFeedback>
 
     fun findByIdAndUserId(id: UUID, userId: UUID): Optional<OnboardingFeedback>
+
+    /** Deletes every piece of feedback the user gave, on a step or not. */
+    fun deleteAllByUserId(userId: UUID)
 }
