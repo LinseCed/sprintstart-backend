@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.model.ConfluencePageArtifactCommand
-import com.sprintstart.sprintstartbackend.ingestion.external.model.ConfluenceRelationshipType
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluencePageArtifactCommand
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceRelationshipType
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.ArtifactCodeBlock
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.ArtifactRelationship

@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.NotionArtifactIngestionApi
-import com.sprintstart.sprintstartbackend.ingestion.external.model.NotionArtifactWriteResult
-import com.sprintstart.sprintstartbackend.ingestion.external.model.NotionPageArtifactCommand
+import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.NotionArtifactIngestionApi
+import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.NotionArtifactWriteResult
+import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.NotionPageArtifactCommand
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.ArtifactSourceRef
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus

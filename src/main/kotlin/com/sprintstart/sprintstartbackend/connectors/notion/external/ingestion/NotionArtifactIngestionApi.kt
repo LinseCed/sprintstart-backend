@@ -1,7 +1,5 @@
-package com.sprintstart.sprintstartbackend.ingestion.external
+package com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion
 
-import com.sprintstart.sprintstartbackend.ingestion.external.model.NotionArtifactWriteResult
-import com.sprintstart.sprintstartbackend.ingestion.external.model.NotionPageArtifactCommand
 import java.util.UUID
 
 /**
@@ -9,6 +7,7 @@ import java.util.UUID
  *
  * The connector supplies credential-free page content and stable source IDs. The ingestion module
  * owns artifact persistence, project membership, indexing work queues, and ingestion-run state.
+ * The connector owns this interface and the ingestion module implements it.
  */
 interface NotionArtifactIngestionApi {
     /** Opens one run for a workspace connection before any page is processed. */
