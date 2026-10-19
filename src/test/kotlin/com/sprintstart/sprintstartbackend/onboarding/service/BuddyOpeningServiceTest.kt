@@ -13,8 +13,8 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepo
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.shared.ids.AuthId
 import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
+import com.sprintstart.sprintstartbackend.user.external.SessionActivityApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
-import com.sprintstart.sprintstartbackend.user.service.SessionActivityService
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -39,7 +39,7 @@ class BuddyOpeningServiceTest {
     private val buddyMessageRepository: BuddyMessageRepository = mockk()
     private val onboardingAiClient: OnboardingAiClient = mockk()
     private val buddyToolExecutor: BuddyToolExecutor = mockk()
-    private val sessionActivityService: SessionActivityService = mockk()
+    private val sessionActivityService: SessionActivityApi = mockk()
     private val userApi: UserApi = mockk()
     private val buddyCompactionService: BuddyCompactionService = mockk(relaxed = true)
 
@@ -79,7 +79,7 @@ class BuddyOpeningServiceTest {
         every { buddySessionRepository.save(any()) } answers { firstArg() }
         every { buddyMessageRepository.save(any()) } answers { firstArg() }
         every {
-            sessionActivityService.recordActivityAndReturnLongAbsence(userId)
+            sessionActivityService.recordVisit(userId)
         } returns false
         every { buddySessionRepository.countByUserId(userId) } returns 1L
 
@@ -116,7 +116,7 @@ class BuddyOpeningServiceTest {
         every { buddySessionRepository.save(any()) } answers { firstArg() }
         every { buddyMessageRepository.save(any()) } answers { firstArg() }
         every {
-            sessionActivityService.recordActivityAndReturnLongAbsence(userId)
+            sessionActivityService.recordVisit(userId)
         } returns false
         every { buddySessionRepository.countByUserId(userId) } returns 1L
 
@@ -151,7 +151,7 @@ class BuddyOpeningServiceTest {
         }
         every { buddyMessageRepository.save(any()) } answers { firstArg() }
         every {
-            sessionActivityService.recordActivityAndReturnLongAbsence(userId)
+            sessionActivityService.recordVisit(userId)
         } returns false
         every { buddySessionRepository.countByUserId(userId) } returns 1L
 
@@ -191,7 +191,7 @@ class BuddyOpeningServiceTest {
         every { onboardingAiClient.streamBuddyOpen(any()) } throws
             OnboardingAiException(503, "", "AI is down")
         every {
-            sessionActivityService.recordActivityAndReturnLongAbsence(userId)
+            sessionActivityService.recordVisit(userId)
         } returns false
         every { buddySessionRepository.countByUserId(userId) } returns 1L
 
@@ -226,7 +226,7 @@ class BuddyOpeningServiceTest {
         )
         every { buddyMessageRepository.save(any()) } answers { firstArg() }
         every {
-            sessionActivityService.recordActivityAndReturnLongAbsence(userId)
+            sessionActivityService.recordVisit(userId)
         } returns false
         every { buddySessionRepository.countByUserId(userId) } returns 1L
 
@@ -260,7 +260,7 @@ class BuddyOpeningServiceTest {
         )
         every { buddyMessageRepository.save(any()) } answers { firstArg() }
         every {
-            sessionActivityService.recordActivityAndReturnLongAbsence(userId)
+            sessionActivityService.recordVisit(userId)
         } returns false
         every { buddySessionRepository.countByUserId(userId) } returns 1L
 
@@ -293,7 +293,7 @@ class BuddyOpeningServiceTest {
         )
         every { buddyMessageRepository.save(any()) } answers { firstArg() }
         every {
-            sessionActivityService.recordActivityAndReturnLongAbsence(userId)
+            sessionActivityService.recordVisit(userId)
         } returns false
         every {
             buddySessionRepository.countByUserId(userId)
@@ -340,7 +340,7 @@ class BuddyOpeningServiceTest {
         )
         every { buddySessionRepository.countByUserId(userId) } returns 2L
         every {
-            sessionActivityService.recordActivityAndReturnLongAbsence(userId)
+            sessionActivityService.recordVisit(userId)
         } returns false
 
         val events = service.streamOpenForMe(AuthId(authId), BuddySessionId(session.id)).toList()
@@ -374,7 +374,7 @@ class BuddyOpeningServiceTest {
             buddySessionRepository.countByUserId(userId)
         } returns 2L
         every {
-            sessionActivityService.recordActivityAndReturnLongAbsence(userId)
+            sessionActivityService.recordVisit(userId)
         } returns false
         every {
             buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
@@ -400,7 +400,7 @@ class BuddyOpeningServiceTest {
             buddySessionRepository.countByUserId(userId)
         } returns 2L
         every {
-            sessionActivityService.recordActivityAndReturnLongAbsence(userId)
+            sessionActivityService.recordVisit(userId)
         } returns true
         every {
             buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
@@ -466,7 +466,7 @@ class BuddyOpeningServiceTest {
         } returns messages
 
         every {
-            sessionActivityService.recordActivityAndReturnLongAbsence(userId)
+            sessionActivityService.recordVisit(userId)
         } returns false
 
         every {
