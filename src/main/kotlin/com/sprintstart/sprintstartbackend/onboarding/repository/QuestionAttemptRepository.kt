@@ -20,4 +20,7 @@ interface QuestionAttemptRepository : JpaRepository<QuestionAttempt, UUID> {
     /** IDs of every question the user ever attempted (correctly or not). */
     @Query("SELECT DISTINCT a.questionId FROM QuestionAttempt a WHERE a.userId = :userId")
     fun findAttemptedQuestionIdsByUserId(@Param("userId") userId: UUID): List<UUID>
+
+    /** Deletes every answer the user gave to a phase check. */
+    fun deleteAllByUserId(userId: UUID)
 }
