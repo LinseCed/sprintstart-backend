@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.ConfluenceArtifactIngestionApi
-import com.sprintstart.sprintstartbackend.ingestion.external.model.ConfluenceArtifactBatchCommand
-import com.sprintstart.sprintstartbackend.ingestion.external.model.ConfluenceArtifactBatchResult
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceArtifactBatchCommand
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceArtifactBatchResult
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
 import org.springframework.stereotype.Service

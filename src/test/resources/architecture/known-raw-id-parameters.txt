@@ -1229,7 +1229,7 @@ QuestionController.kt: QuestionController.submitQuestionAttemptForMe(questionId:
 RunArtifactsIngestionService.kt: RunArtifactsIngestionService.ingestRunArtifacts(runId: UUID)
 RunArtifactsIngestionService.kt: RunArtifactsIngestionService.requireEveryEntrySucceeded(runId: UUID)
 SessionActivityService.kt: SessionActivityService.recordActivity(authId: String)
-SessionActivityService.kt: SessionActivityService.recordActivityAndReturnLongAbsence(userId: UUID)
+SessionActivityService.kt: SessionActivityService.recordVisit(userId: UUID)
 SkillController.kt: SkillAdminController.getUserSkillAssessments(userId: UUID)
 SkillController.kt: SkillAdminController.retireSkill(skillId: UUID)
 SkillController.kt: SkillAdminController.updateSkill(skillId: UUID)

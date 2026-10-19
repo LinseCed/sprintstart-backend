@@ -11,8 +11,8 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepo
 import com.sprintstart.sprintstartbackend.shared.ids.AuthId
 import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.user.external.SessionActivityApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
-import com.sprintstart.sprintstartbackend.user.service.SessionActivityService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import org.springframework.http.HttpStatus
@@ -32,7 +32,7 @@ class BuddyOpeningService(
     private val buddySessionRepository: BuddySessionRepository,
     private val buddyMessageRepository: BuddyMessageRepository,
     private val userApi: UserApi,
-    private val sessionActivityService: SessionActivityService,
+    private val sessionActivityService: SessionActivityApi,
     private val buddyToolExecutor: BuddyToolExecutor,
     private val openingStream: BuddyOpeningStream,
     private val compactionScheduler: BuddyCompactionScheduler,
@@ -46,7 +46,7 @@ class BuddyOpeningService(
         val user = resolveUser(authId)
         val session = ownedSession(sessionId, user)
         val messages = buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id)
-        val longAbsence = sessionActivityService.recordActivityAndReturnLongAbsence(user.value)
+        val longAbsence = sessionActivityService.recordVisit(user.value)
         val firstConversation = buddySessionRepository.countByUserId(user.value) == 1L
         val latestOpening = messages.lastOrNull()?.takeIf { it.opening }
 

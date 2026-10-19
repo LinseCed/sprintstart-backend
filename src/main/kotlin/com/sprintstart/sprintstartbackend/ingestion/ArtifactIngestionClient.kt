@@ -9,10 +9,10 @@ import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ArtifactP
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.ProjectMembershipsDeletedAiResponse
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.response.RunArtifactsIngestResponse
 import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.ArtifactSummaryAiException
+import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionResponseException
 import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
-import com.sprintstart.sprintstartbackend.upload.model.exceptions.IngestionResponseException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map

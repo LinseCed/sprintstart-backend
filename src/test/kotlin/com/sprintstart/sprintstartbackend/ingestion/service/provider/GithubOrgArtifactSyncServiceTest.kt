@@ -11,8 +11,8 @@ import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunStatus
+import com.sprintstart.sprintstartbackend.ingestion.model.exceptions.IngestionResponseException
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
-import com.sprintstart.sprintstartbackend.upload.model.exceptions.IngestionResponseException
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
