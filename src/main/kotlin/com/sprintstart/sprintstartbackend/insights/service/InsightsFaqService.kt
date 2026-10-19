@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.insights.service
 
-import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.insights.InsightsAiClient
 import com.sprintstart.sprintstartbackend.insights.model.ai.AiFaqGroup
 import com.sprintstart.sprintstartbackend.insights.model.ai.AiFaqGroupingRequest
@@ -18,6 +17,7 @@ import com.sprintstart.sprintstartbackend.insights.repository.FaqGroupRepository
 import com.sprintstart.sprintstartbackend.onboarding.external.BuddyQuestionApi
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyQuestion
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager

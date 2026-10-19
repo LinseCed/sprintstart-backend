@@ -1,11 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.external
 
-import com.sprintstart.sprintstartbackend.ApplicationConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeAnswerItem
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeAnswerResult
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeAnswersRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeAnswersResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
+import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
 import org.springframework.stereotype.Component
