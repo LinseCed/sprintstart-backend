@@ -22,12 +22,12 @@
     <ID>CyclomaticComplexMethod:BuddyActionService.kt:BuddyActionService$suspend fun perform(request: BuddyActionRequest, jwt: Jwt): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
     <ID>CyclomaticComplexMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UserId): String</ID>
-    <ID>CyclomaticComplexMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeSkip( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>CyclomaticComplexMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>CyclomaticComplexMethod:BuddyPathTools.kt:BuddyPathTools$fun snapshotFor(userId: UUID): String?</ID>
     <ID>CyclomaticComplexMethod:BuddyPathTools.kt:BuddyPathTools$private fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
     <ID>CyclomaticComplexMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun perform(authId: String, userId: UserId, request: BuddyActionRequest): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, userId: UserId, ): BuddyActionService.ProposeOutcome</ID>
+    <ID>CyclomaticComplexMethod:BuddySkipActions.kt:BuddySkipActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>CyclomaticComplexMethod:BuddyToolExecutor.kt:BuddyToolExecutor$fun execute(call: BuddyToolCallDto, userId: UUID, currentPage: String? = null): String</ID>
     <ID>CyclomaticComplexMethod:BuddyToolExecutor.kt:BuddyToolExecutor$private fun getArrivalSteps(userId: UUID): String</ID>
     <ID>CyclomaticComplexMethod:ConfluenceRestrictionPageMetadata.kt:private fun validateSharedRestrictionMetadata( users: ConfluenceRestrictedUsersResponse, groups: ConfluenceRestrictedGroupsResponse, requestedStart: Int, requestedLimit: Int, requestContext: String, )</ID>
@@ -95,7 +95,6 @@
     <ID>LongMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UserId): String</ID>
     <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeCompleteStep( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeCompleteTask( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
-    <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeSkip( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun perform(authId: String, user: UserId, request: BuddyActionRequest): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyPathTools.kt:BuddyPathTools$fun execute(userId: UUID): String</ID>
@@ -107,6 +106,7 @@
     <ID>LongMethod:BuddyReplyStream.kt:internal suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.relayAgentTurn( events: Flow&lt;BuddyAgentStreamEvent&gt;, emittedContent: StringBuilder, ): BuddyAgentResponse</ID>
     <ID>LongMethod:BuddyService.kt:BuddyService$@Suppress("CyclomaticComplexMethod", "ThrowsCount") suspend fun sendMessageForMe( authId: String, sessionId: UUID?, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters?, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>LongMethod:BuddyService.kt:BuddyService$private suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.runToolCall( call: BuddyToolCallDto, userId: UUID, currentPage: String?, ): String</ID>
+    <ID>LongMethod:BuddySkipActions.kt:BuddySkipActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyTeamService.kt:BuddyTeamService$suspend fun sendMessageForMe( authId: String, projectId: UUID, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters? = null, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>LongMethod:BuddyToolExecutor.kt:BuddyToolExecutor$private fun getArrivalSteps(userId: UUID): String</ID>
     <ID>LongMethod:BuddyToolExecutor.kt:BuddyToolExecutor$private fun getSuggestedTasks(userId: UUID): String</ID>
@@ -350,7 +350,6 @@
     <ID>UnusedPrivateProperty:StarterWorkTaskProposalService.kt:StarterWorkTaskProposalService$private val projectMembershipApi: ProjectMembershipApi</ID>
     <ID>UnusedVariable:BoardService.kt:BoardService$val member = memberOrNull(userId, projectId) ?: return PlacementOutcome.NOT_A_MEMBER</ID>
     <ID>UnusedVariable:UploadArtifactProviderService.kt:UploadArtifactProviderService$val runId = command.ingestionRunId</ID>
-    <ID>UseOrEmpty:BuddyPathActions.kt:BuddyPathActions$declined.reviewComment?.takeIf { it.isNotBlank() }?.let { " with: “$it”" } ?: ""</ID>
     <ID>UseRequire:UploadValidationService.kt:UploadValidationService$throw IllegalArgumentException( "File exceeds maximum allowed size", )</ID>
     <ID>UseRequire:UploadValidationService.kt:UploadValidationService$throw IllegalArgumentException( "Unsupported file extension: $extension", )</ID>
     <ID>UseRequire:UploadValidationService.kt:UploadValidationService$throw IllegalArgumentException("File is empty")</ID>

@@ -60,7 +60,7 @@ class BuddyPathStepActionTest {
         edits = BuddyPathEditActions(buddyPathTools, onboardingStepPlacementService),
         onboardingTaskService = onboardingTaskService,
         questions = BuddyQuestionActions(buddyPathTools, questionAttemptService),
-        onboardingSkipService = onboardingSkipService,
+        skips = BuddySkipActions(buddyPathTools, onboardingSkipService),
         userApi = userApi,
     )
 
