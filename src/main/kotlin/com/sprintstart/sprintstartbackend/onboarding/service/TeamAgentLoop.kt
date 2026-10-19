@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component
  */
 @Component
 class TeamAgentLoop(
-    private val onboardingAiClient: OnboardingAiClient,
+    private val agentAiClient: AgentAiClient,
     private val buddyTeamTools: BuddyTeamTools,
     private val teamToolRunner: TeamToolRunner,
     private val artifactLookupService: ArtifactLookupService,
@@ -43,7 +43,7 @@ class TeamAgentLoop(
         // Per hop, because an area opened on the previous hop is mounted from this one.
         val tools = if (turn.capabilitiesEnabled) buddyTeamTools.toolSpecs(turn.areas.mounted) else emptyList()
         val response = relayAgentTurn(
-            onboardingAiClient.buddyAgentTurnStream(agentRequest(turn, tools)),
+            agentAiClient.buddyAgentTurnStream(agentRequest(turn, tools)),
             turn.emittedContent,
         )
         turn.citations = response.citations

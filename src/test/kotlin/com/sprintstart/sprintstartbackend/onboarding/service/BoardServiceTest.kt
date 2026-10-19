@@ -2,7 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.DiagramAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardActor
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardChange
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
@@ -105,7 +105,7 @@ class BoardServiceTest {
     // Relaxed, and empty by default: arrival steps are incidental to these tests, and an
     // empty list means no arrival card is ensured, so every card assertion here is unaffected.
     private val arrivalStepService: ArrivalStepService = mockk(relaxed = true)
-    private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val diagramAiClient: DiagramAiClient = mockk()
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
 
     private val pathStepReader = PathStepReader(onboardingPathRepository)
@@ -116,7 +116,7 @@ class BoardServiceTest {
         boardRepository,
         boardCardRepository,
         boardDiagramRepository,
-        onboardingAiClient,
+        diagramAiClient,
         transactionManager,
     )
 

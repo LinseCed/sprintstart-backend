@@ -2,7 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.TaskSourceArtifact
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.OrientationAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationStep
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
@@ -59,7 +59,7 @@ class TaskOrientationServiceTest {
     private val proposalRepository: StarterWorkTaskProposalRepository = mockk(relaxed = true)
     private val projectMembershipApi: ProjectMembershipApi = mockk()
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
-    private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val orientationAiClient: OrientationAiClient = mockk()
     private val json: Json = Json { ignoreUnknownKeys = true }
     private val transactionManager: PlatformTransactionManager = mockk(relaxed = true)
 
@@ -73,7 +73,7 @@ class TaskOrientationServiceTest {
         proposalRepository,
         projectMembershipApi,
         artifactIngestionApi,
-        onboardingAiClient,
+        orientationAiClient,
         json,
         transactionManager,
         Clock.fixed(now, ZoneOffset.UTC),
@@ -152,7 +152,7 @@ class TaskOrientationServiceTest {
     @Test
     fun `stores an assembled packet with its provenance and serves it`() = runTest {
         hasTask()
-        coEvery { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
             assembled(section("SET_UP", "Run it locally"), section("OPEN_THE_PR", "How review works"))
 
         val result = service.getForHire(hireId, projectId)
@@ -169,7 +169,7 @@ class TaskOrientationServiceTest {
     @Test
     fun `drops a section of a step the backend cannot store`() = runTest {
         hasTask()
-        coEvery { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
             assembled(section("SET_UP"), section("DEPLOY_IT", "Not a step of ours"))
 
         val result = service.getForHire(hireId, projectId)
@@ -181,7 +181,7 @@ class TaskOrientationServiceTest {
     fun `sends the cached fingerprint so an unchanged corpus is not re-assembled`() = runTest {
         hasTask(cached = cachedPacket("fp-old"))
         val sent = slot<String>()
-        coEvery { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), capture(sent)) } returns
+        coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), capture(sent)) } returns
             OrientationOutcome(status = "unchanged")
 
         val result = service.getForHire(hireId, projectId)
@@ -196,7 +196,7 @@ class TaskOrientationServiceTest {
     fun `a moved corpus replaces the cached packet rather than serving it`() = runTest {
         val cached = cachedPacket("fp-old")
         hasTask(cached = cached)
-        coEvery { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
             assembled(section("CHECK_LOCALLY", "Run the tests"), fingerprint = "fp-new")
 
         val result = service.getForHire(hireId, projectId)
@@ -208,7 +208,7 @@ class TaskOrientationServiceTest {
     @Test
     fun `a skipped assembly drops the stale cache and says so, rather than serving it`() = runTest {
         hasTask(cached = cachedPacket("fp-old"))
-        coEvery { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
             OrientationOutcome(status = "skipped", notes = listOf("no grounding evidence retrieved for this task"))
 
         val result = service.getForHire(hireId, projectId)
@@ -222,7 +222,7 @@ class TaskOrientationServiceTest {
     @Test
     fun `an empty corpus is an honest empty state, never a fabricated packet`() = runTest {
         hasTask()
-        coEvery { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
             OrientationOutcome(status = "skipped", notes = listOf("corpus is empty"))
 
         val result = service.getForHire(hireId, projectId)
@@ -237,7 +237,7 @@ class TaskOrientationServiceTest {
     @Test
     fun `an unreachable AI service serves the last known good packet`() = runTest {
         hasTask(cached = cachedPacket("fp-old"))
-        coEvery { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } throws
+        coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } throws
             OnboardingAiException(503, "", "AI is down")
 
         val result = service.getForHire(hireId, projectId)
@@ -251,7 +251,7 @@ class TaskOrientationServiceTest {
     @Test
     fun `an unreachable AI service with nothing cached says so`() = runTest {
         hasTask()
-        coEvery { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } throws
+        coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } throws
             OnboardingAiException(503, "", "AI is down")
 
         val result = service.getForHire(hireId, projectId)
@@ -269,7 +269,7 @@ class TaskOrientationServiceTest {
 
         assertNull(result.taskId)
         assertNull(result.packet)
-        coVerify(exactly = 0) { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) }
     }
 
     /**
@@ -288,7 +288,7 @@ class TaskOrientationServiceTest {
         hasTask()
         // Stubbed like every other test that lets `getForHire` run to the end: `hasTask` leaves no
         // cached packet, so the call reaches the AI client, and that mock is strict.
-        coEvery { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
             assembled(section("SET_UP"))
 
         val result = service.getForHire(hireId, projectId)
@@ -312,7 +312,7 @@ class TaskOrientationServiceTest {
         val body = slot<String>()
         val labels = slot<List<String>>()
         coEvery {
-            onboardingAiClient.assembleOrientation(
+            orientationAiClient.assembleOrientation(
                 capture(title),
                 capture(pids),
                 capture(body),
@@ -336,7 +336,7 @@ class TaskOrientationServiceTest {
         val title = slot<String>()
         val body = slot<String>()
         coEvery {
-            onboardingAiClient.assembleOrientation(
+            orientationAiClient.assembleOrientation(
                 capture(title),
                 any(),
                 capture(body),
@@ -355,7 +355,7 @@ class TaskOrientationServiceTest {
     @Test
     fun `reading orientation never assigns a task`() = runTest {
         hasTask()
-        coEvery { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
             assembled(section("SET_UP"))
 
         service.getForHire(hireId, projectId)
@@ -375,7 +375,7 @@ class TaskOrientationServiceTest {
         hasTask()
         val saved = slot<TaskOrientationPacket>()
         every { packetRepository.save(capture(saved)) } answers { firstArg() }
-        coEvery { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
+        coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } returns
             assembled(section("SET_UP"), section("MAKE_THE_CHANGE"))
 
         service.getForHire(hireId, projectId)
@@ -420,7 +420,7 @@ class TaskOrientationServiceTest {
         assertEquals(OrientationOrigin.HUMAN, assertNotNull(result.packet).origin)
         assertEquals("Cached section", result.packet!!.sections[0].title)
         // The whole staleness dance is skipped: no assembly, no fingerprint, no delete, no re-store.
-        coVerify(exactly = 0) { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) }
         verify(exactly = 0) { packetRepository.save(any()) }
         verify(exactly = 0) { packetRepository.deleteByTaskProposalIdAndProjectId(any(), any()) }
     }
@@ -533,7 +533,7 @@ class TaskOrientationServiceTest {
         assertEquals(proposal.id, result.taskId)
         assertEquals(OrientationOrigin.HUMAN, assertNotNull(result.packet).origin)
         // Authoring never assembles: no AI call is made when a PM opens the editor.
-        coVerify(exactly = 0) { onboardingAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -619,7 +619,7 @@ class TaskOrientationServiceTest {
         hasTask()
         val saved = slot<TaskOrientationPacket>()
         every { packetRepository.save(capture(saved)) } answers { firstArg() }
-        every { onboardingAiClient.streamOrientation(any(), any(), any(), any(), any(), any()) } returns
+        every { orientationAiClient.streamOrientation(any(), any(), any(), any(), any(), any()) } returns
             flowOf(
                 AiProgressEvent(type = "stage", operation = "orientation", stage = "retrieving", label = "…"),
                 AiProgressEvent(
@@ -648,7 +648,7 @@ class TaskOrientationServiceTest {
         val events = service.streamForHire(hireId, projectId).toList()
 
         assertEquals(listOf("done"), events.map { it.type })
-        verify(exactly = 0) { onboardingAiClient.streamOrientation(any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { orientationAiClient.streamOrientation(any(), any(), any(), any(), any(), any()) }
         verify(exactly = 0) { packetRepository.save(any()) }
     }
 
@@ -660,13 +660,13 @@ class TaskOrientationServiceTest {
         val events = service.streamForHire(hireId, projectId).toList()
 
         assertEquals(listOf("done"), events.map { it.type })
-        verify(exactly = 0) { onboardingAiClient.streamOrientation(any(), any(), any(), any(), any(), any()) }
+        verify(exactly = 0) { orientationAiClient.streamOrientation(any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
     fun `a failing AI stream ends in a synthesised error event`() = runTest {
         hasTask()
-        every { onboardingAiClient.streamOrientation(any(), any(), any(), any(), any(), any()) } returns
+        every { orientationAiClient.streamOrientation(any(), any(), any(), any(), any(), any()) } returns
             flow { throw OnboardingAiException(503, "", "AI is down") }
 
         val events = service.streamForHire(hireId, projectId).toList()

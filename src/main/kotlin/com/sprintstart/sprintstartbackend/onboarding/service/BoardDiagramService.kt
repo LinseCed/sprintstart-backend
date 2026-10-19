@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.DiagramAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.model.DiagramOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.DiagramSchema
@@ -59,7 +59,7 @@ class BoardDiagramService(
     private val boardRepository: BoardRepository,
     private val boardCardRepository: BoardCardRepository,
     private val boardDiagramRepository: BoardDiagramRepository,
-    private val onboardingAiClient: OnboardingAiClient,
+    private val diagramAiClient: DiagramAiClient,
     transactionManager: PlatformTransactionManager,
     private val clock: Clock = Clock.systemUTC(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -106,7 +106,7 @@ class BoardDiagramService(
         } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No such diagram card on your board")
 
         val outcome = try {
-            onboardingAiClient.assembleDiagram(
+            diagramAiClient.assembleDiagram(
                 subject = context.subject,
                 projectIds = listOf(context.projectId),
                 lastFingerprint = context.fingerprint,

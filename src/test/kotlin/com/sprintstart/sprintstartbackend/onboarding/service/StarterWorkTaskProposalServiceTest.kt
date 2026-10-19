@@ -5,7 +5,7 @@ import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionAp
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.IngestedIssue
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.RepositoryResponsiveness
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.TaskSourceArtifact
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.StarterWorkAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CandidatePoolState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
@@ -52,7 +52,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class StarterWorkTaskProposalServiceTest {
-    private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val starterWorkAiClient: StarterWorkAiClient = mockk()
     private val competencyRepository: CompetencyRepository = mockk()
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository = mockk()
     private val userCompetencyStateRepository: UserCompetencyStateRepository = mockk()
@@ -69,7 +69,7 @@ class StarterWorkTaskProposalServiceTest {
         every { getRepositoryIdByOwnerAndName(any(), any()) } returns null
     }
     private val service = StarterWorkTaskProposalService(
-        onboardingAiClient,
+        starterWorkAiClient,
         competencyRepository,
         starterWorkTaskProposalRepository,
         userCompetencyStateRepository,
@@ -88,7 +88,7 @@ class StarterWorkTaskProposalServiceTest {
         fun `persists proposed tasks as PROPOSED rows`() = runTest {
             every { starterWorkTaskProposalRepository.findAllByStatusIn(any()) } returns emptyList()
             every { competencyRepository.findAll() } returns emptyList()
-            coEvery { onboardingAiClient.proposeStarterWork(any(), any(), any()) } returns
+            coEvery { starterWorkAiClient.proposeStarterWork(any(), any(), any()) } returns
                 StarterWorkOutcome(
                     status = "proposed",
                     tasks = listOf(
@@ -135,7 +135,7 @@ class StarterWorkTaskProposalServiceTest {
                 ),
             )
             every { competencyRepository.findAll() } returns emptyList()
-            coEvery { onboardingAiClient.proposeStarterWork(any(), any(), any()) } returns
+            coEvery { starterWorkAiClient.proposeStarterWork(any(), any(), any()) } returns
                 StarterWorkOutcome(
                     status = "proposed",
                     tasks = listOf(
@@ -169,7 +169,7 @@ class StarterWorkTaskProposalServiceTest {
             val sourceIdsSlot = slot<List<String>>()
             val keysSlot = slot<List<String>>()
             coEvery {
-                onboardingAiClient.proposeStarterWork(
+                starterWorkAiClient.proposeStarterWork(
                     capture(pidsSlot),
                     capture(sourceIdsSlot),
                     capture(keysSlot),
@@ -210,7 +210,7 @@ class StarterWorkTaskProposalServiceTest {
             every { starterWorkTaskProposalRepository.findAllByStatusIn(any()) } returns emptyList()
             every { competencyRepository.findAll() } returns emptyList()
             every { starterWorkTaskProposalRepository.save(any()) } answers { firstArg() }
-            every { onboardingAiClient.streamStarterWork(any(), any(), any()) } returns flowOf(
+            every { starterWorkAiClient.streamStarterWork(any(), any(), any()) } returns flowOf(
                 AiProgressEvent(type = "stage", operation = "starter_work", stage = "retrieving", label = "…"),
                 AiProgressEvent(type = "item", operation = "starter_work", label = "Task: Fix typo"),
                 doneEvent(proposedOutcome()),
@@ -234,7 +234,7 @@ class StarterWorkTaskProposalServiceTest {
             )
             every { competencyRepository.findAll() } returns emptyList()
             every {
-                onboardingAiClient.streamStarterWork(any(), any(), any())
+                starterWorkAiClient.streamStarterWork(any(), any(), any())
             } returns flowOf(doneEvent(proposedOutcome()))
 
             val events = service.streamGenerate(projectId).toList()
@@ -247,7 +247,7 @@ class StarterWorkTaskProposalServiceTest {
         fun `a stream failure becomes a synthesised terminal error`() = runTest {
             every { starterWorkTaskProposalRepository.findAllByStatusIn(any()) } returns emptyList()
             every { competencyRepository.findAll() } returns emptyList()
-            every { onboardingAiClient.streamStarterWork(any(), any(), any()) } returns
+            every { starterWorkAiClient.streamStarterWork(any(), any(), any()) } returns
                 flow { throw RuntimeException("ai down") }
 
             val events = service.streamGenerate(projectId).toList()

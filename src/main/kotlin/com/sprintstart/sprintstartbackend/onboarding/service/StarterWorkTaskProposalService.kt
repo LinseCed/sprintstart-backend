@@ -2,7 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.IngestedIssue
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.StarterWorkAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CandidatePoolState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
@@ -50,7 +50,7 @@ import java.util.UUID
 @Service
 @Suppress("TooManyFunctions")
 class StarterWorkTaskProposalService(
-    private val onboardingAiClient: OnboardingAiClient,
+    private val starterWorkAiClient: StarterWorkAiClient,
     private val competencyRepository: CompetencyRepository,
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val userCompetencyStateRepository: UserCompetencyStateRepository,
@@ -79,7 +79,7 @@ class StarterWorkTaskProposalService(
         val (activeSourceIds, activeCompetencyKeys) = withContext(Dispatchers.IO) {
             readTxTemplate.execute { loadActiveState() }!!
         }
-        val outcome = onboardingAiClient.proposeStarterWork(
+        val outcome = starterWorkAiClient.proposeStarterWork(
             projectIds = listOf(projectId),
             activeSourceIds = activeSourceIds,
             activeCompetencyKeys = activeCompetencyKeys,
@@ -105,7 +105,7 @@ class StarterWorkTaskProposalService(
     suspend fun streamGenerate(projectId: UUID): Flow<AiProgressEvent> {
         val active = withContext(Dispatchers.IO) { readTxTemplate.execute { loadActiveState() }!! }
         return flow {
-            onboardingAiClient
+            starterWorkAiClient
                 .streamStarterWork(
                     projectIds = listOf(projectId),
                     activeSourceIds = active.sourceIds,

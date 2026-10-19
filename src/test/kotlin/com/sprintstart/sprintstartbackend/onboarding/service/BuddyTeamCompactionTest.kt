@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCompactRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCompactResponse
@@ -33,7 +33,7 @@ class BuddyTeamCompactionTest {
     private val buddyMessageRepository: BuddyMessageRepository = mockk()
     private val buddyTeamSessionRepository: BuddyTeamSessionRepository = mockk()
     private val buddyTeamMessageRepository: BuddyTeamMessageRepository = mockk()
-    private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val agentAiClient: AgentAiClient = mockk()
 
     private val transactionManager: PlatformTransactionManager = mockk {
         every { getTransaction(any()) } returns SimpleTransactionStatus()
@@ -46,7 +46,7 @@ class BuddyTeamCompactionTest {
         buddyMessageRepository,
         buddyTeamSessionRepository,
         buddyTeamMessageRepository,
-        onboardingAiClient,
+        agentAiClient,
         transactionManager,
     )
 
@@ -73,7 +73,7 @@ class BuddyTeamCompactionTest {
         val session = teamSessionWith(messageCount = 24)
         every { buddyTeamSessionRepository.save(any()) } answers { firstArg() }
         val requests = mutableListOf<BuddyCompactRequest>()
-        coEvery { onboardingAiClient.compactBuddyMemory(capture(requests)) } returns
+        coEvery { agentAiClient.compactBuddyMemory(capture(requests)) } returns
             BuddyCompactResponse(memory = "Asked about Sam twice.")
 
         service.compactTeamIfNeeded(userId, projectId)
@@ -88,7 +88,7 @@ class BuddyTeamCompactionTest {
     fun `never reads or writes the manager's own onboarding session`() = runTest {
         teamSessionWith(messageCount = 24)
         every { buddyTeamSessionRepository.save(any()) } answers { firstArg() }
-        coEvery { onboardingAiClient.compactBuddyMemory(any()) } returns BuddyCompactResponse(memory = "note")
+        coEvery { agentAiClient.compactBuddyMemory(any()) } returns BuddyCompactResponse(memory = "note")
 
         service.compactTeamIfNeeded(userId, projectId)
 
@@ -102,13 +102,13 @@ class BuddyTeamCompactionTest {
 
         service.compactTeamIfNeeded(userId, projectId)
 
-        coVerify(exactly = 0) { onboardingAiClient.compactBuddyMemory(any()) }
+        coVerify(exactly = 0) { agentAiClient.compactBuddyMemory(any()) }
     }
 
     @Test
     fun `discards its fold when the team cursor moved while the model was thinking`() = runTest {
         val session = teamSessionWith(messageCount = 24)
-        coEvery { onboardingAiClient.compactBuddyMemory(any()) } answers {
+        coEvery { agentAiClient.compactBuddyMemory(any()) } answers {
             session.summarizedCount = 4
             session.summary = "somebody else's note"
             BuddyCompactResponse(memory = "my note")
@@ -126,6 +126,6 @@ class BuddyTeamCompactionTest {
 
         service.compactTeamIfNeeded(userId, projectId)
 
-        coVerify(exactly = 0) { onboardingAiClient.compactBuddyMemory(any()) }
+        coVerify(exactly = 0) { agentAiClient.compactBuddyMemory(any()) }
     }
 }
