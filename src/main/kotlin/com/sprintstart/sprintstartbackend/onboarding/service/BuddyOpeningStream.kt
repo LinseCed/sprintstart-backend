@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
@@ -35,7 +35,7 @@ class OpeningConversation(
  */
 @Component
 class BuddyOpeningStream(
-    private val onboardingAiClient: OnboardingAiClient,
+    private val agentAiClient: AgentAiClient,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -62,7 +62,7 @@ class BuddyOpeningStream(
         val shown = StringBuilder()
         var closing: BuddyOpenStreamEvent? = null
         try {
-            onboardingAiClient.streamBuddyOpen(request).collect { event ->
+            agentAiClient.streamBuddyOpen(request).collect { event ->
                 when (event.type) {
                     BuddyOpenStreamEvent.TOKEN -> event.content?.let {
                         shown.append(it)

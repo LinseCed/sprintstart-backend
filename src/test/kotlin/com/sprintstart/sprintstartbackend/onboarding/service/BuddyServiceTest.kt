@@ -2,7 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.onboarding.client.BuddyAiClient
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.external.event.QuestionAskedEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMessageDto
@@ -58,7 +58,7 @@ class BuddyServiceTest {
     private val buddySessionRepository: BuddySessionRepository = mockk()
     private val buddyMessageRepository: BuddyMessageRepository = mockk()
     private val buddyCitationRepository: BuddyCitationRepository = mockk()
-    private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val agentAiClient: AgentAiClient = mockk()
     private val buddyToolExecutor: BuddyToolExecutor = mockk()
     private val buddyActionService: BuddyActionService = mockk()
     private val artifactLookupService: ArtifactLookupService = mockk()
@@ -77,7 +77,7 @@ class BuddyServiceTest {
         buddySessionRepository,
         buddyMessageRepository,
         buddyCitationRepository,
-        onboardingAiClient,
+        agentAiClient,
         buddyToolExecutor,
         buddyActionService,
         userApi,
@@ -408,7 +408,7 @@ class BuddyServiceTest {
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
             every { buddyMessageRepository.save(capture(saved)) } answers { firstArg() }
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             } returnsStream finalReply("Set up like so.")
 
             service
@@ -454,7 +454,7 @@ class BuddyServiceTest {
             every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
             val requests = mutableListOf<BuddyAgentRequest>()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream finalReply("Here.")
+            coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream finalReply("Here.")
 
             service
                 .sendMessageForMe(
@@ -476,7 +476,7 @@ class BuddyServiceTest {
             val only = UUID.randomUUID()
             every { userApi.getUsersByIds(listOf(userId)) } returns listOf(userOn(only))
             val requests = mutableListOf<BuddyAgentRequest>()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream finalReply("Here.")
+            coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream finalReply("Here.")
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
 
             service.sendMessageForMe(authId, session.id, "how do we deploy?", filters = null).toList()
@@ -501,7 +501,7 @@ class BuddyServiceTest {
             val events = service.sendMessageForMe(authId, session.id, "how do we deploy?", filters = null).toList()
 
             // Nothing was searched, because there was nothing to search.
-            coVerify(exactly = 0) { onboardingAiClient.buddyAgentTurnStream(any()) }
+            coVerify(exactly = 0) { agentAiClient.buddyAgentTurnStream(any()) }
             val streamed = events.filter { it.type == "token" }.joinToString("") { it.content ?: "" }
             assertThat(streamed).contains("not on a project")
             assertThat(events.last().type).isEqualTo("done")
@@ -518,7 +518,7 @@ class BuddyServiceTest {
             every { eventPublisher.publishEvent(any<QuestionAskedEvent>()) } just runs
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
             val requests = mutableListOf<BuddyAgentRequest>()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream finalReply("Here.")
+            coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream finalReply("Here.")
 
             service.sendMessageForMe(authId, session.id, "how do we deploy?", filters = null).toList()
 
@@ -540,7 +540,7 @@ class BuddyServiceTest {
             assertThat(session.projectId).isNull()
             verify { buddySessionRepository.save(match { it.projectId == null }) }
             verify(exactly = 0) { eventPublisher.publishEvent(any<QuestionAskedEvent>()) }
-            coVerify(exactly = 0) { onboardingAiClient.buddyAgentTurnStream(any()) }
+            coVerify(exactly = 0) { agentAiClient.buddyAgentTurnStream(any()) }
             val streamed = events.filter { it.type == "token" }.joinToString("") { it.content ?: "" }
             assertThat(streamed).contains("not on a project")
         }
@@ -551,7 +551,7 @@ class BuddyServiceTest {
             stageConversation(session)
             every { eventPublisher.publishEvent(any<QuestionAskedEvent>()) } just runs
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(any()) } returnsStream finalReply("Here.")
+            coEvery { agentAiClient.buddyAgentTurnStream(any()) } returnsStream finalReply("Here.")
 
             service.sendMessageForMe(authId, session.id, "how do we deploy?", filters = null).toList()
 
@@ -600,7 +600,7 @@ class BuddyServiceTest {
 
             val requests = mutableListOf<BuddyAgentRequest>()
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(capture(requests))
+                agentAiClient.buddyAgentTurnStream(capture(requests))
             } returnsStream finalReply("Here.")
 
             service
@@ -629,7 +629,7 @@ class BuddyServiceTest {
 
             val requests = mutableListOf<BuddyAgentRequest>()
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(capture(requests))
+                agentAiClient.buddyAgentTurnStream(capture(requests))
             } returnsStream finalReply("Here.")
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
 
@@ -653,7 +653,7 @@ class BuddyServiceTest {
             every { buddyMessageRepository.save(capture(saved)) } answers { firstArg() }
 
             every {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             } returns streamOf(
                 reasoning("I checked "),
                 reasoning("the relevant context."),
@@ -706,7 +706,7 @@ class BuddyServiceTest {
             val shown = mutableListOf<BuddyStreamEvent>()
             var shownWhenResumed: List<BuddyStreamEvent> = emptyList()
             var calls = 0
-            every { onboardingAiClient.buddyAgentTurnStream(any()) } answers {
+            every { agentAiClient.buddyAgentTurnStream(any()) } answers {
                 if (++calls == 1) {
                     streamOf(token("Let me check. "), toolUse("search_docs"), result(paused))
                 } else {
@@ -746,7 +746,7 @@ class BuddyServiceTest {
                 pendingToolCalls = listOf(toolCall),
             )
             every {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             } returns streamOf(token("Let me check. "), toolUse("search_docs"), result(paused))
             every { buddyToolExecutor.execute(any(), any()) } returns "m"
 
@@ -761,7 +761,7 @@ class BuddyServiceTest {
             }
             job.join()
 
-            verify(exactly = 1) { onboardingAiClient.buddyAgentTurnStream(any()) }
+            verify(exactly = 1) { agentAiClient.buddyAgentTurnStream(any()) }
             verify(exactly = 0) { buddyToolExecutor.execute(any(), any()) }
             verify {
                 buddyMessageRepository.save(
@@ -776,7 +776,7 @@ class BuddyServiceTest {
         fun `keeps what was shown and ends the turn with an error event when the AI reports an error`() = runTest {
             val session = BuddySession(userId = userId, title = "session")
             stageConversation(session)
-            every { onboardingAiClient.buddyAgentTurnStream(any()) } returns streamOf(
+            every { agentAiClient.buddyAgentTurnStream(any()) } returns streamOf(
                 token("Part of "),
                 BuddyAgentStreamEvent(type = BuddyAgentStreamEvent.ERROR, message = "model unavailable"),
             )
@@ -799,7 +799,7 @@ class BuddyServiceTest {
         fun `ends the turn with an error event when the AI ends its stream without a result`() = runTest {
             val session = BuddySession(userId = userId, title = "session")
             stageConversation(session)
-            every { onboardingAiClient.buddyAgentTurnStream(any()) } returns streamOf(token("Part of "))
+            every { agentAiClient.buddyAgentTurnStream(any()) } returns streamOf(token("Part of "))
 
             val events = service.sendMessageForMe(authId, session.id, "hi", true, null).toList()
 
@@ -819,7 +819,7 @@ class BuddyServiceTest {
             val saved = mutableListOf<BuddyMessage>()
             every { buddyMessageRepository.save(capture(saved)) } answers { firstArg() }
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
-            every { onboardingAiClient.buddyAgentTurnStream(any()) } returns
+            every { agentAiClient.buddyAgentTurnStream(any()) } returns
                 streamOf(result(finalReply("Whole answer here.")))
 
             val events = service.sendMessageForMe(authId, session.id, "hi", true, null).toList()
@@ -847,7 +847,7 @@ class BuddyServiceTest {
                 pendingToolCalls = listOf(toolCall),
             )
             every {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             } answers { streamOf(token("Looking."), result(paused)) }
             every { buddyToolExecutor.execute(any(), any()) } returns "m"
 
@@ -881,7 +881,7 @@ class BuddyServiceTest {
             } returns AiGenerateSessionTitleResponse("A new beginning")
 
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             } returnsStream finalReply("Set up like so.")
 
             service
@@ -918,7 +918,7 @@ class BuddyServiceTest {
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
 
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             } returnsStream finalReply("Set up like so.")
 
             service
@@ -963,7 +963,7 @@ class BuddyServiceTest {
 
             val requests = mutableListOf<BuddyAgentRequest>()
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(capture(requests))
+                agentAiClient.buddyAgentTurnStream(capture(requests))
             } returnsStream finalReply("Here.")
 
             service
@@ -990,7 +990,7 @@ class BuddyServiceTest {
             )
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
             val requests = mutableListOf<BuddyAgentRequest>()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream finalReply("Here.")
+            coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream finalReply("Here.")
 
             service
                 .sendMessageForMe(
@@ -1016,7 +1016,7 @@ class BuddyServiceTest {
             stageConversation(session)
             val requests = mutableListOf<BuddyAgentRequest>()
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream finalReply("Here.")
+            coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream finalReply("Here.")
 
             service
                 .sendMessageForMe(
@@ -1042,7 +1042,7 @@ class BuddyServiceTest {
             val session = BuddySession(userId = userId, title = "session")
             stageConversation(session)
             val requests = mutableListOf<BuddyAgentRequest>()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(capture(requests)) } returnsStreams listOf(
+            coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStreams listOf(
                 BuddyAgentResponse(
                     final = false,
                     messages = listOf(BuddyAgentMessageDto(role = "assistant")),
@@ -1077,7 +1077,7 @@ class BuddyServiceTest {
             stageConversation(session)
             val saved = mutableListOf<BuddyMessage>()
             every { buddyMessageRepository.save(capture(saved)) } answers { firstArg() }
-            coEvery { onboardingAiClient.buddyAgentTurnStream(any()) } returnsStream finalReply("Here.")
+            coEvery { agentAiClient.buddyAgentTurnStream(any()) } returnsStream finalReply("Here.")
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
 
             service
@@ -1115,7 +1115,7 @@ class BuddyServiceTest {
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
             val requests = mutableListOf<BuddyAgentRequest>()
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(capture(requests))
+                agentAiClient.buddyAgentTurnStream(capture(requests))
             } returnsStream finalReply("More detail.")
 
             service
@@ -1145,7 +1145,7 @@ class BuddyServiceTest {
             every { buddyActionService.isAction(any()) } returns false
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
             val requests = mutableListOf<BuddyAgentRequest>()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(capture(requests)) } returnsStreams listOf(
+            coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStreams listOf(
                 BuddyAgentResponse(
                     final = false,
                     text = "",
@@ -1179,7 +1179,7 @@ class BuddyServiceTest {
             stageConversation(session)
 
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             } returnsStream finalReply("ok")
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
 
@@ -1220,7 +1220,7 @@ class BuddyServiceTest {
             val saved = mutableListOf<BuddyMessage>()
             every { buddyMessageRepository.save(capture(saved)) } answers { firstArg() }
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             } returnsStream finalReply("No question is too basic.")
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
 
@@ -1256,7 +1256,7 @@ class BuddyServiceTest {
                 pendingToolCalls = listOf(toolCall),
             )
             val requests = mutableListOf<BuddyAgentRequest>()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(capture(requests)) } returnsStreams listOf(
+            coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStreams listOf(
                 paused,
                 finalReply("Your PR has waited 52 hours — that's on the reviewer."),
             )
@@ -1303,7 +1303,7 @@ class BuddyServiceTest {
                 pendingToolCalls = listOf(actionCall),
             )
             val requests = mutableListOf<BuddyAgentRequest>()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(capture(requests)) } returnsStreams listOf(
+            coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStreams listOf(
                 paused,
                 finalReply("I can open the task packet for you — confirm below."),
             )
@@ -1372,7 +1372,7 @@ class BuddyServiceTest {
                     ),
                     pendingToolCalls = listOf(actionCall),
                 )
-                coEvery { onboardingAiClient.buddyAgentTurnStream(any()) } returnsStreams listOf(
+                coEvery { agentAiClient.buddyAgentTurnStream(any()) } returnsStreams listOf(
                     paused,
                     finalReply("I can ask them to confirm it — confirm below."),
                 )
@@ -1412,7 +1412,7 @@ class BuddyServiceTest {
             every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             val saved = mutableListOf<BuddyMessage>()
             every { buddyMessageRepository.save(capture(saved)) } answers { firstArg() }
-            coEvery { onboardingAiClient.buddyAgentTurnStream(any()) } throws
+            coEvery { agentAiClient.buddyAgentTurnStream(any()) } throws
                 OnboardingAiException(502, "", "AI buddy responded with error: boom")
 
             val events = service
@@ -1436,7 +1436,7 @@ class BuddyServiceTest {
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
             every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(any()) } returnsStream finalReply("done")
+            coEvery { agentAiClient.buddyAgentTurnStream(any()) } returnsStream finalReply("done")
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
 
             val events: List<BuddyStreamEvent> = service
@@ -1469,7 +1469,7 @@ class BuddyServiceTest {
             every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             val requests = mutableListOf<BuddyAgentRequest>()
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(capture(requests))
+                agentAiClient.buddyAgentTurnStream(capture(requests))
             } returnsStream finalReply("More detail.")
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
 
@@ -1519,7 +1519,7 @@ class BuddyServiceTest {
             every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
             val requests = mutableListOf<BuddyAgentRequest>()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream
+            coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream
                 finalReply("Picking up where we were.")
 
             service
@@ -1553,7 +1553,7 @@ class BuddyServiceTest {
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
             every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(any()) } returnsStream finalReply("Here you go.")
+            coEvery { agentAiClient.buddyAgentTurnStream(any()) } returnsStream finalReply("Here you go.")
 
             service
                 .sendMessageForMe(
@@ -1579,7 +1579,7 @@ class BuddyServiceTest {
             every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
             every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(any()) } throws
+            coEvery { agentAiClient.buddyAgentTurnStream(any()) } throws
                 OnboardingAiException(500, "boom", "AI down")
 
             service
@@ -1605,7 +1605,7 @@ class BuddyServiceTest {
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
             val toolCall = BuddyToolCallDto(id = "call_0", name = "get_my_metrics")
             val requests = mutableListOf<BuddyAgentRequest>()
-            coEvery { onboardingAiClient.buddyAgentTurnStream(capture(requests)) } returnsStreams listOf(
+            coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStreams listOf(
                 BuddyAgentResponse(
                     final = false,
                     messages = listOf(
@@ -1646,7 +1646,7 @@ class BuddyServiceTest {
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
 
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             } returnsStream finalReply("Here.")
 
             service
@@ -1697,7 +1697,7 @@ class BuddyServiceTest {
             } just runs
 
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             } returnsStream BuddyAgentResponse(
                 reasoning = emptyList(),
                 citations = listOf(
@@ -1750,7 +1750,7 @@ class BuddyServiceTest {
                 ).toList()
 
             coVerify {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             }
 
             verify {
@@ -1801,7 +1801,7 @@ class BuddyServiceTest {
             every { buddyActionService.actionSpecs(userId) } returns emptyList()
 
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             } returnsStream BuddyAgentResponse(
                 reasoning = emptyList(),
                 citations = emptyList(),
@@ -1885,7 +1885,7 @@ class BuddyServiceTest {
             } returns emptyList()
 
             coEvery {
-                onboardingAiClient.buddyAgentTurnStream(any())
+                agentAiClient.buddyAgentTurnStream(any())
             } returnsStream BuddyAgentResponse(
                 reasoning = emptyList(),
                 citations = emptyList(),
@@ -1941,7 +1941,7 @@ class BuddyServiceTest {
                 ),
                 pendingToolCalls = listOf(actionCall),
             )
-            coEvery { onboardingAiClient.buddyAgentTurnStream(any()) } returnsStreams
+            coEvery { agentAiClient.buddyAgentTurnStream(any()) } returnsStreams
                 listOf(paused, finalReply("Done."))
             every { buddyActionService.isAction(actionCall.name) } returns true
             every { buddyActionService.propose(actionCall, userId) } returns outcome

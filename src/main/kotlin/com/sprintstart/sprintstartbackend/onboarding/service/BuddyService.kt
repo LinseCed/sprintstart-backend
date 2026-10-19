@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.client.BuddyAiClient
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.external.event.QuestionAskedEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMessageDto
@@ -61,7 +61,7 @@ class BuddyService(
     private val buddySessionRepository: BuddySessionRepository,
     private val buddyMessageRepository: BuddyMessageRepository,
     private val buddyCitationRepository: BuddyCitationRepository,
-    private val onboardingAiClient: OnboardingAiClient,
+    private val agentAiClient: AgentAiClient,
     private val buddyToolExecutor: BuddyToolExecutor,
     private val buddyActionService: BuddyActionService,
     private val userApi: UserApi,
@@ -268,7 +268,7 @@ class BuddyService(
                 while (answer == null && step < MAX_AGENT_STEPS) {
                     step++
                     val response = relayAgentTurn(
-                        onboardingAiClient.buddyAgentTurnStream(
+                        agentAiClient.buddyAgentTurnStream(
                             agentRequest(
                                 messages,
                                 tools,

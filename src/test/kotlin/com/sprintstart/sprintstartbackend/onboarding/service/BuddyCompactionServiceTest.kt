@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCompactRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCompactResponse
@@ -37,7 +37,7 @@ import java.util.UUID
 class BuddyCompactionServiceTest {
     private val buddySessionRepository: BuddySessionRepository = mockk()
     private val buddyMessageRepository: BuddyMessageRepository = mockk()
-    private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val agentAiClient: AgentAiClient = mockk()
 
     // Runs the callback inline; these tests are about what the fold decides, not about JPA.
     private val transactionManager: PlatformTransactionManager = mockk {
@@ -54,7 +54,7 @@ class BuddyCompactionServiceTest {
         buddyMessageRepository,
         buddyTeamSessionRepository,
         buddyTeamMessageRepository,
-        onboardingAiClient,
+        agentAiClient,
         transactionManager,
     )
 
@@ -100,7 +100,7 @@ class BuddyCompactionServiceTest {
         val session = sessionWith(messageCount = 26, summary = "Earlier notes.")
         every { buddySessionRepository.save(any()) } answers { firstArg() }
         val requests = mutableListOf<BuddyCompactRequest>()
-        coEvery { onboardingAiClient.compactBuddyMemory(capture(requests)) } returns
+        coEvery { agentAiClient.compactBuddyMemory(capture(requests)) } returns
             BuddyCompactResponse(memory = "We covered m1 through m6.")
 
         service.compactIfNeeded(userId, session.id)
@@ -119,7 +119,7 @@ class BuddyCompactionServiceTest {
 
         service.compactIfNeeded(userId, session.id)
 
-        coVerify(exactly = 0) { onboardingAiClient.compactBuddyMemory(any()) }
+        coVerify(exactly = 0) { agentAiClient.compactBuddyMemory(any()) }
         verify(exactly = 0) { buddySessionRepository.save(any()) }
     }
 
@@ -133,7 +133,7 @@ class BuddyCompactionServiceTest {
         val session = sessionWith(messageCount = 60)
         every { buddySessionRepository.save(any()) } answers { firstArg() }
         val requests = mutableListOf<BuddyCompactRequest>()
-        coEvery { onboardingAiClient.compactBuddyMemory(capture(requests)) } returns
+        coEvery { agentAiClient.compactBuddyMemory(capture(requests)) } returns
             BuddyCompactResponse(memory = "note")
 
         service.compactIfNeeded(userId, session.id)
@@ -146,7 +146,7 @@ class BuddyCompactionServiceTest {
         val session = sessionWith(messageCount = 30, cursor = 5)
         every { buddySessionRepository.save(any()) } answers { firstArg() }
         val requests = mutableListOf<BuddyCompactRequest>()
-        coEvery { onboardingAiClient.compactBuddyMemory(capture(requests)) } returns
+        coEvery { agentAiClient.compactBuddyMemory(capture(requests)) } returns
             BuddyCompactResponse(memory = "note")
 
         service.compactIfNeeded(userId, session.id)
@@ -164,7 +164,7 @@ class BuddyCompactionServiceTest {
     @Test
     fun `leaves the cursor alone when the model is unavailable`() = runTest {
         val session = sessionWith(messageCount = 26, summary = "Earlier notes.")
-        coEvery { onboardingAiClient.compactBuddyMemory(any()) } throws
+        coEvery { agentAiClient.compactBuddyMemory(any()) } throws
             OnboardingAiException(503, "model down", "unavailable")
 
         service.compactIfNeeded(userId, session.id)
@@ -178,7 +178,7 @@ class BuddyCompactionServiceTest {
     @Test
     fun `swallows an AI failure rather than surfacing it`() = runTest {
         val session = sessionWith(messageCount = 26)
-        coEvery { onboardingAiClient.compactBuddyMemory(any()) } throws
+        coEvery { agentAiClient.compactBuddyMemory(any()) } throws
             OnboardingAiException(500, "boom", "exploded")
 
         service.compactIfNeeded(userId, session.id)
@@ -192,7 +192,7 @@ class BuddyCompactionServiceTest {
     @Test
     fun `discards its fold when the cursor moved while the model was thinking`() = runTest {
         val session = sessionWith(messageCount = 26)
-        coEvery { onboardingAiClient.compactBuddyMemory(any()) } coAnswers {
+        coEvery { agentAiClient.compactBuddyMemory(any()) } coAnswers {
             // Somebody else's fold lands mid-call.
             session.summarizedCount = 6
             session.summary = "somebody else's note"
@@ -214,7 +214,7 @@ class BuddyCompactionServiceTest {
     @Test
     fun `survives losing the optimistic lock on the swap`() = runTest {
         val session = sessionWith(messageCount = 26)
-        coEvery { onboardingAiClient.compactBuddyMemory(any()) } returns
+        coEvery { agentAiClient.compactBuddyMemory(any()) } returns
             BuddyCompactResponse(memory = "my note")
         every { buddySessionRepository.save(any()) } throws
             ObjectOptimisticLockingFailureException(BuddySession::class.java, UUID.randomUUID())
@@ -233,7 +233,7 @@ class BuddyCompactionServiceTest {
         service.compactIfNeeded(userId, sessionId)
 
         coVerify(exactly = 0) {
-            onboardingAiClient.compactBuddyMemory(any())
+            agentAiClient.compactBuddyMemory(any())
         }
     }
 }

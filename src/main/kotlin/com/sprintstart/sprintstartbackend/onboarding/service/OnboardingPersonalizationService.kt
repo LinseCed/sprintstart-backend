@@ -12,7 +12,7 @@ import com.sprintstart.sprintstartbackend.onboarding.blueprint.factory.Onboardin
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.factory.isIncludedFor
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPath
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.repository.BlueprintPathRepository
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.PhaseContentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
@@ -55,7 +55,7 @@ class OnboardingPersonalizationService(
     private val onboardingPathRepository: OnboardingPathRepository,
     private val blueprintPathRepository: BlueprintPathRepository,
     private val onboardingPathFactory: OnboardingPathFromBlueprintFactory,
-    private val onboardingAiClient: OnboardingAiClient,
+    private val phaseContentAiClient: PhaseContentAiClient,
     private val userApi: UserApi,
     private val projectIndustryApi: ProjectIndustryApi,
     private val json: Json,
@@ -395,7 +395,7 @@ class OnboardingPersonalizationService(
         var content: GeneratedPhaseContent? = null
         var generationStatus = GenerationStatus.FAILED
         var outcomeReason = "stream ended without a done event"
-        onboardingAiClient
+        phaseContentAiClient
             .streamPhase(request)
             .onEach { event ->
                 logger.info(
