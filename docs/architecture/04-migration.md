@@ -8,7 +8,7 @@ up as numbers.
 
 | Number | Today | Target | Source |
 |---|---:|---:|---|
-| Known Modulith violations | 110 | 0 | `known-module-violations.txt` |
+| Known Modulith violations | 110 (1 after stage A) | 0 | `known-module-violations.txt` |
 | Lines in `onboarding` | 52,734 | 0 (package gone) | line count |
 | Cross-feature edges against the layering | 59 of 500 | 0 | `allowedDependencies`, after stage C |
 | Modules with declared `allowedDependencies` | 0 | all | `package-info.java` |
@@ -20,10 +20,13 @@ up as numbers.
 
 | PR | Change | Exit measure |
 |---|---|---|
-| A1 | Delete `shared/seeder/DatabaseSeeder` (it only forwards to `BlueprintSeeder`). `BlueprintSeeder` becomes the runner itself. | 36 cycle entries gone |
-| A2 | Move `ApplicationConfig` from the root package to `shared.config`. Delete `WebRequestClient`, which only its own test uses. | 37 cycle entries gone. Root package holds only the application class. |
-| A3 | `ingestion` gets its own `IngestionResponseException`. Fix the single non-exposed references (`user` → `connectors`, `onboarding` → `SessionActivityService`, `insights` → Buddy question types exposed via `external`). | 10 entries gone |
-| A4 | Connectors publish canonical artifacts (ADR-016). `ingestion` stops reading Jira, GitHub and Bitbucket response classes. Expose the connector event packages `ingestion` listens to. Break the last real cycles: `config ↔ user` (role mapping moves into `user`) and `connectors ↔ ingestion`. | 27 entries gone. **Known violations: 0.** |
+| A1+A2 (#218) | Delete `shared/seeder/DatabaseSeeder` (it only forwarded to `BlueprintSeeder`, which becomes the runner itself). Move `ApplicationConfig` from the root package to `shared.config`. Delete `WebRequestClient`, which only its own test used. | 110 → 37 |
+| A3 (#219) | The Jira issue payload moves next to the event that carries it. `IngestionResponseException` moves to `ingestion`, `KeycloakRoleMapper` to `user`. Named interfaces for what other modules already used. `SessionActivityApi` instead of `user`'s internal service. | 37 → 5 |
+| A4 (#220) | The Confluence and Notion write boundaries move into the connectors, and `ingestion` implements them. `ProjectSourceApi` moves into `user`, and `connectors` implements it. Project deletion reaches the connectors through `ProjectDeletedEvent`. | 5 → 1 |
+
+The one entry left, `insights ↔ onboarding`, needs the Buddy's question log to move (B7).
+
+Two changes from the original plan. The connectors do not publish canonical artifacts. Instead, synchronous calls that pointed upward were inverted (target §3.3, rule 3), which removed the cycles without redesigning run bookkeeping. And `config` turned out to be a composition root rather than kernel.
 
 ### Stage B: untangle inside `onboarding` (no package moves yet)
 
@@ -37,6 +40,7 @@ Each PR removes one cause from the [back-edge table](02-as-is.md#24-the-hidden-s
 | B4 | Extract the agent protocol (`BuddyAgentDtos`, proposal risk/service/repository, `BuddyStreamEvent`, the turn relay, tool-call argument readers, stored params) into one package, the future `assistant`. | 51 of the 68 teamspace → buddy edges |
 | B5 | Goal changes publish an event that the board listens to. `UserGoalService` stops calling `BoardService`. | competency → board |
 | B6 | Re-file the misfiled classes (`TeamOverviewUserDto`, `SaveBoardStructureRequest`, `OpenAreas`, `BuddyTeam*` on the Buddy side). | the remaining back edges |
+| B7 | The Buddy's question log (`BuddyQuestion`, `QuestionAskedEvent`, `BuddyQuestionApi`) moves to `knowledge`. The Buddy records into it, and `insights` reads from it. | the `insights ↔ onboarding` cycle, **known violations 0** |
 
 Exit: [`features.py`'s](README.md#how-the-numbers-were-produced) back-edge list is empty.
 
