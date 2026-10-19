@@ -1,13 +1,13 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.model.ConfluenceArtifactBatchCommand
-import com.sprintstart.sprintstartbackend.ingestion.external.model.ConfluenceCodeBlockCommand
-import com.sprintstart.sprintstartbackend.ingestion.external.model.ConfluencePageArtifactCommand
-import com.sprintstart.sprintstartbackend.ingestion.external.model.ConfluencePageMetadataCommand
-import com.sprintstart.sprintstartbackend.ingestion.external.model.ConfluenceRelationshipCommand
-import com.sprintstart.sprintstartbackend.ingestion.external.model.ConfluenceRelationshipType
-import com.sprintstart.sprintstartbackend.ingestion.external.model.ConfluenceSectionCommand
-import com.sprintstart.sprintstartbackend.ingestion.external.model.ConfluenceSourceAclCommand
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceArtifactBatchCommand
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceCodeBlockCommand
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluencePageArtifactCommand
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluencePageMetadataCommand
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceRelationshipCommand
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceRelationshipType
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceSectionCommand
+import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceSourceAclCommand
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.ArtifactType
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRun

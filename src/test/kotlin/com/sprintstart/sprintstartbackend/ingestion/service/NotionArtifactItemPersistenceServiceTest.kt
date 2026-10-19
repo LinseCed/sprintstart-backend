@@ -1,10 +1,10 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.model.NotionArtifactWriteOutcome
-import com.sprintstart.sprintstartbackend.ingestion.external.model.NotionCodeBlockCommand
-import com.sprintstart.sprintstartbackend.ingestion.external.model.NotionPageArtifactCommand
-import com.sprintstart.sprintstartbackend.ingestion.external.model.NotionPageMetadataCommand
-import com.sprintstart.sprintstartbackend.ingestion.external.model.NotionSectionCommand
+import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.NotionArtifactWriteOutcome
+import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.NotionCodeBlockCommand
+import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.NotionPageArtifactCommand
+import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.NotionPageMetadataCommand
+import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.NotionSectionCommand
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.ArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.NotionArtifactMetadata

@@ -1,7 +1,3 @@
 # Module boundary violations that existed when ModuleBoundariesTest was introduced.
 # This list may only shrink; see KnownViolations for how to update it.
-cycle: connectors -> ingestion -> connectors
-cycle: connectors -> ingestion -> upload -> user -> connectors
-cycle: connectors -> ingestion -> user -> connectors
-cycle: connectors -> user -> connectors
 cycle: insights -> onboarding -> insights

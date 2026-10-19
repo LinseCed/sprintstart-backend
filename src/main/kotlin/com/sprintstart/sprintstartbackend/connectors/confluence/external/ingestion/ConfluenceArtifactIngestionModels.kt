@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.ingestion.external.model
+package com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion
 
 import java.time.Instant
 import java.util.UUID
