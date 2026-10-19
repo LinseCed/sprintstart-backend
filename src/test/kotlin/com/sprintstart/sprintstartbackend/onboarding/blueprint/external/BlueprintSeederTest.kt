@@ -29,6 +29,16 @@ class BlueprintSeederTest {
     }
 
     @Test
+    fun `seeds at startup when run as a command line runner`() {
+        every { blueprintPathRepository.findAllByProjectIdIsNull() } returns emptyList()
+        every { blueprintPathRepository.save(any()) } answers { firstArg() }
+
+        seeder.run()
+
+        verify(exactly = 1) { blueprintPathRepository.save(any()) }
+    }
+
+    @Test
     fun `seeds the default global blueprint path with phases and blocker graph`() {
         every { blueprintPathRepository.findAllByProjectIdIsNull() } returns emptyList()
         val savedSlot = slot<BlueprintPath>()

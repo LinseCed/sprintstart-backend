@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.Blue
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPhase
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.repository.BlueprintPathRepository
 import org.slf4j.LoggerFactory
+import org.springframework.boot.CommandLineRunner
 import org.springframework.stereotype.Component
 import java.util.UUID
 
@@ -18,13 +19,17 @@ import java.util.UUID
  * global (no project ID), so it serves as a template that is copied into projects
  * when they are created.
  *
- * Seeding intentionally runs in every environment, including production: the global
- * template is the baseline every new project starts from, not dev-only demo data.
+ * Seeding runs once at startup and intentionally in every environment, including production:
+ * the global template is the baseline every new project starts from, not dev-only demo data.
  */
 @Component
 class BlueprintSeeder(
     private val blueprintPathRepository: BlueprintPathRepository,
-) {
+) : CommandLineRunner {
+    override fun run(vararg args: String) {
+        seed()
+    }
+
     /**
      * Seeds the default global blueprint path if none exists yet.
      *
