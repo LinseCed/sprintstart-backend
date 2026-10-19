@@ -1,6 +1,6 @@
 # ADR (proposed) 003: Calls go down, events go up; `external` is the module API
 
-**Status:** Proposed (2026-10-19). Awaits confirmation by a human.
+**Status:** Accepted (2026-10-19, confirmed by the team).
 **Amends:** ADR-007 (event-based communication), ADR-008 (the `api/` package).
 
 ## Context

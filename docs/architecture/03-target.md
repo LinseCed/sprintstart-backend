@@ -1,7 +1,7 @@
 # 3 Target architecture
 
-> **Status: proposed.** The decisions are drafted as ADRs in [`../adrs-proposed/`](../adrs-proposed/)
-> (002–005) and still need confirmation.
+> **Status: accepted (2026-10-19).** The decisions are recorded as ADRs 002–005 in
+> [`../adrs-proposed/`](../adrs-proposed/).
 
 ## 3.1 Principles
 

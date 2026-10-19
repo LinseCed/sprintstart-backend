@@ -1,9 +1,9 @@
 # 1 Drivers
 
-> **Status: draft, reconstructed.** Nobody wrote these drivers down at the start. They are
+> **Status: confirmed (2026-10-19).** Nobody wrote these drivers down at the start. They were
 > reconstructed from the product (Wiki, final presentation, demo runbooks), from the accepted ADRs
-> and from what the code and the cluster setup show the system had to cope with. Correct them
-> before decisions are built on them.
+> and from what the code and the cluster setup show the system had to cope with, and then
+> confirmed by the team.
 
 ## 1.1 What the system is for
 

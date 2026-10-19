@@ -1,6 +1,6 @@
 # ADR (proposed) 002: Dissolve `onboarding` into layered feature modules
 
-**Status:** Proposed (2026-10-19). Awaits confirmation by a human.
+**Status:** Accepted (2026-10-19, confirmed by the team).
 **Amends:** ADR-006 (Spring Modulith), ADR-008 (module structure).
 
 ## Context

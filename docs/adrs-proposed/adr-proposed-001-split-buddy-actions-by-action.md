@@ -1,6 +1,6 @@
 # ADR (proposed) 001: Split the buddy's action components by action
 
-**Status:** Proposed – accepted provisionally by agent (2026-10-18). A human confirms or reverts it.
+**Status:** Accepted (provisionally by agent 2026-10-18, confirmed by the team 2026-10-19).
 
 ## Context
 

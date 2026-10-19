@@ -13,7 +13,7 @@ Each step builds on the one before it:
 
 Decisions behind the target are recorded as ADRs. The accepted ADRs (ADR-001 to ADR-020) live in the
 [Wiki](https://github.com/SprintStartProject/Wiki/tree/main/docs/source/explanations/adrs). New ones
-start in [`../adrs-proposed/`](../adrs-proposed/) until they are accepted.
+are in [`../adrs-proposed/`](../adrs-proposed/); the folder name is historical, each file states its status.
 
 ## How the numbers were produced
 

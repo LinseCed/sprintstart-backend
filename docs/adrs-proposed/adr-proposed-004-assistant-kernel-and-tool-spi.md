@@ -1,6 +1,6 @@
 # ADR (proposed) 004: An `assistant` kernel, and tools contributed by the features
 
-**Status:** Proposed (2026-10-19). Awaits confirmation by a human.
+**Status:** Accepted (2026-10-19, confirmed by the team).
 **Builds on:** ADR-proposed-001 (split the Buddy's actions; option 2 there was a registry).
 
 ## Context

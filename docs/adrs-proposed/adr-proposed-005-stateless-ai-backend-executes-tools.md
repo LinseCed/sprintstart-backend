@@ -1,7 +1,7 @@
 # ADR (proposed) 005: The AI service is stateless; the backend runs the tools
 
-**Status:** Proposed, recorded after the fact (2026-10-19). It describes a decision the code made
-without an ADR. Awaits confirmation by a human.
+**Status:** Accepted (2026-10-19, confirmed by the team). Recorded after the fact: it describes a
+decision the code made without an ADR.
 
 ## Context
 
