@@ -100,7 +100,6 @@
     <ID>LongMethod:BuddyPathTools.kt:BuddyPathTools$fun execute(userId: UUID): String</ID>
     <ID>LongMethod:BuddyPathTools.kt:BuddyPathTools$fun snapshotFor(userId: UUID): String?</ID>
     <ID>LongMethod:BuddyPathTools.kt:BuddyPathTools$private fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
-    <ID>LongMethod:BuddyPathTools.kt:BuddyPathTools$private fun StringBuilder.appendQuestion( question: GetOnboardingQuestionForUserResponse, phase: GetOnboardingPhaseForUserResponse, graph: PhaseGraph, lastAnswer: String?, )</ID>
     <ID>LongMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun perform(authId: String, userId: UserId, request: BuddyActionRequest): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, userId: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyReplyStream.kt:internal suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.relayAgentTurn( events: Flow&lt;BuddyAgentStreamEvent&gt;, emittedContent: StringBuilder, ): BuddyAgentResponse</ID>
@@ -156,6 +155,7 @@
     <ID>LongMethod:OnboardingPathService.kt:OnboardingPathService$private fun buildTeamOverviewUserDto( userDto: UserDto, path: OnboardingPath?, ): TeamOverviewUserDto</ID>
     <ID>LongMethod:OnboardingPersonalizationService.kt:OnboardingPersonalizationService$@Suppress("CyclomaticComplexMethod") private suspend fun streamPhaseContent( phase: PhaseAssemblyTarget, projectId: String, industry: String?, relay: suspend (detail: String) -&gt; Unit, ): PhaseGenerationResult</ID>
     <ID>LongMethod:OnboardingPersonalizationService.kt:OnboardingPersonalizationService$@Tracked("Creating onboarding path from blueprint") fun personalize(authId: String, projectId: UUID): Flow&lt;OnboardingSseEvent&gt;</ID>
+    <ID>LongMethod:PathItemText.kt:internal fun StringBuilder.appendQuestion( question: GetOnboardingQuestionForUserResponse, phase: GetOnboardingPhaseForUserResponse, graph: PhaseGraph, lastAnswer: String?, )</ID>
     <ID>LongMethod:PhaseReadingOrder.kt:PhaseReadingOrder$fun of(nodes: List&lt;Pair&lt;UUID, Set&lt;UUID&gt;&gt;&gt;): List&lt;UUID&gt;</ID>
     <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Evaluating project industry automatically") override suspend fun evaluateIndustryAutomatically(projectId: UUID)</ID>
     <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Getting or lazily evaluating project industry") override suspend fun getOrEvaluateIndustry(projectId: UUID): String?</ID>
