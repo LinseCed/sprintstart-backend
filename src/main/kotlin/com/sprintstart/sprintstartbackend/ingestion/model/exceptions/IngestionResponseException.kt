@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.upload.model.exceptions
+package com.sprintstart.sprintstartbackend.ingestion.model.exceptions
 
 /**
  * Thrown if the AI repo returns an error to us.

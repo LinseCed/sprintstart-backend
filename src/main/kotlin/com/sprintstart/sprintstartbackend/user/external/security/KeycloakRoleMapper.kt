@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.config
+package com.sprintstart.sprintstartbackend.user.external.security
 
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 

@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.connectors.jira.model.api.response
+package com.sprintstart.sprintstartbackend.connectors.jira.external.events.issues
 
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.serializer.CustomAdfDeserializer
 import com.sprintstart.sprintstartbackend.connectors.jira.model.api.serializer.CustomOffsetDateTimeSerializer
