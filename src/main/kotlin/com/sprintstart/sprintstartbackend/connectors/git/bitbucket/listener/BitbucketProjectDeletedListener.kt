@@ -10,7 +10,7 @@ import org.springframework.transaction.event.TransactionalEventListener
  * Unlinks a deleted project from every Bitbucket repository connection within the transaction deleting the project.
  *
  * Running before commit keeps the unlinking and the deletion atomic, so no Bitbucket repository connection keeps
- * referencing a project that no longer exists.
+ * referencing the deleted project.
  */
 @Component
 internal class BitbucketProjectDeletedListener(
