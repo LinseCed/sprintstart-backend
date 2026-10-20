@@ -79,3 +79,15 @@ value class CanonicalAnswerId(
 value class StarterWorkTaskId(
     val value: UUID,
 )
+
+/** A phase of a hire's onboarding path. */
+@JvmInline
+value class PhaseId(
+    val value: UUID,
+)
+
+/** A step in a phase of a hire's onboarding path. */
+@JvmInline
+value class StepId(
+    val value: UUID,
+)

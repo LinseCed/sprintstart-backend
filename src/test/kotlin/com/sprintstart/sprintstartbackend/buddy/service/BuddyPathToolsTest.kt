@@ -13,6 +13,7 @@ import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionO
 import com.sprintstart.sprintstartbackend.path.model.response.skip.GetOnboardingStepSkipResponse
 import com.sprintstart.sprintstartbackend.path.model.response.step.GetOnboardingStepsResponse
 import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTaskResponse
+import com.sprintstart.sprintstartbackend.path.service.HirePathService
 import com.sprintstart.sprintstartbackend.path.service.OnboardingPathService
 import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
 import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptReader
@@ -48,7 +49,8 @@ class BuddyPathToolsTest {
     private val questionAttemptReader: QuestionAttemptReader = mockk {
         every { lastAttempt(any(), any()) } returns null
     }
-    private val tools = BuddyPathTools(onboardingPathService, onboardingTaskService, questionAttemptReader)
+    private val tools =
+        BuddyPathTools(HirePathService(onboardingPathService, onboardingTaskService, mockk(), questionAttemptReader))
 
     private val userId = UUID.randomUUID()
 

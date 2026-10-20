@@ -3,7 +3,6 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseForUserResponse
-import com.sprintstart.sprintstartbackend.path.service.isDone
 import java.util.UUID
 
 /**

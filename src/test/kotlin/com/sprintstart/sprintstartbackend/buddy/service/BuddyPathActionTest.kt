@@ -15,6 +15,8 @@ import com.sprintstart.sprintstartbackend.path.model.response.step.GetOnboarding
 import com.sprintstart.sprintstartbackend.path.model.response.step.UpdateOnboardingStepResponse
 import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTaskResponse
 import com.sprintstart.sprintstartbackend.path.model.response.task.UpdateOnboardingTaskResponse
+import com.sprintstart.sprintstartbackend.path.service.HirePathActionsService
+import com.sprintstart.sprintstartbackend.path.service.HirePathService
 import com.sprintstart.sprintstartbackend.path.service.OnboardingSkipService
 import com.sprintstart.sprintstartbackend.path.service.OnboardingStepPlacementService
 import com.sprintstart.sprintstartbackend.path.service.OnboardingStepService
@@ -61,13 +63,21 @@ class BuddyPathActionTest {
     // The real path component behind a real action service: these cases are about the path actions
     // *and* about BuddyActionService routing them around the project gate, and mocking the component
     // would test the routing against nothing.
+    private val hirePathActions = HirePathActionsService(
+        onboardingStepService,
+        onboardingStepPlacementService,
+        onboardingTaskService,
+        onboardingSkipService,
+        questionAttemptService,
+    )
+
     private val pathActions = BuddyPathActions(
         buddyPathTools = buddyPathTools,
-        onboardingStepService = onboardingStepService,
-        edits = BuddyPathEditActions(buddyPathTools, onboardingStepPlacementService),
-        onboardingTaskService = onboardingTaskService,
-        questions = BuddyQuestionActions(buddyPathTools, questionAttemptService),
-        skips = BuddySkipActions(buddyPathTools, onboardingSkipService),
+        hirePathActionsApi = hirePathActions,
+        edits = BuddyPathEditActions(buddyPathTools, hirePathActions),
+        hirePathApi = HirePathService(mockk(), onboardingTaskService, mockk(), mockk()),
+        questions = BuddyQuestionActions(buddyPathTools, hirePathActions),
+        skips = BuddySkipActions(buddyPathTools, hirePathActions),
         userApi = userApi,
     )
 
