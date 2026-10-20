@@ -9,8 +9,7 @@ import com.sprintstart.sprintstartbackend.board.model.response.board.BoardCardRe
 import com.sprintstart.sprintstartbackend.board.service.BoardReading
 import com.sprintstart.sprintstartbackend.board.service.BoardService
 import com.sprintstart.sprintstartbackend.board.service.BoardStructureService
-import com.sprintstart.sprintstartbackend.path.service.PathStepReader
-import com.sprintstart.sprintstartbackend.path.service.isDone
+import com.sprintstart.sprintstartbackend.path.external.HirePathApi
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -59,7 +58,7 @@ class BuddyBoardTools(
     private val boardService: BoardService,
     private val boardStructureService: BoardStructureService,
     private val userApi: UserApi,
-    private val pathStepReader: PathStepReader,
+    private val hirePathApi: HirePathApi,
 ) {
     /** The tool specs this component owns, aggregated into the buddy's catalog by the executor. */
     fun toolSpecs(): List<BuddyToolSpecDto> = listOf(PLACE_CARD_SPEC, READ_BOARD_SPEC)
@@ -299,7 +298,7 @@ class BuddyBoardTools(
      * step on a long path has turned a conversation into a listing.
      */
     private fun noSuchStepMessage(userId: UserId): String {
-        val titles = pathStepReader.titlesFor(userId.value)
+        val titles = hirePathApi.stepTitlesOf(userId)
         if (titles.isEmpty()) {
             return "The hire has no path yet, so there is no step to put on their board."
         }

@@ -12,6 +12,7 @@ import com.sprintstart.sprintstartbackend.board.model.response.board.BoardStruct
 import com.sprintstart.sprintstartbackend.board.model.response.board.NoteContent
 import com.sprintstart.sprintstartbackend.board.service.BoardService
 import com.sprintstart.sprintstartbackend.board.service.BoardStructureService
+import com.sprintstart.sprintstartbackend.path.service.HirePathService
 import com.sprintstart.sprintstartbackend.path.service.PathStepReader
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
@@ -37,7 +38,13 @@ class BuddyBoardToolsTest {
     private val boardStructureService: BoardStructureService = mockk(relaxed = true)
     private val userApi: UserApi = mockk()
     private val pathStepReader: PathStepReader = mockk()
-    private val tools = BuddyBoardTools(boardService, boardStructureService, userApi, pathStepReader)
+    private val tools =
+        BuddyBoardTools(
+            boardService,
+            boardStructureService,
+            userApi,
+            HirePathService(mockk(), mockk(), pathStepReader, mockk()),
+        )
 
     private val userId = UUID.randomUUID()
     private val projectId = UUID.randomUUID()

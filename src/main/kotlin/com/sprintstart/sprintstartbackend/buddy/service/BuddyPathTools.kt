@@ -1,15 +1,15 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.path.external.HirePathApi
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseForUserResponse
 import com.sprintstart.sprintstartbackend.path.model.response.question.GetOnboardingQuestionForUserResponse
 import com.sprintstart.sprintstartbackend.path.model.response.step.GetOnboardingStepsResponse
 import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTaskResponse
-import com.sprintstart.sprintstartbackend.path.service.OnboardingPathService
-import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
-import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptReader
 import com.sprintstart.sprintstartbackend.shared.ids.CheckQuestionId
+import com.sprintstart.sprintstartbackend.shared.ids.PhaseId
+import com.sprintstart.sprintstartbackend.shared.ids.StepId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -52,9 +52,7 @@ import java.util.UUID
 @Component
 @Suppress("TooManyFunctions")
 class BuddyPathTools(
-    private val onboardingPathService: OnboardingPathService,
-    private val onboardingTaskService: OnboardingTaskService,
-    private val questionAttemptReader: QuestionAttemptReader,
+    private val hirePathApi: HirePathApi,
 ) {
     /**
      * The path tool, mounted only for a hire who has a path.
@@ -64,7 +62,7 @@ class BuddyPathTools(
      * Asked as a row count rather than as a read -- see [OnboardingPathService.hasPath].
      */
     fun toolSpecs(userId: UUID): List<BuddyToolSpecDto> =
-        if (onboardingPathService.hasPath(userId)) listOf(READ_MY_PATH_SPEC) else emptyList()
+        if (hirePathApi.hasPath(UserId(userId))) listOf(READ_MY_PATH_SPEC) else emptyList()
 
     /** Whether [toolName] is this component's tool. */
     fun handles(toolName: String): Boolean = toolName == READ_MY_PATH
@@ -76,7 +74,7 @@ class BuddyPathTools(
      * its read tool on, answered by the same call. Two components deciding separately whether a path
      * exists is how a mentor ends up holding an action for a plan its read tool says is not there.
      */
-    fun hasPath(userId: UUID): Boolean = onboardingPathService.hasPath(userId)
+    fun hasPath(userId: UUID): Boolean = hirePathApi.hasPath(UserId(userId))
 
     /**
      * What the hire's path says right now, as plain text for the model.
@@ -85,7 +83,7 @@ class BuddyPathTools(
      * that answers with silence is a tool whose result the model fills in for itself.
      */
     fun execute(userId: UUID): String {
-        val path = onboardingPathService.findPathForUserId(userId) ?: return NO_PATH
+        val path = hirePathApi.pathOf(UserId(userId)) ?: return NO_PATH
         val phases = path.phases.sortedBy { it.position }
         if (phases.isEmpty()) {
             // Nothing visible is not the same as nothing there: every phase may have come back empty
@@ -151,7 +149,7 @@ class BuddyPathTools(
         return phase.steps
             .filter { it.isFinishable() }
             .associate { step ->
-                step.id to onboardingTaskService.getOnboardingTasksByStepId(step.id).sortedBy { it.position }
+                step.id to hirePathApi.tasksOf(StepId(step.id)).sortedBy { it.position }
             }
     }
 
@@ -165,7 +163,7 @@ class BuddyPathTools(
      * Absent entirely when there is no path, so a greeting can never open by discussing one.
      */
     fun snapshotFor(userId: UUID): String? {
-        val path = onboardingPathService.findPathForUserId(userId) ?: return null
+        val path = hirePathApi.pathOf(UserId(userId)) ?: return null
         val phases = path.phases.sortedBy { it.position }
         if (phases.isEmpty()) {
             val empty = path.generationIssues
@@ -239,25 +237,25 @@ class BuddyPathTools(
      * lookup that could not see them refused exactly that.
      */
     fun findPhase(userId: UUID, phaseId: UUID): GetOnboardingPhaseForUserResponse? =
-        onboardingPathService.findPathForUserId(userId)?.phases?.firstOrNull { it.id == phaseId }
-            ?: onboardingPathService.findHiddenPhaseForUserId(userId, phaseId)
+        hirePathApi.pathOf(UserId(userId))?.phases?.firstOrNull { it.id == phaseId }
+            ?: hirePathApi.hiddenPhaseOf(UserId(userId), PhaseId(phaseId))
 
     /** Every phase of the hire's own path, or empty when they have none. */
     fun phasesOf(userId: UUID): List<GetOnboardingPhaseForUserResponse> =
-        onboardingPathService.findPathForUserId(userId)?.phases.orEmpty()
+        hirePathApi.pathOf(UserId(userId))?.phases.orEmpty()
 
     /** One step of the hire's own path by id, or null. See [findPhase] for why it resolves this way. */
     fun findStep(userId: UUID, stepId: UUID): GetOnboardingStepsResponse? =
-        onboardingPathService
-            .findPathForUserId(userId)
+        hirePathApi
+            .pathOf(UserId(userId))
             ?.phases
             ?.flatMap { it.steps }
             ?.firstOrNull { it.id == stepId }
 
     /** One question of the hire's own path by id, or null. See [findPhase]. */
     fun findQuestion(userId: UUID, questionId: UUID): GetOnboardingQuestionForUserResponse? =
-        onboardingPathService
-            .findPathForUserId(userId)
+        hirePathApi
+            .pathOf(UserId(userId))
             ?.phases
             ?.flatMap { it.questions }
             ?.firstOrNull { it.id == questionId }
@@ -275,7 +273,7 @@ class BuddyPathTools(
         phase.questions
             .filter { it.status == QuestionStatus.RETRY }
             .mapNotNull { question ->
-                val last = questionAttemptReader
+                val last = hirePathApi
                     .lastAttempt(CheckQuestionId(question.id), UserId(userId))
                     ?.takeUnless { it.correct }
                     ?: return@mapNotNull null
