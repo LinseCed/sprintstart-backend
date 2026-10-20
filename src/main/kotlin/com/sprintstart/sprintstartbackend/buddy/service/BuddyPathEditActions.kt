@@ -6,12 +6,15 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepOrigin
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.external.model.NewConnectedStep
 import com.sprintstart.sprintstartbackend.path.model.request.step.CreateOnboardingStepRequest
 import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseForUserResponse
-import com.sprintstart.sprintstartbackend.path.service.OnboardingStepPlacementService
+import com.sprintstart.sprintstartbackend.shared.ids.AuthId
+import com.sprintstart.sprintstartbackend.shared.ids.PhaseId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
@@ -31,7 +34,7 @@ import java.util.UUID
 @Component
 class BuddyPathEditActions(
     private val buddyPathTools: BuddyPathTools,
-    private val onboardingStepPlacementService: OnboardingStepPlacementService,
+    private val hirePathActionsApi: HirePathActionsApi,
 ) {
     /**
      * Offers to add a step the conversation produced to a phase of the hire's own path.
@@ -161,25 +164,27 @@ class BuddyPathEditActions(
             )
         }
 
-        val created = onboardingStepPlacementService.createConnectedStepForMe(
-            authId = authId,
-            phaseId = phaseId,
-            request = CreateOnboardingStepRequest(
-                // Next to what it waits on (or in front of what it unlocks), so the list reads in the
-                // order the graph opens it. The end, when it is connected to nothing.
-                position = placement.position(),
-                title = title,
-                description = request.description.orEmpty(),
-                type = StepType.TASK,
-                estimatedMinutes = ADDED_STEP_MINUTES,
-                // Left empty on purpose: an expected outcome is a promise about what doing the step
-                // will leave somebody able to do, and the mentor is not in a position to make one.
-                expectedOutcome = "",
+        val created = hirePathActionsApi.placeMyStep(
+            authId = AuthId(authId),
+            phaseId = PhaseId(phaseId),
+            step = NewConnectedStep(
+                step = CreateOnboardingStepRequest(
+                    // Next to what it waits on (or in front of what it unlocks), so the list reads in the
+                    // order the graph opens it. The end, when it is connected to nothing.
+                    position = placement.position(),
+                    title = title,
+                    description = request.description.orEmpty(),
+                    type = StepType.TASK,
+                    estimatedMinutes = ADDED_STEP_MINUTES,
+                    // Left empty on purpose: an expected outcome is a promise about what doing the step
+                    // will leave somebody able to do, and the mentor is not in a position to make one.
+                    expectedOutcome = "",
+                ),
+                // Theirs, but not their idea: the card says it came from the buddy, not from their team.
+                origin = StepOrigin.BUDDY,
+                waitsOn = placement.waitsOn,
+                unlocks = placement.unlocks,
             ),
-            // Theirs, but not their idea: the card says it came from the buddy, not from their team.
-            origin = StepOrigin.BUDDY,
-            waitsOn = placement.waitsOn,
-            unlocks = placement.unlocks,
         )
         return BuddyActionResponse(
             ok = true,

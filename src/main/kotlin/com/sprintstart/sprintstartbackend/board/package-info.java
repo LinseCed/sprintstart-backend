@@ -7,7 +7,7 @@
         allowedDependencies = {
                 "shared :: shared", "shared :: ids", "shared :: ai", "shared :: annotations", "user :: api", "user :: api-events",
                 "ingestion :: api", "ingestion :: api.model",
-                "path :: api-services", "path :: api-enums", "path :: api-responses",
+                "path :: api", "path :: api-model", "path :: api-enums", "path :: api-responses",
                 "arrival :: api-services", "arrival :: api-enums", "arrival :: api-responses",
                 "starterwork :: api-services", "starterwork :: api-enums", "starterwork :: api-events",
                 "starterwork :: api-model", "starterwork :: api-responses"

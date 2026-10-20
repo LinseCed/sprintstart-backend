@@ -5,9 +5,11 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.request.skip.CreateOnboardingSkipRequest
-import com.sprintstart.sprintstartbackend.path.service.OnboardingSkipService
+import com.sprintstart.sprintstartbackend.shared.ids.AuthId
+import com.sprintstart.sprintstartbackend.shared.ids.StepId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
@@ -26,7 +28,7 @@ import org.springframework.stereotype.Component
 @Component
 class BuddySkipActions(
     private val buddyPathTools: BuddyPathTools,
-    private val onboardingSkipService: OnboardingSkipService,
+    private val hirePathActionsApi: HirePathActionsApi,
 ) {
     /**
      * Offers to send the hire's skip request for one step to their PM.
@@ -112,7 +114,7 @@ class BuddySkipActions(
         val step = buddyPathTools.findStep(user.value, stepId)
             ?: return BuddyActionResponse(ok = false, message = "That step isn't on your path.")
 
-        onboardingSkipService.createOnboardingSkipForMe(authId, stepId, CreateOnboardingSkipRequest(reason = reason))
+        hirePathActionsApi.requestSkip(AuthId(authId), StepId(stepId), CreateOnboardingSkipRequest(reason = reason))
         return BuddyActionResponse(
             ok = true,
             message = "Sent — your PM will decide on skipping “${step.title}”. Until then it stays on " +

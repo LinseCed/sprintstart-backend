@@ -5,11 +5,14 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
+import com.sprintstart.sprintstartbackend.path.external.HirePathApi
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.request.task.UpdateOnboardingTaskRequest
 import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTaskResponse
-import com.sprintstart.sprintstartbackend.path.service.OnboardingStepService
-import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
+import com.sprintstart.sprintstartbackend.shared.ids.AuthId
+import com.sprintstart.sprintstartbackend.shared.ids.OnboardingTaskId
+import com.sprintstart.sprintstartbackend.shared.ids.StepId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.serialization.json.add
@@ -46,9 +49,9 @@ import java.util.UUID
 @Component
 class BuddyPathActions(
     private val buddyPathTools: BuddyPathTools,
-    private val onboardingStepService: OnboardingStepService,
+    private val hirePathActionsApi: HirePathActionsApi,
     private val edits: BuddyPathEditActions,
-    private val onboardingTaskService: OnboardingTaskService,
+    private val hirePathApi: HirePathApi,
     private val questions: BuddyQuestionActions,
     private val skips: BuddySkipActions,
     private val userApi: UserApi,
@@ -247,7 +250,7 @@ class BuddyPathActions(
      * here and would not be on its own.
      */
     private fun findTask(userId: UUID, taskId: UUID): GetOnboardingTaskResponse? {
-        val task = runCatching { onboardingTaskService.getOnboardingTaskById(taskId) }.getOrNull()
+        val task = runCatching { hirePathApi.task(OnboardingTaskId(taskId)) }.getOrNull()
             ?: return null
         return task.takeIf { buddyPathTools.findStep(userId, it.stepId) != null }
     }
@@ -263,16 +266,16 @@ class BuddyPathActions(
         if (taskId == null) {
             return BuddyActionResponse(ok = false, message = "No checklist line was proposed to tick off.")
         }
-        val task = onboardingTaskService.getOnboardingTaskForMe(authId, taskId)
+        val task = hirePathApi.myTask(AuthId(authId), OnboardingTaskId(taskId))
         if (buddyPathTools.findStep(resolveUserId(authId), task.stepId)?.locked == true) {
             return BuddyActionResponse(
                 ok = false,
                 message = "That step is locked right now, so its checklist can't be ticked yet.",
             )
         }
-        onboardingTaskService.updateOnboardingTaskForMe(
-            authId,
-            taskId,
+        hirePathActionsApi.updateMyTask(
+            AuthId(authId),
+            OnboardingTaskId(taskId),
             UpdateOnboardingTaskRequest(
                 position = task.position,
                 title = task.title,
@@ -307,7 +310,7 @@ class BuddyPathActions(
                 message = "“${current.title}” is locked right now — something it waits on isn't finished yet.",
             )
         }
-        val step = onboardingStepService.completeOnboardingStepForMe(authId, stepId)
+        val step = hirePathActionsApi.completeMyStep(AuthId(authId), StepId(stepId))
         return BuddyActionResponse(
             ok = true,
             message = "Ticked off “${step.title}”. It is done on your path — if that was too early, " +

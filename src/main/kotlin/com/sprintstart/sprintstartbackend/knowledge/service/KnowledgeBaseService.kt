@@ -9,7 +9,8 @@ import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.Kno
 import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.toResponse
 import com.sprintstart.sprintstartbackend.knowledge.repository.CanonicalAnswerRepository
 import com.sprintstart.sprintstartbackend.knowledge.repository.KnowledgeRequestRepository
-import com.sprintstart.sprintstartbackend.path.service.OnboardingPositionReader
+import com.sprintstart.sprintstartbackend.path.external.PathReadApi
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import org.springframework.http.HttpStatus
@@ -33,7 +34,7 @@ class KnowledgeBaseService(
     private val knowledgeRequestRepository: KnowledgeRequestRepository,
     private val canonicalAnswerRepository: CanonicalAnswerRepository,
     private val userApi: UserApi,
-    private val onboardingPositionReader: OnboardingPositionReader,
+    private val pathReadApi: PathReadApi,
 ) {
     /**
      * Records a hire's escalation of a question the buddy could not answer.
@@ -80,12 +81,12 @@ class KnowledgeBaseService(
 
         val hireIds = requests.map { it.hireId }.distinct()
         val usersById = userApi.getUsersByIds(hireIds).associateBy { it.id }
-        val positionsById = onboardingPositionReader.positionsFor(hireIds)
+        val positionsById = pathReadApi.positionsOf(hireIds.map(::UserId))
 
         return requests.map { request ->
             val user = usersById[request.hireId]
             val hire = user?.let {
-                val position = positionsById[it.id]
+                val position = positionsById[UserId(it.id)]
                 EscalationHireResponse(
                     userId = it.id,
                     displayName = it.displayName(),

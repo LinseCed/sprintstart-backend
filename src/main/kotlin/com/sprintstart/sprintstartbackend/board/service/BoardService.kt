@@ -20,8 +20,7 @@ import com.sprintstart.sprintstartbackend.board.model.response.board.PathStepCon
 import com.sprintstart.sprintstartbackend.board.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.board.repository.BoardDiagramRepository
 import com.sprintstart.sprintstartbackend.board.repository.BoardRepository
-import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
-import com.sprintstart.sprintstartbackend.path.service.PathStepReader
+import com.sprintstart.sprintstartbackend.path.external.PathReadApi
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.OnboardingTaskId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
@@ -56,8 +55,7 @@ class BoardService(
     private val boardDiagramRepository: BoardDiagramRepository,
     private val hydrator: BoardCardHydrator,
     private val arrivalSteps: ArrivalSteps,
-    private val pathStepReader: PathStepReader,
-    private val onboardingTaskService: OnboardingTaskService,
+    private val pathReadApi: PathReadApi,
 ) {
     /**
      * Whether this hire has a board on this project at all.
@@ -102,7 +100,7 @@ class BoardService(
             .associateBy { it.cardId }
         // One read for every PATH_STEP card, skipped when the board holds none.
         val pathSteps = if (cards.any { it.kind == BoardCardKind.PATH_STEP }) {
-            pathStepReader.stepsById(userId.value)
+            pathReadApi.stepsById(userId)
         } else {
             emptyMap()
         }
@@ -185,7 +183,7 @@ class BoardService(
         // and stored as the step's own id, so a renamed step keeps its card and "the same step
         // twice" is an exact match regardless of how the mentor phrased it.
         val storedSubject = if (kind == BoardCardKind.PATH_STEP) {
-            val resolved = cleanSubject?.let { pathStepReader.resolve(userId.value, it) }
+            val resolved = cleanSubject?.let { pathReadApi.resolveStep(userId, it) }
                 ?: return PlacementOutcome.NO_SUCH_STEP
             resolved.id.toString()
         } else {
@@ -338,11 +336,11 @@ class BoardService(
      *
      * The one live card the hire may change: everywhere else, a card is read-only because it is a
      * live read, but a task ticked here and the same task still open on the path page would be two
-     * different facts about the same piece of work. So this writes through [OnboardingTaskService],
+     * different facts about the same piece of work. So this writes through [PathReadApi.setTaskFinished],
      * the single place [com.sprintstart.sprintstartbackend.path.model.entity.OnboardingTask.finished]
      * is set, and returns the re-hydrated card content — never the entity.
      *
-     * The step's own status is never touched here, the same as [OnboardingTaskService.setFinishedForUser]
+     * The step's own status is never touched here, the same as [PathReadApi.setTaskFinished]
      * leaves it. Idempotent: setting [done] to what it already is still returns the current content.
      *
      * @throws ResponseStatusException 404 for a card that does not exist, belongs to somebody else,
@@ -363,14 +361,14 @@ class BoardService(
         if (card.kind != BoardCardKind.PATH_STEP) noSuchPathStepCard()
 
         val stepId = card.subject?.let { runCatching { UUID.fromString(it) }.getOrNull() }
-        val resolved = stepId?.let { pathStepReader.stepsById(userId.value)[it] } ?: noSuchPathStepCard()
+        val resolved = stepId?.let { pathReadApi.stepsById(userId)[it] } ?: noSuchPathStepCard()
         if (resolved.tasks.none { it.id == taskId.value }) noSuchPathStepCard()
 
-        onboardingTaskService.setFinishedForUser(userId.value, taskId.value, done)
+        pathReadApi.setTaskFinished(userId, taskId, done)
         card.recordChange(BoardCardChange.TICKED, BoardActor.HIRE)
         boardCardRepository.save(card)
 
-        return pathStepReader.stepsById(userId.value)[resolved.id]?.toContent() ?: noSuchPathStepCard()
+        return pathReadApi.stepsById(userId)[resolved.id]?.toContent() ?: noSuchPathStepCard()
     }
 
     /**

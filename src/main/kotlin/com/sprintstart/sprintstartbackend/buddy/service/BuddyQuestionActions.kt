@@ -6,11 +6,13 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.model.request.question.SubmitQuestionAttemptRequest
 import com.sprintstart.sprintstartbackend.path.model.response.question.GetOnboardingQuestionForUserResponse
 import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionOptionForUserResponse
-import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptService
+import com.sprintstart.sprintstartbackend.shared.ids.AuthId
+import com.sprintstart.sprintstartbackend.shared.ids.CheckQuestionId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
@@ -29,7 +31,7 @@ import org.springframework.stereotype.Component
 @Component
 class BuddyQuestionActions(
     private val buddyPathTools: BuddyPathTools,
-    private val questionAttemptService: QuestionAttemptService,
+    private val hirePathActionsApi: HirePathActionsApi,
 ) {
     /**
      * Offers to send the hire's own answer to a knowledge question.
@@ -174,7 +176,7 @@ class BuddyQuestionActions(
             SubmitQuestionAttemptRequest(textAnswer = answer)
         }
 
-        val result = questionAttemptService.submitQuestionAttemptForMe(authId, questionId, submission)
+        val result = hirePathActionsApi.answerCheck(AuthId(authId), CheckQuestionId(questionId), submission)
         // The submit response is the one user-facing place correct answers are revealed, and the
         // hire's own page shows them there. Relaying the same thing keeps the two surfaces telling
         // one story; withholding it here would make the conversation the worse place to answer.

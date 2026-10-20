@@ -13,6 +13,7 @@ import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPhase
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingStep
 import com.sprintstart.sprintstartbackend.path.repository.OnboardingPathRepository
 import com.sprintstart.sprintstartbackend.path.service.OnboardingPositionReader
+import com.sprintstart.sprintstartbackend.path.service.PathReadService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
@@ -40,7 +41,7 @@ class KnowledgeBaseServiceTest {
         knowledgeRequestRepository,
         canonicalAnswerRepository,
         userApi,
-        OnboardingPositionReader(onboardingPathRepository),
+        PathReadService(mockk(), mockk(), OnboardingPositionReader(onboardingPathRepository)),
     )
 
     private val authId = "auth|hire"
