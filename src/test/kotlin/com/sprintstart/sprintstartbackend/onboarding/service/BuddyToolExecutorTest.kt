@@ -4,13 +4,14 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
+import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.CanonicalAnswerResponse
+import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
@@ -494,11 +495,14 @@ class BuddyToolExecutorTest {
     @Test
     fun `serves a teammate's canonical answer faithfully`() {
         every { knowledgeBaseService.searchForUser(userId, "how do we deploy") } returns listOf(
-            CanonicalAnswer(
+            CanonicalAnswerResponse(
+                id = UUID.randomUUID(),
                 projectId = projectId,
                 question = "How do we deploy?",
                 answer = "Run ./deploy.sh from main after CI is green.",
                 authorId = UUID.randomUUID(),
+                createdAt = Instant.EPOCH,
+                updatedAt = Instant.EPOCH,
             ),
         )
 

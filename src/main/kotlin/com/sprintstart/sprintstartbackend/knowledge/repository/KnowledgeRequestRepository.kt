@@ -1,7 +1,7 @@
-package com.sprintstart.sprintstartbackend.onboarding.repository
+package com.sprintstart.sprintstartbackend.knowledge.repository
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.KnowledgeRequestStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.KnowledgeRequest
+import com.sprintstart.sprintstartbackend.knowledge.external.enums.KnowledgeRequestStatus
+import com.sprintstart.sprintstartbackend.knowledge.model.entity.KnowledgeRequest
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query

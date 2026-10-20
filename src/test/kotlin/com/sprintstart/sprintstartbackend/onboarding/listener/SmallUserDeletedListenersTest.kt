@@ -2,8 +2,9 @@ package com.sprintstart.sprintstartbackend.onboarding.listener
 
 import com.sprintstart.sprintstartbackend.assistant.listener.ProposalUserDeletedListener
 import com.sprintstart.sprintstartbackend.assistant.repository.BuddyActionProposalRepository
+import com.sprintstart.sprintstartbackend.knowledge.listener.KnowledgeUserDeletedListener
+import com.sprintstart.sprintstartbackend.knowledge.repository.KnowledgeRequestRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.GithubHistoryPriorRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.KnowledgeRequestRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalRepository
 import com.sprintstart.sprintstartbackend.user.external.events.UserDeletedEvent

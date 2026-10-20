@@ -1,12 +1,12 @@
-package com.sprintstart.sprintstartbackend.onboarding.controller
+package com.sprintstart.sprintstartbackend.knowledge.controller
 
-import com.sprintstart.sprintstartbackend.onboarding.model.request.knowledge.AnswerKnowledgeRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.knowledge.CreateKnowledgeRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.knowledge.UpdateCanonicalAnswer
-import com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge.CanonicalAnswerResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge.KnowledgeRequestResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge.OpenEscalationCountResponse
-import com.sprintstart.sprintstartbackend.onboarding.service.KnowledgeBaseService
+import com.sprintstart.sprintstartbackend.knowledge.model.request.knowledge.AnswerKnowledgeRequest
+import com.sprintstart.sprintstartbackend.knowledge.model.request.knowledge.CreateKnowledgeRequest
+import com.sprintstart.sprintstartbackend.knowledge.model.request.knowledge.UpdateCanonicalAnswer
+import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.CanonicalAnswerResponse
+import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.KnowledgeRequestResponse
+import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.OpenEscalationCountResponse
+import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.tags.Tag

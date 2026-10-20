@@ -1,8 +1,8 @@
-package com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge
+package com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.KnowledgeRequestStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.KnowledgeRequest
+import com.sprintstart.sprintstartbackend.knowledge.external.enums.KnowledgeRequestStatus
+import com.sprintstart.sprintstartbackend.knowledge.model.entity.CanonicalAnswer
+import com.sprintstart.sprintstartbackend.knowledge.model.entity.KnowledgeRequest
 import java.time.Instant
 import java.util.UUID
 
