@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.external
 
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceCalls
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssembleDiagramRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.DiagramOutcome
 import org.springframework.stereotype.Component

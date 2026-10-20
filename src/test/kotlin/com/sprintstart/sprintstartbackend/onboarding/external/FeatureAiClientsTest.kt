@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.external
 
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceCalls
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest

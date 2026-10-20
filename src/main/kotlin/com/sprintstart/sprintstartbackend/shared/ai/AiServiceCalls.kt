@@ -1,6 +1,5 @@
-package com.sprintstart.sprintstartbackend.onboarding.external
+package com.sprintstart.sprintstartbackend.shared.ai
 
-import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
