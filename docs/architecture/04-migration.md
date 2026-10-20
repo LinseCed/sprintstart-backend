@@ -58,10 +58,19 @@ metrics into `insights` → `buddy` → `teamspace`. Each PR:
 
 Exit: `onboarding` no longer exists. `ModuleBoundariesTest` passes with an empty known list.
 
-Interim: `path` has no `PathApi` yet. The Buddy, team mode and the board call its services directly,
-so `path/service` and its request and response DTO packages are named interfaces. Entities,
-repositories and mappers stay hidden (P4). A `PathApi` interface in `path/external` replaces the
-exposed services once its callers have left `onboarding` and the call surface is known.
+Done (#231, #233, #235–#241 and this PR): `onboarding` is gone, and `ModuleBoundariesTest` passes with
+an empty known list. Every feature module declares its allowed dependencies. Where a higher module
+used to hold a lower one's entities, the lower module now answers in DTOs with typed ids (`ArrivalSteps`,
+`StarterWorkPool`, `KnowledgeLookup`, `QuestionAttemptReader`, `ResolvedPathStep`).
+
+Interim: no feature has a `<Feature>Api` interface yet. Higher modules call the services directly,
+so each feature's `service` package and its request and response DTO packages are named interfaces
+(`api-services`, `api-requests`, `api-responses`). Entities, repositories and mappers stay hidden
+(P4). An interface in `<feature>/external` replaces the exposed services one feature at a time, now
+that every caller is a module of its own and the call surface can be read off the dependency graph.
+
+Not yet declared: `shared`, `user`, `connectors`, `config` (the composition root) and `health`.
+They depend on nothing above them today, but nothing enforces it.
 
 ### Stage D: decisions that need the new structure
 

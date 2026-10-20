@@ -1,0 +1,21 @@
+/**
+ * Team mode: the assistant for PMs and the team. Its sessions, the areas it opens, and the tools and
+ * actions it offers across path, arrival, starter work, knowledge and insights. An L4 assistant at the
+ * top: it may use everything below it, including the Buddy's API, and nothing depends on it.
+ */
+@ApplicationModule(
+        allowedDependencies = {
+                "shared :: ids", "assistant :: api", "user :: api", "user :: api-events",
+                "ingestion :: api", "ingestion :: api.model", "blueprint :: api-enums",
+                "path :: api-services", "path :: api-enums", "path :: api-requests", "path :: api-responses",
+                "arrival :: api", "arrival :: api-services", "arrival :: api-enums", "arrival :: api-responses",
+                "starterwork :: api-services", "starterwork :: api-enums", "starterwork :: api-requests",
+                "starterwork :: api-responses",
+                "knowledge :: api-services", "knowledge :: api-responses", "insights :: api", "insights :: api-services", "insights :: api-responses",
+                "buddy :: api", "buddy :: api-services", "buddy :: api-enums", "buddy :: api-requests",
+                "buddy :: api-responses"
+        }
+)
+package com.sprintstart.sprintstartbackend.teamspace;
+
+import org.springframework.modulith.ApplicationModule;

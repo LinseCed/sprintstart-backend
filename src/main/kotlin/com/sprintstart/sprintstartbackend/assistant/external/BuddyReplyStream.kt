@@ -170,7 +170,7 @@ private const val HOP_SEPARATOR = "\n\n"
 private const val TURN_FAILED_MESSAGE = "The buddy could not finish this reply."
 
 private val logger = LoggerFactory.getLogger(
-    "com.sprintstart.sprintstartbackend.onboarding.service.BuddyReplyStream",
+    "com.sprintstart.sprintstartbackend.teamspace.service.BuddyReplyStream",
 )
 
 /** The stream event that tells the client the buddy is running the tool [name]. */
