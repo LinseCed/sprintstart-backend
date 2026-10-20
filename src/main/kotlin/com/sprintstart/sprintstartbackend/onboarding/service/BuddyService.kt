@@ -16,10 +16,10 @@ import com.sprintstart.sprintstartbackend.assistant.external.emitCitationsAndDon
 import com.sprintstart.sprintstartbackend.assistant.external.endFailureWithErrorEvent
 import com.sprintstart.sprintstartbackend.assistant.external.relayAgentTurn
 import com.sprintstart.sprintstartbackend.assistant.external.toolUseEvent
+import com.sprintstart.sprintstartbackend.knowledge.external.QuestionLogApi
 import com.sprintstart.sprintstartbackend.onboarding.client.BuddyAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
-import com.sprintstart.sprintstartbackend.onboarding.external.event.QuestionAskedEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.ContributionWording
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyCitation
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
@@ -27,6 +27,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySessionStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.AiResponseException
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toAgentMessage
+import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toNewQuestion
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.AiGenerateSessionTitleRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
@@ -37,13 +38,14 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepo
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.QuestionId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import org.slf4j.LoggerFactory
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -76,7 +78,7 @@ class BuddyService(
     private val artifactLookupService: ArtifactLookupService,
     private val compactionScheduler: BuddyCompactionScheduler,
     private val buddyAiClient: BuddyAiClient,
-    private val eventPublisher: ApplicationEventPublisher,
+    private val questionLog: QuestionLogApi,
     private val clock: Clock,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -225,15 +227,7 @@ class BuddyService(
         val questionForFaq = stripQuotedSelection(message.content)
 
         session.projectId?.let { projectId ->
-            eventPublisher.publishEvent(
-                QuestionAskedEvent(
-                    messageId = message.id,
-                    sessionId = session.id,
-                    projectId = projectId,
-                    question = questionForFaq,
-                    askedAt = message.createdAt,
-                ),
-            )
+            questionLog.record(message.toNewQuestion(ProjectId(projectId), questionForFaq))
         }
 
         // The reasoner gets the read-only tools and the action tools it may propose; an action never mutates
@@ -576,6 +570,7 @@ class BuddyService(
             )
         }
         buddyMessageRepository.delete(message)
+        questionLog.forget(QuestionId(message.id))
     }
 
     @Transactional

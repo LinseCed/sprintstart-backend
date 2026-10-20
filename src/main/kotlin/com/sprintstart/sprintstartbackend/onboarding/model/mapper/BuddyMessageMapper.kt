@@ -1,11 +1,16 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.mapper
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
+import com.sprintstart.sprintstartbackend.knowledge.external.NewQuestion
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyCitation
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyCitationResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
+import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.QuestionId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 
 fun BuddyMessage.toResponse(): BuddyMessageResponse =
     BuddyMessageResponse(
@@ -39,6 +44,20 @@ fun BuddyCitation.toResponse(): BuddyCitationResponse =
  */
 fun BuddyMessage.toAgentMessage(): BuddyAgentMessageDto =
     BuddyAgentMessageDto(role = role.toHistoryRole(), content = content)
+
+/**
+ * This message as the question log records it: [text] is the question without a quoted selection, and the
+ * message itself identifies it, so deleting the message can forget it.
+ */
+fun BuddyMessage.toNewQuestion(project: ProjectId, text: String): NewQuestion =
+    NewQuestion(
+        id = QuestionId(id),
+        conversation = BuddySessionId(session.id),
+        askedBy = UserId(session.userId),
+        project = project,
+        text = text,
+        askedAt = createdAt,
+    )
 
 /** A role as the AI service spells it, for every transcript the buddy sends. */
 internal fun BuddyMessageRole.toHistoryRole(): String =

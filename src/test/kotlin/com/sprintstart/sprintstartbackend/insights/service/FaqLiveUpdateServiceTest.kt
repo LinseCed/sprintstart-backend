@@ -8,7 +8,7 @@ import com.sprintstart.sprintstartbackend.insights.model.ai.AiFaqDocument
 import com.sprintstart.sprintstartbackend.insights.model.entity.FaqGroup
 import com.sprintstart.sprintstartbackend.insights.repository.FaqGroupRepository
 import com.sprintstart.sprintstartbackend.insights.repository.FaqQuestionRepository
-import com.sprintstart.sprintstartbackend.onboarding.external.event.QuestionAskedEvent
+import com.sprintstart.sprintstartbackend.knowledge.external.event.QuestionAskedEvent
 import com.sprintstart.sprintstartbackend.shared.config.FaqInsightsConfig
 import io.mockk.CapturingSlot
 import io.mockk.coEvery
