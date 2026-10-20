@@ -6,7 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpe
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.Flow
@@ -97,7 +97,7 @@ class BuddyOpeningStreamTest {
         aiSends(
             flow {
                 emit(token("Half"))
-                throw OnboardingAiException(503, "down", "AI unavailable")
+                throw AiServiceException(503, "down", "AI unavailable")
             },
         )
 
@@ -109,7 +109,7 @@ class BuddyOpeningStreamTest {
 
     @Test
     fun `shows the fallback and stores nothing when no word arrived`() = runTest {
-        aiSends(flow { throw OnboardingAiException(503, "down", "AI unavailable") })
+        aiSends(flow { throw AiServiceException(503, "down", "AI unavailable") })
 
         val events = stream.open(request, conversation).toList()
 

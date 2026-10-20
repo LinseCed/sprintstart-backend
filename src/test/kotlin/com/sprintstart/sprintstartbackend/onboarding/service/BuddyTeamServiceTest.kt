@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentResponse
@@ -23,6 +22,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamMessage
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamSessionRepository
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.shared.model.SourceSystem
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.coEvery
 import io.mockk.coVerify

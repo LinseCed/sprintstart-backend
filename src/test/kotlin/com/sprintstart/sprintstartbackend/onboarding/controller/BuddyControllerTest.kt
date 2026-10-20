@@ -3,7 +3,6 @@ package com.sprintstart.sprintstartbackend.onboarding.controller
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
@@ -20,6 +19,7 @@ import com.sprintstart.sprintstartbackend.onboarding.service.BuddyTeamConversati
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyTeamService
 import com.sprintstart.sprintstartbackend.shared.ids.AuthId
 import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
+import com.sprintstart.sprintstartbackend.shared.model.SourceSystem
 import com.sprintstart.sprintstartbackend.user.external.security.ProjectAuthorization
 import io.mockk.coEvery
 import io.mockk.coVerify

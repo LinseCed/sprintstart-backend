@@ -5,7 +5,7 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpe
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
@@ -73,7 +73,7 @@ class BuddyOpeningStream(
                     BuddyOpenStreamEvent.DONE -> closing = event
                 }
             }
-        } catch (e: OnboardingAiException) {
+        } catch (e: AiServiceException) {
             logger.warn("Buddy opening stream failed; keeping the {} characters already shown", shown.length, e)
         }
         return RelayedOpening(shown.toString(), closing)

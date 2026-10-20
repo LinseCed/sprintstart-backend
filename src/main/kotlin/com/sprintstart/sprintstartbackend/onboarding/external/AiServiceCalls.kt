@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.external
 
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
@@ -29,7 +29,7 @@ class AiServiceCalls(
      * POSTs [body] to [path] and decodes the response.
      *
      * @param action What the call does, for the error message ("assemble diagram").
-     * @throws OnboardingAiException for a non-2xx response, carrying the upstream status and body.
+     * @throws AiServiceException for a non-2xx response, carrying the upstream status and body.
      */
     final suspend inline fun <reified B, reified R> post(path: String, body: B, action: String): R =
         try {
@@ -40,7 +40,7 @@ class AiServiceCalls(
                 .sync()
                 .perform<R>()
         } catch (@Suppress("SwallowedException") e: WebClientException) {
-            throw OnboardingAiException(e.statusCode, e.body, "Failed to $action (HTTP ${e.statusCode}): ${e.body}")
+            throw AiServiceException(e.statusCode, e.body, "Failed to $action (HTTP ${e.statusCode}): ${e.body}")
         }
 
     /**

@@ -4,10 +4,10 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAge
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCompactRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMemory
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toAgentMessage
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import org.slf4j.LoggerFactory
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Service
@@ -81,7 +81,7 @@ class BuddyCompactionService(
         val request = BuddyCompactRequest(priorSummary = plan.priorSummary, folded = plan.folded)
         val memory = try {
             agentAiClient.compactBuddyMemory(request).memory
-        } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
+        } catch (@Suppress("SwallowedException") e: AiServiceException) {
             // The note shapes the prompt and is not the record, so a failed fold costs only a
             // longer prompt next turn. Warned, not retried.
             logger.warn("Buddy compaction skipped for {}: {}", store.label, e.message)

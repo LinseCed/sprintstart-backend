@@ -5,7 +5,6 @@ import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.N
 import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.NotionPageArtifactCommand
 import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.NotionPageMetadataCommand
 import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.NotionSectionCommand
-import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.ArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.NotionArtifactMetadata
 import com.sprintstart.sprintstartbackend.ingestion.model.entity.Artifact
@@ -14,6 +13,7 @@ import com.sprintstart.sprintstartbackend.ingestion.model.entity.IngestionRunSta
 import com.sprintstart.sprintstartbackend.ingestion.model.mapper.ArtifactMetadataJsonMapper
 import com.sprintstart.sprintstartbackend.ingestion.repository.ArtifactRepository
 import com.sprintstart.sprintstartbackend.ingestion.repository.IngestionRunRepository
+import com.sprintstart.sprintstartbackend.shared.model.SourceSystem
 import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just

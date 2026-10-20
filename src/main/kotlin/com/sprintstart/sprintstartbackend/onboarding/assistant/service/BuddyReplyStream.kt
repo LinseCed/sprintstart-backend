@@ -4,7 +4,7 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAge
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.catch
@@ -30,7 +30,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * separator at that seam is written here: the first token of a call is preceded by one when
  * [emittedContent] already holds text.
  *
- * @throws OnboardingAiException if the AI reports an `error`, or the stream ends without a `result`.
+ * @throws AiServiceException if the AI reports an `error`, or the stream ends without a `result`.
  */
 internal suspend fun FlowCollector<BuddyStreamEvent>.relayAgentTurn(
     events: Flow<BuddyAgentStreamEvent>,
@@ -58,7 +58,7 @@ internal suspend fun FlowCollector<BuddyStreamEvent>.relayAgentTurn(
 
             BuddyAgentStreamEvent.RESULT -> result = event.toResponse()
 
-            BuddyAgentStreamEvent.ERROR -> throw OnboardingAiException(
+            BuddyAgentStreamEvent.ERROR -> throw AiServiceException(
                 HttpStatus.SERVICE_UNAVAILABLE.value(),
                 event.message.orEmpty(),
                 "The AI service failed the buddy turn: ${event.message}",
@@ -66,7 +66,7 @@ internal suspend fun FlowCollector<BuddyStreamEvent>.relayAgentTurn(
         }
     }
 
-    return result ?: throw OnboardingAiException(
+    return result ?: throw AiServiceException(
         HttpStatus.BAD_GATEWAY.value(),
         "",
         "The AI service ended the buddy turn without a result.",
