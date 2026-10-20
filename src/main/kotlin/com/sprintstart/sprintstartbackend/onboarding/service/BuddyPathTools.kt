@@ -1,12 +1,14 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.QuestionStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.response.phase.GetOnboardingPhaseForUserResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.question.GetOnboardingQuestionForUserResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.step.GetOnboardingStepsResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.task.GetOnboardingTaskResponse
-import com.sprintstart.sprintstartbackend.onboarding.repository.QuestionAttemptRepository
+import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
+import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseForUserResponse
+import com.sprintstart.sprintstartbackend.path.model.response.question.GetOnboardingQuestionForUserResponse
+import com.sprintstart.sprintstartbackend.path.model.response.step.GetOnboardingStepsResponse
+import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTaskResponse
+import com.sprintstart.sprintstartbackend.path.repository.QuestionAttemptRepository
+import com.sprintstart.sprintstartbackend.path.service.OnboardingPathService
+import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject

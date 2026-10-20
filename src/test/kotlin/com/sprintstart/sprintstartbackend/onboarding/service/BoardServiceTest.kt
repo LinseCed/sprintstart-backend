@@ -13,7 +13,6 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKi
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Board
@@ -24,11 +23,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.ChecklistItemP
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ChecklistPayload
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.LinkPayload
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.NotePayload
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhase
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingResource
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingStep
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTask
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.AuthoredCardRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.ChecklistCardRequest
@@ -50,7 +44,15 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardReposit
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardDiagramRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
+import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPath
+import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPhase
+import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingResource
+import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingStep
+import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingTask
+import com.sprintstart.sprintstartbackend.path.repository.OnboardingPathRepository
+import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
+import com.sprintstart.sprintstartbackend.path.service.PathStepReader
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.OnboardingTaskId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId

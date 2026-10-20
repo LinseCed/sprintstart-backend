@@ -1,9 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toGetAllResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathStepContent
-import com.sprintstart.sprintstartbackend.onboarding.model.response.resource.GetOnboardingResourcesResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.task.GetOnboardingTasksResponse
+import com.sprintstart.sprintstartbackend.path.model.mapper.toGetAllResponse
+import com.sprintstart.sprintstartbackend.path.model.response.resource.GetOnboardingResourcesResponse
+import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTasksResponse
+import com.sprintstart.sprintstartbackend.path.service.ResolvedPathStep
 import java.util.UUID
 
 // What a `PATH_STEP` card shows: a pure mapping from the hire's path. [BoardService] decides which cards are

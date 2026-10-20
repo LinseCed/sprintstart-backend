@@ -1,9 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.external
 
-import com.sprintstart.sprintstartbackend.shared.ai.AiServiceCalls
-import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.MineStarterWorkRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
+import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceCalls
 import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import kotlinx.coroutines.flow.Flow
 import org.springframework.stereotype.Component

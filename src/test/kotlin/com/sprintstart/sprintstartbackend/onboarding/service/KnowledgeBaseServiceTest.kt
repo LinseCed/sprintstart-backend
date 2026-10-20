@@ -2,15 +2,16 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.KnowledgeRequestStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.KnowledgeRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhase
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingStep
 import com.sprintstart.sprintstartbackend.onboarding.repository.CanonicalAnswerRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.KnowledgeRequestRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
+import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPath
+import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPhase
+import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingStep
+import com.sprintstart.sprintstartbackend.path.repository.OnboardingPathRepository
+import com.sprintstart.sprintstartbackend.path.service.OnboardingPositionReader
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto

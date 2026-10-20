@@ -4,9 +4,10 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.skip.CreateOnboardingSkipRequest
+import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.model.request.skip.CreateOnboardingSkipRequest
+import com.sprintstart.sprintstartbackend.path.service.OnboardingSkipService
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject

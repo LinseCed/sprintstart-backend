@@ -3,10 +3,12 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.text
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.request.step.CreateOnboardingStepRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.step.UpdateOnboardingStepRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.response.step.GetOnboardingStepResponse
+import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.model.request.step.CreateOnboardingStepRequest
+import com.sprintstart.sprintstartbackend.path.model.request.step.UpdateOnboardingStepRequest
+import com.sprintstart.sprintstartbackend.path.model.response.step.GetOnboardingStepResponse
+import com.sprintstart.sprintstartbackend.path.service.OnboardingStepService
+import com.sprintstart.sprintstartbackend.path.service.PathElementKind
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot

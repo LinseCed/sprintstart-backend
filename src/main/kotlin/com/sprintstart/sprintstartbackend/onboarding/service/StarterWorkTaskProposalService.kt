@@ -6,7 +6,6 @@ import com.sprintstart.sprintstartbackend.onboarding.external.StarterWorkAiClien
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CandidatePoolState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
-import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
@@ -20,6 +19,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
+import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers

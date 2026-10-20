@@ -1,8 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.model.request.resource.CreateOnboardingResourceRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.resource.UpdateOnboardingResourceRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.response.resource.GetOnboardingResourceResponse
+import com.sprintstart.sprintstartbackend.path.model.request.resource.CreateOnboardingResourceRequest
+import com.sprintstart.sprintstartbackend.path.model.request.resource.UpdateOnboardingResourceRequest
+import com.sprintstart.sprintstartbackend.path.model.response.resource.GetOnboardingResourceResponse
+import com.sprintstart.sprintstartbackend.path.service.OnboardingResourceService
+import com.sprintstart.sprintstartbackend.path.service.PathElementKind
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot

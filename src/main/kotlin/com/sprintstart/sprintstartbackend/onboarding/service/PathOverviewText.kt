@@ -1,10 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnboardingPathForUserResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.phase.GetOnboardingPhaseForUserResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyPathTools.Companion.NEWLINE
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyPathTools.Companion.PHASE_LINK
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyPathTools.Companion.quoted
+import com.sprintstart.sprintstartbackend.path.model.response.path.GetOnboardingPathForUserResponse
+import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseForUserResponse
 
 /*
  * How the hire's path as a whole reads to the mentor in get_my_onboarding_path: where they

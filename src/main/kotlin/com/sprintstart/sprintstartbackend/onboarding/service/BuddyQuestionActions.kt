@@ -5,11 +5,12 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.question.SubmitQuestionAttemptRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.response.question.GetOnboardingQuestionForUserResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.question.QuestionOptionForUserResponse
+import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
+import com.sprintstart.sprintstartbackend.path.model.request.question.SubmitQuestionAttemptRequest
+import com.sprintstart.sprintstartbackend.path.model.response.question.GetOnboardingQuestionForUserResponse
+import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionOptionForUserResponse
+import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptService
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject

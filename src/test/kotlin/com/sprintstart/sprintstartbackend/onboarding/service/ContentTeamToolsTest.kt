@@ -1,14 +1,16 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.GenerationStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnboardingPathForUserResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.path.OnboardingGenerationIssueResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.phase.GetOnboardingPhaseForUserResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.resource.GetOnboardingResourcesResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.step.GetOnboardingStepResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.task.GetOnboardingTasksResponse
+import com.sprintstart.sprintstartbackend.path.external.enums.GenerationStatus
+import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.model.response.path.GetOnboardingPathForUserResponse
+import com.sprintstart.sprintstartbackend.path.model.response.path.OnboardingGenerationIssueResponse
+import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseForUserResponse
+import com.sprintstart.sprintstartbackend.path.model.response.resource.GetOnboardingResourcesResponse
+import com.sprintstart.sprintstartbackend.path.model.response.step.GetOnboardingStepResponse
+import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTasksResponse
+import com.sprintstart.sprintstartbackend.path.service.OnboardingPathService
+import com.sprintstart.sprintstartbackend.path.service.OnboardingStepService
 import io.mockk.every
 import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat

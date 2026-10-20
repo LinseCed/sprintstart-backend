@@ -2,10 +2,13 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.text
-import com.sprintstart.sprintstartbackend.onboarding.model.request.phase.CreateOnboardingPhaseRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.phase.UpdateOnboardingPhaseRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.response.phase.GetOnboardingPhaseResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.phase.GetOnboardingPhasesResponse
+import com.sprintstart.sprintstartbackend.path.model.request.phase.CreateOnboardingPhaseRequest
+import com.sprintstart.sprintstartbackend.path.model.request.phase.UpdateOnboardingPhaseRequest
+import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseResponse
+import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhasesResponse
+import com.sprintstart.sprintstartbackend.path.service.OnboardingPhaseService
+import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.path.service.PathSummary
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot

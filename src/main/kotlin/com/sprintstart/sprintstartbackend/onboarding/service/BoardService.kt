@@ -18,6 +18,8 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathSt
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardDiagramRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
+import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
+import com.sprintstart.sprintstartbackend.path.service.PathStepReader
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.OnboardingTaskId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
@@ -332,7 +334,7 @@ class BoardService(
      * The one live card the hire may change: everywhere else, a card is read-only because it is a
      * live read, but a task ticked here and the same task still open on the path page would be two
      * different facts about the same piece of work. So this writes through [OnboardingTaskService],
-     * the single place [com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTask.finished]
+     * the single place [com.sprintstart.sprintstartbackend.path.model.entity.OnboardingTask.finished]
      * is set, and returns the re-hydrated card content — never the entity.
      *
      * The step's own status is never touched here, the same as [OnboardingTaskService.setFinishedForUser]
