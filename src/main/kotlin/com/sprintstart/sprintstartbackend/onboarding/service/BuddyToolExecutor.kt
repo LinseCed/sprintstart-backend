@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.board.service.OpenPullRequestReader
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse

@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.model.response.board.MemoryRecapContent
+import com.sprintstart.sprintstartbackend.board.model.response.board.MemoryRecapContent
+import com.sprintstart.sprintstartbackend.board.service.MemoryRecapSource
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import org.springframework.stereotype.Component
