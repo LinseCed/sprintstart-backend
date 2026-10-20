@@ -331,7 +331,6 @@
     <ID>TooGenericExceptionCaught:UploadService.kt:UploadService$e: Exception</ID>
     <ID>TooGenericExceptionThrown:OnDiskOperations.kt:OnDiskOperations.Companion$throw RuntimeException("$command failed (exit $exitCode)$suffix")</ID>
     <ID>UnnecessaryFilter:BuddyQuestionActions.kt:BuddyQuestionActions$filter { needle.contains(it.label.trim(), ignoreCase = true) }</ID>
-    <ID>UnnecessaryFilter:PathStepReader.kt:PathStepReader$filter { normalise(it.step.title).contains(needle, ignoreCase = true) }</ID>
     <ID>UnnecessaryNotNullOperator:BoardDiagramService.kt:BoardDiagramService$txTemplate.execute { apply(context, outcome) }!!</ID>
     <ID>UnnecessaryNotNullOperator:StarterWorkTaskProposalService.kt:StarterWorkTaskProposalService$readTxTemplate.execute { loadActiveState() }!!</ID>
     <ID>UnnecessaryNotNullOperator:StarterWorkTaskProposalService.kt:StarterWorkTaskProposalService$txTemplate.execute { persistProposals(outcome) }!!</ID>

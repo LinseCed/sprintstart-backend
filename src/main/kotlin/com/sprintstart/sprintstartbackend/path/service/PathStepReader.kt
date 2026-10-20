@@ -64,7 +64,7 @@ class PathStepReader(
 
         steps.firstOrNull { normalise(it.title).equals(needle, ignoreCase = true) }?.let { return it }
 
-        return steps.filter { normalise(it.title).contains(needle, ignoreCase = true) }.singleOrNull()
+        return steps.singleOrNull { normalise(it.title).contains(needle, ignoreCase = true) }
     }
 
     /** The hire's actual step titles, for a refusal sentence that lets the model self-correct. */
