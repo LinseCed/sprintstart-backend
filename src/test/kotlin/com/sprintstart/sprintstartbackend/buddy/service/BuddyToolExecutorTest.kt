@@ -13,6 +13,7 @@ import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredP
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsService
 import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.CanonicalAnswerResponse
+import com.sprintstart.sprintstartbackend.knowledge.service.HireKnowledgeService
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.CompetencySource
@@ -77,7 +78,7 @@ class BuddyToolExecutorTest {
         onboardingMetricsService,
         myCompetencyService,
         starterWorkTaskProposalService,
-        knowledgeBaseService,
+        HireKnowledgeService(knowledgeBaseService),
         userApi,
         buddyBoardTools,
         // The real reader, not a mock: which pull requests count as open and which one leads are

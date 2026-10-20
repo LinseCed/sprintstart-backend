@@ -8,7 +8,7 @@ import com.sprintstart.sprintstartbackend.board.service.OpenPullRequestReader
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsService
-import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
+import com.sprintstart.sprintstartbackend.knowledge.external.HireKnowledgeApi
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.starterwork.service.CompetencyPlacementService
 import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
@@ -41,7 +41,7 @@ class BuddyToolExecutor(
     private val onboardingMetricsService: OnboardingMetricsService,
     private val myCompetencyService: MyCompetencyService,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
-    private val knowledgeBaseService: KnowledgeBaseService,
+    private val hireKnowledgeApi: HireKnowledgeApi,
     private val userApi: UserApi,
     private val buddyBoardTools: BuddyBoardTools,
     private val openPullRequestReader: OpenPullRequestReader,
@@ -441,7 +441,7 @@ class BuddyToolExecutor(
 
     private fun searchCanonicalAnswers(userId: UUID, query: String): String {
         if (query.isBlank()) return "No search query was provided."
-        val matches = knowledgeBaseService.searchForUser(userId, query)
+        val matches = hireKnowledgeApi.searchAnswers(UserId(userId), query)
         if (matches.isEmpty()) {
             return "No teammate has answered anything like this yet."
         }

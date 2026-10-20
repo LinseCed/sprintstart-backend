@@ -6,7 +6,8 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
-import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
+import com.sprintstart.sprintstartbackend.knowledge.external.HireKnowledgeApi
+import com.sprintstart.sprintstartbackend.shared.ids.AuthId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.GoalClaimant
@@ -53,7 +54,7 @@ import java.util.UUID
 @Suppress("TooManyFunctions")
 class BuddyActionService(
     private val taskOrientationService: TaskOrientationService,
-    private val knowledgeBaseService: KnowledgeBaseService,
+    private val hireKnowledgeApi: HireKnowledgeApi,
     private val userGoalService: UserGoalService,
     private val userApi: UserApi,
     private val attestationService: AttestationService,
@@ -528,7 +529,7 @@ class BuddyActionService(
         if (trimmed.isBlank()) {
             return BuddyActionResponse(ok = false, message = "I need the question to flag — tell me what to ask.")
         }
-        knowledgeBaseService.escalate(authId, projectId, trimmed)
+        hireKnowledgeApi.escalate(AuthId(authId), ProjectId(projectId), trimmed)
         return BuddyActionResponse(
             ok = true,
             message = "Flagged to your PM. Their answer will show up here once they reply.",

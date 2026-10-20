@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.board.service.BoardService
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.knowledge.service.HireKnowledgeService
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.GoalClaimant
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProficiencyLevel
@@ -54,7 +55,7 @@ class BuddyActionServiceTest {
     }
     private val service = BuddyActionService(
         taskOrientationService,
-        knowledgeBaseService,
+        HireKnowledgeService(knowledgeBaseService),
         userGoalService,
         userApi,
         attestationService,
