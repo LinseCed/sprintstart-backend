@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.ContributionWording
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCitationDto
@@ -20,7 +21,6 @@ import com.sprintstart.sprintstartbackend.knowledge.external.QuestionLogApi
 import com.sprintstart.sprintstartbackend.onboarding.client.BuddyAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
-import com.sprintstart.sprintstartbackend.onboarding.model.ContributionWording
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyCitation
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession

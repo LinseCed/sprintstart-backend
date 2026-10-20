@@ -1,8 +1,8 @@
-package com.sprintstart.sprintstartbackend.onboarding.service
+package com.sprintstart.sprintstartbackend.insights.service
 
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionSeverity
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectOnboardingMetricsResponse
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.AttentionSeverity
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.ProjectOnboardingMetricsResponse
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every

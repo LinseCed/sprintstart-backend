@@ -6,8 +6,9 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.board.service.OpenPullRequestReader
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsService
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.starterwork.service.CompetencyPlacementService
 import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService

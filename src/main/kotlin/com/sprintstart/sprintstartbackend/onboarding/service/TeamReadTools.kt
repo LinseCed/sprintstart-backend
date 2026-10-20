@@ -4,7 +4,9 @@ import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionSeverity
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.AttentionSeverity
+import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsService
+import com.sprintstart.sprintstartbackend.insights.service.ProjectAttentionService
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
