@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.assistant.external
+package com.sprintstart.sprintstartbackend.assistant.external
 
 /**
  * Where a stored team-mode action proposal stands.

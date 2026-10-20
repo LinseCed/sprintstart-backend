@@ -1,9 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.textArray
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.textArray
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.ProjectRoleApi

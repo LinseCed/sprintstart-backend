@@ -1,7 +1,7 @@
-package com.sprintstart.sprintstartbackend.onboarding.assistant.repository
+package com.sprintstart.sprintstartbackend.assistant.repository
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalStatus
+import com.sprintstart.sprintstartbackend.assistant.model.entity.BuddyActionProposal
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query

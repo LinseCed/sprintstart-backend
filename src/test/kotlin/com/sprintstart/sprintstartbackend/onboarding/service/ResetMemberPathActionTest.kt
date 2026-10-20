@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

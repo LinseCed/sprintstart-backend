@@ -1,12 +1,13 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
-import com.sprintstart.sprintstartbackend.onboarding.assistant.repository.BuddyActionProposalRepository
-import com.sprintstart.sprintstartbackend.onboarding.assistant.service.ActionProposalStore
+import com.sprintstart.sprintstartbackend.assistant.external.ActionProposalApi
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalStatus
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.model.entity.BuddyActionProposal
+import com.sprintstart.sprintstartbackend.assistant.repository.BuddyActionProposalRepository
+import com.sprintstart.sprintstartbackend.assistant.service.ActionProposalStore
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
 import io.mockk.mockk
@@ -144,7 +145,7 @@ class TeamProposalServiceTest {
             assertThat(action).isEqualTo("dismiss_escalation")
             assertThat(risk).isEqualTo(BuddyProposalRisk.DESTRUCTIVE)
             assertThat(status).isEqualTo(BuddyProposalStatus.PROPOSED)
-            assertThat(expiresAt).isEqualTo(now.plus(ActionProposalStore.TIME_TO_LIVE))
+            assertThat(expiresAt).isEqualTo(now.plus(ActionProposalApi.TIME_TO_LIVE))
             assertThat(params).contains("r-1")
             assertThat(label).isEqualTo("Dismiss: how do we deploy?")
             assertThat(preview).isEqualTo("The question disappears from the inbox.")

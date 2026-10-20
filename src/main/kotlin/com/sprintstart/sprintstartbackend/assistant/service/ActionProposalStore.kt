@@ -1,10 +1,12 @@
-package com.sprintstart.sprintstartbackend.onboarding.assistant.service
+package com.sprintstart.sprintstartbackend.assistant.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyActionResponse
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
-import com.sprintstart.sprintstartbackend.onboarding.assistant.repository.BuddyActionProposalRepository
+import com.sprintstart.sprintstartbackend.assistant.external.ActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.ActionProposalApi
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalStatus
+import com.sprintstart.sprintstartbackend.assistant.external.ProposalOffer
+import com.sprintstart.sprintstartbackend.assistant.model.entity.BuddyActionProposal
+import com.sprintstart.sprintstartbackend.assistant.repository.BuddyActionProposalRepository
 import com.sprintstart.sprintstartbackend.shared.ids.ActionProposalId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
@@ -17,26 +19,19 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
-import java.time.Duration
 
-/**
- * The life of a change an assistant offers: stored when offered, claimed once when confirmed, and settled.
- *
- * Which actions exist and what they do belongs to the assistant that offers them. This store only makes
- * sure a proposal runs at most once, never after it expired, and never stays claimed.
- */
+/** [ActionProposalApi], stored in `buddy_action_proposals`. */
 @Service
-class ActionProposalStore(
+internal class ActionProposalStore(
     private val buddyActionProposalRepository: BuddyActionProposalRepository,
     private val clock: Clock,
-) {
+) : ActionProposalApi {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** Stores [offer] as an open proposal for [userId] in [projectId], valid for [TIME_TO_LIVE]. */
-    fun open(userId: UserId, projectId: ProjectId, offer: Offer): BuddyActionProposal {
+    override fun open(userId: UserId, projectId: ProjectId, offer: ProposalOffer): ActionProposal {
         val now = clock.instant()
-        return buddyActionProposalRepository.save(
+        val stored = buddyActionProposalRepository.save(
             BuddyActionProposal(
                 userId = userId.value,
                 projectId = projectId.value,
@@ -46,21 +41,34 @@ class ActionProposalStore(
                 preview = offer.preview,
                 risk = offer.risk,
                 createdAt = now,
-                expiresAt = now.plus(TIME_TO_LIVE),
+                expiresAt = now.plus(ActionProposalApi.TIME_TO_LIVE),
             ),
         )
+        return stored.toProposal(offer.params)
     }
 
+    override suspend fun confirm(
+        userId: UserId,
+        proposalId: ActionProposalId,
+        run: suspend (ActionProposal) -> BuddyActionResponse,
+    ): BuddyActionResponse {
+        val proposal = owned(userId, proposalId)
+        claim(proposal)?.let { return it }
+        return settle(proposalId) { run(proposal.toProposal(params(proposal))) }
+    }
+
+    override fun dismiss(userId: UserId, proposalId: ActionProposalId): BuddyActionResponse =
+        decline(owned(userId, proposalId))
+
     /** @throws ResponseStatusException 404 when the proposal does not exist or is not [userId]'s. */
-    fun owned(userId: UserId, proposalId: ActionProposalId): BuddyActionProposal =
+    private fun owned(userId: UserId, proposalId: ActionProposalId): BuddyActionProposal =
         buddyActionProposalRepository
             .findById(proposalId.value)
             .orElse(null)
             ?.takeIf { it.userId == userId.value }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "No proposal ${proposalId.value}")
 
-    /** The params the proposal was stored with. */
-    fun params(proposal: BuddyActionProposal): JsonObject = json.parseToJsonElement(proposal.params).jsonObject
+    private fun params(proposal: BuddyActionProposal): JsonObject = json.parseToJsonElement(proposal.params).jsonObject
 
     /**
      * Claims an open proposal for running, with one conditional update, so a confirm that loses a race runs
@@ -68,7 +76,7 @@ class ActionProposalStore(
      *
      * @return `null` once claimed, otherwise the refusal to show.
      */
-    fun claim(proposal: BuddyActionProposal): BuddyActionResponse? {
+    private fun claim(proposal: BuddyActionProposal): BuddyActionResponse? {
         if (proposal.status != BuddyProposalStatus.PROPOSED) {
             return BuddyActionResponse(ok = false, message = alreadyDecided(proposal.status))
         }
@@ -101,7 +109,10 @@ class ActionProposalStore(
      * A [ResponseStatusException] from [run] is a handled failure: its reason is shown and the proposal is
      * marked failed.
      */
-    suspend fun settle(proposalId: ActionProposalId, run: suspend () -> BuddyActionResponse): BuddyActionResponse {
+    private suspend fun settle(
+        proposalId: ActionProposalId,
+        run: suspend () -> BuddyActionResponse,
+    ): BuddyActionResponse {
         var outcome = BuddyActionResponse(ok = false, message = "Something went wrong, so this was not done.")
         try {
             outcome = run()
@@ -114,8 +125,7 @@ class ActionProposalStore(
         return outcome
     }
 
-    /** Declines a proposal. Nothing changes but the proposal itself. */
-    fun dismiss(proposal: BuddyActionProposal): BuddyActionResponse {
+    private fun decline(proposal: BuddyActionProposal): BuddyActionResponse {
         val dismissed = buddyActionProposalRepository.transition(
             proposal.id,
             BuddyProposalStatus.PROPOSED,
@@ -153,6 +163,18 @@ class ActionProposalStore(
         }
     }
 
+    private fun BuddyActionProposal.toProposal(params: JsonObject) =
+        ActionProposal(
+            id = id,
+            userId = userId,
+            projectId = projectId,
+            action = action,
+            params = params,
+            label = label,
+            preview = preview,
+            risk = risk,
+        )
+
     private fun alreadyDecided(status: BuddyProposalStatus): String =
         when (status) {
             BuddyProposalStatus.PROPOSED -> "This was already confirmed or dismissed."
@@ -163,25 +185,7 @@ class ActionProposalStore(
             BuddyProposalStatus.FAILED -> "This did not go through earlier. Ask the buddy again if you still want it."
         }
 
-    /**
-     * What a proposal offers.
-     *
-     * @property action The tool name that identifies the action when the proposal is confirmed.
-     * @property label The confirm button, naming the action and its target.
-     * @property preview Everything the user is agreeing to, in words.
-     */
-    data class Offer(
-        val action: String,
-        val risk: BuddyProposalRisk,
-        val params: JsonObject,
-        val label: String,
-        val preview: String,
-    )
-
     companion object {
-        /** Long enough to read it later the same day, short enough that a stale preview is not confirmed. */
-        val TIME_TO_LIVE: Duration = Duration.ofHours(24)
-
         private const val EXPIRED_MESSAGE =
             "This proposal expired before it was confirmed. Ask the buddy again if you still want it."
     }

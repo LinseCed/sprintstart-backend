@@ -12,10 +12,10 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.DiagramSchem
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Board
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardDiagram
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardDiagramRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import io.mockk.coEvery
@@ -174,7 +174,7 @@ class BoardDiagramServiceTest {
     fun `an unreachable ai service serves the kept picture rather than losing it`() = runTest {
         every { boardDiagramRepository.findById(cardId) } returns Optional.of(cached())
         coEvery { diagramAiClient.assembleDiagram(subject, listOf(projectId), "corpus-1") } throws
-            OnboardingAiException(503, "", "down")
+            AiServiceException(503, "", "down")
 
         val content = service.refresh(hire, card)
 
@@ -187,7 +187,7 @@ class BoardDiagramServiceTest {
     @Test
     fun `an outage with nothing kept says so instead of pretending`() = runTest {
         coEvery { diagramAiClient.assembleDiagram(subject, listOf(projectId), null) } throws
-            OnboardingAiException(503, "", "down")
+            AiServiceException(503, "", "down")
 
         val content = service.refresh(hire, card)
 

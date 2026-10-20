@@ -3,7 +3,7 @@ package com.sprintstart.sprintstartbackend.onboarding.external
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.MineStarterWorkRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import kotlinx.coroutines.flow.Flow
 import org.springframework.stereotype.Component
 import java.util.UUID
@@ -19,7 +19,7 @@ class StarterWorkAiClient(
      * The AI service is stateless: [activeSourceIds] (issues already in the backend's pool) drive
      * dedup, and [activeCompetencyKeys] (the backend's live competency keys) ground each proposed
      * task's tags — a tag outside this set is dropped by the AI service rather than invented. A
-     * non-2xx response is wrapped in an [OnboardingAiException] carrying the upstream status/body.
+     * non-2xx response is wrapped in an [AiServiceException] carrying the upstream status/body.
      */
     suspend fun proposeStarterWork(
         projectIds: List<UUID>,

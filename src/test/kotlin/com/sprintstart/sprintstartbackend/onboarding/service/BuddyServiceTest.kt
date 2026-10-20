@@ -1,18 +1,17 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentResponse
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyCitationDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddySessionFilters
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventType
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.FALLBACK_REPLY
 import com.sprintstart.sprintstartbackend.knowledge.external.QuestionLogApi
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentMessageDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentResponse
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCitationDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.service.FALLBACK_REPLY
 import com.sprintstart.sprintstartbackend.onboarding.client.BuddyAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
@@ -20,13 +19,14 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyCitation
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySessionStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.AiGenerateSessionTitleResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyCitationRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.QuestionId
+import com.sprintstart.sprintstartbackend.shared.model.SourceSystem
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
@@ -1416,7 +1416,7 @@ class BuddyServiceTest {
             val saved = mutableListOf<BuddyMessage>()
             every { buddyMessageRepository.save(capture(saved)) } answers { firstArg() }
             coEvery { agentAiClient.buddyAgentTurnStream(any()) } throws
-                OnboardingAiException(502, "", "AI buddy responded with error: boom")
+                AiServiceException(502, "", "AI buddy responded with error: boom")
 
             val events = service
                 .sendMessageForMe(
@@ -1583,7 +1583,7 @@ class BuddyServiceTest {
             every { buddyMessageRepository.save(any()) } answers { firstArg() }
             every { buddyToolExecutor.toolSpecs(any()) } returns emptyList()
             coEvery { agentAiClient.buddyAgentTurnStream(any()) } throws
-                OnboardingAiException(500, "boom", "AI down")
+                AiServiceException(500, "boom", "AI down")
 
             service
                 .sendMessageForMe(

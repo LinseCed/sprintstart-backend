@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.assistant.external
+package com.sprintstart.sprintstartbackend.assistant.external
 
 /**
  * How much a confirmed team-mode action changes, which decides how its confirm card is drawn.

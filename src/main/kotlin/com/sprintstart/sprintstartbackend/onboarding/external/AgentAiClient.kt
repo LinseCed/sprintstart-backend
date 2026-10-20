@@ -1,12 +1,12 @@
 package com.sprintstart.sprintstartbackend.onboarding.external
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCompactRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCompactResponse
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactResponse
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenStreamEvent
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -27,7 +27,7 @@ class AgentAiClient(
      * with each tool result appended.
      *
      * A malformed chunk is logged and skipped. A non-2xx response is wrapped in an
-     * [OnboardingAiException] carrying the upstream status/body; so is a failure after the response
+     * [AiServiceException] carrying the upstream status/body; so is a failure after the response
      * started, which the AI reports as an `error` event, and a stream that ends without a `result`
      * (see `relayAgentTurn`).
      */
@@ -40,7 +40,7 @@ class AgentAiClient(
             ).catch { e ->
                 if (e is WebClientException) {
                     val msg = "Failed to run buddy agent turn (HTTP ${e.statusCode}): ${e.body}"
-                    throw OnboardingAiException(e.statusCode, e.body, msg)
+                    throw AiServiceException(e.statusCode, e.body, msg)
                 }
                 throw e
             }
@@ -51,7 +51,7 @@ class AgentAiClient(
      * Nothing waits on this: call it after a turn, never ahead of the answer.
      *
      * A non-2xx (including the AI service's 503 for an unavailable model) is wrapped in an
-     * [OnboardingAiException]. That is not a degraded success — the caller must leave its cursor
+     * [AiServiceException]. That is not a degraded success — the caller must leave its cursor
      * where it is, because advancing past messages nothing summarized would drop them from both the
      * prompt and the memory standing in for it.
      */

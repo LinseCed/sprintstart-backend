@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyActionResponse
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardActor
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.ChecklistCardRequest

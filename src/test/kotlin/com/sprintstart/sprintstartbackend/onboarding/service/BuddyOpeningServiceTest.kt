@@ -1,16 +1,16 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenActionDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenActionDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.shared.ids.AuthId
 import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
 import com.sprintstart.sprintstartbackend.user.external.SessionActivityApi
@@ -147,7 +147,7 @@ class BuddyOpeningServiceTest {
         every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
         every { agentAiClient.streamBuddyOpen(any()) } returns flow {
             emit(BuddyOpenStreamEvent(type = "token", content = "Welcome ba"))
-            throw OnboardingAiException(503, "", "AI went away")
+            throw AiServiceException(503, "", "AI went away")
         }
         every { buddyMessageRepository.save(any()) } answers { firstArg() }
         every {
@@ -189,7 +189,7 @@ class BuddyOpeningServiceTest {
         )
         every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
         every { agentAiClient.streamBuddyOpen(any()) } throws
-            OnboardingAiException(503, "", "AI is down")
+            AiServiceException(503, "", "AI is down")
         every {
             sessionActivityService.recordVisit(userId)
         } returns false

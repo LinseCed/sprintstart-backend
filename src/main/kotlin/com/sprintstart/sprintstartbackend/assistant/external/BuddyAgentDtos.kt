@@ -1,5 +1,10 @@
-package com.sprintstart.sprintstartbackend.onboarding.assistant.external
+package com.sprintstart.sprintstartbackend.assistant.external
 
+import com.sprintstart.sprintstartbackend.assistant.external.BuddySessionFilters
+import com.sprintstart.sprintstartbackend.assistant.external.boolean
+import com.sprintstart.sprintstartbackend.assistant.external.text
+import com.sprintstart.sprintstartbackend.assistant.external.textArray
+import com.sprintstart.sprintstartbackend.assistant.external.uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
