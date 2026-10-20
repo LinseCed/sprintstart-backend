@@ -15,7 +15,7 @@ import com.sprintstart.sprintstartbackend.board.model.response.board.BoardPullRe
 import com.sprintstart.sprintstartbackend.board.model.response.board.CompetencyProgressContent
 import com.sprintstart.sprintstartbackend.board.model.response.board.CurrentTaskContent
 import com.sprintstart.sprintstartbackend.board.model.response.board.OpenPullRequestsContent
-import com.sprintstart.sprintstartbackend.path.service.ResolvedPathStep
+import com.sprintstart.sprintstartbackend.path.external.model.ResolvedPathStep
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus

@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.path.service
 
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.external.model.OnboardingPosition
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPhase
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingStep
@@ -98,16 +99,4 @@ class OnboardingPositionReader(
 data class ActiveStep(
     val phase: OnboardingPhase,
     val step: OnboardingStep,
-)
-
-/**
- * Where somebody stands in their onboarding, in the words a reader can put on a screen.
- *
- * Titles rather than entities: every consumer so far wants to *say* where somebody is, and handing
- * out the entities would let a caller reach through this into the path and start writing to it.
- */
-data class OnboardingPosition(
-    val currentPhase: String?,
-    val currentStep: String?,
-    val progressPercentage: Double,
 )
