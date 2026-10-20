@@ -1,5 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStep
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepService
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
+import com.sprintstart.sprintstartbackend.arrival.service.ResolvedArrivalStep
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
@@ -7,9 +12,7 @@ import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredP
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
@@ -75,7 +78,7 @@ class BuddyToolExecutorTest {
         // its judgements now, and these tests are about the buddy still reporting them.
         OpenPullRequestReader(artifactIngestionApi),
         projectMembershipApi,
-        arrivalStepService,
+        ArrivalSteps(arrivalStepService),
         competencyPlacementService,
         // Pathless by default: every case here is about a tool that reads something other than the
         // onboarding path, and "no path" is what keeps the path tool out of their expectations.

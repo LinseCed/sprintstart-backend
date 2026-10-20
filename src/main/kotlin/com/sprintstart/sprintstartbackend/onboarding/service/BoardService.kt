@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardActor
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardChange
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
@@ -50,7 +52,7 @@ class BoardService(
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val boardDiagramRepository: BoardDiagramRepository,
     private val hydrator: BoardCardHydrator,
-    private val arrivalStepService: ArrivalStepService,
+    private val arrivalSteps: ArrivalSteps,
     private val pathStepReader: PathStepReader,
     private val onboardingTaskService: OnboardingTaskService,
 ) {
@@ -85,7 +87,7 @@ class BoardService(
         val board = boardOf(userId, projectId)
 
         // Read once and reuse: it decides whether the card is ensured at all, and then fills it.
-        val arrivalSteps = arrivalStepService.forHire(userId.value)
+        val arrivalSteps = arrivalSteps.forHire(userId)
         val cards = ensureRelevantCards(board, arrivalSteps.isNotEmpty())
         // Whether the hire is on a task at all, for the pin. Read through the same
         // [CurrentTaskReader] the card's content comes from, so the pin and the card agree.
@@ -132,7 +134,7 @@ class BoardService(
      *   claimed yet" is not pinned.
      */
     private fun attentionOrder(
-        arrivalSteps: List<ResolvedArrivalStep>,
+        arrivalSteps: List<ArrivalStepResponse>,
         onATask: Boolean,
     ): Comparator<BoardCard> {
         val anythingOutstanding = arrivalSteps.any { !it.settled }

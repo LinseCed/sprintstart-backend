@@ -1,9 +1,12 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStep
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepService
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
+import com.sprintstart.sprintstartbackend.arrival.service.NewArrivalStep
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -62,7 +65,7 @@ class ArrivalTeamActionsTest {
 
     @Nested
     inner class Create {
-        private val action = CreateArrivalStepsAction(arrivalStepService)
+        private val action = CreateArrivalStepsAction(ArrivalSteps(arrivalStepService))
 
         private fun steps(vararg entries: Map<String, String>) = buildJsonObject {
             putJsonArray("steps") {
@@ -299,7 +302,7 @@ class ArrivalTeamActionsTest {
 
     @Nested
     inner class Update {
-        private val action = UpdateArrivalStepAction(arrivalStepService)
+        private val action = UpdateArrivalStepAction(ArrivalSteps(arrivalStepService))
 
         private fun args(vararg pairs: Pair<String, String>) = buildJsonObject {
             pairs.forEach { (k, v) -> put(k, v) }
@@ -527,7 +530,7 @@ class ArrivalTeamActionsTest {
 
     @Nested
     inner class Reorder {
-        private val action = ReorderArrivalStepsAction(arrivalStepService)
+        private val action = ReorderArrivalStepsAction(ArrivalSteps(arrivalStepService))
 
         private fun order(vararg keys: String) = buildJsonObject {
             putJsonArray("ordered_keys") { keys.forEach { add(it) } }
@@ -597,7 +600,7 @@ class ArrivalTeamActionsTest {
 
     @Nested
     inner class Delete {
-        private val action = DeleteArrivalStepAction(arrivalStepService)
+        private val action = DeleteArrivalStepAction(ArrivalSteps(arrivalStepService))
 
         @Test
         fun `is marked destructive`() {

@@ -1,9 +1,12 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionSeverity
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
@@ -24,7 +27,7 @@ class TeamReadTools(
     private val projectAttentionService: ProjectAttentionService,
     private val onboardingMetricsService: OnboardingMetricsService,
     private val myCompetencyService: MyCompetencyService,
-    private val arrivalStepService: ArrivalStepService,
+    private val arrivalSteps: ArrivalSteps,
     private val projectMembershipApi: ProjectMembershipApi,
 ) {
     fun toolSpecs(): List<BuddyToolSpecDto> = listOf(
@@ -114,12 +117,12 @@ class TeamReadTools(
     }
 
     /**
-     * Read with [ArrivalStepService.forHireOn], not by filtering the member's full list: another of their
+     * Read with [ArrivalSteps.forHireOn], not by filtering the member's full list: another of their
      * projects can override a company step there, which would hide a step that still applies here.
      * Like the hire's own tool, it gives no total and never calls a step blocking.
      */
     private fun arrivalFor(memberId: UUID, projectId: UUID): String {
-        val steps = arrivalStepService.forHireOn(memberId, projectId)
+        val steps = arrivalSteps.forHireOn(UserId(memberId), ProjectId(projectId))
         if (steps.isEmpty()) {
             return "No arrival steps apply to them on this project."
         }
@@ -130,8 +133,8 @@ class TeamReadTools(
             } else {
                 appendLine("Still outstanding (none of this stops them working):")
                 outstanding.forEach { resolved ->
-                    append("- ${resolved.step.title}")
-                    if (!resolved.step.selfConfirmable) {
+                    append("- ${resolved.title}")
+                    if (!resolved.selfConfirmable) {
                         append(" [confirmed by the system; they cannot mark it done themselves]")
                     }
                     appendLine()
@@ -141,7 +144,7 @@ class TeamReadTools(
                 appendLine("Already settled:")
                 settled.forEach { resolved ->
                     val how = if (resolved.rigor == Rigor.OBSERVED) "we confirmed this" else "they told us"
-                    appendLine("- ${resolved.step.title} ($how)")
+                    appendLine("- ${resolved.title} ($how)")
                 }
             }
         }.trim()

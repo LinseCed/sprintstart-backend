@@ -1,5 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStep
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepService
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
+import com.sprintstart.sprintstartbackend.arrival.service.ResolvedArrivalStep
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
@@ -12,9 +17,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardSta
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Board
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCardPayload
@@ -142,9 +145,9 @@ class BoardServiceTest {
             myCompetencyService,
             BuddyMemoryRecapSource(buddySessionRepository),
             boardDiagramService,
-            arrivalStepService,
+            ArrivalSteps(arrivalStepService),
         ),
-        arrivalStepService,
+        ArrivalSteps(arrivalStepService),
         pathStepReader,
         onboardingTaskService,
     )

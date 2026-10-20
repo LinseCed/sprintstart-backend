@@ -1,12 +1,16 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.enums.ArrivalDerivation
+import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepService
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
+import com.sprintstart.sprintstartbackend.arrival.service.NewArrivalStep
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.assistant.external.objectArray
 import com.sprintstart.sprintstartbackend.assistant.external.text
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.ArrivalDerivation
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.add
@@ -39,7 +43,7 @@ data class CreateArrivalStepsParams(
  */
 @Component
 class CreateArrivalStepsAction(
-    private val arrivalStepService: ArrivalStepService,
+    private val arrivalSteps: ArrivalSteps,
 ) : TypedTeamAction<CreateArrivalStepsParams>(CreateArrivalStepsParams.serializer()) {
     override val area = TeamArea.ARRIVAL
     override val risk = BuddyProposalRisk.STANDARD
@@ -105,9 +109,9 @@ class CreateArrivalStepsAction(
             return TeamActionDraft.Refused("No steps were given, so there is nothing to offer.")
         }
 
-        val taken = arrivalStepService.listForAuthoring(context.projectId).map { it.key }.toSet()
+        val taken = arrivalSteps.authoredOn(ProjectId(context.projectId)).map { it.key }.toSet()
         // Read to warn, not to offer: a project step replaces the company step of the same key for everybody.
-        val companyTitles = arrivalStepService.listForAuthoring(null).associate { it.key to it.title }
+        val companyTitles = arrivalSteps.authoredOn(null).associate { it.key to it.title }
         val drafted = mutableListOf<DraftedStep>()
         for (entry in requested) {
             val key = normalizeKey(entry.text("key"))
@@ -189,7 +193,7 @@ class CreateArrivalStepsAction(
     }.trim()
 
     override fun recheckParams(params: CreateArrivalStepsParams, context: TeamToolContext): String? {
-        val taken = arrivalStepService.listForAuthoring(context.projectId).map { it.key }.toSet()
+        val taken = arrivalSteps.authoredOn(ProjectId(context.projectId)).map { it.key }.toSet()
         val clash = params.steps.map { it.key }.firstOrNull { it in taken }
         return clash?.let { "An arrival step '$it' was added since, so nothing was changed." }
     }
@@ -204,7 +208,7 @@ class CreateArrivalStepsAction(
                 settledBy = step.settledBy,
             )
         }
-        arrivalStepService.createAll(context.projectId, steps)
+        arrivalSteps.createAll(ProjectId(context.projectId), steps)
         return if (steps.size == 1) {
             "Added. “${steps.single().title}” is now on this project's arrival list."
         } else {
