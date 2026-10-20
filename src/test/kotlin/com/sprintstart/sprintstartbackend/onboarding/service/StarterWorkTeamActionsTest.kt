@@ -4,10 +4,14 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.IngestedIssue
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
-import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.PromoteStarterWorkCandidateRequest
-import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.starterwork.model.entity.StarterWorkTaskProposal
+import com.sprintstart.sprintstartbackend.starterwork.model.request.starterwork.PromoteStarterWorkCandidateRequest
+import com.sprintstart.sprintstartbackend.starterwork.repository.StarterWorkTaskProposalRepository
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPool
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPoolReconciler
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkScope
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -33,10 +37,12 @@ class StarterWorkTeamActionsTest {
     private val projectId = UUID.randomUUID()
     private val context = TeamToolContext(userId = UUID.randomUUID(), authId = "auth|pm", projectId = projectId)
 
-    private val review = MarkStarterWorkReviewedAction(repository, service, scope)
-    private val reject = RejectStarterWorkAction(repository, service, scope)
-    private val promote = PromoteCandidateAction(ingestion, repository, service, scope)
-    private val taskZero = SetTaskZeroEligibleAction(repository, starterWorkTaskProposalService, scope)
+    private val pool = StarterWorkPool(repository, scope)
+
+    private val review = MarkStarterWorkReviewedAction(pool, service)
+    private val reject = RejectStarterWorkAction(pool, service)
+    private val promote = PromoteCandidateAction(ingestion, pool, service, scope)
+    private val taskZero = SetTaskZeroEligibleAction(pool, starterWorkTaskProposalService)
 
     private val mineSource = "github:acme/shop:ISSUE:42"
 

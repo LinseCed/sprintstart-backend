@@ -2,9 +2,9 @@ package com.sprintstart.sprintstartbackend.onboarding.listener
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardActor
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.GoalClaimant
-import com.sprintstart.sprintstartbackend.onboarding.external.event.GoalClaimedEvent
 import com.sprintstart.sprintstartbackend.onboarding.service.BoardService
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.GoalClaimant
+import com.sprintstart.sprintstartbackend.starterwork.external.event.GoalClaimedEvent
 import org.springframework.context.event.EventListener
 import org.springframework.stereotype.Component
 

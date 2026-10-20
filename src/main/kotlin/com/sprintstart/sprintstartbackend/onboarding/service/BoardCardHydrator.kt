@@ -4,7 +4,6 @@ import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
 import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardDiagram
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toLastChangeResponse
@@ -16,11 +15,16 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardP
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.CompetencyProgressContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.CurrentTaskContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.OpenPullRequestsContent
-import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.path.service.ResolvedPathStep
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.starterwork.model.response.competency.MyCompetencyResponse
+import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.RankedStarterWorkTaskResponse
+import com.sprintstart.sprintstartbackend.starterwork.service.CurrentTaskReader
+import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
+import com.sprintstart.sprintstartbackend.starterwork.service.currentTaskOf
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import org.springframework.stereotype.Component
 import java.util.UUID
@@ -84,7 +88,7 @@ class BoardCardHydrator(
         BoardCardKind.SUGGESTED_TASKS -> BoardTaskCards.suggested(matches())
         BoardCardKind.TASK_POOL -> BoardTaskCards.pool(
             matches(),
-            currentTaskId = currentTaskReader.currentTaskFor(member.userId, projectId.value)?.id,
+            currentTaskId = currentTaskReader.currentTaskOf(UserId(member.userId), projectId)?.id,
         )
         BoardCardKind.COMPETENCY_PROGRESS -> competencyProgressContent(member)
         BoardCardKind.MEMORY_RECAP -> memoryRecapSource.latestRecap(UserId(member.userId))
@@ -147,7 +151,7 @@ class BoardCardHydrator(
      * A card with no task on it is a real state and says so.
      */
     private fun currentTaskContent(member: ProjectMember, projectId: ProjectId): CurrentTaskContent {
-        val task = currentTaskReader.currentTaskFor(member.userId, projectId.value)
+        val task = currentTaskReader.currentTaskOf(UserId(member.userId), projectId)
         return CurrentTaskContent(
             taskId = task?.id,
             title = task?.title,

@@ -73,3 +73,9 @@ value class KnowledgeRequestId(
 value class CanonicalAnswerId(
     val value: UUID,
 )
+
+/** A task in the starter-work pool, proposed from an open issue for hires to take on. */
+@JvmInline
+value class StarterWorkTaskId(
+    val value: UUID,
+)

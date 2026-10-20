@@ -1,12 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationStep
-import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.MyOrientationResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationCitationResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationPacketResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationSectionResponse
 import com.sprintstart.sprintstartbackend.path.external.enums.SkipStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.response.feedback.GetAdminOnboardingFeedbackResponse
@@ -18,6 +12,13 @@ import com.sprintstart.sprintstartbackend.path.service.OnboardingFeedbackService
 import com.sprintstart.sprintstartbackend.path.service.OnboardingSkipService
 import com.sprintstart.sprintstartbackend.path.service.PathElementKind
 import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptService
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.OrientationOrigin
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.OrientationStep
+import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.MyOrientationResponse
+import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.OrientationCitationResponse
+import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.OrientationPacketResponse
+import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.OrientationSectionResponse
+import com.sprintstart.sprintstartbackend.starterwork.service.TaskOrientationService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

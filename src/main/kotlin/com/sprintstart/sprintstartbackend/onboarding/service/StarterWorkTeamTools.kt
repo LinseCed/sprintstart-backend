@@ -2,11 +2,14 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CandidatePoolState
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
-import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkCandidateResponse
-import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.CandidatePoolState
+import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkCandidateResponse
+import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkTaskProposalResponse
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPool
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkScope
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
+import com.sprintstart.sprintstartbackend.starterwork.service.githubRepositoryOf
 import org.springframework.stereotype.Component
 import java.util.UUID
 
@@ -20,7 +23,7 @@ import java.util.UUID
  */
 @Component
 class StarterWorkTeamTools(
-    private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
+    private val starterWorkPool: StarterWorkPool,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val starterWorkScope: StarterWorkScope,
 ) : TeamAreaTools {
@@ -40,8 +43,7 @@ class StarterWorkTeamTools(
         }
 
     private fun pool(projectId: UUID): String {
-        val live = starterWorkTaskProposalRepository.findAllByStatus(ProposalStatus.LIVE).sortedBy { it.title }
-        val tasks = starterWorkScope.onProject(live, projectId) { it.sourceId }
+        val tasks = starterWorkPool.liveTasksOn(ProjectId(projectId))
         if (tasks.isEmpty()) {
             return "The starter-work pool has no tasks from this project's repositories."
         }
@@ -49,10 +51,7 @@ class StarterWorkTeamTools(
     }
 
     private fun unreviewed(projectId: UUID): String {
-        val live = starterWorkTaskProposalRepository
-            .findAllByStatusAndReviewedFalse(ProposalStatus.LIVE)
-            .sortedBy { it.createdAt }
-        val tasks = starterWorkScope.onProject(live, projectId) { it.sourceId }
+        val tasks = starterWorkPool.unreviewedTasksOn(ProjectId(projectId))
         if (tasks.isEmpty()) {
             return "Nothing from this project's repositories is waiting for a review."
         }
@@ -62,7 +61,7 @@ class StarterWorkTeamTools(
         )
     }
 
-    private fun List<StarterWorkTaskProposal>.listed(heading: String): String {
+    private fun List<StarterWorkTaskProposalResponse>.listed(heading: String): String {
         val tasks = this
         return buildString {
             appendLine(heading)

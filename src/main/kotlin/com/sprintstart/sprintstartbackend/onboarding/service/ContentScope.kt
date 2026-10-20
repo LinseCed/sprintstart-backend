@@ -1,10 +1,12 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
-import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.path.service.PathElement
 import com.sprintstart.sprintstartbackend.path.service.PathElementKind
 import com.sprintstart.sprintstartbackend.path.service.PathElements
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.StarterWorkTaskId
+import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkTaskProposalResponse
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPool
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -33,8 +35,7 @@ class ContentScope(
     private val pathElements: PathElements,
     private val projectMembershipApi: ProjectMembershipApi,
     private val userApi: UserApi,
-    private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
-    private val starterWorkScope: StarterWorkScope,
+    private val starterWorkPool: StarterWorkPool,
 ) {
     /**
      * The [kind] element [id] names, if it sits on the path of a member of [projectId].
@@ -59,10 +60,8 @@ class ContentScope(
      * check that the task exists. The task's source is what ties it to a project, so that is what is
      * asked here — the same question the starter-work area asks of the pool.
      */
-    fun proposal(taskId: UUID?, projectId: UUID): StarterWorkTaskProposal? =
-        taskId
-            ?.let { starterWorkTaskProposalRepository.findById(it).orElse(null) }
-            ?.takeIf { starterWorkScope.covers(it.sourceId, projectId) }
+    fun proposal(taskId: UUID?, projectId: UUID): StarterWorkTaskProposalResponse? =
+        starterWorkPool.taskOn(taskId?.let(::StarterWorkTaskId), ProjectId(projectId))
 
     /** Everyone on [projectId]. */
     fun members(projectId: UUID): List<ProjectMember> = projectMembershipApi.getProjectMembers(projectId)

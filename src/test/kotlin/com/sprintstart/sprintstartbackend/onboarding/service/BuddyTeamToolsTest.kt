@@ -8,11 +8,12 @@ import com.sprintstart.sprintstartbackend.arrival.service.ResolvedArrivalStep
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionItemResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionSeverity
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectAttentionResponse
+import com.sprintstart.sprintstartbackend.starterwork.model.response.competency.MyCompetencyResponse
+import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every

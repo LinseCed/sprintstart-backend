@@ -8,6 +8,9 @@ import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredP
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.starterwork.service.CompetencyPlacementService
+import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.serialization.json.add

@@ -4,7 +4,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardP
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardSuggestedTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.SuggestedTasksContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.TaskPoolContent
-import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
+import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.RankedStarterWorkTaskResponse
 import java.util.UUID
 
 /**

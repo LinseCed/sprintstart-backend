@@ -3,8 +3,6 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.external.DiagramAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
-import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProvenanceSchema
-import com.sprintstart.sprintstartbackend.onboarding.external.model.CitationRefSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.DiagramEdgeSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.DiagramNodeSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.DiagramOutcome
@@ -18,6 +16,8 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
 import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.starterwork.external.model.AiProvenanceSchema
+import com.sprintstart.sprintstartbackend.starterwork.external.model.CitationRefSchema
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
