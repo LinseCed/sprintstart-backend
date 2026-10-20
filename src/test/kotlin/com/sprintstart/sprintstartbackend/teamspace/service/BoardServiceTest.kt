@@ -55,6 +55,7 @@ import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingStep
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingTask
 import com.sprintstart.sprintstartbackend.path.repository.OnboardingPathRepository
 import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
+import com.sprintstart.sprintstartbackend.path.service.PathReadService
 import com.sprintstart.sprintstartbackend.path.service.PathStepReader
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.OnboardingTaskId
@@ -159,8 +160,7 @@ class BoardServiceTest {
             ArrivalSteps(arrivalStepService),
         ),
         ArrivalSteps(arrivalStepService),
-        pathStepReader,
-        onboardingTaskService,
+        PathReadService(pathStepReader, onboardingTaskService, mockk()),
     )
 
     @BeforeEach

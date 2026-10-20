@@ -7,7 +7,6 @@ import com.sprintstart.sprintstartbackend.board.model.response.board.BoardCardRe
 import com.sprintstart.sprintstartbackend.board.model.response.board.ChecklistContent
 import com.sprintstart.sprintstartbackend.board.model.response.board.LinkContent
 import com.sprintstart.sprintstartbackend.board.model.response.board.NoteContent
-import com.sprintstart.sprintstartbackend.path.service.isDone
 
 /**
  * Reading a board the way the hire sees it.
