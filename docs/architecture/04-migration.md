@@ -58,6 +58,11 @@ metrics into `insights` → `buddy` → `teamspace`. Each PR:
 
 Exit: `onboarding` no longer exists. `ModuleBoundariesTest` passes with an empty known list.
 
+Interim: `path` has no `PathApi` yet. The Buddy, team mode and the board call its services directly,
+so `path/service` and its request and response DTO packages are named interfaces. Entities,
+repositories and mappers stay hidden (P4). A `PathApi` interface in `path/external` replaces the
+exposed services once its callers have left `onboarding` and the call surface is known.
+
 ### Stage D: decisions that need the new structure
 
 | Item | Note |
