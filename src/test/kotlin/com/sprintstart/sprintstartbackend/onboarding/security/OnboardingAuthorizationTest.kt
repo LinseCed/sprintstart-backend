@@ -1,13 +1,14 @@
 package com.sprintstart.sprintstartbackend.onboarding.security
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPath
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.repository.BlueprintPathRepository
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhase
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckQuestion
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPhaseRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.PhaseCheckQuestionRepository
+import com.sprintstart.sprintstartbackend.shared.ids.BlueprintId
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.user.external.security.ProjectAuthorization
 import io.mockk.every
 import io.mockk.mockk
@@ -22,13 +23,13 @@ class OnboardingAuthorizationTest {
     private val projectAuth: ProjectAuthorization = mockk()
     private val onboardingPhaseRepository: OnboardingPhaseRepository = mockk()
     private val phaseCheckQuestionRepository: PhaseCheckQuestionRepository = mockk()
-    private val blueprintPathRepository: BlueprintPathRepository = mockk()
+    private val blueprintApi: BlueprintApi = mockk()
 
     private val onboardingAuth = OnboardingAuthorization(
         projectAuth,
         onboardingPhaseRepository,
         phaseCheckQuestionRepository,
-        blueprintPathRepository,
+        blueprintApi,
     )
 
     private val authentication: Authentication = mockk()
@@ -54,8 +55,7 @@ class OnboardingAuthorizationTest {
     fun `canManagePhase allows the manager of the project the phase's blueprint belongs to`() {
         every { projectAuth.isAdmin(authentication) } returns false
         every { onboardingPhaseRepository.findById(phase.id) } returns Optional.of(phase)
-        every { blueprintPathRepository.findById(blueprintId) } returns
-            Optional.of(BlueprintPath(blueprintKey = UUID.randomUUID(), title = "t", projectId = projectId))
+        every { blueprintApi.projectIdOf(BlueprintId(blueprintId)) } returns ProjectId(projectId)
         every { projectAuth.canManageProject(authentication, projectId) } returns true
 
         assertTrue(onboardingAuth.canManagePhase(authentication, phase.id))
@@ -65,8 +65,7 @@ class OnboardingAuthorizationTest {
     fun `canManagePhase denies a non-manager of the project`() {
         every { projectAuth.isAdmin(authentication) } returns false
         every { onboardingPhaseRepository.findById(phase.id) } returns Optional.of(phase)
-        every { blueprintPathRepository.findById(blueprintId) } returns
-            Optional.of(BlueprintPath(blueprintKey = UUID.randomUUID(), title = "t", projectId = projectId))
+        every { blueprintApi.projectIdOf(BlueprintId(blueprintId)) } returns ProjectId(projectId)
         every { projectAuth.canManageProject(authentication, projectId) } returns false
 
         assertFalse(onboardingAuth.canManagePhase(authentication, phase.id))
@@ -94,8 +93,7 @@ class OnboardingAuthorizationTest {
     fun `canManagePhase denies a non-admin when the blueprint is global`() {
         every { projectAuth.isAdmin(authentication) } returns false
         every { onboardingPhaseRepository.findById(phase.id) } returns Optional.of(phase)
-        every { blueprintPathRepository.findById(blueprintId) } returns
-            Optional.of(BlueprintPath(blueprintKey = UUID.randomUUID(), title = "t"))
+        every { blueprintApi.projectIdOf(BlueprintId(blueprintId)) } returns null
 
         assertFalse(onboardingAuth.canManagePhase(authentication, phase.id))
     }
@@ -111,8 +109,7 @@ class OnboardingAuthorizationTest {
     fun `canManageQuestion allows the manager of the project the question's blueprint belongs to`() {
         every { projectAuth.isAdmin(authentication) } returns false
         every { phaseCheckQuestionRepository.findById(question.id) } returns Optional.of(question)
-        every { blueprintPathRepository.findById(blueprintId) } returns
-            Optional.of(BlueprintPath(blueprintKey = UUID.randomUUID(), title = "t", projectId = projectId))
+        every { blueprintApi.projectIdOf(BlueprintId(blueprintId)) } returns ProjectId(projectId)
         every { projectAuth.canManageProject(authentication, projectId) } returns true
 
         assertTrue(onboardingAuth.canManageQuestion(authentication, question.id))
@@ -130,8 +127,7 @@ class OnboardingAuthorizationTest {
     fun `canManageQuestion denies a non-manager of the project`() {
         every { projectAuth.isAdmin(authentication) } returns false
         every { phaseCheckQuestionRepository.findById(question.id) } returns Optional.of(question)
-        every { blueprintPathRepository.findById(blueprintId) } returns
-            Optional.of(BlueprintPath(blueprintKey = UUID.randomUUID(), title = "t", projectId = projectId))
+        every { blueprintApi.projectIdOf(BlueprintId(blueprintId)) } returns ProjectId(projectId)
         every { projectAuth.canManageProject(authentication, projectId) } returns false
 
         assertFalse(onboardingAuth.canManageQuestion(authentication, question.id))

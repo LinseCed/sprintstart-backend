@@ -1,8 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPath
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.repository.BlueprintPathRepository
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
@@ -10,6 +9,8 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhas
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckQuestion
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.QuestionAttemptRepository
+import com.sprintstart.sprintstartbackend.shared.ids.BlueprintId
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
@@ -35,7 +36,7 @@ class OnboardingPathServiceTest {
     private val onboardingPathRepository: OnboardingPathRepository = mockk()
     private val questionAttemptRepository: QuestionAttemptRepository = mockk(relaxed = true)
     private val userApi: UserApi = mockk()
-    private val blueprintPathRepository: BlueprintPathRepository = mockk()
+    private val blueprintApi: BlueprintApi = mockk()
 
     // The real reader: it now owns the active-step and progress rules this service's team
     // overview reports, so stubbing it would hollow out exactly what these tests assert.
@@ -44,7 +45,7 @@ class OnboardingPathServiceTest {
         questionAttemptRepository,
         userApi,
         OnboardingPositionReader(onboardingPathRepository),
-        blueprintPathRepository,
+        blueprintApi,
     )
 
     private val userId = UUID.randomUUID()
@@ -279,8 +280,7 @@ class OnboardingPathServiceTest {
             every { onboardingPathRepository.findByUserId(userId) } returns
                 Optional.of(OnboardingPath(id = pathId, userId = userId, blueprintId = blueprintId))
             if (blueprintId != null) {
-                every { blueprintPathRepository.findById(blueprintId) } returns
-                    Optional.of(mockk<BlueprintPath> { every { projectId } returns project })
+                every { blueprintApi.projectIdOf(BlueprintId(blueprintId)) } returns ProjectId(project)
             }
         }
 
@@ -373,7 +373,7 @@ class OnboardingPathServiceTest {
         fun `treats a path whose blueprint was deleted as of unknown origin`() {
             every { onboardingPathRepository.findByUserId(userId) } returns
                 Optional.of(OnboardingPath(id = pathId, userId = userId, blueprintId = blueprintA))
-            every { blueprintPathRepository.findById(blueprintA) } returns Optional.empty()
+            every { blueprintApi.projectIdOf(BlueprintId(blueprintA)) } returns null
             every { userApi.isAdmin(callerAuthId) } returns false
 
             assertForbidden { service.requireMayReplacePath(callerAuthId, userId, null) }
@@ -432,8 +432,8 @@ class OnboardingPathServiceTest {
         fun `names the project whose blueprint the path was built from`() {
             every { onboardingPathRepository.findByUserId(userId) } returns
                 Optional.of(OnboardingPath(id = pathId, userId = userId, blueprintId = blueprintId))
-            every { blueprintPathRepository.findById(blueprintId) } returns
-                Optional.of(mockk<BlueprintPath> { every { projectId } returns this@FindPathOrigin.projectId })
+            every { blueprintApi.projectIdOf(BlueprintId(blueprintId)) } returns
+                ProjectId(this@FindPathOrigin.projectId)
 
             assertEquals(OnboardingPathService.PathOrigin(projectId), service.findPathOrigin(userId))
         }

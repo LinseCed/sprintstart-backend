@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.blueprint.model.response.step
 
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.response.resource.GetBlueprintResourceResponse
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.response.task.GetBlueprintTaskResponse
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepType
 import java.util.UUID
 
 data class UpdateBlueprintStepResponse(

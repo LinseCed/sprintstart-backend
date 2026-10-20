@@ -1,9 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.security
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.repository.BlueprintPathRepository
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPhaseRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.PhaseCheckQuestionRepository
+import com.sprintstart.sprintstartbackend.shared.ids.BlueprintId
 import com.sprintstart.sprintstartbackend.user.external.security.ProjectAuthorization
 import org.springframework.security.core.Authentication
 import org.springframework.stereotype.Component
@@ -33,7 +34,7 @@ class OnboardingAuthorization(
     private val projectAuth: ProjectAuthorization,
     private val onboardingPhaseRepository: OnboardingPhaseRepository,
     private val phaseCheckQuestionRepository: PhaseCheckQuestionRepository,
-    private val blueprintPathRepository: BlueprintPathRepository,
+    private val blueprintApi: BlueprintApi,
 ) {
     /**
      * Checks whether the authenticated principal may manage the project an onboarding phase
@@ -73,7 +74,7 @@ class OnboardingAuthorization(
      */
     private fun canManagePath(authentication: Authentication, path: OnboardingPath): Boolean {
         val blueprintId = path.blueprintId ?: return false
-        val projectId = blueprintPathRepository.findById(blueprintId).orElse(null)?.projectId ?: return false
-        return projectAuth.canManageProject(authentication, projectId)
+        val projectId = blueprintApi.projectIdOf(BlueprintId(blueprintId)) ?: return false
+        return projectAuth.canManageProject(authentication, projectId.value)
     }
 }

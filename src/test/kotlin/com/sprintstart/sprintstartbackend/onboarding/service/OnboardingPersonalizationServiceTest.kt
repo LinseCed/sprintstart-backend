@@ -1,13 +1,13 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintPhaseType
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintStatus
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.RequirementType
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.factory.OnboardingPathFromBlueprintFactory
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPath
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPhase
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPhaseRequirement
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.repository.BlueprintPathRepository
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.mapper.toSnapshot
 import com.sprintstart.sprintstartbackend.onboarding.external.PhaseContentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
@@ -18,6 +18,7 @@ import com.sprintstart.sprintstartbackend.onboarding.external.model.PhaseContent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.PhaseResourceDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.PhaseStepDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.PhaseTaskDto
+import com.sprintstart.sprintstartbackend.onboarding.factory.OnboardingPathFromBlueprintFactory
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
 import com.sprintstart.sprintstartbackend.shared.config.AiConfig
 import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
@@ -26,6 +27,8 @@ import com.sprintstart.sprintstartbackend.shared.config.CryptoConfig
 import com.sprintstart.sprintstartbackend.shared.config.GithubConfig
 import com.sprintstart.sprintstartbackend.shared.config.OnboardingConfig
 import com.sprintstart.sprintstartbackend.shared.config.UploadConfig
+import com.sprintstart.sprintstartbackend.shared.ids.BlueprintId
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.user.external.ProjectIndustryApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile
@@ -57,7 +60,7 @@ import kotlin.test.assertTrue
 
 class OnboardingPersonalizationServiceTest {
     private val onboardingPathRepository: OnboardingPathRepository = mockk()
-    private val blueprintPathRepository: BlueprintPathRepository = mockk()
+    private val blueprintApi: BlueprintApi = mockk()
     private val phaseContentAiClient: PhaseContentAiClient = mockk()
     private val userApi: UserApi = mockk()
     private val projectIndustryApi: ProjectIndustryApi = mockk(relaxed = true)
@@ -96,7 +99,7 @@ class OnboardingPersonalizationServiceTest {
         }
 
         assertEquals(HttpStatus.FORBIDDEN, error.statusCode)
-        verify(exactly = 0) { blueprintPathRepository.findAllByProjectIdAndStatus(any(), any()) }
+        verify(exactly = 0) { blueprintApi.activeBlueprints(any()) }
         verify(exactly = 0) { onboardingPathRepository.deleteByUserId(any()) }
     }
 
@@ -105,9 +108,9 @@ class OnboardingPersonalizationServiceTest {
         val blueprint = blueprint(BlueprintStatus.ACTIVE)
         every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
         every {
-            blueprintPathRepository.findAllByProjectIdAndStatus(projectId, BlueprintStatus.ACTIVE)
-        } returns listOf(blueprint)
-        every { blueprintPathRepository.findById(blueprint.id) } returns Optional.of(blueprint)
+            blueprintApi.activeBlueprints(ProjectId(projectId))
+        } answers { listOf(blueprint).map { it.toSnapshot() } }
+        every { blueprintApi.snapshot(BlueprintId(blueprint.id)) } answers { blueprint.toSnapshot() }
         every { onboardingPathRepository.deleteByUserId(userId) } just runs
         every { onboardingPathRepository.flush() } just runs
 
@@ -133,8 +136,9 @@ class OnboardingPersonalizationServiceTest {
     fun `returns conflict event when the project has several active blueprints`() = runTest {
         every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
         every {
-            blueprintPathRepository.findAllByProjectIdAndStatus(projectId, BlueprintStatus.ACTIVE)
-        } returns listOf(blueprint(BlueprintStatus.ACTIVE), blueprint(BlueprintStatus.ACTIVE))
+            blueprintApi.activeBlueprints(ProjectId(projectId))
+        } answers
+            { listOf(blueprint(BlueprintStatus.ACTIVE), blueprint(BlueprintStatus.ACTIVE)).map { it.toSnapshot() } }
 
         val events = service.personalize(authId, projectId).toList()
 
@@ -153,7 +157,7 @@ class OnboardingPersonalizationServiceTest {
     fun `returns not found error event when the project has no active blueprint`() = runTest {
         every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
         every {
-            blueprintPathRepository.findAllByProjectIdAndStatus(projectId, BlueprintStatus.ACTIVE)
+            blueprintApi.activeBlueprints(ProjectId(projectId))
         } returns emptyList()
 
         val events = service.personalize(authId, projectId).toList()
@@ -175,9 +179,9 @@ class OnboardingPersonalizationServiceTest {
         val blueprint = blueprint(BlueprintStatus.ACTIVE)
         every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
         every {
-            blueprintPathRepository.findAllByProjectIdAndStatus(projectId, BlueprintStatus.ACTIVE)
-        } returns listOf(blueprint)
-        every { blueprintPathRepository.findById(blueprint.id) } returns Optional.empty()
+            blueprintApi.activeBlueprints(ProjectId(projectId))
+        } answers { listOf(blueprint).map { it.toSnapshot() } }
+        every { blueprintApi.snapshot(BlueprintId(blueprint.id)) } returns null
 
         val events = service.personalize(authId, projectId).toList()
 
@@ -243,9 +247,9 @@ class OnboardingPersonalizationServiceTest {
         path.blueprintPhases += excluded
         every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
         every {
-            blueprintPathRepository.findAllByProjectIdAndStatus(projectId, BlueprintStatus.ACTIVE)
-        } returns listOf(path)
-        every { blueprintPathRepository.findById(path.id) } returns Optional.of(path)
+            blueprintApi.activeBlueprints(ProjectId(projectId))
+        } answers { listOf(path).map { it.toSnapshot() } }
+        every { blueprintApi.snapshot(BlueprintId(path.id)) } answers { path.toSnapshot() }
         every { onboardingPathRepository.deleteByUserId(userId) } just runs
         every { onboardingPathRepository.flush() } just runs
         every { phaseContentAiClient.streamPhase(any()) } returns flowOf(doneEvent())
@@ -333,9 +337,9 @@ class OnboardingPersonalizationServiceTest {
         )
         every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
         every {
-            blueprintPathRepository.findAllByProjectIdAndStatus(projectId, BlueprintStatus.ACTIVE)
-        } returns listOf(blueprint)
-        every { blueprintPathRepository.findById(blueprint.id) } returns Optional.of(blueprint)
+            blueprintApi.activeBlueprints(ProjectId(projectId))
+        } answers { listOf(blueprint).map { it.toSnapshot() } }
+        every { blueprintApi.snapshot(BlueprintId(blueprint.id)) } answers { blueprint.toSnapshot() }
         every { onboardingPathRepository.deleteByUserId(userId) } just runs
         every { onboardingPathRepository.flush() } just runs
         every {
@@ -364,9 +368,9 @@ class OnboardingPersonalizationServiceTest {
         val blueprint = aiEnhancedBlueprint()
         every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
         every {
-            blueprintPathRepository.findAllByProjectIdAndStatus(projectId, BlueprintStatus.ACTIVE)
-        } returns listOf(blueprint)
-        every { blueprintPathRepository.findById(blueprint.id) } returns Optional.of(blueprint)
+            blueprintApi.activeBlueprints(ProjectId(projectId))
+        } answers { listOf(blueprint).map { it.toSnapshot() } }
+        every { blueprintApi.snapshot(BlueprintId(blueprint.id)) } answers { blueprint.toSnapshot() }
         every { onboardingPathRepository.deleteByUserId(userId) } just runs
         every { onboardingPathRepository.flush() } just runs
         every { phaseContentAiClient.streamPhase(any()) } returns flowOf()
@@ -538,7 +542,7 @@ class OnboardingPersonalizationServiceTest {
     private fun serviceWith(onboarding: OnboardingConfig): OnboardingPersonalizationService =
         OnboardingPersonalizationService(
             onboardingPathRepository = onboardingPathRepository,
-            blueprintPathRepository = blueprintPathRepository,
+            blueprintApi = blueprintApi,
             onboardingPathFactory = OnboardingPathFromBlueprintFactory(),
             phaseContentAiClient = phaseContentAiClient,
             userApi = userApi,
@@ -560,9 +564,9 @@ class OnboardingPersonalizationServiceTest {
         every { userApi.getOnboardingProfileByAuthId(authId) } returns Optional.of(profile)
         coEvery { projectIndustryApi.getOrEvaluateIndustry(projectId) } returns "Fintech / Banking"
         every {
-            blueprintPathRepository.findAllByProjectIdAndStatus(projectId, BlueprintStatus.ACTIVE)
-        } returns listOf(blueprint)
-        every { blueprintPathRepository.findById(blueprint.id) } returns Optional.of(blueprint)
+            blueprintApi.activeBlueprints(ProjectId(projectId))
+        } answers { listOf(blueprint).map { it.toSnapshot() } }
+        every { blueprintApi.snapshot(BlueprintId(blueprint.id)) } answers { blueprint.toSnapshot() }
         every { onboardingPathRepository.deleteByUserId(userId) } just runs
         every { onboardingPathRepository.flush() } just runs
     }
