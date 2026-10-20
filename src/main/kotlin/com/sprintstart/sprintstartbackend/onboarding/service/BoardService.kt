@@ -182,7 +182,7 @@ class BoardService(
         val storedSubject = if (kind == BoardCardKind.PATH_STEP) {
             val resolved = cleanSubject?.let { pathStepReader.resolve(userId.value, it) }
                 ?: return PlacementOutcome.NO_SUCH_STEP
-            resolved.step.id.toString()
+            resolved.id.toString()
         } else {
             cleanSubject
         }
@@ -359,13 +359,13 @@ class BoardService(
 
         val stepId = card.subject?.let { runCatching { UUID.fromString(it) }.getOrNull() }
         val resolved = stepId?.let { pathStepReader.stepsById(userId.value)[it] } ?: noSuchPathStepCard()
-        if (resolved.step.tasks.none { it.id == taskId.value }) noSuchPathStepCard()
+        if (resolved.tasks.none { it.id == taskId.value }) noSuchPathStepCard()
 
         onboardingTaskService.setFinishedForUser(userId.value, taskId.value, done)
         card.recordChange(BoardCardChange.TICKED, BoardActor.HIRE)
         boardCardRepository.save(card)
 
-        return resolved.toContent()
+        return pathStepReader.stepsById(userId.value)[resolved.id]?.toContent() ?: noSuchPathStepCard()
     }
 
     /**

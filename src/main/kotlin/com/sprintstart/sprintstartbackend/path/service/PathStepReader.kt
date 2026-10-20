@@ -1,7 +1,11 @@
 package com.sprintstart.sprintstartbackend.path.service
 
+import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPhase
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingStep
+import com.sprintstart.sprintstartbackend.path.model.mapper.toGetAllResponse
+import com.sprintstart.sprintstartbackend.path.model.response.resource.GetOnboardingResourcesResponse
+import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTasksResponse
 import com.sprintstart.sprintstartbackend.path.repository.OnboardingPathRepository
 import org.springframework.stereotype.Component
 import java.util.UUID
@@ -34,11 +38,11 @@ class PathStepReader(
         return path.phases
             .sortedBy { it.position }
             .filterNot { it.generationStatus.isHiddenFromUser() }
-            .flatMap { phase -> phase.steps.sortedBy { it.position }.map { step -> ResolvedPathStep(phase, step) } }
+            .flatMap { phase -> phase.steps.sortedBy { it.position }.map { step -> resolved(phase, step) } }
     }
 
     /** [stepsFor], keyed by step id — for hydrating a card that already stores which step it means. */
-    fun stepsById(userId: UUID): Map<UUID, ResolvedPathStep> = stepsFor(userId).associateBy { it.step.id }
+    fun stepsById(userId: UUID): Map<UUID, ResolvedPathStep> = stepsFor(userId).associateBy { it.id }
 
     /**
      * The step [reference] names, or null when nothing matches.
@@ -53,18 +57,18 @@ class PathStepReader(
         val steps = stepsFor(userId)
         if (steps.isEmpty()) return null
 
-        asUuidOrNull(reference)?.let { id -> return steps.firstOrNull { it.step.id == id } }
+        asUuidOrNull(reference)?.let { id -> return steps.firstOrNull { it.id == id } }
 
         val needle = normalise(reference)
         if (needle.isBlank()) return null
 
-        steps.firstOrNull { normalise(it.step.title).equals(needle, ignoreCase = true) }?.let { return it }
+        steps.firstOrNull { normalise(it.title).equals(needle, ignoreCase = true) }?.let { return it }
 
-        return steps.filter { normalise(it.step.title).contains(needle, ignoreCase = true) }.singleOrNull()
+        return steps.filter { normalise(it.title).contains(needle, ignoreCase = true) }.singleOrNull()
     }
 
     /** The hire's actual step titles, for a refusal sentence that lets the model self-correct. */
-    fun titlesFor(userId: UUID): List<String> = stepsFor(userId).map { it.step.title }
+    fun titlesFor(userId: UUID): List<String> = stepsFor(userId).map { it.title }
 
     private fun asUuidOrNull(value: String): UUID? =
         try {
@@ -73,6 +77,18 @@ class PathStepReader(
             null
         }
 
+    private fun resolved(phase: OnboardingPhase, step: OnboardingStep) = ResolvedPathStep(
+        phaseTitle = phase.title,
+        id = step.id,
+        title = step.title,
+        description = step.description,
+        status = step.status,
+        aiAssisted = step.aiAssisted,
+        expectedOutcome = step.expectedOutcome,
+        tasks = step.tasks.sortedBy { it.position }.map { it.toGetAllResponse() },
+        resources = step.resources.map { it.toGetAllResponse() },
+    )
+
     private fun normalise(value: String): String = value.trim().replace(WHITESPACE, " ")
 
     private companion object {
@@ -80,8 +96,20 @@ class PathStepReader(
     }
 }
 
-/** One step of a path, with the phase it belongs to. */
+/**
+ * One step of a path, by its [id], with the title of the phase it belongs to.
+ *
+ * Tasks and resources come in the shapes the path page serves, so whoever shows a step can never describe
+ * a task or resource differently than the path does.
+ */
 data class ResolvedPathStep(
-    val phase: OnboardingPhase,
-    val step: OnboardingStep,
+    val phaseTitle: String,
+    val id: UUID,
+    val title: String,
+    val description: String,
+    val status: StepStatus,
+    val aiAssisted: Boolean,
+    val expectedOutcome: String,
+    val tasks: List<GetOnboardingTasksResponse>,
+    val resources: List<GetOnboardingResourcesResponse>,
 )

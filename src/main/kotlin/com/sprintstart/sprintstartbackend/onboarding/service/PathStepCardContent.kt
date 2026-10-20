@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathStepContent
-import com.sprintstart.sprintstartbackend.path.model.mapper.toGetAllResponse
 import com.sprintstart.sprintstartbackend.path.model.response.resource.GetOnboardingResourcesResponse
 import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTasksResponse
 import com.sprintstart.sprintstartbackend.path.service.ResolvedPathStep
@@ -38,18 +37,18 @@ internal fun pathStepContent(
 
 /**
  * The same shapes the path page itself serves — [GetOnboardingTasksResponse] and
- * [GetOnboardingResourcesResponse] via their own mappers — so a `PATH_STEP` card can never
- * describe a task or resource differently than the path does.
+ * [GetOnboardingResourcesResponse] — so a `PATH_STEP` card can never describe a task or resource
+ * differently than the path does.
  */
 internal fun ResolvedPathStep.toContent(): PathStepContent = PathStepContent(
-    stepId = step.id,
-    phaseTitle = phase.title,
-    title = step.title,
-    description = step.description,
-    status = step.status,
-    isAiAssisted = step.aiAssisted,
-    expectedOutcomes = listOf(step.expectedOutcome),
-    tasks = step.tasks.sortedBy { it.position }.map { it.toGetAllResponse() },
-    resources = step.resources.map { it.toGetAllResponse() },
+    stepId = id,
+    phaseTitle = phaseTitle,
+    title = title,
+    description = description,
+    status = status,
+    isAiAssisted = aiAssisted,
+    expectedOutcomes = listOf(expectedOutcome),
+    tasks = tasks,
+    resources = resources,
     reason = null,
 )

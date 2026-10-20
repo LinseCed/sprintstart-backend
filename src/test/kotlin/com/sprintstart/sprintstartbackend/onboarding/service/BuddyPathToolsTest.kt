@@ -4,18 +4,20 @@ import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestion
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
-import com.sprintstart.sprintstartbackend.path.model.entity.QuestionAttempt
 import com.sprintstart.sprintstartbackend.path.model.response.path.GetOnboardingPathForUserResponse
 import com.sprintstart.sprintstartbackend.path.model.response.path.OnboardingGenerationIssueResponse
 import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseForUserResponse
 import com.sprintstart.sprintstartbackend.path.model.response.question.GetOnboardingQuestionForUserResponse
+import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionAttemptResponse
 import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionOptionForUserResponse
 import com.sprintstart.sprintstartbackend.path.model.response.skip.GetOnboardingStepSkipResponse
 import com.sprintstart.sprintstartbackend.path.model.response.step.GetOnboardingStepsResponse
 import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTaskResponse
-import com.sprintstart.sprintstartbackend.path.repository.QuestionAttemptRepository
 import com.sprintstart.sprintstartbackend.path.service.OnboardingPathService
 import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
+import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptReader
+import com.sprintstart.sprintstartbackend.shared.ids.CheckQuestionId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -43,10 +45,10 @@ class BuddyPathToolsTest {
     }
 
     // No attempts unless a case puts some there.
-    private val questionAttemptRepository: QuestionAttemptRepository = mockk {
-        every { findAllByQuestionIdAndUserIdOrderByCreatedAtDesc(any(), any()) } returns mutableListOf()
+    private val questionAttemptReader: QuestionAttemptReader = mockk {
+        every { lastAttempt(any(), any()) } returns null
     }
-    private val tools = BuddyPathTools(onboardingPathService, onboardingTaskService, questionAttemptRepository)
+    private val tools = BuddyPathTools(onboardingPathService, onboardingTaskService, questionAttemptReader)
 
     private val userId = UUID.randomUUID()
 
@@ -451,8 +453,8 @@ class BuddyPathToolsTest {
         val missed = question("Who runs the retro?", QuestionStatus.RETRY)
         every { onboardingPathService.findPathForUserId(userId) } returns
             path(phase(0, "Meetings", questions = listOf(missed)))
-        every { questionAttemptRepository.findAllByQuestionIdAndUserIdOrderByCreatedAtDesc(missed.id, userId) } returns
-            mutableListOf(attempt(missed.id, correct = false, text = "The PM"))
+        every { questionAttemptReader.lastAttempt(CheckQuestionId(missed.id), UserId(userId)) } returns
+            attempt(correct = false, text = "The PM")
 
         val text = tools.execute(userId)
 
@@ -465,8 +467,8 @@ class BuddyPathToolsTest {
         val missed = question("Which meeting sets scope?", QuestionStatus.RETRY, options = listOf("Planning", "Retro"))
         every { onboardingPathService.findPathForUserId(userId) } returns
             path(phase(0, "Meetings", questions = listOf(missed)))
-        every { questionAttemptRepository.findAllByQuestionIdAndUserIdOrderByCreatedAtDesc(missed.id, userId) } returns
-            mutableListOf(attempt(missed.id, correct = false, options = listOf(missed.options[1].id)))
+        every { questionAttemptReader.lastAttempt(CheckQuestionId(missed.id), UserId(userId)) } returns
+            attempt(correct = false, options = listOf(missed.options[1].id))
 
         assertThat(tools.execute(userId)).contains("their last answer, which was not right: “Retro”")
     }
@@ -478,7 +480,7 @@ class BuddyPathToolsTest {
             path(phase(0, "Meetings", questions = listOf(passed)))
 
         assertThat(tools.execute(userId)).doesNotContain("their last answer")
-        verify(exactly = 0) { questionAttemptRepository.findAllByQuestionIdAndUserIdOrderByCreatedAtDesc(any(), any()) }
+        verify(exactly = 0) { questionAttemptReader.lastAttempt(any(), any()) }
     }
 
     @Test
@@ -746,15 +748,14 @@ class BuddyPathToolsTest {
     )
 
     private fun attempt(
-        questionId: UUID,
         correct: Boolean,
         text: String? = null,
         options: List<UUID> = emptyList(),
-    ) = QuestionAttempt(
-        questionId = questionId,
-        userId = userId,
+    ) = QuestionAttemptResponse(
+        id = UUID.randomUUID(),
         correct = correct,
-        selectedOptionIds = options.toMutableList(),
+        createdAt = Instant.EPOCH,
+        selectedOptionIds = options,
         textAnswer = text,
     )
 

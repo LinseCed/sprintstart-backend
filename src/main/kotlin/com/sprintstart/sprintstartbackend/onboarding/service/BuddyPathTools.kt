@@ -6,9 +6,11 @@ import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardin
 import com.sprintstart.sprintstartbackend.path.model.response.question.GetOnboardingQuestionForUserResponse
 import com.sprintstart.sprintstartbackend.path.model.response.step.GetOnboardingStepsResponse
 import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTaskResponse
-import com.sprintstart.sprintstartbackend.path.repository.QuestionAttemptRepository
 import com.sprintstart.sprintstartbackend.path.service.OnboardingPathService
 import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
+import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptReader
+import com.sprintstart.sprintstartbackend.shared.ids.CheckQuestionId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
@@ -52,7 +54,7 @@ import java.util.UUID
 class BuddyPathTools(
     private val onboardingPathService: OnboardingPathService,
     private val onboardingTaskService: OnboardingTaskService,
-    private val questionAttemptRepository: QuestionAttemptRepository,
+    private val questionAttemptReader: QuestionAttemptReader,
 ) {
     /**
      * The path tool, mounted only for a hire who has a path.
@@ -273,9 +275,8 @@ class BuddyPathTools(
         phase.questions
             .filter { it.status == QuestionStatus.RETRY }
             .mapNotNull { question ->
-                val last = questionAttemptRepository
-                    .findAllByQuestionIdAndUserIdOrderByCreatedAtDesc(question.id, userId)
-                    .firstOrNull()
+                val last = questionAttemptReader
+                    .lastAttempt(CheckQuestionId(question.id), UserId(userId))
                     ?.takeUnless { it.correct }
                     ?: return@mapNotNull null
                 val labels = question.options.filter { it.id in last.selectedOptionIds }.map { it.label }

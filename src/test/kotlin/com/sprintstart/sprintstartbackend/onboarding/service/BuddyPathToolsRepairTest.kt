@@ -11,9 +11,9 @@ import com.sprintstart.sprintstartbackend.path.model.response.path.GetOnboarding
 import com.sprintstart.sprintstartbackend.path.model.response.path.OnboardingGenerationIssueResponse
 import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseForUserResponse
 import com.sprintstart.sprintstartbackend.path.model.response.step.GetOnboardingStepsResponse
-import com.sprintstart.sprintstartbackend.path.repository.QuestionAttemptRepository
 import com.sprintstart.sprintstartbackend.path.service.OnboardingPathService
 import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
+import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptReader
 import io.mockk.every
 import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
@@ -35,10 +35,10 @@ class BuddyPathToolsRepairTest {
     private val onboardingTaskService: OnboardingTaskService = mockk {
         every { getOnboardingTasksByStepId(any()) } returns emptyList()
     }
-    private val questionAttemptRepository: QuestionAttemptRepository = mockk {
-        every { findAllByQuestionIdAndUserIdOrderByCreatedAtDesc(any(), any()) } returns mutableListOf()
+    private val questionAttemptReader: QuestionAttemptReader = mockk {
+        every { lastAttempt(any(), any()) } returns null
     }
-    private val tools = BuddyPathTools(onboardingPathService, onboardingTaskService, questionAttemptRepository)
+    private val tools = BuddyPathTools(onboardingPathService, onboardingTaskService, questionAttemptReader)
 
     private val userId = UUID.randomUUID()
 

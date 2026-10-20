@@ -5,7 +5,9 @@ import com.sprintstart.sprintstartbackend.path.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPhase
+import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingResource
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingStep
+import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingTask
 import com.sprintstart.sprintstartbackend.path.repository.OnboardingPathRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -79,12 +81,36 @@ class PathStepReaderTest {
         addStep(phaseOne, "First phase, first step", position = 0)
         stubPath()
 
-        val titles = reader.stepsFor(userId).map { it.step.title }
+        val titles = reader.stepsFor(userId).map { it.title }
 
         assertEquals(
             listOf("First phase, first step", "First phase, second step", "Second phase, first step"),
             titles,
         )
+    }
+
+    @Test
+    fun `a step carries what is shown of it, its tasks in order`() {
+        val phase = addPhase(position = 0, title = "Phase One")
+        val step = addStep(phase, "Set up your laptop", position = 0)
+        step.aiAssisted = false
+        step.tasks.add(OnboardingTask(step = step, position = 1, title = "Second", description = "Desc"))
+        step.tasks.add(OnboardingTask(step = step, position = 0, title = "First", description = "Desc"))
+        step.resources.add(
+            OnboardingResource(step = step, title = "Guide", description = "Desc", url = "https://example.com"),
+        )
+        stubPath()
+
+        val resolved = reader.stepsById(userId).getValue(step.id)
+
+        assertEquals("Phase One", resolved.phaseTitle)
+        assertEquals("Set up your laptop", resolved.title)
+        assertEquals("Desc", resolved.description)
+        assertEquals(StepStatus.WAITING, resolved.status)
+        assertEquals(false, resolved.aiAssisted)
+        assertEquals("Outcome", resolved.expectedOutcome)
+        assertEquals(listOf("First", "Second"), resolved.tasks.map { it.title })
+        assertEquals(listOf("Guide"), resolved.resources.map { it.title })
     }
 
     @Test
@@ -101,7 +127,7 @@ class PathStepReaderTest {
             .also { addStep(it, "A hidden step", position = 0) }
         stubPath()
 
-        val titles = reader.stepsFor(userId).map { it.step.title }
+        val titles = reader.stepsFor(userId).map { it.title }
 
         assertEquals(listOf("A step"), titles)
     }
@@ -112,7 +138,7 @@ class PathStepReaderTest {
         val step = addStep(phase, "Set up your laptop", position = 0)
         stubPath()
 
-        assertEquals(step.id, reader.resolve(userId, step.id.toString())?.step?.id)
+        assertEquals(step.id, reader.resolve(userId, step.id.toString())?.id)
     }
 
     @Test
@@ -121,7 +147,7 @@ class PathStepReaderTest {
         val step = addStep(phase, "Set up your laptop", position = 0)
         stubPath()
 
-        assertEquals(step.id, reader.resolve(userId, "  SET UP your Laptop  ")?.step?.id)
+        assertEquals(step.id, reader.resolve(userId, "  SET UP your Laptop  ")?.id)
     }
 
     @Test
@@ -130,7 +156,7 @@ class PathStepReaderTest {
         val step = addStep(phase, "Set   up your laptop", position = 0)
         stubPath()
 
-        assertEquals(step.id, reader.resolve(userId, "Set up your laptop")?.step?.id)
+        assertEquals(step.id, reader.resolve(userId, "Set up your laptop")?.id)
     }
 
     @Test
@@ -139,7 +165,7 @@ class PathStepReaderTest {
         val step = addStep(phase, "Set up your development laptop", position = 0)
         stubPath()
 
-        assertEquals(step.id, reader.resolve(userId, "development laptop")?.step?.id)
+        assertEquals(step.id, reader.resolve(userId, "development laptop")?.id)
     }
 
     @Test
