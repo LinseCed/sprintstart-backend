@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.board.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.ArrivalReadApi
 import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
-import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardActor
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardChange
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
@@ -54,7 +54,7 @@ class BoardService(
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val boardDiagramRepository: BoardDiagramRepository,
     private val hydrator: BoardCardHydrator,
-    private val arrivalSteps: ArrivalSteps,
+    private val arrivalSteps: ArrivalReadApi,
     private val pathReadApi: PathReadApi,
 ) {
     /**

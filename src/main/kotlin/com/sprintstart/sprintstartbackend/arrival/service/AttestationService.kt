@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.arrival.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.HireArrivalApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.AttestationState
 import com.sprintstart.sprintstartbackend.arrival.model.entity.Attestation
 import com.sprintstart.sprintstartbackend.arrival.repository.AttestationRepository
@@ -39,13 +40,13 @@ class AttestationService(
     private val attestationRepository: AttestationRepository,
     private val projectMembershipApi: ProjectMembershipApi,
     private val clock: Clock = Clock.systemUTC(),
-) {
+) : HireArrivalApi {
     /**
      * [request] without an evidence link, for an assistant filing it on the hire's behalf: answers with
      * the title as it was stored, which is all the assistant repeats back.
      */
     @Transactional
-    fun requestForHire(hireId: UserId, projectId: ProjectId, title: String, attesterId: UserId): String =
+    override fun requestAttestation(hireId: UserId, projectId: ProjectId, title: String, attesterId: UserId): String =
         request(hireId.value, projectId.value, title, null, attesterId.value).title
 
     /**

@@ -1,10 +1,9 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.ArrivalAuthoringApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ArrivalDerivation
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
-import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepService
-import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
-import com.sprintstart.sprintstartbackend.arrival.service.NewArrivalStep
+import com.sprintstart.sprintstartbackend.arrival.external.model.NewArrivalStep
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
@@ -43,7 +42,7 @@ data class CreateArrivalStepsParams(
  */
 @Component
 class CreateArrivalStepsAction(
-    private val arrivalSteps: ArrivalSteps,
+    private val arrivalSteps: ArrivalAuthoringApi,
 ) : TypedTeamAction<CreateArrivalStepsParams>(CreateArrivalStepsParams.serializer()) {
     override val area = TeamArea.ARRIVAL
     override val risk = BuddyProposalRisk.STANDARD
@@ -115,7 +114,7 @@ class CreateArrivalStepsAction(
         val drafted = mutableListOf<DraftedStep>()
         for (entry in requested) {
             val key = normalizeKey(entry.text("key"))
-            if (!ArrivalStepService.KEY.matches(key)) {
+            if (!ArrivalAuthoringApi.KEY.matches(key)) {
                 return TeamActionDraft.Refused(
                     "'${entry.text("key")}' is not a usable key. Keys are lower-case letters, digits, '-' " +
                         "and '_', starting with a letter or digit.",

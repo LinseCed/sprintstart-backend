@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
-import com.sprintstart.sprintstartbackend.arrival.service.AttestationService
+import com.sprintstart.sprintstartbackend.arrival.external.HireArrivalApi
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
@@ -56,7 +56,7 @@ class BuddyActionService(
     private val knowledgeBaseService: KnowledgeBaseService,
     private val userGoalService: UserGoalService,
     private val userApi: UserApi,
-    private val attestationService: AttestationService,
+    private val hireArrivalApi: HireArrivalApi,
     private val competencyPlacementService: CompetencyPlacementService,
     private val buddyPathActions: BuddyPathActions,
     private val boardWrites: BuddyBoardWriteActions,
@@ -493,7 +493,7 @@ class BuddyActionService(
      * Asks a named colleague to confirm a piece of the hire's work.
      *
      * The buddy relays; it never confirms. Every rule that makes an attestation worth anything —
-     * not the hire, on this project — is enforced by [AttestationService], so a buddy that got the
+     * not the hire, on this project — is enforced by [HireArrivalApi.requestAttestation], so a buddy that got the
      * person wrong produces a legible refusal rather than weak evidence.
      */
     private fun requestAttestation(
@@ -505,7 +505,7 @@ class BuddyActionService(
             return BuddyActionResponse(ok = false, message = "I need to know what work to confirm and who to ask.")
         }
         return try {
-            val stored = attestationService.requestForHire(
+            val stored = hireArrivalApi.requestAttestation(
                 hireId = UserId(resolved.userId),
                 projectId = ProjectId(resolved.projectId),
                 title = title,

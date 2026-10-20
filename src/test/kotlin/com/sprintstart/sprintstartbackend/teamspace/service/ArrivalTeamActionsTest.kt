@@ -1,10 +1,10 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.external.model.NewArrivalStep
 import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepService
 import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
-import com.sprintstart.sprintstartbackend.arrival.service.NewArrivalStep
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import io.mockk.every

@@ -1,10 +1,10 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.ArrivalAuthoringApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ArrivalDerivation
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.external.model.ArrivalStepChange
 import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
-import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepChange
-import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
@@ -37,7 +37,7 @@ data class UpdateArrivalStepParams(
 /** Offers to change a step's wording, link, place or how it gets settled — never its key. */
 @Component
 class UpdateArrivalStepAction(
-    private val arrivalSteps: ArrivalSteps,
+    private val arrivalSteps: ArrivalAuthoringApi,
 ) : TypedTeamAction<UpdateArrivalStepParams>(UpdateArrivalStepParams.serializer()) {
     override val area = TeamArea.ARRIVAL
     override val risk = BuddyProposalRisk.STANDARD

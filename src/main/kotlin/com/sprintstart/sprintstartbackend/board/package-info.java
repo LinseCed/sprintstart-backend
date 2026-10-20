@@ -8,7 +8,7 @@
                 "shared :: shared", "shared :: ids", "shared :: ai", "shared :: annotations", "user :: api", "user :: api-events",
                 "ingestion :: api", "ingestion :: api.model",
                 "path :: api", "path :: api-model", "path :: api-enums", "path :: api-responses",
-                "arrival :: api-services", "arrival :: api-enums", "arrival :: api-responses",
+                "arrival :: api", "arrival :: api-model", "arrival :: api-enums", "arrival :: api-responses",
                 "starterwork :: api-services", "starterwork :: api-enums", "starterwork :: api-events",
                 "starterwork :: api-model", "starterwork :: api-responses"
         }

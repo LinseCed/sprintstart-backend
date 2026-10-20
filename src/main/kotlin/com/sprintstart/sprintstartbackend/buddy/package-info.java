@@ -9,7 +9,7 @@
                 "assistant :: api", "user :: api", "user :: api-enum", "user :: api-events",
                 "upload :: upload.api", "upload :: upload.model", "ingestion :: api", "ingestion :: api.model", "blueprint :: api-enums",
                 "path :: api", "path :: api-model", "path :: api-enums", "path :: api-requests", "path :: api-responses",
-                "arrival :: api", "arrival :: api-services", "arrival :: api-enums", "arrival :: api-responses",
+                "arrival :: api", "arrival :: api-model", "arrival :: api-enums", "arrival :: api-responses",
                 "starterwork :: api-services", "starterwork :: api-enums", "starterwork :: api-responses",
                 "knowledge :: api", "knowledge :: api-services", "knowledge :: api-responses",
                 "board :: api-services", "board :: api-enums", "board :: api-model", "board :: api-requests",

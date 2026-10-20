@@ -47,7 +47,7 @@ class BuddyBoardWriteActionsTest {
         knowledgeBaseService = mockk(relaxed = true),
         userGoalService = mockk(relaxed = true),
         userApi = userApi,
-        attestationService = mockk(relaxed = true),
+        hireArrivalApi = mockk(relaxed = true),
         competencyPlacementService = mockk(relaxed = true),
         buddyPathActions = mockk(relaxed = true),
         boardWrites = boardWrites,

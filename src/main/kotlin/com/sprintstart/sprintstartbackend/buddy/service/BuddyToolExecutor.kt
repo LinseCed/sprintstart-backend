@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.ArrivalReadApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
-import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.board.service.OpenPullRequestReader
@@ -46,7 +46,7 @@ class BuddyToolExecutor(
     private val buddyBoardTools: BuddyBoardTools,
     private val openPullRequestReader: OpenPullRequestReader,
     private val projectMembershipApi: ProjectMembershipApi,
-    private val arrivalSteps: ArrivalSteps,
+    private val arrivalSteps: ArrivalReadApi,
     private val competencyPlacementService: CompetencyPlacementService,
     private val buddyPathTools: BuddyPathTools,
     private val buddyAppGuideTools: BuddyAppGuideTools,

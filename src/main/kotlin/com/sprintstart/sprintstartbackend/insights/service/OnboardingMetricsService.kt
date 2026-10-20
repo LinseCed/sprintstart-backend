@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.insights.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.ContributionApi
 import com.sprintstart.sprintstartbackend.arrival.external.ContributionWording
-import com.sprintstart.sprintstartbackend.arrival.service.Contribution
-import com.sprintstart.sprintstartbackend.arrival.service.ContributionService
+import com.sprintstart.sprintstartbackend.arrival.external.model.Contribution
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.ProjectOnboardingMetricsResponse
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
@@ -31,7 +31,7 @@ import java.util.UUID
 @Service
 class OnboardingMetricsService(
     private val projectMembershipApi: ProjectMembershipApi,
-    private val contributionService: ContributionService,
+    private val contributionApi: ContributionApi,
     private val userGoalService: UserGoalService,
     private val clock: Clock = Clock.systemUTC(),
 ) {
@@ -81,7 +81,7 @@ class OnboardingMetricsService(
 
         // No attributable identity means no contributions can be found — which is not the
         // same as having done nothing.
-        val contributions = contributionService.forHire(member, projectId)
+        val contributions = contributionApi.contributionsOf(member, ProjectId(projectId))
 
         val opened = contributions.mapNotNull { it.openedAt }.minOrNull()
         val accepted = contributions.mapNotNull { it.acceptedAt }.minOrNull()

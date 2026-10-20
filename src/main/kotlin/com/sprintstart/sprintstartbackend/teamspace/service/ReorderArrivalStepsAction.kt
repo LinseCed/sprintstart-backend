@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
-import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
+import com.sprintstart.sprintstartbackend.arrival.external.ArrivalAuthoringApi
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
@@ -28,7 +28,7 @@ data class ReorderArrivalStepsParams(
  */
 @Component
 class ReorderArrivalStepsAction(
-    private val arrivalSteps: ArrivalSteps,
+    private val arrivalSteps: ArrivalAuthoringApi,
 ) : TypedTeamAction<ReorderArrivalStepsParams>(ReorderArrivalStepsParams.serializer()) {
     override val area = TeamArea.ARRIVAL
     override val risk = BuddyProposalRisk.STANDARD
