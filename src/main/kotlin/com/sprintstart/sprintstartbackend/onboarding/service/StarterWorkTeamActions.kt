@@ -5,10 +5,16 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.IngestedIssue
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
-import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.PromoteStarterWorkCandidateRequest
-import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.StarterWorkTaskId
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.starterwork.model.request.starterwork.PromoteStarterWorkCandidateRequest
+import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkTaskProposalResponse
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPool
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPoolReconciler
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkScope
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
+import com.sprintstart.sprintstartbackend.starterwork.service.githubRepositoryOf
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -30,16 +36,6 @@ import java.util.UUID
  * resolves its target through StarterWorkScope, at draft and again at confirm. A repository can be linked
  * to several projects that share the same rows, and the previews say so where that reaches past this one.
  */
-
-/** The live pool task [taskId] names, if its repository is linked to [projectId]. */
-private fun StarterWorkTaskProposalRepository.liveOn(
-    taskId: UUID?,
-    projectId: UUID,
-    scope: StarterWorkScope,
-): StarterWorkTaskProposal? =
-    taskId
-        ?.let { findById(it).orElse(null) }
-        ?.takeIf { it.status == ProposalStatus.LIVE && scope.covers(it.sourceId, projectId) }
 
 /** The pool task a confirmed review marks as reviewed. */
 @Serializable
@@ -68,14 +64,15 @@ data class SetTaskZeroEligibleParams(
     val eligible: Boolean,
 )
 
-/** The refusal for a stored proposal whose task is no longer live on [TeamToolContext.projectId]. */
-private fun StarterWorkTaskProposalRepository.goneSince(
-    taskId: UUID,
-    context: TeamToolContext,
-    scope: StarterWorkScope,
-): String? = TASK_GONE_SINCE.takeIf { liveOn(taskId, context.projectId, scope) == null }
+/** The live pool task [taskId] names on [TeamToolContext.projectId], if any. */
+private fun StarterWorkPool.liveOn(taskId: UUID?, context: TeamToolContext): StarterWorkTaskProposalResponse? =
+    liveOn(taskId?.let(::StarterWorkTaskId), ProjectId(context.projectId))
 
-private fun StarterWorkTaskProposal.named(): String = "“$title” (${githubRepositoryOf(sourceId)})"
+/** The refusal for a stored proposal whose task is no longer live on [TeamToolContext.projectId]. */
+private fun StarterWorkPool.goneSince(taskId: UUID, context: TeamToolContext): String? =
+    TASK_GONE_SINCE.takeIf { liveOn(taskId, context) == null }
+
+private fun StarterWorkTaskProposalResponse.named(): String = "“$title” (${githubRepositoryOf(sourceId)})"
 
 private const val NOT_IN_POOL_HERE =
     "That task is not in this project's starter-work pool. Call list_starter_work_pool for the tasks that are, " +
@@ -93,9 +90,8 @@ private fun taskIdOnly(description: String): JsonObject =
 /** Offers to record that somebody looked at a task and is happy to hand it to a newcomer. */
 @Component
 class MarkStarterWorkReviewedAction(
-    private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
+    private val starterWorkPool: StarterWorkPool,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
-    private val starterWorkScope: StarterWorkScope,
 ) : TypedTeamAction<MarkStarterWorkReviewedParams>(MarkStarterWorkReviewedParams.serializer()) {
     override val area = TeamArea.STARTER_WORK
     override val risk = BuddyProposalRisk.STANDARD
@@ -108,11 +104,9 @@ class MarkStarterWorkReviewedAction(
     )
 
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
-        val task = starterWorkTaskProposalRepository.liveOn(
-            call.uuidArgument("task_id"),
-            context.projectId,
-            starterWorkScope,
-        ) ?: return TeamActionDraft.Refused(NOT_IN_POOL_HERE)
+        val task =
+            starterWorkPool.liveOn(call.uuidArgument("task_id"), context)
+                ?: return TeamActionDraft.Refused(NOT_IN_POOL_HERE)
         if (task.reviewed) {
             return TeamActionDraft.Refused("That task is already reviewed, so there is nothing to confirm.")
         }
@@ -125,7 +119,7 @@ class MarkStarterWorkReviewedAction(
     }
 
     override fun recheckParams(params: MarkStarterWorkReviewedParams, context: TeamToolContext): String? =
-        starterWorkTaskProposalRepository.goneSince(params.taskId, context, starterWorkScope)
+        starterWorkPool.goneSince(params.taskId, context)
 
     override suspend fun performParams(params: MarkStarterWorkReviewedParams, context: TeamToolContext): String {
         starterWorkTaskProposalService.markReviewed(params.taskId)
@@ -136,9 +130,8 @@ class MarkStarterWorkReviewedAction(
 /** Offers to take a task out of the pool, permanently. */
 @Component
 class RejectStarterWorkAction(
-    private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
+    private val starterWorkPool: StarterWorkPool,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
-    private val starterWorkScope: StarterWorkScope,
 ) : TypedTeamAction<RejectStarterWorkParams>(RejectStarterWorkParams.serializer()) {
     override val area = TeamArea.STARTER_WORK
     override val risk = BuddyProposalRisk.DESTRUCTIVE
@@ -155,11 +148,9 @@ class RejectStarterWorkAction(
     )
 
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
-        val task = starterWorkTaskProposalRepository.liveOn(
-            call.uuidArgument("task_id"),
-            context.projectId,
-            starterWorkScope,
-        ) ?: return TeamActionDraft.Refused(NOT_IN_POOL_HERE)
+        val task =
+            starterWorkPool.liveOn(call.uuidArgument("task_id"), context)
+                ?: return TeamActionDraft.Refused(NOT_IN_POOL_HERE)
         val reason = call.textArgument("reason")
         return proposed(
             params = RejectStarterWorkParams(task.id, reason),
@@ -175,7 +166,7 @@ class RejectStarterWorkAction(
     }
 
     override fun recheckParams(params: RejectStarterWorkParams, context: TeamToolContext): String? =
-        starterWorkTaskProposalRepository.goneSince(params.taskId, context, starterWorkScope)
+        starterWorkPool.goneSince(params.taskId, context)
 
     override suspend fun performParams(params: RejectStarterWorkParams, context: TeamToolContext): String {
         starterWorkTaskProposalService.reject(
@@ -195,7 +186,7 @@ class RejectStarterWorkAction(
 @Component
 class PromoteCandidateAction(
     private val artifactIngestionApi: ArtifactIngestionApi,
-    private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
+    private val starterWorkPool: StarterWorkPool,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val starterWorkScope: StarterWorkScope,
 ) : TypedTeamAction<PromoteCandidateParams>(PromoteCandidateParams.serializer()) {
@@ -270,7 +261,7 @@ class PromoteCandidateAction(
 
     /** Why the issue cannot join the pool, or null when it can — a stale row is revived, not refused. */
     private fun poolRefusal(sourceId: String): String? =
-        when (starterWorkTaskProposalRepository.findBySourceId(sourceId)?.status) {
+        when (starterWorkPool.statusOf(sourceId)) {
             ProposalStatus.LIVE -> "That issue is already in the starter-work pool."
             ProposalStatus.REJECTED ->
                 "That issue was removed from the starter-work pool for good and cannot be put back."
@@ -286,9 +277,8 @@ class PromoteCandidateAction(
  */
 @Component
 class SetTaskZeroEligibleAction(
-    private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
+    private val starterWorkPool: StarterWorkPool,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
-    private val starterWorkScope: StarterWorkScope,
 ) : TypedTeamAction<SetTaskZeroEligibleParams>(SetTaskZeroEligibleParams.serializer()) {
     override val area = TeamArea.STARTER_WORK
     override val risk = BuddyProposalRisk.STANDARD
@@ -317,11 +307,9 @@ class SetTaskZeroEligibleAction(
     )
 
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
-        val task = starterWorkTaskProposalRepository.liveOn(
-            call.uuidArgument("task_id"),
-            context.projectId,
-            starterWorkScope,
-        ) ?: return TeamActionDraft.Refused(NOT_IN_POOL_HERE)
+        val task =
+            starterWorkPool.liveOn(call.uuidArgument("task_id"), context)
+                ?: return TeamActionDraft.Refused(NOT_IN_POOL_HERE)
         val eligible = call.booleanArgument("eligible")
             ?: return TeamActionDraft.Refused(
                 "Say whether to flag it for Task 0 (eligible: true) or take the flag off (eligible: false).",
@@ -345,7 +333,7 @@ class SetTaskZeroEligibleAction(
     }
 
     override fun recheckParams(params: SetTaskZeroEligibleParams, context: TeamToolContext): String? =
-        starterWorkTaskProposalRepository.goneSince(params.taskId, context, starterWorkScope)
+        starterWorkPool.goneSince(params.taskId, context)
 
     override suspend fun performParams(params: SetTaskZeroEligibleParams, context: TeamToolContext): String {
         starterWorkTaskProposalService.setTaskZeroEligibility(params.taskId, params.eligible)

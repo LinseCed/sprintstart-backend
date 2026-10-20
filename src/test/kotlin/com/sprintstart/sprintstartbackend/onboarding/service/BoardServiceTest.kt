@@ -14,10 +14,6 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardCha
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardState
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Board
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCardPayload
@@ -26,7 +22,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.ChecklistItemP
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ChecklistPayload
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.LinkPayload
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.NotePayload
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.AuthoredCardRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.ChecklistCardRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.ChecklistItemRequest
@@ -40,9 +35,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.OpenPu
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathStepContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.SuggestedTasksContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.TaskPoolContent
-import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkTaskProposalResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardDiagramRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
@@ -60,6 +52,17 @@ import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.OnboardingTaskId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.CompetencyKind
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.CompetencySource
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.TaskType
+import com.sprintstart.sprintstartbackend.starterwork.model.entity.StarterWorkTaskProposal
+import com.sprintstart.sprintstartbackend.starterwork.model.response.competency.MyCompetencyResponse
+import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.RankedStarterWorkTaskResponse
+import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkTaskProposalResponse
+import com.sprintstart.sprintstartbackend.starterwork.service.CurrentTaskReader
+import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every

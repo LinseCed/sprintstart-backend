@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionSeverity
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject

@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.external.model
 
+import com.sprintstart.sprintstartbackend.starterwork.external.model.AiProvenanceSchema
+import com.sprintstart.sprintstartbackend.starterwork.external.model.CitationRefSchema
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 

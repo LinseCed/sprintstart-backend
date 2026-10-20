@@ -1,12 +1,14 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
-import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.service.PathElement
 import com.sprintstart.sprintstartbackend.path.service.PathElementKind
 import com.sprintstart.sprintstartbackend.path.service.PathElements
+import com.sprintstart.sprintstartbackend.starterwork.model.entity.StarterWorkTaskProposal
+import com.sprintstart.sprintstartbackend.starterwork.repository.StarterWorkTaskProposalRepository
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPool
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkScope
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -36,7 +38,7 @@ internal class ContentFixture {
     val userApi: UserApi = mockk(relaxed = true)
     val proposals: StarterWorkTaskProposalRepository = mockk(relaxed = true)
     val starterWorkScope: StarterWorkScope = mockk(relaxed = true)
-    val scope = ContentScope(pathElements, projectMembershipApi, userApi, proposals, starterWorkScope)
+    val scope = ContentScope(pathElements, projectMembershipApi, userApi, StarterWorkPool(proposals, starterWorkScope))
 
     val projectId: UUID = UUID.randomUUID()
     val memberId: UUID = UUID.randomUUID()

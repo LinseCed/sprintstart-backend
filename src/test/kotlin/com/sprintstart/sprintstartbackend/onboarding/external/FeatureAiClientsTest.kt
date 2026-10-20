@@ -14,6 +14,8 @@ import com.sprintstart.sprintstartbackend.shared.config.CryptoConfig
 import com.sprintstart.sprintstartbackend.shared.config.GithubConfig
 import com.sprintstart.sprintstartbackend.shared.config.UploadConfig
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
+import com.sprintstart.sprintstartbackend.starterwork.external.OrientationAiClient
+import com.sprintstart.sprintstartbackend.starterwork.external.StarterWorkAiClient
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json

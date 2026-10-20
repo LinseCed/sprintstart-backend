@@ -5,7 +5,9 @@ import com.sprintstart.sprintstartbackend.arrival.service.ContributionService
 import com.sprintstart.sprintstartbackend.onboarding.model.ContributionWording
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectOnboardingMetricsResponse
-import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalRepository
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.starterwork.service.UserGoalService
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import org.springframework.stereotype.Service
@@ -30,7 +32,7 @@ import java.util.UUID
 class OnboardingMetricsService(
     private val projectMembershipApi: ProjectMembershipApi,
     private val contributionService: ContributionService,
-    private val userGoalRepository: UserGoalRepository,
+    private val userGoalService: UserGoalService,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     /**
@@ -87,7 +89,7 @@ class OnboardingMetricsService(
             .filter { it.openedAt != null }
             .minByOrNull { it.openedAt as Instant }
 
-        val goalClaimedAt = userGoalRepository.findByUserIdAndProjectId(member.userId, projectId)?.claimedAt
+        val goalClaimedAt = userGoalService.claimedAt(UserId(member.userId), ProjectId(projectId))
 
         val longestOpenWait = contributions
             // Only a contribution still in flight is "waiting on somebody": an abandoned one is

@@ -1,11 +1,14 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CandidatePoolState
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
-import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkCandidateResponse
-import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.CandidatePoolState
+import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.starterwork.model.entity.StarterWorkTaskProposal
+import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkCandidateResponse
+import com.sprintstart.sprintstartbackend.starterwork.repository.StarterWorkTaskProposalRepository
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPool
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkScope
+import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.serialization.json.JsonObject
@@ -19,7 +22,7 @@ class StarterWorkTeamToolsTest {
     private val repository: StarterWorkTaskProposalRepository = mockk()
     private val service: StarterWorkTaskProposalService = mockk()
     private val scope: StarterWorkScope = mockk()
-    private val tools = StarterWorkTeamTools(repository, service, scope)
+    private val tools = StarterWorkTeamTools(StarterWorkPool(repository, scope), service, scope)
 
     private val projectId = UUID.randomUUID()
     private val context = TeamToolContext(userId = UUID.randomUUID(), authId = "auth|pm", projectId = projectId)

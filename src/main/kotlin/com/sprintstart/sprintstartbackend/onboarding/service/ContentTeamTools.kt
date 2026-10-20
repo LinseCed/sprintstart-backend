@@ -2,7 +2,6 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationPacketResponse
 import com.sprintstart.sprintstartbackend.path.external.enums.SkipStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionForAdminResponse
@@ -13,6 +12,8 @@ import com.sprintstart.sprintstartbackend.path.service.OnboardingStepService
 import com.sprintstart.sprintstartbackend.path.service.PathElementKind
 import com.sprintstart.sprintstartbackend.path.service.PathElements
 import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptService
+import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.OrientationPacketResponse
+import com.sprintstart.sprintstartbackend.starterwork.service.TaskOrientationService
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.springframework.stereotype.Component

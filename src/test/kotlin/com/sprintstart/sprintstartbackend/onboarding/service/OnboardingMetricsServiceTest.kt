@@ -4,8 +4,9 @@ import com.sprintstart.sprintstartbackend.arrival.service.ContributionService
 import com.sprintstart.sprintstartbackend.arrival.service.evidence.PullRequestEvidenceProvider
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGoal
-import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalRepository
+import com.sprintstart.sprintstartbackend.starterwork.model.entity.UserGoal
+import com.sprintstart.sprintstartbackend.starterwork.repository.UserGoalRepository
+import com.sprintstart.sprintstartbackend.starterwork.service.UserGoalService
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every
@@ -46,7 +47,7 @@ class OnboardingMetricsServiceTest {
         // tests assert the numbers this service reports, and the point of the refactor is
         // that swapping pull requests for contributions did not move any of them.
         ContributionService(listOf(PullRequestEvidenceProvider(artifactIngestionApi))),
-        userGoalRepository,
+        UserGoalService(userGoalRepository, mockk(), mockk(), mockk(), mockk()),
         Clock.fixed(now, ZoneOffset.UTC),
     )
 
