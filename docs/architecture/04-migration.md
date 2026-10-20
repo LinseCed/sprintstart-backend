@@ -63,11 +63,17 @@ an empty known list. Every feature module declares its allowed dependencies. Whe
 used to hold a lower one's entities, the lower module now answers in DTOs with typed ids (`ArrivalSteps`,
 `StarterWorkPool`, `KnowledgeLookup`, `QuestionAttemptReader`, `ResolvedPathStep`).
 
-Interim: no feature has a `<Feature>Api` interface yet. Higher modules call the services directly,
-so each feature's `service` package and its request and response DTO packages are named interfaces
-(`api-services`, `api-requests`, `api-responses`). Entities, repositories and mappers stay hidden
-(P4). An interface in `<feature>/external` replaces the exposed services one feature at a time, now
-that every caller is a module of its own and the call surface can be read off the dependency graph.
+Interim: most features still expose their `service` package and their request and response DTO
+packages as named interfaces (`api-services`, `api-requests`, `api-responses`), so higher modules
+call the services directly. Entities, repositories and mappers stay hidden (P4).
+
+`path` is the first to replace that with an API (#244, #245, #246), and the template for the rest:
+interfaces in `path/external` cut **by caller** (the board and knowledge read through `PathReadApi`,
+the Buddy through `HirePathApi` and `HirePathActionsApi`, team mode through `PathReviewApi`,
+`PhaseAuthoringApi`, `StepAuthoringApi` and `TaskAuthoringApi`), with **typed ids**, each
+implemented by one facade in `path/service` over the services that own the calls. Detekt's limits
+(11 functions per interface, 4 parameters) split a large caller once more. `path/service` is no
+longer a named interface, so `ModuleBoundariesTest` keeps every caller on the API.
 
 Not yet declared: `shared`, `user`, `connectors`, `config` (the composition root) and `health`.
 They depend on nothing above them today, but nothing enforces it.
