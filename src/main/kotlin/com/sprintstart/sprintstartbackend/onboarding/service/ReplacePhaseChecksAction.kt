@@ -7,10 +7,12 @@ import com.sprintstart.sprintstartbackend.assistant.external.boolean
 import com.sprintstart.sprintstartbackend.assistant.external.text
 import com.sprintstart.sprintstartbackend.assistant.external.uuid
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
-import com.sprintstart.sprintstartbackend.onboarding.model.request.question.UpdateOptionRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.question.UpdatePhaseQuestionsRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.question.UpdateQuestionRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.response.question.QuestionForAdminResponse
+import com.sprintstart.sprintstartbackend.path.model.request.question.UpdateOptionRequest
+import com.sprintstart.sprintstartbackend.path.model.request.question.UpdatePhaseQuestionsRequest
+import com.sprintstart.sprintstartbackend.path.model.request.question.UpdateQuestionRequest
+import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionForAdminResponse
+import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptService
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray

@@ -6,7 +6,6 @@ import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CandidatePoolState
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
-import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.GenerateStarterWorkResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.StarterWorkCandidateResponse
@@ -15,6 +14,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.
 import com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkPoolReconciler
 import com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkTaskProposalService
 import com.sprintstart.sprintstartbackend.onboarding.service.UserGoalService
+import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.user.external.security.ProjectAuthorization
 import io.mockk.coEvery
 import io.mockk.every

@@ -3,9 +3,11 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.request.task.CreateOnboardingTaskRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.task.UpdateOnboardingTaskRequest
+import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.model.request.task.CreateOnboardingTaskRequest
+import com.sprintstart.sprintstartbackend.path.model.request.task.UpdateOnboardingTaskRequest
+import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
+import com.sprintstart.sprintstartbackend.path.service.PathElementKind
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component

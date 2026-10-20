@@ -9,6 +9,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge.Kn
 import com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.CanonicalAnswerRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.KnowledgeRequestRepository
+import com.sprintstart.sprintstartbackend.path.service.OnboardingPositionReader
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
 import org.springframework.http.HttpStatus

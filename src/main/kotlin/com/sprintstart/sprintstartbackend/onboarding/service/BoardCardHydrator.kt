@@ -18,6 +18,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.Curren
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.OpenPullRequestsContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
+import com.sprintstart.sprintstartbackend.path.service.ResolvedPathStep
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember

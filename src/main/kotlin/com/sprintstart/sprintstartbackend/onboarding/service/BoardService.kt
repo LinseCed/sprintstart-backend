@@ -18,6 +18,8 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathSt
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardDiagramRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
+import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
+import com.sprintstart.sprintstartbackend.path.service.PathStepReader
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.OnboardingTaskId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
@@ -180,7 +182,7 @@ class BoardService(
         val storedSubject = if (kind == BoardCardKind.PATH_STEP) {
             val resolved = cleanSubject?.let { pathStepReader.resolve(userId.value, it) }
                 ?: return PlacementOutcome.NO_SUCH_STEP
-            resolved.step.id.toString()
+            resolved.id.toString()
         } else {
             cleanSubject
         }
@@ -332,7 +334,7 @@ class BoardService(
      * The one live card the hire may change: everywhere else, a card is read-only because it is a
      * live read, but a task ticked here and the same task still open on the path page would be two
      * different facts about the same piece of work. So this writes through [OnboardingTaskService],
-     * the single place [com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingTask.finished]
+     * the single place [com.sprintstart.sprintstartbackend.path.model.entity.OnboardingTask.finished]
      * is set, and returns the re-hydrated card content — never the entity.
      *
      * The step's own status is never touched here, the same as [OnboardingTaskService.setFinishedForUser]
@@ -357,13 +359,13 @@ class BoardService(
 
         val stepId = card.subject?.let { runCatching { UUID.fromString(it) }.getOrNull() }
         val resolved = stepId?.let { pathStepReader.stepsById(userId.value)[it] } ?: noSuchPathStepCard()
-        if (resolved.step.tasks.none { it.id == taskId.value }) noSuchPathStepCard()
+        if (resolved.tasks.none { it.id == taskId.value }) noSuchPathStepCard()
 
         onboardingTaskService.setFinishedForUser(userId.value, taskId.value, done)
         card.recordChange(BoardCardChange.TICKED, BoardActor.HIRE)
         boardCardRepository.save(card)
 
-        return resolved.toContent()
+        return pathStepReader.stepsById(userId.value)[resolved.id]?.toContent() ?: noSuchPathStepCard()
     }
 
     /**

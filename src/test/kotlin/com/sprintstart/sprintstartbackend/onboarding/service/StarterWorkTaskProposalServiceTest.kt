@@ -10,7 +10,6 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.CandidatePoo
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.ProposedStarterTaskSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.StarterWorkOutcome
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.Competency
@@ -22,6 +21,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.P
 import com.sprintstart.sprintstartbackend.onboarding.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
+import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.coEvery

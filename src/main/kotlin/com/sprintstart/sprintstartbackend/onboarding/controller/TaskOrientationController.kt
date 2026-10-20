@@ -1,10 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
-import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.AuthorOrientationRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.MyOrientationResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationPacketResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.TaskOrientationService
+import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter

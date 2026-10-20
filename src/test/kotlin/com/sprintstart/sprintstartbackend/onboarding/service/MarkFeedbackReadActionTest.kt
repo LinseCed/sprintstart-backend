@@ -1,6 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.model.response.feedback.GetAdminOnboardingFeedbackResponse
+import com.sprintstart.sprintstartbackend.path.model.response.feedback.GetAdminOnboardingFeedbackResponse
+import com.sprintstart.sprintstartbackend.path.service.OnboardingFeedbackService
+import com.sprintstart.sprintstartbackend.path.service.PathElementKind
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

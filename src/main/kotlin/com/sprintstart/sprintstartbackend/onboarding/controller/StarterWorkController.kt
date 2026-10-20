@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.request.competency.RejectProposalRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.ClaimGoalRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.CreateStarterWorkTaskRequest
@@ -16,6 +15,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.
 import com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkPoolReconciler
 import com.sprintstart.sprintstartbackend.onboarding.service.StarterWorkTaskProposalService
 import com.sprintstart.sprintstartbackend.onboarding.service.UserGoalService
+import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.responses.ApiResponse

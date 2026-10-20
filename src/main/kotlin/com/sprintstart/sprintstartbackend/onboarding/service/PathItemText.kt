@@ -1,14 +1,14 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.QuestionStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.response.phase.GetOnboardingPhaseForUserResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.question.GetOnboardingQuestionForUserResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.step.GetOnboardingStepsResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyPathTools.Companion.QUESTION_LINK
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyPathTools.Companion.STEP_LINK
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyPathTools.Companion.STEP_PAGE_LINK
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyPathTools.Companion.quoted
+import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
+import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseForUserResponse
+import com.sprintstart.sprintstartbackend.path.model.response.question.GetOnboardingQuestionForUserResponse
+import com.sprintstart.sprintstartbackend.path.model.response.step.GetOnboardingStepsResponse
 import java.util.UUID
 
 /*

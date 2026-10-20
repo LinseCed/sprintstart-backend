@@ -3,7 +3,9 @@ package com.sprintstart.sprintstartbackend.onboarding.external
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.AssemblePhaseRequest
+import com.sprintstart.sprintstartbackend.path.external.PhaseContentAiClient
+import com.sprintstart.sprintstartbackend.path.external.model.AssemblePhaseRequest
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceCalls
 import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.shared.config.AiConfig
 import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig

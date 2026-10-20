@@ -4,7 +4,6 @@ import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.AuthoredCardRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.board.NoteCardRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCardResponse
@@ -14,6 +13,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.NoteCo
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.PathStepContent
 import com.sprintstart.sprintstartbackend.onboarding.service.BoardDiagramService
 import com.sprintstart.sprintstartbackend.onboarding.service.BoardService
+import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.OnboardingTaskId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId

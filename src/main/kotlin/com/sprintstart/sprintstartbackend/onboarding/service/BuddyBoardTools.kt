@@ -6,6 +6,8 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardStage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardStructurePayload
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCardResponse
+import com.sprintstart.sprintstartbackend.path.service.PathStepReader
+import com.sprintstart.sprintstartbackend.path.service.isDone
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi

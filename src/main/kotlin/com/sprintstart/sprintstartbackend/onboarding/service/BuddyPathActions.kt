@@ -4,10 +4,12 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.task.UpdateOnboardingTaskRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.response.task.GetOnboardingTaskResponse
+import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.model.request.task.UpdateOnboardingTaskRequest
+import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTaskResponse
+import com.sprintstart.sprintstartbackend.path.service.OnboardingStepService
+import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.serialization.json.add

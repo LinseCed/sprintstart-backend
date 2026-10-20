@@ -13,6 +13,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.Checkl
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.LinkContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.NoteContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.OpenPullRequestsContent
+import com.sprintstart.sprintstartbackend.path.service.isDone
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue

@@ -6,11 +6,11 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardActor
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardChange
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
 import com.sprintstart.sprintstartbackend.onboarding.model.response.arrival.ArrivalStepResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.resource.GetOnboardingResourcesResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.task.GetOnboardingTasksResponse
+import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.model.response.resource.GetOnboardingResourcesResponse
+import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTasksResponse
 import java.time.Instant
 import java.util.UUID
 

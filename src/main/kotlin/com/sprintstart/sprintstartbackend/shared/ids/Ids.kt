@@ -55,3 +55,9 @@ value class ActionProposalId(
 value class QuestionId(
     val value: UUID,
 )
+
+/** A knowledge-check question in a phase of a hire's onboarding path. */
+@JvmInline
+value class CheckQuestionId(
+    val value: UUID,
+)

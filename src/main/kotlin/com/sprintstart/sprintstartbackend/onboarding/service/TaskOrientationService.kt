@@ -4,7 +4,6 @@ import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionAp
 import com.sprintstart.sprintstartbackend.onboarding.external.OrientationAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationStep
-import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OrientationOutcome
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OrientationPacketSchema
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
@@ -18,6 +17,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationPacketResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.TaskOrientationPacketRepository
+import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import kotlinx.coroutines.Dispatchers

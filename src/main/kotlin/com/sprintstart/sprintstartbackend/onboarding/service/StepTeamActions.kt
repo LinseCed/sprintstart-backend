@@ -4,9 +4,11 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.request.step.CreateOnboardingStepRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.step.UpdateOnboardingStepRequest
+import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.model.request.step.CreateOnboardingStepRequest
+import com.sprintstart.sprintstartbackend.path.model.request.step.UpdateOnboardingStepRequest
+import com.sprintstart.sprintstartbackend.path.service.OnboardingStepService
+import com.sprintstart.sprintstartbackend.path.service.PathElementKind
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component

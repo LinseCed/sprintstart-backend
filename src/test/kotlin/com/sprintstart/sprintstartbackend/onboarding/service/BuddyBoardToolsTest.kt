@@ -10,6 +10,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardC
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardStructureResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.NoteContent
+import com.sprintstart.sprintstartbackend.path.service.PathStepReader
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi

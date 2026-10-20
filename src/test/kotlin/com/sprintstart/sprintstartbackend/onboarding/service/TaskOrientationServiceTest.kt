@@ -6,7 +6,6 @@ import com.sprintstart.sprintstartbackend.onboarding.external.OrientationAiClien
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationStep
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProvenanceSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.CitationRefSchema
 import com.sprintstart.sprintstartbackend.onboarding.external.model.OrientationOutcome
@@ -22,6 +21,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.A
 import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.AuthorOrientationSectionRequest
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.TaskOrientationPacketRepository
+import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi

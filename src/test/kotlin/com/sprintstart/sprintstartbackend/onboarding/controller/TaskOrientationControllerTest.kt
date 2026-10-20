@@ -5,13 +5,13 @@ import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationStep
-import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.MyOrientationResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationCitationResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationPacketResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationSectionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationSourceResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.TaskOrientationService
+import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.coEvery
 import io.mockk.every
