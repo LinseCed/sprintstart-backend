@@ -1,10 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.external.PhaseCheckAiClient
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeAnswerResult
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhase

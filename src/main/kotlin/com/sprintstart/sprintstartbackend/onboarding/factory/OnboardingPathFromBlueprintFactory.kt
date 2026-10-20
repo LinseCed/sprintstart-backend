@@ -1,18 +1,16 @@
-package com.sprintstart.sprintstartbackend.onboarding.blueprint.factory
+package com.sprintstart.sprintstartbackend.onboarding.factory
 
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintCheckOptionSnapshot
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintCheckQuestionSnapshot
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintPhaseSnapshot
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintResourceSnapshot
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintSnapshot
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintStepSnapshot
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintTaskSnapshot
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintPhaseType
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.RequirementType
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintCheckOption
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintCheckQuestion
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPath
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPhase
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintResource
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintStep
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintTask
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhase
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingResource
@@ -24,74 +22,8 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckQues
 import org.springframework.stereotype.Component
 import java.util.UUID
 
-/** AI-generated content for one `AI_ENHANCED` blueprint phase, filled at personalization time. */
-data class GeneratedPhaseContent(
-    val steps: List<GeneratedStep> = emptyList(),
-    val checkQuestions: List<GeneratedQuestion> = emptyList(),
-)
-
 /**
- * AI-generated step content as returned by the phase-assembly endpoint.
- *
- * [key] and [blockedBy] carry the optional dependency edges the model drew
- * between the assembled items: [blockedBy] holds the keys of steps/questions
- * that must be completed first. Keys are scoped to one assembled phase; a key
- * that resolves to nothing (unknown, self, or an item grounding dropped) is
- * ignored when the edges are wired onto the onboarding phase.
- */
-data class GeneratedStep(
-    val key: String = "",
-    val title: String,
-    val description: String = "",
-    val tasks: List<GeneratedTask> = emptyList(),
-    val resources: List<GeneratedResource> = emptyList(),
-    val estimatedMinutes: Int? = null,
-    val expectedOutcome: String = "",
-    val blockedBy: List<String> = emptyList(),
-)
-
-data class GeneratedTask(
-    val title: String,
-    val description: String = "",
-)
-
-data class GeneratedResource(
-    val title: String,
-    val url: String,
-)
-
-/**
- * AI-generated knowledge-check question as returned by the phase-assembly endpoint.
- *
- * [key] and [blockedBy] mirror [GeneratedStep]: optional dependency edges,
- * resolved by key against the phase's assembled items.
- */
-data class GeneratedQuestion(
-    val key: String = "",
-    val type: CheckQuestionType,
-    val question: String,
-    val explanation: String? = null,
-    val correctAnswer: String? = null,
-    val options: List<GeneratedOption> = emptyList(),
-    val blockedBy: List<String> = emptyList(),
-)
-
-data class GeneratedOption(
-    val label: String,
-    val correct: Boolean = false,
-)
-
-/** Whether the phase's role/skill requirements are satisfied by the user profile. */
-fun BlueprintPhase.isIncludedFor(projectRoleIds: Set<UUID>, skillIds: Set<UUID>): Boolean =
-    requirements.all { requirement ->
-        when (requirement.type) {
-            RequirementType.PROJECT_ROLE -> requirement.referenceId in projectRoleIds
-            RequirementType.SKILL -> requirement.referenceId in skillIds
-        }
-    }
-
-/**
- * Creates a user-owned onboarding path from a fully authored blueprint path.
+ * Creates a user-owned onboarding path from a snapshot of a fully authored blueprint path.
  *
  * The conversion copies content and graph layout into a new aggregate. Dependency
  * edges are rebuilt against the copied entities, keeping blueprint and onboarding
@@ -104,16 +36,16 @@ fun BlueprintPhase.isIncludedFor(projectRoleIds: Set<UUID>, skillIds: Set<UUID>)
 @Component
 class OnboardingPathFromBlueprintFactory {
     /**
-     * Deep-copies [blueprintPath] for [userId].
+     * Deep-copies [blueprint] for [userId].
      *
-     * @param blueprintPath The source blueprint whose complete graph is copied.
+     * @param blueprint The source blueprint whose complete graph is copied.
      * @param userId The user who owns the resulting onboarding path.
      * @param generatedContentByBlueprintPhaseId AI-assembled content for `AI_ENHANCED` phases,
      *   keyed by source blueprint phase id.
      * @return A new, unsaved onboarding path aggregate.
      */
     fun createFrom(
-        blueprintPath: BlueprintPath,
+        blueprint: BlueprintSnapshot,
         userId: UUID,
         projectRoleIds: Set<UUID> = emptySet(),
         skillIds: Set<UUID> = emptySet(),
@@ -122,11 +54,11 @@ class OnboardingPathFromBlueprintFactory {
     ): OnboardingPath {
         val onboardingPath = OnboardingPath(
             userId = userId,
-            blueprintId = blueprintPath.id,
+            blueprintId = blueprint.id,
         )
         val phasesByBlueprintId = mutableMapOf<UUID, OnboardingPhase>()
         val nodesByBlueprintId = mutableMapOf<UUID, OnboardingSubGraphNode>()
-        val includedPhases = blueprintPath.blueprintPhases.filter { phase ->
+        val includedPhases = blueprint.phases.filter { phase ->
             phase.isIncludedFor(projectRoleIds, skillIds)
         }
 
@@ -146,19 +78,17 @@ class OnboardingPathFromBlueprintFactory {
 
         wirePhaseBlockers(includedPhases, phasesByBlueprintId)
 
-        includedPhases
-            .flatMap { it.blueprintSteps + it.blueprintCheckQuestions }
-            .forEach { blueprintNode ->
-                val onboardingNode = nodesByBlueprintId.getValue(blueprintNode.id)
-                blueprintNode.blockedBy.forEach { blocker ->
-                    nodesByBlueprintId[blocker.id]?.let(onboardingNode.blockedBy::add)
-                }
-            }
+        val nodeEdges = includedPhases.flatMap { phase ->
+            phase.steps.map { it.id to it.blockedBy } + phase.checkQuestions.map { it.id to it.blockedBy }
+        }
+        for ((nodeId, blockerIds) in nodeEdges) {
+            blockerIds.mapNotNull(nodesByBlueprintId::get).forEach(nodesByBlueprintId.getValue(nodeId).blockedBy::add)
+        }
 
         return onboardingPath
     }
 
-    private fun BlueprintPhase.copyTo(
+    private fun BlueprintPhaseSnapshot.copyTo(
         onboardingPath: OnboardingPath,
         nodesByBlueprintId: MutableMap<UUID, OnboardingSubGraphNode>,
         generated: GeneratedPhaseContent? = null,
@@ -179,7 +109,7 @@ class OnboardingPathFromBlueprintFactory {
             graphY = graphY,
         )
 
-        blueprintSteps
+        steps
             .sortedBy { it.position }
             .map { it.copyTo(onboardingPhase) }
             .forEach { copied ->
@@ -187,7 +117,7 @@ class OnboardingPathFromBlueprintFactory {
                 nodesByBlueprintId[copied.sourceBlueprintId] = copied.entity
             }
 
-        blueprintCheckQuestions
+        checkQuestions
             .sortedBy { it.position }
             .map { it.copyTo(onboardingPhase) }
             .forEach { copied ->
@@ -205,17 +135,20 @@ class OnboardingPathFromBlueprintFactory {
     private fun GeneratedPhaseContent.isEmpty(): Boolean = steps.isEmpty() && checkQuestions.isEmpty()
 
     private fun wirePhaseBlockers(
-        includedPhases: List<BlueprintPhase>,
+        includedPhases: List<BlueprintPhaseSnapshot>,
         phasesByBlueprintId: Map<UUID, OnboardingPhase>,
     ) {
+        val byId = includedPhases.associateBy { it.id }
+
         fun visibleBlockers(
-            blueprintPhase: BlueprintPhase,
+            blueprintPhase: BlueprintPhaseSnapshot,
             visiting: MutableSet<UUID>,
         ): Set<OnboardingPhase> {
             val copied = phasesByBlueprintId[blueprintPhase.id] ?: return emptySet()
             if (!copied.generationStatus.isHiddenFromUser()) return setOf(copied)
             if (!visiting.add(blueprintPhase.id)) return emptySet()
             val inherited = blueprintPhase.blockedBy
+                .mapNotNull(byId::get)
                 .flatMap { blocker -> visibleBlockers(blocker, visiting) }
                 .toSet()
             visiting.remove(blueprintPhase.id)
@@ -226,10 +159,11 @@ class OnboardingPathFromBlueprintFactory {
             val onboardingPhase = phasesByBlueprintId.getValue(blueprintPhase.id)
             if (onboardingPhase.generationStatus.isHiddenFromUser()) {
                 blueprintPhase.blockedBy
-                    .mapNotNull { blocker -> phasesByBlueprintId[blocker.id] }
+                    .mapNotNull { blockerId -> phasesByBlueprintId[blockerId] }
                     .forEach(onboardingPhase.blockedBy::add)
             } else {
                 blueprintPhase.blockedBy
+                    .mapNotNull(byId::get)
                     .flatMap { blocker -> visibleBlockers(blocker, mutableSetOf()) }
                     .forEach(onboardingPhase.blockedBy::add)
             }
@@ -331,7 +265,7 @@ class OnboardingPathFromBlueprintFactory {
         }
     }
 
-    private fun BlueprintStep.copyTo(onboardingPhase: OnboardingPhase): CopiedNode<OnboardingStep> {
+    private fun BlueprintStepSnapshot.copyTo(onboardingPhase: OnboardingPhase): CopiedNode<OnboardingStep> {
         val onboardingStep = OnboardingStep(
             phase = onboardingPhase,
             position = position,
@@ -346,18 +280,18 @@ class OnboardingPathFromBlueprintFactory {
             graphY = graphY,
         )
 
-        blueprintTasks
+        tasks
             .sortedBy { it.position }
             .map { it.copyTo(onboardingStep) }
             .forEach(onboardingStep.tasks::add)
-        blueprintResources
+        resources
             .map { it.copyTo(onboardingStep) }
             .forEach(onboardingStep.resources::add)
 
         return CopiedNode(id, onboardingStep)
     }
 
-    private fun BlueprintCheckQuestion.copyTo(
+    private fun BlueprintCheckQuestionSnapshot.copyTo(
         onboardingPhase: OnboardingPhase,
     ): CopiedNode<PhaseCheckQuestion> {
         val onboardingQuestion = PhaseCheckQuestion(
@@ -372,7 +306,7 @@ class OnboardingPathFromBlueprintFactory {
             graphY = graphY,
         )
 
-        blueprintCheckOptions
+        options
             .sortedBy { it.position }
             .map { it.copyTo(onboardingQuestion) }
             .forEach(onboardingQuestion.options::add)
@@ -380,7 +314,7 @@ class OnboardingPathFromBlueprintFactory {
         return CopiedNode(id, onboardingQuestion)
     }
 
-    private fun BlueprintTask.copyTo(onboardingStep: OnboardingStep): OnboardingTask {
+    private fun BlueprintTaskSnapshot.copyTo(onboardingStep: OnboardingStep): OnboardingTask {
         return OnboardingTask(
             step = onboardingStep,
             position = position,
@@ -389,7 +323,7 @@ class OnboardingPathFromBlueprintFactory {
         )
     }
 
-    private fun BlueprintResource.copyTo(onboardingStep: OnboardingStep): OnboardingResource {
+    private fun BlueprintResourceSnapshot.copyTo(onboardingStep: OnboardingStep): OnboardingResource {
         return OnboardingResource(
             step = onboardingStep,
             title = title,
@@ -398,7 +332,7 @@ class OnboardingPathFromBlueprintFactory {
         )
     }
 
-    private fun BlueprintCheckOption.copyTo(onboardingQuestion: PhaseCheckQuestion): PhaseCheckOption {
+    private fun BlueprintCheckOptionSnapshot.copyTo(onboardingQuestion: PhaseCheckQuestion): PhaseCheckOption {
         return PhaseCheckOption(
             question = onboardingQuestion,
             position = position,

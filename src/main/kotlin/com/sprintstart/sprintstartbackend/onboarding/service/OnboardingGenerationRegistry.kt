@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintStatus
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.repository.BlueprintPathRepository
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.OnboardingSseEvent
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.BufferOverflow
@@ -48,7 +48,7 @@ import java.util.concurrent.ConcurrentHashMap
 @Component
 class OnboardingGenerationRegistry(
     private val personalizationService: OnboardingPersonalizationService,
-    private val blueprintPathRepository: BlueprintPathRepository,
+    private val blueprintApi: BlueprintApi,
     private val applicationScope: CoroutineScope,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -152,7 +152,7 @@ class OnboardingGenerationRegistry(
      * page say which, up front, instead of starting a generation that can only end in an error.
      */
     fun activeBlueprintCount(projectId: UUID): Long =
-        blueprintPathRepository.countByProjectIdAndStatus(projectId, BlueprintStatus.ACTIVE)
+        blueprintApi.activeBlueprintCount(ProjectId(projectId))
 
     /** The generation currently running for the caller, or null. */
     fun status(authId: String): GenerationRun? = runs[authId]

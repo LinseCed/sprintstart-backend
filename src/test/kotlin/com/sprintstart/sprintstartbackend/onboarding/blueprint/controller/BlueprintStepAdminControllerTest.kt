@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.blueprint.controller
 
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.BlueprintScope
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.request.step.CreateBlueprintStepRequest
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.request.step.DeleteBlueprintStepRequest
@@ -11,7 +12,6 @@ import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.response.st
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.response.step.UpdateBlueprintStepPositionResponse
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.response.step.UpdateBlueprintStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.service.BlueprintStepService
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepType
 import io.mockk.clearMocks
 import io.mockk.mockk
 import org.springframework.http.MediaType

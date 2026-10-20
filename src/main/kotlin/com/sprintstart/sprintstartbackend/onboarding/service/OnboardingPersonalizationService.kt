@@ -1,29 +1,29 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintSnapshot
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintPhaseType
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintStatus
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.factory.GeneratedOption
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.factory.GeneratedPhaseContent
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.factory.GeneratedQuestion
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.factory.GeneratedResource
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.factory.GeneratedStep
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.factory.GeneratedTask
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.factory.OnboardingPathFromBlueprintFactory
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.factory.isIncludedFor
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPath
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.repository.BlueprintPathRepository
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.PhaseContentAiClient
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssemblePhaseRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.PhaseContentOutcome
+import com.sprintstart.sprintstartbackend.onboarding.factory.GeneratedOption
+import com.sprintstart.sprintstartbackend.onboarding.factory.GeneratedPhaseContent
+import com.sprintstart.sprintstartbackend.onboarding.factory.GeneratedQuestion
+import com.sprintstart.sprintstartbackend.onboarding.factory.GeneratedResource
+import com.sprintstart.sprintstartbackend.onboarding.factory.GeneratedStep
+import com.sprintstart.sprintstartbackend.onboarding.factory.GeneratedTask
+import com.sprintstart.sprintstartbackend.onboarding.factory.OnboardingPathFromBlueprintFactory
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toGetForUserResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.GetOnboardingPathForUserResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.OnboardingSseEvent
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPathRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
+import com.sprintstart.sprintstartbackend.shared.ids.BlueprintId
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.user.external.ProjectIndustryApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import jakarta.persistence.EntityManager
@@ -53,7 +53,7 @@ import java.util.UUID
 @Service
 class OnboardingPersonalizationService(
     private val onboardingPathRepository: OnboardingPathRepository,
-    private val blueprintPathRepository: BlueprintPathRepository,
+    private val blueprintApi: BlueprintApi,
     private val onboardingPathFactory: OnboardingPathFromBlueprintFactory,
     private val phaseContentAiClient: PhaseContentAiClient,
     private val userApi: UserApi,
@@ -64,7 +64,6 @@ class OnboardingPersonalizationService(
     private val applicationConfig: ApplicationConfig,
 ) {
     private val txTemplate = TransactionTemplate(transactionManager)
-    private val readTxTemplate = TransactionTemplate(transactionManager).apply { isReadOnly = true }
     private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
@@ -226,37 +225,29 @@ class OnboardingPersonalizationService(
         }
     }
 
-    /**
-     * Selects the active blueprint and snapshots the fields needed by the slow AI phase.
-     *
-     * Blueprint relationships are lazy JPA collections. They must be filtered and copied while
-     * this read transaction is open; returning the entity itself would detach those collections
-     * before the cold personalization flow starts consuming them.
-     */
+    /** Selects the active blueprint and picks out the phases the slow AI step has to assemble. */
     private suspend fun loadBlueprintSelection(
         projectId: UUID,
         projectRoleIds: Set<UUID>,
         skillIds: Set<UUID>,
     ): BlueprintSelection =
         withContext(Dispatchers.IO) {
-            readTxTemplate.execute { _ ->
-                val blueprint = selectActiveBlueprint(projectId)
-                BlueprintSelection(
-                    id = blueprint.id,
-                    aiEnhancedPhases = blueprint.blueprintPhases
-                        .filter { it.isIncludedFor(projectRoleIds, skillIds) }
-                        .filter { it.type == BlueprintPhaseType.AI_ENHANCED && !it.aiPrompt.isNullOrBlank() }
-                        .sortedBy { it.position }
-                        .map { phase ->
-                            PhaseAssemblyTarget(
-                                id = phase.id,
-                                title = phase.title,
-                                description = phase.description.orEmpty(),
-                                prompt = phase.aiPrompt.orEmpty(),
-                            )
-                        },
-                )
-            }
+            val blueprint = selectActiveBlueprint(projectId)
+            BlueprintSelection(
+                id = blueprint.id,
+                aiEnhancedPhases = blueprint.phases
+                    .filter { it.isIncludedFor(projectRoleIds, skillIds) }
+                    .filter { it.type == BlueprintPhaseType.AI_ENHANCED && !it.aiPrompt.isNullOrBlank() }
+                    .sortedBy { it.position }
+                    .map { phase ->
+                        PhaseAssemblyTarget(
+                            id = phase.id,
+                            title = phase.title,
+                            description = phase.description.orEmpty(),
+                            prompt = phase.aiPrompt.orEmpty(),
+                        )
+                    },
+            )
         }
 
     private suspend fun persistPath(
@@ -269,15 +260,10 @@ class OnboardingPersonalizationService(
     ): GetOnboardingPathForUserResponse =
         withContext(Dispatchers.IO) {
             txTemplate.execute {
-                val blueprintEntity = blueprintPathRepository
-                    .findById(blueprint.id)
-                    .orElseThrow {
-                        IllegalStateException(
-                            "Selected blueprint ${blueprint.id} no longer exists",
-                        )
-                    }
+                val snapshot = blueprintApi.snapshot(BlueprintId(blueprint.id))
+                    ?: error("Selected blueprint ${blueprint.id} no longer exists")
                 val onboardingPath = onboardingPathFactory.createFrom(
-                    blueprintPath = blueprintEntity,
+                    blueprint = snapshot,
                     userId = userId,
                     projectRoleIds = projectRoleIds,
                     skillIds = skillIds,
@@ -540,8 +526,8 @@ class OnboardingPersonalizationService(
 
     private fun GeneratedPhaseContent.isEmpty(): Boolean = steps.isEmpty() && checkQuestions.isEmpty()
 
-    private fun selectActiveBlueprint(projectId: UUID): BlueprintPath {
-        val activeBlueprints = blueprintPathRepository.findAllByProjectIdAndStatus(projectId, BlueprintStatus.ACTIVE)
+    private fun selectActiveBlueprint(projectId: UUID): BlueprintSnapshot {
+        val activeBlueprints = blueprintApi.activeBlueprints(ProjectId(projectId))
         return when (activeBlueprints.size) {
             0 -> throw ResponseStatusException(
                 HttpStatus.NOT_FOUND,

@@ -37,3 +37,9 @@ value class BoardCardId(
 value class OnboardingTaskId(
     val value: UUID,
 )
+
+/** A blueprint path: the template a project's onboarding paths are built from. */
+@JvmInline
+value class BlueprintId(
+    val value: UUID,
+)

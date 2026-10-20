@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.blueprint.controller
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.BlueprintScope
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.request.checkquestion.CreateBlueprintCheckQuestionRequest
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.request.checkquestion.DeleteBlueprintCheckQuestionRequest
@@ -12,7 +13,6 @@ import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.response.ch
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.response.checkquestion.UpdateBlueprintCheckQuestionPositionResponse
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.response.checkquestion.UpdateBlueprintCheckQuestionResponse
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.service.BlueprintCheckQuestionService
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType
 import io.mockk.clearMocks
 import io.mockk.mockk
 import org.springframework.http.MediaType

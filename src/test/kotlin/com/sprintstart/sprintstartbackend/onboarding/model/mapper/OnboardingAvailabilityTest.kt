@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.mapper
 
+import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
@@ -31,7 +32,7 @@ class OnboardingAvailabilityTest {
             position = position,
             title = "s$position",
             description = "d",
-            type = com.sprintstart.sprintstartbackend.onboarding.external.enums.StepType.TASK,
+            type = com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType.TASK,
             estimatedMinutes = 1,
             expectedOutcome = "o",
             status = status,
@@ -44,7 +45,7 @@ class OnboardingAvailabilityTest {
         val q = PhaseCheckQuestion(
             phase = phase,
             position = position,
-            type = com.sprintstart.sprintstartbackend.onboarding.external.enums.CheckQuestionType.MULTIPLE_CHOICE,
+            type = CheckQuestionType.MULTIPLE_CHOICE,
             question = "q$position",
         )
         phase.checkQuestions += q
