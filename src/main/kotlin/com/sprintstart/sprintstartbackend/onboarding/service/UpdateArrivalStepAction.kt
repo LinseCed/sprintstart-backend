@@ -138,7 +138,11 @@ class UpdateArrivalStepAction(
      * A place in the list, refused when another step holds it or it lies past the end. Both leave an
      * ambiguous or gapped order, so they point to reorder_arrival_steps instead.
      */
-    private fun readPosition(call: BuddyToolCallDto, step: ArrivalStepResponse, context: TeamToolContext): Parsed<Int?> {
+    private fun readPosition(
+        call: BuddyToolCallDto,
+        step: ArrivalStepResponse,
+        context: TeamToolContext,
+    ): Parsed<Int?> {
         val text = call.textArgument("position")
         if (text.isBlank()) return Parsed.Value(null)
 
