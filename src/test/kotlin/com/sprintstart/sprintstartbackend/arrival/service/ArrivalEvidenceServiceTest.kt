@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.arrival.service
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ContributionEvidenceKind
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ContributionState
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.external.model.Contribution
 import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStepState
 import com.sprintstart.sprintstartbackend.arrival.repository.ArrivalStepStateRepository

@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.arrival.service.evidence
 
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ContributionEvidenceKind
-import com.sprintstart.sprintstartbackend.arrival.service.Contribution
+import com.sprintstart.sprintstartbackend.arrival.external.model.Contribution
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import java.util.UUID
 

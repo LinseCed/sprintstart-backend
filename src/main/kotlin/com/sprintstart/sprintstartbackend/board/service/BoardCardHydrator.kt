@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.board.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.ArrivalReadApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
-import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardDiagram
@@ -43,7 +43,7 @@ class BoardCardHydrator(
     private val myCompetencyService: MyCompetencyService,
     private val memoryRecapSource: MemoryRecapSource,
     private val boardDiagramService: BoardDiagramService,
-    private val arrivalSteps: ArrivalSteps,
+    private val arrivalSteps: ArrivalReadApi,
 ) {
     /**
      * One card as the board shows it, its content read live.

@@ -101,7 +101,7 @@ class AttestationServiceTest {
         onProject(hireId, attesterId)
         saves()
 
-        val stored = service.requestForHire(
+        val stored = service.requestAttestation(
             UserId(hireId),
             ProjectId(projectId),
             "  Ran the retro  ",

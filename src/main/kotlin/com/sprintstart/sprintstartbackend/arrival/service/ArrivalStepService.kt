@@ -1,7 +1,9 @@
 package com.sprintstart.sprintstartbackend.arrival.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.ArrivalAuthoringApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ArrivalDerivation
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.external.model.NewArrivalStep
 import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStepState
 import com.sprintstart.sprintstartbackend.arrival.repository.ArrivalStepRepository
@@ -402,7 +404,7 @@ class ArrivalStepService(
     private fun normalizeKey(key: String): String {
         val normalized = key.trim().lowercase()
 
-        if (!KEY.matches(normalized)) {
+        if (!ArrivalAuthoringApi.KEY.matches(normalized)) {
             throw ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
                 "'$key' is not a valid arrival step key (lower-case letters, digits, '-' and '_')",
@@ -430,23 +432,4 @@ class ArrivalStepService(
             ?.projects
             .orEmpty()
             .associate { it.projectId to it.name }
-
-    companion object {
-        /**
-         * The shape of a step key.
-         *
-         * Exposed so a caller that wants to refuse a malformed key in its own words answers by the
-         * same rule this service enforces, instead of keeping a copy that can drift from it.
-         */
-        val KEY = Regex("^[a-z\\d][a-z\\d_-]{0,63}$")
-    }
 }
-
-/** One step in a [ArrivalStepService.createAll] batch, before the scope decides its position. */
-data class NewArrivalStep(
-    val key: String,
-    val title: String,
-    val description: String? = null,
-    val href: String? = null,
-    val settledBy: Rigor = Rigor.DECLARED,
-)

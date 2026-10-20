@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.arrival.service
 
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ArrivalDerivation
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.external.model.NewArrivalStep
 import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStepState
 import com.sprintstart.sprintstartbackend.arrival.repository.ArrivalStepRepository

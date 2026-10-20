@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.ArrivalReadApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
-import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.AttentionSeverity
@@ -30,7 +30,7 @@ class TeamReadTools(
     private val projectAttentionService: ProjectAttentionService,
     private val onboardingMetricsService: OnboardingMetricsService,
     private val myCompetencyService: MyCompetencyService,
-    private val arrivalSteps: ArrivalSteps,
+    private val arrivalSteps: ArrivalReadApi,
     private val projectMembershipApi: ProjectMembershipApi,
 ) {
     fun toolSpecs(): List<BuddyToolSpecDto> = listOf(
@@ -120,7 +120,7 @@ class TeamReadTools(
     }
 
     /**
-     * Read with [ArrivalSteps.forHireOn], not by filtering the member's full list: another of their
+     * Read with [ArrivalReadApi.forHireOn], not by filtering the member's full list: another of their
      * projects can override a company step there, which would hide a step that still applies here.
      * Like the hire's own tool, it gives no total and never calls a step blocking.
      */

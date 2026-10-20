@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.ArrivalAuthoringApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
-import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
@@ -21,7 +21,7 @@ import java.util.UUID
  */
 @Component
 class ArrivalTeamTools(
-    private val arrivalSteps: ArrivalSteps,
+    private val arrivalSteps: ArrivalAuthoringApi,
 ) : TeamAreaTools {
     override val area = TeamArea.ARRIVAL
 

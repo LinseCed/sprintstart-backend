@@ -4,9 +4,9 @@ import com.sprintstart.sprintstartbackend.arrival.external.enums.AttestationStat
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ContributionEvidenceKind
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ContributionState
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.external.model.Contribution
 import com.sprintstart.sprintstartbackend.arrival.model.entity.Attestation
 import com.sprintstart.sprintstartbackend.arrival.repository.AttestationRepository
-import com.sprintstart.sprintstartbackend.arrival.service.Contribution
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import org.springframework.stereotype.Component
 import java.util.UUID

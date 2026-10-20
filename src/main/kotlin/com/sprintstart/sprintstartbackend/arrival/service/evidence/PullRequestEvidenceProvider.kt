@@ -3,7 +3,7 @@ package com.sprintstart.sprintstartbackend.arrival.service.evidence
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ContributionEvidenceKind
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ContributionState
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
-import com.sprintstart.sprintstartbackend.arrival.service.Contribution
+import com.sprintstart.sprintstartbackend.arrival.external.model.Contribution
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
