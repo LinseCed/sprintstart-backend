@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.listener
 
-import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyActionProposalRepository
+import com.sprintstart.sprintstartbackend.onboarding.assistant.repository.BuddyActionProposalRepository
 import com.sprintstart.sprintstartbackend.user.external.events.OnUserDeleted
 import com.sprintstart.sprintstartbackend.user.external.events.UserDeletedEvent
 import org.springframework.stereotype.Component

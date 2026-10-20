@@ -1,6 +1,13 @@
-package com.sprintstart.sprintstartbackend.onboarding.service
+package com.sprintstart.sprintstartbackend.onboarding.assistant.external
 
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.boolean
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.booleanArgument
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.text
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.textArgument
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.textListArgument
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.uuid
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.uuidArgument
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject

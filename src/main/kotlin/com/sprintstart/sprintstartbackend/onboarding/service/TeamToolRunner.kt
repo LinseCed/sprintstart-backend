@@ -1,7 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.TOOL_CALL_WRITTEN_OUT
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.text
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.writtenOutToolNames
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.toolUseEvent
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 

@@ -1,6 +1,6 @@
-package com.sprintstart.sprintstartbackend.onboarding.external.model
+package com.sprintstart.sprintstartbackend.onboarding.assistant.external
 
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySessionFilters
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject

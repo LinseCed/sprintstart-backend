@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.service
+package com.sprintstart.sprintstartbackend.onboarding.assistant.external
 
 private val NAMED_CALL = Regex(""""name"\s*:\s*"([\w.-]+)"""")
 private val CALL_ARGUMENTS = Regex(""""(?:parameters|arguments)"\s*:""")

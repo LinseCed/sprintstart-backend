@@ -1,11 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyActionProposal
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
+import com.sprintstart.sprintstartbackend.onboarding.assistant.repository.BuddyActionProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
-import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyActionProposalRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

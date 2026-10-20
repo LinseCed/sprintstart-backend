@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.external.enums
+package com.sprintstart.sprintstartbackend.onboarding.assistant.external
 
 /**
  * Where a stored team-mode action proposal stands.

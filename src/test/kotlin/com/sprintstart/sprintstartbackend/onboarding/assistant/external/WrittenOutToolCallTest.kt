@@ -1,5 +1,8 @@
-package com.sprintstart.sprintstartbackend.onboarding.service
+package com.sprintstart.sprintstartbackend.onboarding.assistant.external
 
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.text
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.writesOutAToolCall
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.writtenOutToolNames
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
