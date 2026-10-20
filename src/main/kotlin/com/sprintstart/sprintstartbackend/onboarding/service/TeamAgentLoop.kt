@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.ContributionWording
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentResponse
@@ -14,7 +15,6 @@ import com.sprintstart.sprintstartbackend.assistant.external.completeReply
 import com.sprintstart.sprintstartbackend.assistant.external.emitCitationsAndDone
 import com.sprintstart.sprintstartbackend.assistant.external.relayAgentTurn
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
-import com.sprintstart.sprintstartbackend.onboarding.model.ContributionWording
 import kotlinx.coroutines.flow.FlowCollector
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component

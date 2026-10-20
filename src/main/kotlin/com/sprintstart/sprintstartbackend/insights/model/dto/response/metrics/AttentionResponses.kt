@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.model.response.metrics
+package com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics
 
 import java.util.UUID
 
