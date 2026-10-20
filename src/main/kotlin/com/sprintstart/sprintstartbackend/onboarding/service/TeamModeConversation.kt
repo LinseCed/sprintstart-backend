@@ -22,5 +22,5 @@ interface TeamModeConversation {
     fun open(authId: AuthId, project: ProjectId): Flow<BuddyStreamEvent>
 
     /** Answers [message] in the caller's team conversation about [project]. */
-    suspend fun send(authId: AuthId, project: ProjectId, message: SendBuddyMessageRequest): Flow<BuddyStreamEvent>
+    fun send(authId: AuthId, project: ProjectId, message: SendBuddyMessageRequest): Flow<BuddyStreamEvent>
 }

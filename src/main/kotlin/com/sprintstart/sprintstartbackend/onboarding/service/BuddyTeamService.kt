@@ -95,7 +95,7 @@ class BuddyTeamService(
      *
      * @throws ResponseStatusException 404 if the user does not exist; 403 if they do not manage the project.
      */
-    suspend fun sendMessageForMe(
+    fun sendMessageForMe(
         authId: String,
         projectId: UUID,
         content: String,

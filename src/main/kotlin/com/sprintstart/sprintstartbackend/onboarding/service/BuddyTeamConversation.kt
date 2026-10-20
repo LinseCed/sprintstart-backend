@@ -19,7 +19,7 @@ class BuddyTeamConversation(
     override fun open(authId: AuthId, project: ProjectId): Flow<BuddyStreamEvent> =
         buddyTeamService.streamOpenForMe(authId.value, project.value)
 
-    override suspend fun send(
+    override fun send(
         authId: AuthId,
         project: ProjectId,
         message: SendBuddyMessageRequest,
