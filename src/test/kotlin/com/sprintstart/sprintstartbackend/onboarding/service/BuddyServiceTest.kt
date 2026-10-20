@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
+import com.sprintstart.sprintstartbackend.knowledge.external.QuestionLogApi
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentResponse
@@ -15,7 +16,6 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.service.FALLBACK_
 import com.sprintstart.sprintstartbackend.onboarding.client.BuddyAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
-import com.sprintstart.sprintstartbackend.onboarding.external.event.QuestionAskedEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyCitation
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
@@ -25,6 +25,8 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.AiGene
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyCitationRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.QuestionId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
@@ -48,7 +50,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.springframework.context.ApplicationEventPublisher
 import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 import java.time.Instant
@@ -66,7 +67,7 @@ class BuddyServiceTest {
     private val artifactLookupService: ArtifactLookupService = mockk()
     private val userApi: UserApi = mockk()
     private val buddyAiClient: BuddyAiClient = mockk()
-    private val eventPublisher: ApplicationEventPublisher = mockk()
+    private val questionLog: QuestionLogApi = mockk(relaxed = true)
     private val clock: Clock = mockk()
 
     // Folding is somebody else's job now, and these tests assert it is *asked for*, never that it
@@ -86,7 +87,7 @@ class BuddyServiceTest {
         artifactLookupService,
         BuddyCompactionScheduler(buddyCompactionService, CoroutineScope(Dispatchers.Unconfined)),
         buddyAiClient,
-        eventPublisher,
+        questionLog,
         clock,
     )
 
@@ -517,7 +518,7 @@ class BuddyServiceTest {
             stageConversation(session)
             every { userApi.getUsersByIds(listOf(userId)) } returns listOf(userOn(newProject))
             every { buddySessionRepository.save(any()) } answers { firstArg() }
-            every { eventPublisher.publishEvent(any<QuestionAskedEvent>()) } just runs
+            every { questionLog.record(any()) } just runs
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
             val requests = mutableListOf<BuddyAgentRequest>()
             coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStream finalReply("Here.")
@@ -526,7 +527,7 @@ class BuddyServiceTest {
 
             assertThat(session.projectId).isEqualTo(newProject)
             verify { buddySessionRepository.save(match { it.projectId == newProject }) }
-            verify { eventPublisher.publishEvent(match<QuestionAskedEvent> { it.projectId == newProject }) }
+            verify { questionLog.record(match { it.project == ProjectId(newProject) }) }
             assertThat(requests.first().projectIds).containsExactly(newProject.toString())
         }
 
@@ -541,7 +542,7 @@ class BuddyServiceTest {
 
             assertThat(session.projectId).isNull()
             verify { buddySessionRepository.save(match { it.projectId == null }) }
-            verify(exactly = 0) { eventPublisher.publishEvent(any<QuestionAskedEvent>()) }
+            verify(exactly = 0) { questionLog.record(any()) }
             coVerify(exactly = 0) { agentAiClient.buddyAgentTurnStream(any()) }
             val streamed = events.filter { it.type == "token" }.joinToString("") { it.content ?: "" }
             assertThat(streamed).contains("not on a project")
@@ -551,7 +552,7 @@ class BuddyServiceTest {
         fun `a session that is still on one of the hire's projects is left alone`() = runTest {
             val session = BuddySession(userId = userId, projectId = defaultProjectId, title = "session")
             stageConversation(session)
-            every { eventPublisher.publishEvent(any<QuestionAskedEvent>()) } just runs
+            every { questionLog.record(any()) } just runs
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
             coEvery { agentAiClient.buddyAgentTurnStream(any()) } returnsStream finalReply("Here.")
 
@@ -597,7 +598,7 @@ class BuddyServiceTest {
                     projectRoles = emptyList(),
                 ),
             )
-            every { eventPublisher.publishEvent(any<QuestionAskedEvent>()) } just runs
+            every { questionLog.record(any()) } just runs
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
 
             val requests = mutableListOf<BuddyAgentRequest>()
@@ -1644,7 +1645,7 @@ class BuddyServiceTest {
             )
             stageConversation(session)
 
-            every { eventPublisher.publishEvent(any<QuestionAskedEvent>()) } just runs
+            every { questionLog.record(any()) } just runs
             every { buddyCitationRepository.saveAll(emptyList<BuddyCitation>()) } returns emptyList()
 
             coEvery {
@@ -1666,9 +1667,9 @@ class BuddyServiceTest {
                 ).toList()
 
             verify {
-                eventPublisher.publishEvent(
-                    match<QuestionAskedEvent> {
-                        it.question == "How do we deploy this?"
+                questionLog.record(
+                    match {
+                        it.text == "How do we deploy this?"
                     },
                 )
             }
@@ -1695,7 +1696,7 @@ class BuddyServiceTest {
             } returns AiGenerateSessionTitleResponse("A new beginning")
 
             every {
-                eventPublisher.publishEvent(any<QuestionAskedEvent>())
+                questionLog.record(any())
             } just runs
 
             coEvery {
@@ -1798,7 +1799,7 @@ class BuddyServiceTest {
                 buddyMessageRepository.save(any<BuddyMessage>())
             } answers { firstArg() }
 
-            every { eventPublisher.publishEvent(any<QuestionAskedEvent>()) } just runs
+            every { questionLog.record(any()) } just runs
             every { buddyToolExecutor.toolSpecs(userId) } returns emptyList()
             every { buddyActionService.actionSpecs(userId) } returns emptyList()
 
@@ -1875,7 +1876,7 @@ class BuddyServiceTest {
             }
 
             every {
-                eventPublisher.publishEvent(any<QuestionAskedEvent>())
+                questionLog.record(any())
             } just runs
 
             every {
@@ -2036,6 +2037,8 @@ class BuddyServiceTest {
             verify {
                 buddyMessageRepository.delete(message)
             }
+            // A deleted question leaves the FAQ's material too.
+            verify { questionLog.forget(QuestionId(message.id)) }
         }
 
         @Test

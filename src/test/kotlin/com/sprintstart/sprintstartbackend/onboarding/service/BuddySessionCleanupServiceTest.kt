@@ -1,10 +1,12 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.knowledge.external.QuestionLogApi
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySessionStatus
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyCitationRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
+import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -22,6 +24,7 @@ class BuddySessionCleanupServiceTest {
     private val messageRepository: BuddyMessageRepository = mockk()
     private val citationRepository: BuddyCitationRepository = mockk()
     private val clock: Clock = mockk()
+    private val questionLog: QuestionLogApi = mockk(relaxed = true)
 
     private lateinit var service: BuddySessionCleanupService
 
@@ -34,6 +37,7 @@ class BuddySessionCleanupServiceTest {
             messageRepository = messageRepository,
             citationRepository = citationRepository,
             clock = clock,
+            questionLog = questionLog,
         )
 
         every { clock.instant() } returns now
@@ -70,6 +74,9 @@ class BuddySessionCleanupServiceTest {
 
         service.deleteBinnedChats()
 
+        // Their questions go with them, or the FAQ would keep quoting chats that no longer exist.
+        verify { questionLog.forgetConversation(BuddySessionId(sessionId1)) }
+        verify { questionLog.forgetConversation(BuddySessionId(sessionId2)) }
         verify {
             sessionRepository.findByStatusAndBinnedAtBefore(
                 BuddySessionStatus.BINNED,
