@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAge
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCitationDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyVocabularyDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.service.ResolvedBuddyCitation
@@ -82,7 +83,7 @@ class TeamAgentLoop(
         tools: List<BuddyToolSpecDto>,
     ) {
         logger.warn("Team buddy wrote a tool call out as its reply; asking again")
-        emit(BuddyStreamEvent(type = BuddyStreamEvent.RESET))
+        emit(BuddyStreamEvent(type = BuddyStreamEventType.RESET))
         turn.emittedContent.setLength(0)
         val retry = teamToolRunner.openAreasWrittenOut(
             response.text,

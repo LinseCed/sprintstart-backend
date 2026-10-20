@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
 import io.mockk.every
@@ -49,7 +50,7 @@ class TeamToolRunnerTest {
         val result = runner.run(call("answer_escalation"), context, setOf("answer_escalation"), areas, emit)
 
         assertThat(result).isEqualTo("Offered.")
-        assertThat(events.single().type).isEqualTo(BuddyStreamEvent.ACTION_PROPOSAL)
+        assertThat(events.single().type).isEqualTo(BuddyStreamEventType.ACTION_PROPOSAL)
         assertThat(events.single().proposalId).isEqualTo(stored.id.toString())
         verify(exactly = 0) { buddyTeamTools.execute(any(), any(), any()) }
     }
@@ -84,7 +85,7 @@ class TeamToolRunnerTest {
 
         assertThat(result).isEqualTo("Two open questions.")
         assertThat(areas.activeThisTurn).containsExactly(TeamArea.KNOWLEDGE)
-        assertThat(events.single().type).isEqualTo(BuddyStreamEvent.TOOL_USE)
+        assertThat(events.single().type).isEqualTo(BuddyStreamEventType.TOOL_USE)
     }
 
     @Test

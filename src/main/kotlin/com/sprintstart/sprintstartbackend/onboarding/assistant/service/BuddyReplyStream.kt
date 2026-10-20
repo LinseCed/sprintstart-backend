@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.onboarding.assistant.service
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentResponse
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -91,11 +92,11 @@ internal fun Flow<BuddyStreamEvent>.endFailureWithErrorEvent(): Flow<BuddyStream
         var answered = false
         emitAll(
             upstream
-                .onEach { if (it.type == BuddyStreamEvent.DONE) answered = true }
+                .onEach { if (it.type == BuddyStreamEventType.DONE) answered = true }
                 .catch { e ->
                     if (e is CancellationException || answered) throw e
                     logger.error("Buddy turn failed after its stream started", e)
-                    emit(BuddyStreamEvent(type = BuddyStreamEvent.ERROR, message = TURN_FAILED_MESSAGE))
+                    emit(BuddyStreamEvent(type = BuddyStreamEventType.ERROR, message = TURN_FAILED_MESSAGE))
                 },
         )
     }
@@ -150,7 +151,7 @@ internal suspend fun FlowCollector<BuddyStreamEvent>.emitCitationsAndDone(citati
             ),
         )
     }
-    emit(BuddyStreamEvent(type = BuddyStreamEvent.DONE))
+    emit(BuddyStreamEvent(type = BuddyStreamEventType.DONE))
 }
 
 private suspend fun FlowCollector<BuddyStreamEvent>.emitWords(text: String, emittedContent: StringBuilder) {
@@ -160,7 +161,7 @@ private suspend fun FlowCollector<BuddyStreamEvent>.emitWords(text: String, emit
 }
 
 private suspend fun FlowCollector<BuddyStreamEvent>.emitToken(content: String, emittedContent: StringBuilder) {
-    emit(BuddyStreamEvent(type = BuddyStreamEvent.TOKEN, content = content))
+    emit(BuddyStreamEvent(type = BuddyStreamEventType.TOKEN, content = content))
     emittedContent.append(content)
 }
 
@@ -174,7 +175,7 @@ private val logger = LoggerFactory.getLogger(
 
 /** The stream event that tells the client the buddy is running the tool [name]. */
 internal fun toolUseEvent(name: String?): BuddyStreamEvent =
-    BuddyStreamEvent(type = BuddyStreamEvent.TOOL_USE, name = name, kind = BuddyStreamEvent.TOOL_KIND)
+    BuddyStreamEvent(type = BuddyStreamEventType.TOOL_USE, name = name, kind = BuddyStreamEventType.TOOL_KIND)
 
 internal data class ResolvedBuddyCitation(
     val artifactId: UUID,

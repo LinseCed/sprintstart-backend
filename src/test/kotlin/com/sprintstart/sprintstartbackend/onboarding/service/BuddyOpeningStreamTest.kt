@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpe
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import io.mockk.every
@@ -38,9 +39,9 @@ class BuddyOpeningStreamTest {
     private fun done(greeting: String?, action: BuddyOpenActionDto? = null) =
         BuddyOpenStreamEvent(type = BuddyOpenStreamEvent.DONE, greeting = greeting, action = action)
 
-    private fun tokenEvent(text: String) = BuddyStreamEvent(type = BuddyStreamEvent.TOKEN, content = text)
+    private fun tokenEvent(text: String) = BuddyStreamEvent(type = BuddyStreamEventType.TOKEN, content = text)
 
-    private val doneEvent = BuddyStreamEvent(type = BuddyStreamEvent.DONE)
+    private val doneEvent = BuddyStreamEvent(type = BuddyStreamEventType.DONE)
 
     @Test
     fun `replays an existing greeting whole, then ends the stream`() = runTest {
@@ -66,7 +67,11 @@ class BuddyOpeningStreamTest {
 
         assertThat(events).containsExactly(
             tokenEvent("Hi"),
-            BuddyStreamEvent(type = BuddyStreamEvent.OPENING_ACTION, label = "Find a task", question = "What next?"),
+            BuddyStreamEvent(
+                type = BuddyStreamEventType.OPENING_ACTION,
+                label = "Find a task",
+                question = "What next?",
+            ),
             doneEvent,
         )
     }

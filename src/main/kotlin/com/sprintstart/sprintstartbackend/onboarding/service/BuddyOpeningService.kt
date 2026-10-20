@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
@@ -52,7 +53,7 @@ class BuddyOpeningService(
 
         return when {
             !longAbsence && latestOpening != null -> openingStream.replay(latestOpening.content)
-            !longAbsence && !firstConversation -> flowOf(BuddyStreamEvent(type = BuddyStreamEvent.DONE))
+            !longAbsence && !firstConversation -> flowOf(BuddyStreamEvent(type = BuddyStreamEventType.DONE))
             else -> openingStream.open(openRequest(session, messages, user), conversationOf(session, user))
         }
     }

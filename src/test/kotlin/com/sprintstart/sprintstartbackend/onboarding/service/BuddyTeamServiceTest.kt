@@ -10,6 +10,7 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpe
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
@@ -627,7 +628,7 @@ class BuddyTeamServiceTest {
         val events = service.sendMessageForMe(authId, projectId, "how is Ada?").toList()
 
         assertThat(shownAfterLastReset(events)).isEqualTo(FALLBACK_REPLY)
-        assertThat(events.count { it.type == BuddyStreamEvent.RESET }).isEqualTo(BuddyService.MAX_AGENT_STEPS)
+        assertThat(events.count { it.type == BuddyStreamEventType.RESET }).isEqualTo(BuddyService.MAX_AGENT_STEPS)
         assertThat(saved.single { it.role == BuddyMessageRole.ASSISTANT }.content)
             .isEqualTo(FALLBACK_REPLY)
         coVerify(exactly = BuddyService.MAX_AGENT_STEPS) { agentAiClient.buddyAgentTurnStream(any()) }
@@ -690,7 +691,7 @@ class BuddyTeamServiceTest {
 
         val events = service.sendMessageForMe(authId, projectId, "who is stuck?").toList()
 
-        assertThat(events.map { it.type }).containsExactly(BuddyStreamEvent.TOKEN, BuddyStreamEvent.ERROR)
+        assertThat(events.map { it.type }).containsExactly(BuddyStreamEventType.TOKEN, BuddyStreamEventType.ERROR)
         // The provider's text stays in the log; the client gets a fixed sentence.
         assertThat(events.last().message).isNotBlank().doesNotContain("model unavailable")
 
@@ -736,8 +737,8 @@ class BuddyTeamServiceTest {
 
     private fun shownAfterLastReset(events: List<BuddyStreamEvent>): String =
         events
-            .takeLastWhile { it.type != BuddyStreamEvent.RESET }
-            .filter { it.type == BuddyStreamEvent.TOKEN }
+            .takeLastWhile { it.type != BuddyStreamEventType.RESET }
+            .filter { it.type == BuddyStreamEventType.TOKEN }
             .joinToString("") { it.content.orEmpty() }
 
     @Test

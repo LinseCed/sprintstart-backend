@@ -146,6 +146,8 @@ class TeamProposalServiceTest {
             assertThat(status).isEqualTo(BuddyProposalStatus.PROPOSED)
             assertThat(expiresAt).isEqualTo(now.plus(ActionProposalStore.TIME_TO_LIVE))
             assertThat(params).contains("r-1")
+            assertThat(label).isEqualTo("Dismiss: how do we deploy?")
+            assertThat(preview).isEqualTo("The question disappears from the inbox.")
         }
         assertThat(outcome.toolResult).contains("never say it is done")
         assertThat(action.performed).isEmpty()
@@ -239,6 +241,21 @@ class TeamProposalServiceTest {
 
         assertThat(response.ok).isFalse()
         assertThat(response.message).contains("no longer manage")
+        assertThat(action.performed).isEmpty()
+        assertThat(recorded.single().first).isEqualTo(BuddyProposalStatus.FAILED)
+    }
+
+    /** A deploy between proposing and confirming may have removed the action the proposal names. */
+    @Test
+    fun `a proposal whose action no longer exists is recorded as failed and runs nothing`() = runTest {
+        val proposal = stored()
+        claimSucceeds(proposal)
+        every { handlersProvider.orderedStream() } answers { emptyList<TeamActionHandler>().stream() }
+
+        val response = service().confirm(authId, proposal.id)
+
+        assertThat(response.ok).isFalse()
+        assertThat(response.message).contains("no longer available")
         assertThat(action.performed).isEmpty()
         assertThat(recorded.single().first).isEqualTo(BuddyProposalStatus.FAILED)
     }

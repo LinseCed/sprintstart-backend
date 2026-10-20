@@ -6,6 +6,7 @@ import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.onboarding.assistant.service.ResolvedBuddyCitation
 import com.sprintstart.sprintstartbackend.onboarding.assistant.service.emitCitationsAndDone
 import com.sprintstart.sprintstartbackend.onboarding.assistant.service.endFailureWithErrorEvent
@@ -91,10 +92,10 @@ class StreamContractTest {
 
     /** Built inside private service methods today, so constructed here the way those methods do. */
     private fun representativeServiceEvents(): List<BuddyStreamEvent> = listOf(
-        BuddyStreamEvent(type = BuddyStreamEvent.OPENING_ACTION, label = "Find me a task", question = "What next?"),
-        BuddyStreamEvent(type = BuddyStreamEvent.RESET),
+        BuddyStreamEvent(type = BuddyStreamEventType.OPENING_ACTION, label = "Find me a task", question = "What next?"),
+        BuddyStreamEvent(type = BuddyStreamEventType.RESET),
         BuddyStreamEvent(
-            type = BuddyStreamEvent.ACTION_PROPOSAL,
+            type = BuddyStreamEventType.ACTION_PROPOSAL,
             action = "dismiss_cards",
             label = "Dismiss 2 cards",
             cardIds = listOf(UUID.randomUUID().toString()),

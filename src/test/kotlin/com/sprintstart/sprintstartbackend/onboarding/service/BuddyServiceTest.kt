@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAge
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCitationDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.service.FALLBACK_REPLY
@@ -784,7 +785,7 @@ class BuddyServiceTest {
 
             val events = service.sendMessageForMe(authId, session.id, "hi", true, null).toList()
 
-            assertThat(events.map { it.type }).containsExactly(BuddyStreamEvent.TOKEN, BuddyStreamEvent.ERROR)
+            assertThat(events.map { it.type }).containsExactly(BuddyStreamEventType.TOKEN, BuddyStreamEventType.ERROR)
             // The provider's text stays in the log; the client gets a fixed sentence.
             assertThat(events.last().message).isNotBlank().doesNotContain("model unavailable")
             verify {
@@ -804,8 +805,8 @@ class BuddyServiceTest {
 
             val events = service.sendMessageForMe(authId, session.id, "hi", true, null).toList()
 
-            assertThat(events.last().type).isEqualTo(BuddyStreamEvent.ERROR)
-            assertThat(events.map { it.type }).doesNotContain(BuddyStreamEvent.DONE)
+            assertThat(events.last().type).isEqualTo(BuddyStreamEventType.ERROR)
+            assertThat(events.map { it.type }).doesNotContain(BuddyStreamEventType.DONE)
             verify {
                 buddyMessageRepository.save(
                     match<BuddyMessage> { it.isIncomplete && it.content == "Part of " },
@@ -1425,7 +1426,7 @@ class BuddyServiceTest {
                     null,
                 ).toList()
 
-            assertThat(events.single().type).isEqualTo(BuddyStreamEvent.ERROR)
+            assertThat(events.single().type).isEqualTo(BuddyStreamEventType.ERROR)
             assertThat(saved.map { it.role }).containsExactly(BuddyMessageRole.USER)
         }
 
@@ -1824,7 +1825,7 @@ class BuddyServiceTest {
                         content = "Where is the architecture documented?",
                         filters = null,
                     ).collect { event ->
-                        if (event.type == BuddyStreamEvent.TOKEN) {
+                        if (event.type == BuddyStreamEventType.TOKEN) {
                             cancel()
                         }
                     }

@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAge
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCitationDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyVocabularyDto
@@ -468,7 +469,7 @@ class BuddyService(
             outcome.proposal?.let { proposal ->
                 emit(
                     BuddyStreamEvent(
-                        type = BuddyStreamEvent.ACTION_PROPOSAL,
+                        type = BuddyStreamEventType.ACTION_PROPOSAL,
                         action = proposal.action,
                         label = proposal.label,
                         question = proposal.question,

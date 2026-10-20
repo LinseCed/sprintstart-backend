@@ -112,4 +112,20 @@ class TypedTeamActionTest {
 
         assertThat(action.recheck(extra, context)).isNull()
     }
+
+    @Test
+    fun `a label that fits a confirm button is kept as it is`() {
+        val sixty = "x".repeat(60)
+
+        assertThat(sixty.forLabel()).isEqualTo(sixty)
+    }
+
+    @Test
+    fun `a longer label is cut to sixty characters, ellipsis included`() {
+        val label = ("word ".repeat(14) + "end").forLabel()
+
+        assertThat(label).hasSize(60).endsWith("…")
+        assertThat(label).startsWith("word word")
+        assertThat(label.dropLast(1)).doesNotEndWith(" ")
+    }
 }
