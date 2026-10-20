@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardActor
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.GoalClaimant
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.external.event.GoalClaimedEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGoal
 import com.sprintstart.sprintstartbackend.onboarding.model.response.goal.GoalView
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
@@ -10,6 +10,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalReposito
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -34,14 +35,15 @@ class UserGoalService(
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val starterWorkPoolReconciler: StarterWorkPoolReconciler,
     private val userApi: UserApi,
-    private val boardService: BoardService,
+    private val eventPublisher: ApplicationEventPublisher,
 ) {
     /**
      * Claims a live starter-work task as this hire's goal for [projectId], replacing any goal they
      * had claimed there before.
      *
-     * @param by Who is claiming: the hire by hand, or the buddy behind a confirm the hire pressed. It
-     *   is what the current-task card records as its latest change.
+     * Publishes [GoalClaimedEvent] inside the claim's transaction.
+     *
+     * @param by Who is claiming: the hire by hand, or the buddy behind a confirm the hire pressed.
      * @throws ResponseStatusException 404 if the proposal doesn't exist; 409 if it is not `LIVE`
      * (a rejected task is not something a hire may commit to).
      */
@@ -50,7 +52,7 @@ class UserGoalService(
         authId: String,
         projectId: UUID,
         proposalId: UUID,
-        by: BoardActor = BoardActor.HIRE,
+        by: GoalClaimant = GoalClaimant.HIRE,
     ): GoalView {
         val userId = resolveUserId(authId)
         val proposal = starterWorkTaskProposalRepository.findById(proposalId).orElseThrow {
@@ -76,9 +78,7 @@ class UserGoalService(
             sourceProposalId = proposal.id,
         )
         userGoalRepository.save(goal)
-        // Pinned however the task was claimed, and revived if dismissed: claiming a task says this is what
-        // they are working on.
-        boardService.placeOrRevive(UserId(userId), ProjectId(projectId), BoardCardKind.CURRENT_TASK, by)
+        eventPublisher.publishEvent(GoalClaimedEvent(UserId(userId), ProjectId(projectId), by))
 
         return GoalView(
             proposalId = proposal.id,
