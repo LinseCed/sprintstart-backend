@@ -11,6 +11,8 @@ import com.sprintstart.sprintstartbackend.path.model.response.step.GetOnboarding
 import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTasksResponse
 import com.sprintstart.sprintstartbackend.path.service.OnboardingPathService
 import com.sprintstart.sprintstartbackend.path.service.OnboardingStepService
+import com.sprintstart.sprintstartbackend.path.service.PhaseAuthoringService
+import com.sprintstart.sprintstartbackend.path.service.StepAuthoringService
 import io.mockk.every
 import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
@@ -26,12 +28,9 @@ class ContentTeamToolsTest {
     private val stepService: OnboardingStepService = mockk(relaxed = true)
     private val tools = ContentTeamTools(
         f.scope,
-        f.pathElements,
-        pathService,
-        stepService,
-        mockk(relaxed = true),
-        mockk(relaxed = true),
-        mockk(relaxed = true),
+        f.review(path = pathService),
+        StepAuthoringService(stepService, mockk(relaxed = true)),
+        PhaseAuthoringService(mockk(relaxed = true), mockk(relaxed = true)),
         mockk(relaxed = true),
     )
 

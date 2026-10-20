@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.path.external.model.PathSummary
 import com.sprintstart.sprintstartbackend.path.service.OnboardingPathService
-import com.sprintstart.sprintstartbackend.path.service.PathSummary
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test
 class ResetMemberPathActionTest {
     private val f = ContentFixture()
     private val pathService: OnboardingPathService = mockk(relaxed = true)
-    private val action = ResetMemberPathAction(f.scope, f.pathElements, pathService)
+    private val action = ResetMemberPathAction(f.scope, f.review(path = pathService))
 
     private fun call(id: Any) = f.call("reset_member_path", "member_id" to id)
 

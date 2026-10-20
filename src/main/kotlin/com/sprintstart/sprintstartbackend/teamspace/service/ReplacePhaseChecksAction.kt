@@ -7,12 +7,13 @@ import com.sprintstart.sprintstartbackend.assistant.external.boolean
 import com.sprintstart.sprintstartbackend.assistant.external.text
 import com.sprintstart.sprintstartbackend.assistant.external.uuid
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.path.external.PhaseAuthoringApi
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.request.question.UpdateOptionRequest
 import com.sprintstart.sprintstartbackend.path.model.request.question.UpdatePhaseQuestionsRequest
 import com.sprintstart.sprintstartbackend.path.model.request.question.UpdateQuestionRequest
 import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionForAdminResponse
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
-import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptService
+import com.sprintstart.sprintstartbackend.shared.ids.PhaseId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
@@ -198,7 +199,7 @@ data class ReplacePhaseChecksParams(
 @Component
 class ReplacePhaseChecksAction(
     private val scope: ContentScope,
-    private val questionAttemptService: QuestionAttemptService,
+    private val phaseAuthoringApi: PhaseAuthoringApi,
 ) : TypedTeamAction<ReplacePhaseChecksParams>(ReplacePhaseChecksParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -272,7 +273,7 @@ class ReplacePhaseChecksAction(
                     "current ones.",
             )
         }
-        val current = questionAttemptService.getPhaseQuestions(target.element.id).questions
+        val current = phaseAuthoringApi.checksOf(PhaseId(target.element.id)).questions
         val questions = when (val read = readChecks(list, current)) {
             is Checks.Invalid -> return TeamActionDraft.Refused(read.reason)
             is Checks.Valid -> read.questions
@@ -316,18 +317,18 @@ class ReplacePhaseChecksAction(
 
     override fun recheckParams(params: ReplacePhaseChecksParams, context: TeamToolContext): String? {
         scope.missing(PathElementKind.PHASE, params.phaseId, context.projectId)?.let { return it }
-        val now = questionAttemptService.getPhaseQuestions(params.phaseId).questions.map { it.id }
+        val now = phaseAuthoringApi.checksOf(PhaseId(params.phaseId)).questions.map { it.id }
         return CHECKS_CHANGED.takeIf { now.toSet() != params.baseIds.toSet() }
     }
 
     override suspend fun performParams(params: ReplacePhaseChecksParams, context: TeamToolContext): String {
         val phaseId = params.phaseId
-        val current = questionAttemptService.getPhaseQuestions(phaseId).questions
+        val current = phaseAuthoringApi.checksOf(PhaseId(phaseId)).questions
         val questions = when (val read = readChecks(params.questions, current)) {
             is Checks.Invalid -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, read.reason)
             is Checks.Valid -> read.questions
         }
-        questionAttemptService.replacePhaseQuestions(phaseId, UpdatePhaseQuestionsRequest(questions))
+        phaseAuthoringApi.replaceChecks(PhaseId(phaseId), UpdatePhaseQuestionsRequest(questions))
         return "Done. The phase now has ${questions.size} question${if (questions.size == 1) "" else "s"}."
     }
 }

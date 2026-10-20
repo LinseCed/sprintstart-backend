@@ -3,10 +3,12 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.path.external.StepAuthoringApi
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.request.resource.CreateOnboardingResourceRequest
 import com.sprintstart.sprintstartbackend.path.model.request.resource.UpdateOnboardingResourceRequest
-import com.sprintstart.sprintstartbackend.path.service.OnboardingResourceService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.shared.ids.ResourceId
+import com.sprintstart.sprintstartbackend.shared.ids.StepId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
@@ -57,7 +59,7 @@ data class DeleteResourceParams(
 @Component
 class AddResourceAction(
     private val scope: ContentScope,
-    private val onboardingResourceService: OnboardingResourceService,
+    private val stepAuthoringApi: StepAuthoringApi,
 ) : TypedTeamAction<AddResourceParams>(AddResourceParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -99,8 +101,8 @@ class AddResourceAction(
         scope.missing(PathElementKind.STEP, params.stepId, context.projectId)
 
     override suspend fun performParams(params: AddResourceParams, context: TeamToolContext): String {
-        onboardingResourceService.createOnboardingResourceForStepId(
-            params.stepId,
+        stepAuthoringApi.createResource(
+            StepId(params.stepId),
             CreateOnboardingResourceRequest(
                 title = params.title,
                 description = params.description,
@@ -115,7 +117,7 @@ class AddResourceAction(
 @Component
 class UpdateResourceAction(
     private val scope: ContentScope,
-    private val onboardingResourceService: OnboardingResourceService,
+    private val stepAuthoringApi: StepAuthoringApi,
 ) : TypedTeamAction<UpdateResourceParams>(UpdateResourceParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -136,7 +138,7 @@ class UpdateResourceAction(
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
         val target = scope.element(PathElementKind.RESOURCE, call.uuidArgument("resource_id"), context.projectId)
             ?: return TeamActionDraft.Refused(notInScope(PathElementKind.RESOURCE))
-        val current = onboardingResourceService.getOnboardingResourceById(target.element.id)
+        val current = stepAuthoringApi.resource(ResourceId(target.element.id))
 
         val url = call.changedText("url", current.url, allowBlank = false)
         if (url != null && !isWebLink(url)) return TeamActionDraft.Refused(NOT_A_WEB_LINK)
@@ -164,9 +166,9 @@ class UpdateResourceAction(
 
     override suspend fun performParams(params: UpdateResourceParams, context: TeamToolContext): String {
         val id = params.resourceId
-        val current = onboardingResourceService.getOnboardingResourceById(id)
-        onboardingResourceService.updateOnboardingResourceById(
-            id,
+        val current = stepAuthoringApi.resource(ResourceId(id))
+        stepAuthoringApi.updateResource(
+            ResourceId(id),
             UpdateOnboardingResourceRequest(
                 title = params.title ?: current.title,
                 description = params.description ?: current.description,
@@ -181,7 +183,7 @@ class UpdateResourceAction(
 @Component
 class DeleteResourceAction(
     private val scope: ContentScope,
-    private val onboardingResourceService: OnboardingResourceService,
+    private val stepAuthoringApi: StepAuthoringApi,
 ) : TypedTeamAction<DeleteResourceParams>(DeleteResourceParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
@@ -215,7 +217,7 @@ class DeleteResourceAction(
         scope.missing(PathElementKind.RESOURCE, params.resourceId, context.projectId)
 
     override suspend fun performParams(params: DeleteResourceParams, context: TeamToolContext): String {
-        onboardingResourceService.deleteOnboardingResourceById(params.resourceId)
+        stepAuthoringApi.deleteResource(ResourceId(params.resourceId))
         return "Removed. The link is gone."
     }
 }
