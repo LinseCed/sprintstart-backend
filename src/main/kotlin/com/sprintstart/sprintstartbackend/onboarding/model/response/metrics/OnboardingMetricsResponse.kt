@@ -11,7 +11,7 @@ import java.util.UUID
  * renders an unreached milestone as `0 days` reports success where there is none.
  *
  * The fields say "contribution", never "pull request". They are composed from
- * [com.sprintstart.sprintstartbackend.onboarding.service.Contribution] — a merged pull request, a
+ * [com.sprintstart.sprintstartbackend.arrival.service.Contribution] — a merged pull request, a
  * colleague's attestation and a tracked issue somebody else accepted all land here — so naming
  * them after one source would quietly tell a PM their Scrum Master had opened nothing. The
  * vocabulary is `Contribution`'s: opened, first answered, accepted, returned.

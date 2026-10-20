@@ -1,10 +1,13 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStep
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepService
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
+import com.sprintstart.sprintstartbackend.arrival.service.ResolvedArrivalStep
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionItemResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionSeverity
@@ -55,7 +58,7 @@ class BuddyTeamToolsTest {
                 projectAttentionService,
                 onboardingMetricsService,
                 myCompetencyService,
-                arrivalStepService,
+                ArrivalSteps(arrivalStepService),
                 projectMembershipApi,
             ),
             areaToolsProvider,
@@ -315,20 +318,12 @@ class BuddyTeamToolsTest {
     }
 
     private fun outstandingStep(title: String, stepProjectId: UUID?): ResolvedArrivalStep {
-        val step = mockk<ArrivalStep> {
-            every { this@mockk.title } returns title
-            every { projectId } returns stepProjectId
-            every { selfConfirmable } returns true
-        }
+        val step = ArrivalStep(key = title.lowercase().replace(' ', '-'), projectId = stepProjectId, title = title)
         return ResolvedArrivalStep(step = step, settledAt = null, rigor = null)
     }
 
     private fun settledStep(title: String, stepProjectId: UUID?, rigor: Rigor): ResolvedArrivalStep {
-        val step = mockk<ArrivalStep> {
-            every { this@mockk.title } returns title
-            every { projectId } returns stepProjectId
-            every { selfConfirmable } returns true
-        }
+        val step = ArrivalStep(key = title.lowercase().replace(' ', '-'), projectId = stepProjectId, title = title)
         return ResolvedArrivalStep(step = step, settledAt = Instant.now(), rigor = rigor)
     }
 

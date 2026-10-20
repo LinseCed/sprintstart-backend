@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.service.AttestationService
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
@@ -9,6 +10,8 @@ import com.sprintstart.sprintstartbackend.onboarding.external.enums.GoalClaimant
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProficiencyLevel
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.MyOrientationResponse
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -499,16 +502,15 @@ class BuddyActionService(
             return BuddyActionResponse(ok = false, message = "I need to know what work to confirm and who to ask.")
         }
         return try {
-            val attestation = attestationService.request(
-                hireId = resolved.userId,
-                projectId = resolved.projectId,
+            val stored = attestationService.requestForHire(
+                hireId = UserId(resolved.userId),
+                projectId = ProjectId(resolved.projectId),
                 title = title,
-                evidenceUrl = null,
-                attesterId = attesterId,
+                attesterId = UserId(attesterId),
             )
             BuddyActionResponse(
                 ok = true,
-                message = "Asked them to confirm “${attestation.title}”. " +
+                message = "Asked them to confirm “$stored”. " +
                     "It counts once they do — you will see it in what you have shown.",
             )
         } catch (e: ResponseStatusException) {

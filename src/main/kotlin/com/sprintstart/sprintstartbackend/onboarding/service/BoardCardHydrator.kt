@@ -1,13 +1,13 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardDiagram
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toLastChangeResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.arrival.ArrivalStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.ArrivalStepsContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCardContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCardResponse
@@ -39,7 +39,7 @@ class BoardCardHydrator(
     private val myCompetencyService: MyCompetencyService,
     private val memoryRecapSource: MemoryRecapSource,
     private val boardDiagramService: BoardDiagramService,
-    private val arrivalStepService: ArrivalStepService,
+    private val arrivalSteps: ArrivalSteps,
 ) {
     /**
      * One card as the board shows it, its content read live.
@@ -54,7 +54,7 @@ class BoardCardHydrator(
         projectId: ProjectId,
         diagram: BoardDiagram? = null,
         // A single card rendered on its own reads for itself; a whole board shares one read of each.
-        arrivalSteps: List<ResolvedArrivalStep> = arrivalStepService.forHire(member.userId),
+        arrivalSteps: List<ArrivalStepResponse> = this.arrivalSteps.forHire(UserId(member.userId)),
         pathSteps: Map<UUID, ResolvedPathStep> = emptyMap(),
         matches: () -> List<RankedStarterWorkTaskResponse> = {
             starterWorkTaskProposalService.matchForUserId(member.userId, projectId.value)
@@ -74,7 +74,7 @@ class BoardCardHydrator(
         member: ProjectMember,
         projectId: ProjectId,
         diagram: BoardDiagram?,
-        arrivalSteps: List<ResolvedArrivalStep>,
+        arrivalSteps: List<ArrivalStepResponse>,
         pathSteps: Map<UUID, ResolvedPathStep>,
         matches: () -> List<RankedStarterWorkTaskResponse>,
     ): BoardCardContent = when (card.kind) {
@@ -104,14 +104,12 @@ class BoardCardHydrator(
      * Counted per rigor and never totalled. A step the system observed and a step somebody
      * ticked are different facts, and a single blended figure here would be meaningless.
      */
-    private fun arrivalStepsContent(steps: List<ResolvedArrivalStep>): ArrivalStepsContent {
-        val responses: List<ArrivalStepResponse> = steps.map { it.toResponse() }
-
+    private fun arrivalStepsContent(steps: List<ArrivalStepResponse>): ArrivalStepsContent {
         return ArrivalStepsContent(
-            steps = responses,
-            observedCount = responses.count { it.rigor == Rigor.OBSERVED },
-            declaredCount = responses.count { it.rigor == Rigor.DECLARED },
-            outstandingCount = responses.count { !it.settled },
+            steps = steps,
+            observedCount = steps.count { it.rigor == Rigor.OBSERVED },
+            declaredCount = steps.count { it.rigor == Rigor.DECLARED },
+            outstandingCount = steps.count { !it.settled },
         )
     }
 

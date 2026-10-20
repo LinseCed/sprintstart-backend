@@ -1,11 +1,14 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.enums.ArrivalDerivation
+import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepChange
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.ArrivalDerivation
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.add
@@ -34,7 +37,7 @@ data class UpdateArrivalStepParams(
 /** Offers to change a step's wording, link, place or how it gets settled — never its key. */
 @Component
 class UpdateArrivalStepAction(
-    private val arrivalStepService: ArrivalStepService,
+    private val arrivalSteps: ArrivalSteps,
 ) : TypedTeamAction<UpdateArrivalStepParams>(UpdateArrivalStepParams.serializer()) {
     override val area = TeamArea.ARRIVAL
     override val risk = BuddyProposalRisk.STANDARD
@@ -91,7 +94,7 @@ class UpdateArrivalStepAction(
 
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
         val key = normalizeKey(call.textArgument("key"))
-        val step = arrivalStepService.stepOn(key, context.projectId)
+        val step = arrivalSteps.stepOn(key, ProjectId(context.projectId))
             ?: return TeamActionDraft.Refused(NO_SUCH_STEP)
 
         return when (val read = read(call, step, context)) {
@@ -100,7 +103,7 @@ class UpdateArrivalStepAction(
         }
     }
 
-    private fun read(call: BuddyToolCallDto, step: ArrivalStep, context: TeamToolContext): Read {
+    private fun read(call: BuddyToolCallDto, step: ArrivalStepResponse, context: TeamToolContext): Read {
         val position = when (val parsed = readPosition(call, step, context)) {
             is Parsed.Bad -> return Read.Refused(parsed.reason)
             is Parsed.Value -> parsed.value
@@ -135,13 +138,17 @@ class UpdateArrivalStepAction(
      * A place in the list, refused when another step holds it or it lies past the end. Both leave an
      * ambiguous or gapped order, so they point to reorder_arrival_steps instead.
      */
-    private fun readPosition(call: BuddyToolCallDto, step: ArrivalStep, context: TeamToolContext): Parsed<Int?> {
+    private fun readPosition(
+        call: BuddyToolCallDto,
+        step: ArrivalStepResponse,
+        context: TeamToolContext,
+    ): Parsed<Int?> {
         val text = call.textArgument("position")
         if (text.isBlank()) return Parsed.Value(null)
 
         val position = text.toIntOrNull()?.takeIf { it >= 0 }
             ?: return Parsed.Bad("That is not a place in the list. Give a whole number from 0.")
-        val steps = arrivalStepService.listForAuthoring(context.projectId)
+        val steps = arrivalSteps.authoredOn(ProjectId(context.projectId))
         val occupant = occupantOf(position, step.key, steps)
         if (occupant != null) {
             return Parsed.Bad(
@@ -196,7 +203,7 @@ class UpdateArrivalStepAction(
         return Parsed.Value(rigor)
     }
 
-    private fun lines(step: ArrivalStep, changes: Read.Changes): List<String> = buildList {
+    private fun lines(step: ArrivalStepResponse, changes: Read.Changes): List<String> = buildList {
         changes.title?.let { add("Title: “${step.title}” becomes “$it”") }
         changes.description?.let { add(fieldLine("Description", step.description, it) { text -> "“$text”" }) }
         changes.href?.let { add(fieldLine("Link", step.href, it) { text -> text }) }
@@ -204,7 +211,7 @@ class UpdateArrivalStepAction(
         changes.rigor?.let { add("Settled by ${settlementWords(step.settledBy)} becomes ${settlementWords(it)}") }
     }
 
-    private fun propose(step: ArrivalStep, key: String, changes: Read.Changes): TeamActionDraft {
+    private fun propose(step: ArrivalStepResponse, key: String, changes: Read.Changes): TeamActionDraft {
         val lines = lines(step, changes)
         return proposed(
             params = UpdateArrivalStepParams(
@@ -228,7 +235,7 @@ class UpdateArrivalStepAction(
 
     /** The step is still here and its place is still free: [perform] sets the position unconditionally. */
     override fun recheckParams(params: UpdateArrivalStepParams, context: TeamToolContext): String? {
-        val steps = arrivalStepService.listForAuthoring(context.projectId)
+        val steps = arrivalSteps.authoredOn(ProjectId(context.projectId))
         val step = steps.firstOrNull { it.key == params.key } ?: return STEP_GONE_SINCE
         val position = params.position ?: return null
 
@@ -246,14 +253,16 @@ class UpdateArrivalStepAction(
     }
 
     override suspend fun performParams(params: UpdateArrivalStepParams, context: TeamToolContext): String {
-        arrivalStepService.update(
+        arrivalSteps.update(
             key = params.key,
-            projectId = context.projectId,
-            title = params.title,
-            description = params.description,
-            href = params.href,
-            position = params.position,
-            settledBy = params.settledBy,
+            projectId = ProjectId(context.projectId),
+            change = ArrivalStepChange(
+                title = params.title,
+                description = params.description,
+                href = params.href,
+                position = params.position,
+                settledBy = params.settledBy,
+            ),
         )
         return "Updated. That step now reads as proposed on this project's arrival list."
     }

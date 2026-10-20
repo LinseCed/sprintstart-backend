@@ -1,10 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.service.ContributionService
+import com.sprintstart.sprintstartbackend.arrival.service.evidence.PullRequestEvidenceProvider
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.UserGoal
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserGoalRepository
-import com.sprintstart.sprintstartbackend.onboarding.service.evidence.PullRequestEvidenceProvider
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every

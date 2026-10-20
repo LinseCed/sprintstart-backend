@@ -1,9 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.springframework.stereotype.Component
@@ -19,7 +21,7 @@ import java.util.UUID
  */
 @Component
 class ArrivalTeamTools(
-    private val arrivalStepService: ArrivalStepService,
+    private val arrivalSteps: ArrivalSteps,
 ) : TeamAreaTools {
     override val area = TeamArea.ARRIVAL
 
@@ -36,7 +38,7 @@ class ArrivalTeamTools(
 
     /** In list order, because that order is the thing a manager reorders and has to be able to see. */
     private fun arrivalSteps(projectId: UUID): String {
-        val steps = arrivalStepService.listForAuthoring(projectId)
+        val steps = arrivalSteps.authoredOn(ProjectId(projectId))
         if (steps.isEmpty()) {
             return "This project has no arrival steps yet. Nothing is blocked by that — an empty list simply " +
                 "means nobody has written down what a new hire needs in place."
@@ -47,7 +49,7 @@ class ArrivalTeamTools(
         }.trim()
     }
 
-    private fun render(step: ArrivalStep): String = buildString {
+    private fun render(step: ArrivalStepResponse): String = buildString {
         append("${step.title} [key: ${step.key}]")
         append(" — settled by ${settlement(step)}")
         step.description?.let { append("\n  $it") }
@@ -58,7 +60,7 @@ class ArrivalTeamTools(
      * How a step gets settled, in words rather than the enum name: the manager is deciding whether
      * this is something the system proves, somebody else signs off, or the hire says themselves.
      */
-    private fun settlement(step: ArrivalStep): String {
+    private fun settlement(step: ArrivalStepResponse): String {
         val how = when (step.settledBy) {
             Rigor.OBSERVED -> "the system observing it"
             Rigor.ATTESTED -> "somebody else attesting it"
@@ -68,7 +70,7 @@ class ArrivalTeamTools(
     }
 
     private fun derivableSteps(projectId: UUID): String {
-        val derivable = arrivalStepService.derivable(projectId)
+        val derivable = arrivalSteps.derivable(ProjectId(projectId))
         return buildString {
             appendLine(
                 "Steps the system knows how to check by itself. Adding one of these keys makes the step " +

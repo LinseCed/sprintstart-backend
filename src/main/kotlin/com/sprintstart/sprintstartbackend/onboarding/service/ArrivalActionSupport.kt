@@ -1,9 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.ArrivalDerivation
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
-import java.util.UUID
+import com.sprintstart.sprintstartbackend.arrival.external.enums.ArrivalDerivation
+import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
 
 /*
  * The actions of team mode's arrival area.
@@ -16,10 +15,6 @@ import java.util.UUID
  * the key. Renaming is therefore delete plus create, and the tools say so.
  */
 
-/** The step [key] names on [projectId], or null. */
-internal fun ArrivalStepService.stepOn(key: String, projectId: UUID): ArrivalStep? =
-    listForAuthoring(projectId).firstOrNull { it.key == key }
-
 /** A preview line for a field that can be replaced or, as an empty [to], taken off. */
 internal fun fieldLine(label: String, from: String?, to: String, show: (String) -> String): String =
     if (to.isEmpty()) {
@@ -29,7 +24,7 @@ internal fun fieldLine(label: String, from: String?, to: String, show: (String) 
     }
 
 /** The step other than [key] already sitting on [position], or null when nobody is. */
-internal fun occupantOf(position: Int, key: String, steps: List<ArrivalStep>): ArrivalStep? =
+internal fun occupantOf(position: Int, key: String, steps: List<ArrivalStepResponse>): ArrivalStepResponse? =
     steps.firstOrNull { it.position == position && it.key != key }
 
 /** A model-supplied key, lower-cased and trimmed the way the service will store it. */

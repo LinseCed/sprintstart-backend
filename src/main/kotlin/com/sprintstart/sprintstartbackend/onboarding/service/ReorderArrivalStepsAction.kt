@@ -1,9 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.assistant.external.textArray
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.add
@@ -26,7 +28,7 @@ data class ReorderArrivalStepsParams(
  */
 @Component
 class ReorderArrivalStepsAction(
-    private val arrivalStepService: ArrivalStepService,
+    private val arrivalSteps: ArrivalSteps,
 ) : TypedTeamAction<ReorderArrivalStepsParams>(ReorderArrivalStepsParams.serializer()) {
     override val area = TeamArea.ARRIVAL
     override val risk = BuddyProposalRisk.STANDARD
@@ -49,7 +51,7 @@ class ReorderArrivalStepsAction(
     )
 
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
-        val steps = arrivalStepService.listForAuthoring(context.projectId)
+        val steps = arrivalSteps.authoredOn(ProjectId(context.projectId))
         if (steps.isEmpty()) {
             return TeamActionDraft.Refused("This project has no arrival steps to reorder.")
         }
@@ -99,13 +101,13 @@ class ReorderArrivalStepsAction(
     }
 
     override fun recheckParams(params: ReorderArrivalStepsParams, context: TeamToolContext): String? {
-        val present = arrivalStepService.listForAuthoring(context.projectId).map { it.key }
+        val present = arrivalSteps.authoredOn(ProjectId(context.projectId)).map { it.key }
         return "The arrival list changed since, so the order was not applied."
             .takeIf { disagreement(params.orderedKeys, present) != null }
     }
 
     override suspend fun performParams(params: ReorderArrivalStepsParams, context: TeamToolContext): String {
-        arrivalStepService.reorder(context.projectId, params.orderedKeys)
+        arrivalSteps.reorder(ProjectId(context.projectId), params.orderedKeys)
         return "Reordered. This project's arrival list now runs in the order you confirmed."
     }
 }

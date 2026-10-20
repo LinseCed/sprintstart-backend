@@ -2,12 +2,12 @@ package com.sprintstart.sprintstartbackend.onboarding.model.response.board
 
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
+import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardActor
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardChange
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.TaskType
-import com.sprintstart.sprintstartbackend.onboarding.model.response.arrival.ArrivalStepResponse
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.response.resource.GetOnboardingResourcesResponse
 import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTasksResponse

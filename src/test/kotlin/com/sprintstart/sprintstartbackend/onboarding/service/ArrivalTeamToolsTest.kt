@@ -1,9 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.enums.ArrivalDerivation
+import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStep
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepService
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.ArrivalDerivation
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -13,7 +15,7 @@ import java.util.UUID
 
 class ArrivalTeamToolsTest {
     private val arrivalStepService: ArrivalStepService = mockk()
-    private val tools = ArrivalTeamTools(arrivalStepService)
+    private val tools = ArrivalTeamTools(ArrivalSteps(arrivalStepService))
 
     private val projectId = UUID.randomUUID()
     private val context = TeamToolContext(userId = UUID.randomUUID(), authId = "auth|pm", projectId = projectId)

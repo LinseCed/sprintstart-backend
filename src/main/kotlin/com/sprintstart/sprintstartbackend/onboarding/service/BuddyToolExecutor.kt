@@ -1,11 +1,13 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.serialization.json.add
@@ -39,7 +41,7 @@ class BuddyToolExecutor(
     private val buddyBoardTools: BuddyBoardTools,
     private val openPullRequestReader: OpenPullRequestReader,
     private val projectMembershipApi: ProjectMembershipApi,
-    private val arrivalStepService: ArrivalStepService,
+    private val arrivalSteps: ArrivalSteps,
     private val competencyPlacementService: CompetencyPlacementService,
     private val buddyPathTools: BuddyPathTools,
     private val buddyAppGuideTools: BuddyAppGuideTools,
@@ -69,7 +71,7 @@ class BuddyToolExecutor(
         // Setup is not part of the onboarding -- an account or an access grant is something to
         // chase whatever phase somebody is in. Mounted only when a step applies -- "absent, never
         // empty", read from the same service the board card uses so the two cannot disagree.
-        if (arrivalStepService.forHire(userId).isNotEmpty()) {
+        if (arrivalSteps.forHire(UserId(userId)).isNotEmpty()) {
             add(GET_ARRIVAL_STEPS_SPEC)
         }
         add(GET_MY_METRICS_SPEC)
@@ -113,7 +115,7 @@ class BuddyToolExecutor(
             // one they have not got.
             buddyPathTools.snapshotFor(userId),
             ("Before they can work:\n" + getArrivalSteps(userId))
-                .takeIf { arrivalStepService.forHire(userId).isNotEmpty() },
+                .takeIf { arrivalSteps.forHire(UserId(userId)).isNotEmpty() },
             "Progress:\n" + getMyMetrics(userId),
             // Omitted for somebody whose work cannot be found at all, on the same rule as the
             // tool: a greeting handed "Open pull requests: you have not set a GitHub username"
@@ -211,7 +213,7 @@ class BuddyToolExecutor(
      * think to look for it — the model's own words.
      */
     private fun getArrivalSteps(userId: UUID): String {
-        val steps = arrivalStepService.forHire(userId)
+        val steps = arrivalSteps.forHire(UserId(userId))
         if (steps.isEmpty()) {
             return "Nobody has written an arrival list for this hire, so there is nothing outstanding."
         }
@@ -224,17 +226,17 @@ class BuddyToolExecutor(
             } else {
                 appendLine("Still outstanding (none of this stops them working):")
                 outstanding.forEach { resolved ->
-                    append("- ${resolved.step.title}")
+                    append("- ${resolved.title}")
                     // Which project's step this is, for the same reason the card needs a heading:
                     // a hire on two projects can be told "get staging access" twice, and a mentor
                     // that cannot say which one is asking them to guess.
                     resolved.projectName?.let { append(" (on $it)") }
-                    resolved.step.description?.let { append(" — $it") }
-                    resolved.step.href?.let { append(" ($it)") }
+                    resolved.description?.let { append(" — $it") }
+                    resolved.href?.let { append(" ($it)") }
                     // Whether the hire can settle it themselves decides what the buddy may offer.
                     // Offering to tick a step the backend refuses would end in an error the hire
                     // never caused.
-                    if (!resolved.step.selfConfirmable) {
+                    if (!resolved.selfConfirmable) {
                         append(" [we check this one ourselves; they cannot mark it done]")
                     }
                     appendLine()
@@ -250,7 +252,7 @@ class BuddyToolExecutor(
                     } else {
                         "they told us"
                     }
-                    appendLine("- ${resolved.step.title} ($how)")
+                    appendLine("- ${resolved.title} ($how)")
                 }
             }
         }.trim()
