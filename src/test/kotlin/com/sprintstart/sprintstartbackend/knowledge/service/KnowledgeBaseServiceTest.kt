@@ -1,11 +1,13 @@
-package com.sprintstart.sprintstartbackend.onboarding.service
+package com.sprintstart.sprintstartbackend.knowledge.service
 
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.KnowledgeRequestStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.KnowledgeRequest
-import com.sprintstart.sprintstartbackend.onboarding.repository.CanonicalAnswerRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.KnowledgeRequestRepository
+import com.sprintstart.sprintstartbackend.knowledge.external.enums.KnowledgeRequestStatus
+import com.sprintstart.sprintstartbackend.knowledge.model.entity.CanonicalAnswer
+import com.sprintstart.sprintstartbackend.knowledge.model.entity.KnowledgeRequest
+import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.toResponse
+import com.sprintstart.sprintstartbackend.knowledge.repository.CanonicalAnswerRepository
+import com.sprintstart.sprintstartbackend.knowledge.repository.KnowledgeRequestRepository
+import com.sprintstart.sprintstartbackend.onboarding.service.result
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPhase
@@ -143,7 +145,7 @@ class KnowledgeBaseServiceTest {
 
         val results = service.searchForUser(userId, "how do we deploy")
 
-        assertThat(results).containsExactly(deployAnswer)
+        assertThat(results).containsExactly(deployAnswer.toResponse())
     }
 
     @Test

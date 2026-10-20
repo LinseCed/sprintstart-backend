@@ -1,9 +1,9 @@
-package com.sprintstart.sprintstartbackend.onboarding.external.enums
+package com.sprintstart.sprintstartbackend.knowledge.external.enums
 
 /**
  * Where a hire's escalated question is in its life.
  *
- * `OPEN` is waiting on a PM; `ANSWERED` has a [com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer]
+ * `OPEN` is waiting on a PM; `ANSWERED` has a [com.sprintstart.sprintstartbackend.knowledge.model.entity.CanonicalAnswer]
  * behind it that the buddy can now serve; `DISMISSED` is a question a PM decided needs no durable
  * answer (a one-off, a duplicate) — closed without polluting the answer store.
  */

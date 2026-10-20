@@ -61,3 +61,15 @@ value class QuestionId(
 value class CheckQuestionId(
     val value: UUID,
 )
+
+/** A question a hire escalated to the project's PMs because the Buddy could not answer it. */
+@JvmInline
+value class KnowledgeRequestId(
+    val value: UUID,
+)
+
+/** An answer a PM gave and the project keeps, served to the next hire who asks something like it. */
+@JvmInline
+value class CanonicalAnswerId(
+    val value: UUID,
+)

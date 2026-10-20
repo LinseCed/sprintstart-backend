@@ -1,6 +1,6 @@
-package com.sprintstart.sprintstartbackend.onboarding.listener
+package com.sprintstart.sprintstartbackend.knowledge.listener
 
-import com.sprintstart.sprintstartbackend.onboarding.repository.KnowledgeRequestRepository
+import com.sprintstart.sprintstartbackend.knowledge.repository.KnowledgeRequestRepository
 import com.sprintstart.sprintstartbackend.user.external.events.OnUserDeleted
 import com.sprintstart.sprintstartbackend.user.external.events.UserDeletedEvent
 import org.springframework.stereotype.Component

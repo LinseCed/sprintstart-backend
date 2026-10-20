@@ -1,14 +1,14 @@
-package com.sprintstart.sprintstartbackend.onboarding.service
+package com.sprintstart.sprintstartbackend.knowledge.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.KnowledgeRequestStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.KnowledgeRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge.CanonicalAnswerResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge.EscalationHireResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge.KnowledgeRequestResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge.toResponse
-import com.sprintstart.sprintstartbackend.onboarding.repository.CanonicalAnswerRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.KnowledgeRequestRepository
+import com.sprintstart.sprintstartbackend.knowledge.external.enums.KnowledgeRequestStatus
+import com.sprintstart.sprintstartbackend.knowledge.model.entity.CanonicalAnswer
+import com.sprintstart.sprintstartbackend.knowledge.model.entity.KnowledgeRequest
+import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.CanonicalAnswerResponse
+import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.EscalationHireResponse
+import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.KnowledgeRequestResponse
+import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.toResponse
+import com.sprintstart.sprintstartbackend.knowledge.repository.CanonicalAnswerRepository
+import com.sprintstart.sprintstartbackend.knowledge.repository.KnowledgeRequestRepository
 import com.sprintstart.sprintstartbackend.path.service.OnboardingPositionReader
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
@@ -333,7 +333,7 @@ class KnowledgeBaseService(
      * what the human wrote, not a paraphrase.
      */
     @Transactional(readOnly = true)
-    fun searchForUser(userId: UUID, query: String): List<CanonicalAnswer> {
+    fun searchForUser(userId: UUID, query: String): List<CanonicalAnswerResponse> {
         val projectIds = userApi
             .getUsersByIds(listOf(userId))
             .firstOrNull()
@@ -351,7 +351,7 @@ class KnowledgeBaseService(
             .filter { it.second > 0 }
             .sortedByDescending { it.second }
             .take(MAX_SEARCH_RESULTS)
-            .map { it.first }
+            .map { it.first.toResponse() }
     }
 
     private fun resolveUserId(authId: String): UUID =

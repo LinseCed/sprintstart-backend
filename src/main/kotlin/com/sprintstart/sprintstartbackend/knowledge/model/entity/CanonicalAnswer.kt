@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.model.entity
+package com.sprintstart.sprintstartbackend.knowledge.model.entity
 
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
