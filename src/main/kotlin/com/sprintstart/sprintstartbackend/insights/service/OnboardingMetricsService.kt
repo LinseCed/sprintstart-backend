@@ -1,10 +1,10 @@
-package com.sprintstart.sprintstartbackend.onboarding.service
+package com.sprintstart.sprintstartbackend.insights.service
 
+import com.sprintstart.sprintstartbackend.arrival.external.ContributionWording
 import com.sprintstart.sprintstartbackend.arrival.service.Contribution
 import com.sprintstart.sprintstartbackend.arrival.service.ContributionService
-import com.sprintstart.sprintstartbackend.onboarding.model.ContributionWording
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectOnboardingMetricsResponse
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.ProjectOnboardingMetricsResponse
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.starterwork.service.UserGoalService

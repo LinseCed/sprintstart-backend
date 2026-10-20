@@ -1,9 +1,9 @@
-package com.sprintstart.sprintstartbackend.onboarding.service
+package com.sprintstart.sprintstartbackend.insights.service
 
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionItemResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionSeverity
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectAttentionResponse
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.AttentionItemResponse
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.AttentionSeverity
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.ProjectAttentionResponse
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional

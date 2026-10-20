@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.model
+package com.sprintstart.sprintstartbackend.arrival.external
 
 /**
  * What one unit of a hire's accepted work is called, and how their own act reads.

@@ -1,10 +1,10 @@
-package com.sprintstart.sprintstartbackend.onboarding.controller
+package com.sprintstart.sprintstartbackend.insights.controller
 
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
-import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingMetricsService
-import com.sprintstart.sprintstartbackend.onboarding.service.ProjectAttentionService
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsService
+import com.sprintstart.sprintstartbackend.insights.service.ProjectAttentionService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
 import io.mockk.verify

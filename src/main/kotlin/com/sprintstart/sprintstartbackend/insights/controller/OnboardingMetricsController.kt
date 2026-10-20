@@ -1,10 +1,10 @@
-package com.sprintstart.sprintstartbackend.onboarding.controller
+package com.sprintstart.sprintstartbackend.insights.controller
 
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.HireTimelineResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectAttentionResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.ProjectOnboardingMetricsResponse
-import com.sprintstart.sprintstartbackend.onboarding.service.OnboardingMetricsService
-import com.sprintstart.sprintstartbackend.onboarding.service.ProjectAttentionService
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.ProjectAttentionResponse
+import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.ProjectOnboardingMetricsResponse
+import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsService
+import com.sprintstart.sprintstartbackend.insights.service.ProjectAttentionService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter

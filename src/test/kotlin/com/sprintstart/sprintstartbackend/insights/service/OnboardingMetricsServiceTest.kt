@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.service
+package com.sprintstart.sprintstartbackend.insights.service
 
 import com.sprintstart.sprintstartbackend.arrival.service.ContributionService
 import com.sprintstart.sprintstartbackend.arrival.service.evidence.PullRequestEvidenceProvider
