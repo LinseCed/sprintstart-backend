@@ -17,6 +17,8 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -50,9 +52,10 @@ class BuddyTeamCompactionTest {
         transactionManager,
     )
 
+    // Unconfined runs the background fold inline, so a test sees its outcome as soon as it is scheduled.
     private val teamCompaction = BuddyTeamCompaction(
         service,
-        mockk(),
+        BuddyCompactionScheduler(service, CoroutineScope(Dispatchers.Unconfined)),
         buddyTeamSessionRepository,
         buddyTeamMessageRepository,
     )
@@ -87,6 +90,18 @@ class BuddyTeamCompactionTest {
 
         assertThat(requests.single().folded.map { it.content }).containsExactly("t1", "t2", "t3", "t4")
         assertThat(session.summary).isEqualTo("Asked about Sam twice.")
+        assertThat(session.summarizedCount).isEqualTo(4)
+    }
+
+    @Test
+    fun `a fold scheduled after a turn runs in the background and folds the team conversation`() {
+        val session = teamSessionWith(messageCount = 24)
+        every { buddyTeamSessionRepository.save(any()) } answers { firstArg() }
+        coEvery { agentAiClient.compactBuddyMemory(any()) } returns BuddyCompactResponse(memory = "Asked about Sam.")
+
+        teamCompaction.foldInBackground(UserId(userId), ProjectId(projectId))
+
+        assertThat(session.summary).isEqualTo("Asked about Sam.")
         assertThat(session.summarizedCount).isEqualTo(4)
     }
 
