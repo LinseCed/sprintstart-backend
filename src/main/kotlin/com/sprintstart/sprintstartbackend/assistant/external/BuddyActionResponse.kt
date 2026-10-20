@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.assistant.external
+package com.sprintstart.sprintstartbackend.assistant.external
 
 /**
  * The outcome of a confirmed buddy action, as a single line the buddy can relay in the thread.

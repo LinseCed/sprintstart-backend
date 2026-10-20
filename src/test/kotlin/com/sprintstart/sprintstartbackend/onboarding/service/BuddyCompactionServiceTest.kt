@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCompactRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCompactResponse
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage

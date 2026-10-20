@@ -1,9 +1,9 @@
-package com.sprintstart.sprintstartbackend.onboarding.assistant.service
+package com.sprintstart.sprintstartbackend.assistant.external
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentResponse
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentResponse
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector

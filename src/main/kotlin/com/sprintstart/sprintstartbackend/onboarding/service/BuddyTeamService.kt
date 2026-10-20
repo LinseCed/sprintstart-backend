@@ -1,10 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentMessageDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.service.endFailureWithErrorEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddySessionFilters
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.endFailureWithErrorEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamSession

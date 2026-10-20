@@ -1,16 +1,16 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentMessageDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentResponse
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCitationDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.service.FALLBACK_REPLY
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentResponse
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyCitationDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddySessionFilters
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventType
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.FALLBACK_REPLY
 import com.sprintstart.sprintstartbackend.onboarding.client.BuddyAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole

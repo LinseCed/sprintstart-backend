@@ -1,9 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenActionDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenActionDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage

@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.assistant.external
+package com.sprintstart.sprintstartbackend.assistant.external
 
 /** The values of [BuddyStreamEvent.type]: the stream vocabulary the browser switches on. */
 object BuddyStreamEventType {

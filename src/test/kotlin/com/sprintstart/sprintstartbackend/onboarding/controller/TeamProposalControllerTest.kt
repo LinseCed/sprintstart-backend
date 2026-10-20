@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
 import com.ninjasquad.springmockk.MockkBean
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.TeamProposalService
 import io.mockk.coEvery
 import io.mockk.coVerify

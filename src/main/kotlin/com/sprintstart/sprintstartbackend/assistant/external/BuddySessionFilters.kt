@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.assistant.external
+package com.sprintstart.sprintstartbackend.assistant.external
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.sprintstart.sprintstartbackend.shared.model.SourceSystem
