@@ -49,3 +49,9 @@ value class BlueprintId(
 value class ActionProposalId(
     val value: UUID,
 )
+
+/** A question in the question log, identified by the chat message it was asked in. */
+@JvmInline
+value class QuestionId(
+    val value: UUID,
+)

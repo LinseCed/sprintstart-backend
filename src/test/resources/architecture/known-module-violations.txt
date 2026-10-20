@@ -1,3 +1,2 @@
 # Module boundary violations that existed when ModuleBoundariesTest was introduced.
 # This list may only shrink; see KnownViolations for how to update it.
-cycle: insights -> onboarding -> insights
