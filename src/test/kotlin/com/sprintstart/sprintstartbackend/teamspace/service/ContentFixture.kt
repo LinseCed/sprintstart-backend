@@ -2,9 +2,13 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
-import com.sprintstart.sprintstartbackend.path.service.PathElement
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.path.external.model.PathElement
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
+import com.sprintstart.sprintstartbackend.path.service.OnboardingFeedbackService
+import com.sprintstart.sprintstartbackend.path.service.OnboardingPathService
+import com.sprintstart.sprintstartbackend.path.service.OnboardingSkipService
 import com.sprintstart.sprintstartbackend.path.service.PathElements
+import com.sprintstart.sprintstartbackend.path.service.PathReviewService
 import com.sprintstart.sprintstartbackend.starterwork.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.starterwork.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPool
@@ -38,7 +42,14 @@ internal class ContentFixture {
     val userApi: UserApi = mockk(relaxed = true)
     val proposals: StarterWorkTaskProposalRepository = mockk(relaxed = true)
     val starterWorkScope: StarterWorkScope = mockk(relaxed = true)
-    val scope = ContentScope(pathElements, projectMembershipApi, userApi, StarterWorkPool(proposals, starterWorkScope))
+    val scope = ContentScope(review(), projectMembershipApi, userApi, StarterWorkPool(proposals, starterWorkScope))
+
+    /** Path review over [pathElements] and the given services, the shape team mode reads a member's path in. */
+    fun review(
+        path: OnboardingPathService = mockk(relaxed = true),
+        skips: OnboardingSkipService = mockk(relaxed = true),
+        feedback: OnboardingFeedbackService = mockk(relaxed = true),
+    ) = PathReviewService(path, pathElements, skips, feedback)
 
     val projectId: UUID = UUID.randomUUID()
     val memberId: UUID = UUID.randomUUID()

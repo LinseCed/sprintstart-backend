@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.path.external.enums.SkipStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.response.feedback.GetAdminOnboardingFeedbackResponse
 import com.sprintstart.sprintstartbackend.path.model.response.question.GetPhaseQuestionsResponse
 import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionForAdminResponse
@@ -10,8 +11,9 @@ import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionO
 import com.sprintstart.sprintstartbackend.path.model.response.skip.GetOnboardingSkipResponse
 import com.sprintstart.sprintstartbackend.path.service.OnboardingFeedbackService
 import com.sprintstart.sprintstartbackend.path.service.OnboardingSkipService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.path.service.PhaseAuthoringService
 import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptService
+import com.sprintstart.sprintstartbackend.path.service.StepAuthoringService
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.OrientationStep
 import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.MyOrientationResponse
@@ -36,12 +38,9 @@ class ContentTeamToolsReadsTest {
     private val orientationService: TaskOrientationService = mockk(relaxed = true)
     private val tools = ContentTeamTools(
         f.scope,
-        f.pathElements,
-        mockk(relaxed = true),
-        mockk(relaxed = true),
-        skipService,
-        feedbackService,
-        questionService,
+        f.review(skips = skipService, feedback = feedbackService),
+        StepAuthoringService(mockk(relaxed = true), mockk(relaxed = true)),
+        PhaseAuthoringService(mockk(relaxed = true), questionService),
         orientationService,
     )
 

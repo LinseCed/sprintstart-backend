@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
-import com.sprintstart.sprintstartbackend.path.service.PathElement
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
-import com.sprintstart.sprintstartbackend.path.service.PathElements
+import com.sprintstart.sprintstartbackend.path.external.PathReviewApi
+import com.sprintstart.sprintstartbackend.path.external.model.PathElement
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.StarterWorkTaskId
 import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkTaskProposalResponse
@@ -32,7 +32,7 @@ data class ScopedElement(
  */
 @Component
 class ContentScope(
-    private val pathElements: PathElements,
+    private val pathReviewApi: PathReviewApi,
     private val projectMembershipApi: ProjectMembershipApi,
     private val userApi: UserApi,
     private val starterWorkPool: StarterWorkPool,
@@ -44,7 +44,7 @@ class ContentScope(
      * not distinguishable, so the model cannot use a refusal to probe for ids elsewhere.
      */
     fun element(kind: PathElementKind, id: UUID?, projectId: UUID): ScopedElement? {
-        val found = id?.let { pathElements.find(kind, it) } ?: return null
+        val found = id?.let { pathReviewApi.element(kind, it) } ?: return null
         val owner = member(found.ownerId, projectId) ?: return null
         return ScopedElement(found, owner)
     }

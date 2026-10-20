@@ -4,10 +4,11 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.text
 import com.sprintstart.sprintstartbackend.path.external.enums.SkipStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.request.skip.ReviewOnboardingSkipRequest
 import com.sprintstart.sprintstartbackend.path.model.response.skip.GetOnboardingSkipResponse
 import com.sprintstart.sprintstartbackend.path.service.OnboardingSkipService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.path.service.PathReviewService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -37,7 +38,7 @@ class SkipTeamActionsTest {
 
     @Nested
     inner class Accept {
-        private val action = AcceptSkipAction(f.scope, skipService)
+        private val action = AcceptSkipAction(f.scope, PathReviewService(mockk(), mockk(), skipService, mockk()))
 
         @Test
         fun `shows the hire's reason and what accepting does to the step`() {
@@ -127,7 +128,7 @@ class SkipTeamActionsTest {
 
     @Nested
     inner class Deny {
-        private val action = DenySkipAction(f.scope, skipService)
+        private val action = DenySkipAction(f.scope, PathReviewService(mockk(), mockk(), skipService, mockk()))
 
         @Test
         fun `a denial without a comment is refused, because the hire is shown it`() {
@@ -199,7 +200,7 @@ class SkipTeamActionsTest {
 
     @Nested
     inner class Delete {
-        private val action = DeleteSkipAction(f.scope, skipService)
+        private val action = DeleteSkipAction(f.scope, PathReviewService(mockk(), mockk(), skipService, mockk()))
 
         @Test
         fun `is destructive and says the hire is not told`() {

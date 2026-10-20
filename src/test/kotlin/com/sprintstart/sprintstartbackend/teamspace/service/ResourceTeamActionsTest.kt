@@ -1,10 +1,11 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.request.resource.CreateOnboardingResourceRequest
 import com.sprintstart.sprintstartbackend.path.model.request.resource.UpdateOnboardingResourceRequest
 import com.sprintstart.sprintstartbackend.path.model.response.resource.GetOnboardingResourceResponse
 import com.sprintstart.sprintstartbackend.path.service.OnboardingResourceService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.path.service.StepAuthoringService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -21,7 +22,7 @@ class ResourceTeamActionsTest {
 
     @Nested
     inner class Add {
-        private val action = AddResourceAction(f.scope, resourceService)
+        private val action = AddResourceAction(f.scope, StepAuthoringService(mockk(), resourceService))
         private val stepId = UUID.randomUUID()
 
         private fun call(url: String) = f.call("add_resource", "step_id" to stepId, "title" to "Docs", "url" to url)
@@ -71,7 +72,7 @@ class ResourceTeamActionsTest {
 
     @Nested
     inner class Update {
-        private val action = UpdateResourceAction(f.scope, resourceService)
+        private val action = UpdateResourceAction(f.scope, StepAuthoringService(mockk(), resourceService))
         private val resourceId = UUID.randomUUID()
 
         private fun existing() {
@@ -135,7 +136,7 @@ class ResourceTeamActionsTest {
 
     @Nested
     inner class Delete {
-        private val action = DeleteResourceAction(f.scope, resourceService)
+        private val action = DeleteResourceAction(f.scope, StepAuthoringService(mockk(), resourceService))
         private val resourceId = UUID.randomUUID()
 
         @Test

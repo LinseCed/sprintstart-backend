@@ -79,3 +79,33 @@ value class CanonicalAnswerId(
 value class StarterWorkTaskId(
     val value: UUID,
 )
+
+/** A phase of a hire's onboarding path. */
+@JvmInline
+value class PhaseId(
+    val value: UUID,
+)
+
+/** A step in a phase of a hire's onboarding path. */
+@JvmInline
+value class StepId(
+    val value: UUID,
+)
+
+/** A resource (a link to read or watch) on a step of a hire's onboarding path. */
+@JvmInline
+value class ResourceId(
+    val value: UUID,
+)
+
+/** A hire's request to skip one step of their onboarding path. */
+@JvmInline
+value class SkipId(
+    val value: UUID,
+)
+
+/** Feedback a hire left on their onboarding. */
+@JvmInline
+value class FeedbackId(
+    val value: UUID,
+)

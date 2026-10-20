@@ -3,11 +3,12 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.text
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.request.task.CreateOnboardingTaskRequest
 import com.sprintstart.sprintstartbackend.path.model.request.task.UpdateOnboardingTaskRequest
 import com.sprintstart.sprintstartbackend.path.model.response.task.GetOnboardingTaskResponse
 import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.path.service.TaskAuthoringService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -33,7 +34,7 @@ class TaskTeamActionsTest {
 
     @Nested
     inner class Add {
-        private val action = AddTaskAction(f.scope, taskService)
+        private val action = AddTaskAction(f.scope, TaskAuthoringService(taskService))
         private val stepId = UUID.randomUUID()
 
         private fun addCall(vararg extra: Pair<String, Any?>) =
@@ -147,7 +148,7 @@ class TaskTeamActionsTest {
 
     @Nested
     inner class Update {
-        private val action = UpdateTaskAction(f.scope, taskService)
+        private val action = UpdateTaskAction(f.scope, TaskAuthoringService(taskService))
         private val taskId = UUID.randomUUID()
         private val stepId = UUID.randomUUID()
 
@@ -213,7 +214,7 @@ class TaskTeamActionsTest {
 
     @Nested
     inner class Delete {
-        private val action = DeleteTaskAction(f.scope, taskService)
+        private val action = DeleteTaskAction(f.scope, TaskAuthoringService(taskService))
         private val taskId = UUID.randomUUID()
 
         @Test

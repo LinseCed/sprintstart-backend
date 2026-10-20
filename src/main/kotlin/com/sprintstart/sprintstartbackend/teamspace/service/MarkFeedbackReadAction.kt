@@ -3,8 +3,10 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.path.service.OnboardingFeedbackService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.path.external.PathReviewApi
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
+import com.sprintstart.sprintstartbackend.shared.ids.FeedbackId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
@@ -26,7 +28,7 @@ data class MarkFeedbackReadParams(
 @Component
 class MarkFeedbackReadAction(
     private val scope: ContentScope,
-    private val onboardingFeedbackService: OnboardingFeedbackService,
+    private val pathReviewApi: PathReviewApi,
 ) : TypedTeamAction<MarkFeedbackReadParams>(MarkFeedbackReadParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -44,8 +46,8 @@ class MarkFeedbackReadAction(
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
         val scoped = scope.element(PathElementKind.FEEDBACK, call.uuidArgument("feedback_id"), context.projectId)
             ?: return TeamActionDraft.Refused(notInScope(PathElementKind.FEEDBACK))
-        val feedback = onboardingFeedbackService
-            .getAllFeedbackByUserId(scoped.owner.userId)
+        val feedback = pathReviewApi
+            .feedbackOf(UserId(scoped.owner.userId))
             .firstOrNull { it.id == scoped.element.id }
             ?: return TeamActionDraft.Refused(goneSince(PathElementKind.FEEDBACK))
         if (feedback.read) return TeamActionDraft.Refused("That feedback is already marked as read.")
@@ -66,15 +68,15 @@ class MarkFeedbackReadAction(
     override fun recheckParams(params: MarkFeedbackReadParams, context: TeamToolContext): String? {
         val scoped = scope.element(PathElementKind.FEEDBACK, params.feedbackId, context.projectId)
             ?: return goneSince(PathElementKind.FEEDBACK)
-        val alreadyRead = onboardingFeedbackService
-            .getAllFeedbackByUserId(scoped.owner.userId)
+        val alreadyRead = pathReviewApi
+            .feedbackOf(UserId(scoped.owner.userId))
             .firstOrNull { it.id == scoped.element.id }
             ?.read
         return "Somebody already marked that feedback as read, so nothing was changed.".takeIf { alreadyRead == true }
     }
 
     override suspend fun performParams(params: MarkFeedbackReadParams, context: TeamToolContext): String {
-        onboardingFeedbackService.markFeedbackAsRead(params.feedbackId)
+        pathReviewApi.markFeedbackRead(FeedbackId(params.feedbackId))
         return "Marked as read."
     }
 }

@@ -4,11 +4,13 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
+import com.sprintstart.sprintstartbackend.path.external.StepAuthoringApi
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.request.step.CreateOnboardingStepRequest
 import com.sprintstart.sprintstartbackend.path.model.request.step.UpdateOnboardingStepRequest
-import com.sprintstart.sprintstartbackend.path.service.OnboardingStepService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.shared.ids.PhaseId
+import com.sprintstart.sprintstartbackend.shared.ids.StepId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
@@ -73,7 +75,7 @@ data class DeleteStepParams(
 @Component
 class AddStepAction(
     private val scope: ContentScope,
-    private val onboardingStepService: OnboardingStepService,
+    private val stepAuthoringApi: StepAuthoringApi,
 ) : TypedTeamAction<AddStepParams>(AddStepParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -140,8 +142,8 @@ class AddStepAction(
     }
 
     override suspend fun performParams(params: AddStepParams, context: TeamToolContext): String {
-        onboardingStepService.createOnboardingStepForPhaseId(
-            params.phaseId,
+        stepAuthoringApi.createStep(
+            PhaseId(params.phaseId),
             CreateOnboardingStepRequest(
                 position = params.position,
                 title = params.title,
@@ -159,7 +161,7 @@ class AddStepAction(
 @Component
 class UpdateStepAction(
     private val scope: ContentScope,
-    private val onboardingStepService: OnboardingStepService,
+    private val stepAuthoringApi: StepAuthoringApi,
 ) : TypedTeamAction<UpdateStepParams>(UpdateStepParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -184,8 +186,8 @@ class UpdateStepAction(
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
         val target = scope.element(PathElementKind.STEP, call.uuidArgument("step_id"), context.projectId)
             ?: return TeamActionDraft.Refused(notInScope(PathElementKind.STEP))
-        val current = onboardingStepService.getOnboardingStepById(target.element.id)
-        val siblings = onboardingStepService.getOnboardingStepsByPhaseId(current.phaseId).size
+        val current = stepAuthoringApi.step(StepId(target.element.id))
+        val siblings = stepAuthoringApi.stepsOf(PhaseId(current.phaseId)).size
 
         badArgument(call, siblings)?.let { return TeamActionDraft.Refused(it) }
 
@@ -246,9 +248,9 @@ class UpdateStepAction(
     override suspend fun performParams(params: UpdateStepParams, context: TeamToolContext): String {
         val id = params.stepId
         // Only what the manager saw is written; the rest is read fresh.
-        val current = onboardingStepService.getOnboardingStepById(id)
-        onboardingStepService.updateOnboardingStepById(
-            id,
+        val current = stepAuthoringApi.step(StepId(id))
+        stepAuthoringApi.updateStep(
+            StepId(id),
             UpdateOnboardingStepRequest(
                 position = params.position ?: current.position,
                 title = params.title ?: current.title,
@@ -266,7 +268,7 @@ class UpdateStepAction(
 @Component
 class DeleteStepAction(
     private val scope: ContentScope,
-    private val onboardingStepService: OnboardingStepService,
+    private val stepAuthoringApi: StepAuthoringApi,
 ) : TypedTeamAction<DeleteStepParams>(DeleteStepParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
@@ -301,7 +303,7 @@ class DeleteStepAction(
         scope.missing(PathElementKind.STEP, params.stepId, context.projectId)
 
     override suspend fun performParams(params: DeleteStepParams, context: TeamToolContext): String {
-        onboardingStepService.deleteOnboardingStepById(params.stepId)
+        stepAuthoringApi.deleteStep(StepId(params.stepId))
         return "Deleted. The step and what was in it are gone."
     }
 }

@@ -3,8 +3,8 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.path.service.OnboardingPathService
-import com.sprintstart.sprintstartbackend.path.service.PathElements
+import com.sprintstart.sprintstartbackend.path.external.PathReviewApi
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
@@ -26,8 +26,7 @@ data class ResetMemberPathParams(
 @Component
 class ResetMemberPathAction(
     private val scope: ContentScope,
-    private val pathElements: PathElements,
-    private val onboardingPathService: OnboardingPathService,
+    private val pathReviewApi: PathReviewApi,
 ) : TypedTeamAction<ResetMemberPathParams>(ResetMemberPathParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
@@ -43,7 +42,7 @@ class ResetMemberPathAction(
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
         val owner = scope.member(call.uuidArgument("member_id"), context.projectId)
             ?: return TeamActionDraft.Refused(NOT_A_MEMBER_HERE)
-        val summary = pathElements.pathOf(owner.userId)
+        val summary = pathReviewApi.summaryOf(UserId(owner.userId))
             ?: return TeamActionDraft.Refused(
                 "${owner.displayName} has no onboarding path, so there is nothing to delete.",
             )
@@ -75,11 +74,11 @@ class ResetMemberPathAction(
     override fun recheckParams(params: ResetMemberPathParams, context: TeamToolContext): String? {
         val owner = scope.member(params.memberId, context.projectId) ?: return LEFT_SINCE_HERE
         return "That person's path is already gone, so nothing was changed."
-            .takeIf { pathElements.pathOf(owner.userId) == null }
+            .takeIf { pathReviewApi.summaryOf(UserId(owner.userId)) == null }
     }
 
     override suspend fun performParams(params: ResetMemberPathParams, context: TeamToolContext): String {
-        onboardingPathService.deleteOnboardingPathByUserId(params.memberId)
+        pathReviewApi.resetPath(UserId(params.memberId))
         return "Deleted. The path and everything on it are gone."
     }
 }

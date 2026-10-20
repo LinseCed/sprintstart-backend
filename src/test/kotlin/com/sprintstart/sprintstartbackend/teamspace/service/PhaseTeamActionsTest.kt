@@ -2,13 +2,15 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.text
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
+import com.sprintstart.sprintstartbackend.path.external.model.PathSummary
 import com.sprintstart.sprintstartbackend.path.model.request.phase.CreateOnboardingPhaseRequest
 import com.sprintstart.sprintstartbackend.path.model.request.phase.UpdateOnboardingPhaseRequest
 import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseResponse
 import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhasesResponse
 import com.sprintstart.sprintstartbackend.path.service.OnboardingPhaseService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
-import com.sprintstart.sprintstartbackend.path.service.PathSummary
+import com.sprintstart.sprintstartbackend.path.service.PathReviewService
+import com.sprintstart.sprintstartbackend.path.service.PhaseAuthoringService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -46,7 +48,12 @@ class PhaseTeamActionsTest {
 
     @Nested
     inner class Add {
-        private val action = AddPhaseAction(f.scope, f.pathElements, phaseService)
+        private val action =
+            AddPhaseAction(
+                f.scope,
+                PathReviewService(mockk(), f.pathElements, mockk(), mockk()),
+                PhaseAuthoringService(phaseService, mockk()),
+            )
 
         private fun pathOf(phases: Int) {
             every { f.pathElements.pathOf(f.memberId) } returns PathSummary(phases, 0, 0, 0)
@@ -191,7 +198,7 @@ class PhaseTeamActionsTest {
 
     @Nested
     inner class Update {
-        private val action = UpdatePhaseAction(f.scope, phaseService)
+        private val action = UpdatePhaseAction(f.scope, PhaseAuthoringService(phaseService, mockk()))
         private val phaseId = UUID.randomUUID()
 
         private fun onMembersPath(siblings: Int = 3) {
@@ -293,7 +300,7 @@ class PhaseTeamActionsTest {
 
     @Nested
     inner class Delete {
-        private val action = DeletePhaseAction(f.scope, phaseService)
+        private val action = DeletePhaseAction(f.scope, PhaseAuthoringService(phaseService, mockk()))
         private val phaseId = UUID.randomUUID()
 
         @Test

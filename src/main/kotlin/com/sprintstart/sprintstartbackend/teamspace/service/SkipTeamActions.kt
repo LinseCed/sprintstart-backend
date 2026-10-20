@@ -3,12 +3,13 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.path.external.PathReviewApi
 import com.sprintstart.sprintstartbackend.path.external.enums.SkipStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.request.skip.ReviewOnboardingSkipRequest
 import com.sprintstart.sprintstartbackend.path.model.response.skip.GetOnboardingSkipResponse
-import com.sprintstart.sprintstartbackend.path.service.OnboardingSkipService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.shared.ids.SkipId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
@@ -49,7 +50,7 @@ private sealed interface SkipLookup {
 
 private fun lookUpPendingSkip(
     scope: ContentScope,
-    skips: OnboardingSkipService,
+    skips: PathReviewApi,
     id: UUID?,
     projectId: UUID,
 ): SkipLookup {
@@ -57,7 +58,7 @@ private fun lookUpPendingSkip(
         ?: return SkipLookup.Refused(notInScope(PathElementKind.SKIP))
     // Gone between the scope check and this read is the same answer as gone before it.
     val skip = try {
-        skips.getSkipById(scoped.element.id)
+        skips.skip(SkipId(scoped.element.id))
     } catch (_: ResponseStatusException) {
         return SkipLookup.Refused(goneSince(PathElementKind.SKIP))
     }
@@ -98,7 +99,7 @@ private fun commentLine(comment: String): String =
 @Component
 class AcceptSkipAction(
     private val scope: ContentScope,
-    private val onboardingSkipService: OnboardingSkipService,
+    private val pathReviewApi: PathReviewApi,
 ) : TypedTeamAction<SkipReviewParams>(SkipReviewParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -115,7 +116,7 @@ class AcceptSkipAction(
     )
 
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
-        val lookup = lookUpPendingSkip(scope, onboardingSkipService, call.uuidArgument("skip_id"), context.projectId)
+        val lookup = lookUpPendingSkip(scope, pathReviewApi, call.uuidArgument("skip_id"), context.projectId)
         val pending = lookup.pendingOrNull() ?: return TeamActionDraft.Refused(lookup.reason())
         val comment = call.textArgument("review_comment")
         val owner = pending.scoped.owner.displayName
@@ -142,11 +143,11 @@ class AcceptSkipAction(
     }
 
     override fun recheckParams(params: SkipReviewParams, context: TeamToolContext): String? =
-        recheckPending(scope, onboardingSkipService, params.skipId, context)
+        recheckPending(scope, pathReviewApi, params.skipId, context)
 
     override suspend fun performParams(params: SkipReviewParams, context: TeamToolContext): String {
-        onboardingSkipService.acceptSkipById(
-            params.skipId,
+        pathReviewApi.acceptSkip(
+            SkipId(params.skipId),
             ReviewOnboardingSkipRequest(reviewComment = params.reviewComment),
         )
         return "Accepted. The step is skipped, and it counts as done for them."
@@ -157,7 +158,7 @@ class AcceptSkipAction(
 @Component
 class DenySkipAction(
     private val scope: ContentScope,
-    private val onboardingSkipService: OnboardingSkipService,
+    private val pathReviewApi: PathReviewApi,
 ) : TypedTeamAction<SkipReviewParams>(SkipReviewParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -180,7 +181,7 @@ class DenySkipAction(
                 "A denial needs a comment saying why, because the hire sees it. Ask the manager what to write.",
             )
         }
-        val lookup = lookUpPendingSkip(scope, onboardingSkipService, call.uuidArgument("skip_id"), context.projectId)
+        val lookup = lookUpPendingSkip(scope, pathReviewApi, call.uuidArgument("skip_id"), context.projectId)
         val pending = lookup.pendingOrNull() ?: return TeamActionDraft.Refused(lookup.reason())
         val owner = pending.scoped.owner.displayName
         val step = pending.scoped.element
@@ -204,11 +205,11 @@ class DenySkipAction(
     }
 
     override fun recheckParams(params: SkipReviewParams, context: TeamToolContext): String? =
-        recheckPending(scope, onboardingSkipService, params.skipId, context)
+        recheckPending(scope, pathReviewApi, params.skipId, context)
 
     override suspend fun performParams(params: SkipReviewParams, context: TeamToolContext): String {
-        onboardingSkipService.denySkipById(
-            params.skipId,
+        pathReviewApi.denySkip(
+            SkipId(params.skipId),
             ReviewOnboardingSkipRequest(reviewComment = params.reviewComment),
         )
         return "Denied. They have your comment, and the step is theirs to do."
@@ -219,7 +220,7 @@ class DenySkipAction(
 @Component
 class DeleteSkipAction(
     private val scope: ContentScope,
-    private val onboardingSkipService: OnboardingSkipService,
+    private val pathReviewApi: PathReviewApi,
 ) : TypedTeamAction<DeleteSkipParams>(DeleteSkipParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
@@ -232,7 +233,7 @@ class DeleteSkipAction(
     )
 
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
-        val lookup = lookUpPendingSkip(scope, onboardingSkipService, call.uuidArgument("skip_id"), context.projectId)
+        val lookup = lookUpPendingSkip(scope, pathReviewApi, call.uuidArgument("skip_id"), context.projectId)
         val pending = lookup.pendingOrNull() ?: return TeamActionDraft.Refused(lookup.reason())
         val owner = pending.scoped.owner.displayName
         val step = pending.scoped.element
@@ -253,10 +254,10 @@ class DeleteSkipAction(
     }
 
     override fun recheckParams(params: DeleteSkipParams, context: TeamToolContext): String? =
-        recheckPending(scope, onboardingSkipService, params.skipId, context)
+        recheckPending(scope, pathReviewApi, params.skipId, context)
 
     override suspend fun performParams(params: DeleteSkipParams, context: TeamToolContext): String {
-        onboardingSkipService.deleteSkipById(params.skipId)
+        pathReviewApi.deleteSkip(SkipId(params.skipId))
         return "Deleted. The request is gone; they were not told."
     }
 }
@@ -264,7 +265,7 @@ class DeleteSkipAction(
 /** The refusal for a stored skip proposal whose request is gone, out of scope, or already answered. */
 private fun recheckPending(
     scope: ContentScope,
-    skips: OnboardingSkipService,
+    skips: PathReviewApi,
     skipId: UUID,
     context: TeamToolContext,
 ): String? =

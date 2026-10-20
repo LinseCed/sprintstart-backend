@@ -2,16 +2,15 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.path.external.PathReviewApi
+import com.sprintstart.sprintstartbackend.path.external.PhaseAuthoringApi
+import com.sprintstart.sprintstartbackend.path.external.StepAuthoringApi
 import com.sprintstart.sprintstartbackend.path.external.enums.SkipStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionForAdminResponse
-import com.sprintstart.sprintstartbackend.path.service.OnboardingFeedbackService
-import com.sprintstart.sprintstartbackend.path.service.OnboardingPathService
-import com.sprintstart.sprintstartbackend.path.service.OnboardingSkipService
-import com.sprintstart.sprintstartbackend.path.service.OnboardingStepService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
-import com.sprintstart.sprintstartbackend.path.service.PathElements
-import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptService
+import com.sprintstart.sprintstartbackend.shared.ids.PhaseId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.OrientationPacketResponse
 import com.sprintstart.sprintstartbackend.starterwork.service.TaskOrientationService
 import kotlinx.serialization.json.buildJsonObject
@@ -74,12 +73,9 @@ private fun renderPacket(packet: OrientationPacketResponse): String =
 @Component
 class ContentTeamTools(
     private val scope: ContentScope,
-    private val pathElements: PathElements,
-    private val onboardingPathService: OnboardingPathService,
-    private val onboardingStepService: OnboardingStepService,
-    private val onboardingSkipService: OnboardingSkipService,
-    private val onboardingFeedbackService: OnboardingFeedbackService,
-    private val questionAttemptService: QuestionAttemptService,
+    private val pathReviewApi: PathReviewApi,
+    private val stepAuthoringApi: StepAuthoringApi,
+    private val phaseAuthoringApi: PhaseAuthoringApi,
     private val taskOrientationService: TaskOrientationService,
 ) : TeamAreaTools {
     override val area = TeamArea.CONTENT
@@ -106,7 +102,7 @@ class ContentTeamTools(
      */
     private fun memberPath(memberId: UUID?, projectId: UUID): String {
         val owner = scope.member(memberId, projectId) ?: return NOT_A_MEMBER_HERE
-        val path = runCatching { onboardingPathService.getOnboardingPathByUserId(owner.userId) }
+        val path = runCatching { pathReviewApi.pathOf(UserId(owner.userId)) }
             .getOrElse {
                 if (it !is ResponseStatusException) throw it
                 return "${owner.displayName} has no onboarding path yet."
@@ -119,7 +115,7 @@ class ContentTeamTools(
                 appendLine()
                 appendLine("Phase ${phase.position + 1}: ${phase.title} [phase_id: ${phase.id}]")
                 phase.description.takeIf { it.isNotBlank() }?.let { appendLine("  ${it.short()}") }
-                onboardingStepService.getOnboardingStepsByPhaseId(phase.id).sortedBy { it.position }.forEach { step ->
+                stepAuthoringApi.stepsOf(PhaseId(phase.id)).sortedBy { it.position }.forEach { step ->
                     appendLine(
                         "  Step ${step.position + 1}: ${step.title} [step_id: ${step.id}] — " +
                             "${step.type.name.lowercase()}, ${step.estimatedMinutes} min, ${step.status.said()}",
@@ -148,8 +144,8 @@ class ContentTeamTools(
     /** Requests to skip a step that nobody has answered, from members of this project only. */
     private fun pendingSkips(projectId: UUID): String {
         val pending = scope.members(projectId).flatMap { member ->
-            onboardingSkipService
-                .getAllSkipsByUserId(member.userId)
+            pathReviewApi
+                .skipsOf(UserId(member.userId))
                 .filter { it.status == SkipStatus.PENDING }
                 .map { member to it }
         }
@@ -158,7 +154,7 @@ class ContentTeamTools(
         return buildString {
             appendLine("Skip requests waiting for an answer, oldest first:")
             pending.sortedBy { it.second.createdAt }.forEach { (member, skip) ->
-                val step = pathElements.find(PathElementKind.STEP, skip.stepId)
+                val step = pathReviewApi.element(PathElementKind.STEP, skip.stepId)
                 append("- ${member.displayName} asks to skip “${step?.title ?: "a step"}”")
                 step?.stepStatus?.let { append(" (${it.said()})") }
                 appendLine(" [skip_id: ${skip.id}]")
@@ -170,7 +166,7 @@ class ContentTeamTools(
     /** Feedback hires left on their onboarding, unread first — the read ones only when asked for. */
     private fun feedback(includeRead: Boolean, projectId: UUID): String {
         val all = scope.members(projectId).flatMap { member ->
-            onboardingFeedbackService.getAllFeedbackByUserId(member.userId).map { member to it }
+            pathReviewApi.feedbackOf(UserId(member.userId)).map { member to it }
         }
         val shown = all.filter { includeRead || !it.second.read }
         if (shown.isEmpty()) {
@@ -197,7 +193,7 @@ class ContentTeamTools(
     private fun phaseChecks(phaseId: UUID?, projectId: UUID): String {
         val target =
             scope.element(PathElementKind.PHASE, phaseId, projectId) ?: return notInScope(PathElementKind.PHASE)
-        val questions = questionAttemptService.getPhaseQuestions(target.element.id).questions
+        val questions = phaseAuthoringApi.checksOf(PhaseId(target.element.id)).questions
         if (questions.isEmpty()) return "“${target.element.title}” has no knowledge-check questions."
         return "Knowledge checks of “${target.element.title}” on ${target.owner.displayName}'s path:\n" +
             renderChecks(questions.sortedBy { it.position })
