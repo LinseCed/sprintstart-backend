@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest

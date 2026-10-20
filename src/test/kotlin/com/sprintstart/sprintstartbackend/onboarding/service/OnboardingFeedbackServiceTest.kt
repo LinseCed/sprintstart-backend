@@ -42,7 +42,7 @@ class OnboardingFeedbackServiceTest {
             position = 0,
             title = "Step",
             description = "Desc",
-            type = com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType.DOCUMENT,
+            type = com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType.DOCUMENT,
             estimatedMinutes = 30,
             expectedOutcome = "Outcome",
             status = com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus.WAITING,

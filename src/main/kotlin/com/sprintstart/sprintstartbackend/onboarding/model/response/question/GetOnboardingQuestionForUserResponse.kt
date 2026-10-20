@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.response.question
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.QuestionStatus
 import java.util.UUID
 

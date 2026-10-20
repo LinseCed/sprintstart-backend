@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.mapper
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
@@ -32,7 +32,7 @@ class OnboardingAvailabilityTest {
             position = position,
             title = "s$position",
             description = "d",
-            type = com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType.TASK,
+            type = com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType.TASK,
             estimatedMinutes = 1,
             expectedOutcome = "o",
             status = status,

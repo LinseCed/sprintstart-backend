@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.response.step
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import java.util.UUID

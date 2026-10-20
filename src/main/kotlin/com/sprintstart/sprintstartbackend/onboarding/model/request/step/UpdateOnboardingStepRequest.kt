@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.request.step
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 
 data class UpdateOnboardingStepRequest(
     val position: Int,

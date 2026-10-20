@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
 import com.ninjasquad.springmockk.MockkBean
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.request.graph.ArrangeOnboardingGraphRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.graph.OnboardingGraphNodePosition

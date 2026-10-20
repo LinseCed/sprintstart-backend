@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.repository
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhase
