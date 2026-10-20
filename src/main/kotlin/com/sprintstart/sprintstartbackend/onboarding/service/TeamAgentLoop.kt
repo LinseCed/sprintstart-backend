@@ -1,15 +1,20 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentMessageDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentRequest
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentResponse
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCitationDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyVocabularyDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.ResolvedBuddyCitation
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.completeReply
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.emitCitationsAndDone
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.relayAgentTurn
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMessageDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCitationDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyVocabularyDto
 import com.sprintstart.sprintstartbackend.onboarding.model.ContributionWording
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySessionFilters
 import kotlinx.coroutines.flow.FlowCollector
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -78,7 +83,7 @@ class TeamAgentLoop(
         tools: List<BuddyToolSpecDto>,
     ) {
         logger.warn("Team buddy wrote a tool call out as its reply; asking again")
-        emit(BuddyStreamEvent(type = BuddyService.RESET))
+        emit(BuddyStreamEvent(type = BuddyStreamEventType.RESET))
         turn.emittedContent.setLength(0)
         val retry = teamToolRunner.openAreasWrittenOut(
             response.text,

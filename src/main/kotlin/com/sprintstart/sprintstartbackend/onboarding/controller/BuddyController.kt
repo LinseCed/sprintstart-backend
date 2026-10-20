@@ -1,10 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.controller
 
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyActionResponse
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.CreateSessionRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.SendBuddyMessageRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddySuggestionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.CreateSessionResponse

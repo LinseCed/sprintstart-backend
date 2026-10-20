@@ -1,9 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenRequest
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -42,8 +43,8 @@ class BuddyOpeningStream(
     /** The visit's existing greeting, sent again whole instead of asking the model for another. */
     fun replay(greeting: String): Flow<BuddyStreamEvent> =
         flowOf(
-            BuddyStreamEvent(type = BuddyService.TOKEN, content = greeting),
-            BuddyStreamEvent(type = BuddyService.DONE),
+            BuddyStreamEvent(type = BuddyStreamEventType.TOKEN, content = greeting),
+            BuddyStreamEvent(type = BuddyStreamEventType.DONE),
         )
 
     /** Streams a new greeting for [request] and settles it in [conversation]. */
@@ -66,7 +67,7 @@ class BuddyOpeningStream(
                 when (event.type) {
                     BuddyOpenStreamEvent.TOKEN -> event.content?.let {
                         shown.append(it)
-                        emit(BuddyStreamEvent(type = BuddyService.TOKEN, content = it))
+                        emit(BuddyStreamEvent(type = BuddyStreamEventType.TOKEN, content = it))
                     }
 
                     BuddyOpenStreamEvent.DONE -> closing = event
@@ -84,15 +85,15 @@ class BuddyOpeningStream(
     ) {
         val greeting = relayed.closing?.greeting?.takeIf { it.isNotBlank() } ?: relayed.shown
         if (greeting.isBlank()) {
-            emit(BuddyStreamEvent(type = BuddyService.TOKEN, content = conversation.fallbackGreeting))
-            emit(BuddyStreamEvent(type = BuddyService.DONE))
+            emit(BuddyStreamEvent(type = BuddyStreamEventType.TOKEN, content = conversation.fallbackGreeting))
+            emit(BuddyStreamEvent(type = BuddyStreamEventType.DONE))
             return
         }
         conversation.saveOpening(greeting)
         relayed.closing?.action?.let {
-            emit(BuddyStreamEvent(type = BuddyService.OPENING_ACTION, label = it.label, question = it.question))
+            emit(BuddyStreamEvent(type = BuddyStreamEventType.OPENING_ACTION, label = it.label, question = it.question))
         }
-        emit(BuddyStreamEvent(type = BuddyService.DONE))
+        emit(BuddyStreamEvent(type = BuddyStreamEventType.DONE))
     }
 
     private class RelayedOpening(

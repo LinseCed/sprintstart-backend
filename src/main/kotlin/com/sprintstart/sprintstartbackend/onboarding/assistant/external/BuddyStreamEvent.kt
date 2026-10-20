@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.external.model
+package com.sprintstart.sprintstartbackend.onboarding.assistant.external
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.text
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.request.task.CreateOnboardingTaskRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.task.UpdateOnboardingTaskRequest

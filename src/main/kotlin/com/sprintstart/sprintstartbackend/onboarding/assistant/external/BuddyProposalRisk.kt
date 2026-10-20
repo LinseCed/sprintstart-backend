@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.external.enums
+package com.sprintstart.sprintstartbackend.onboarding.assistant.external
 
 /**
  * How much a confirmed team-mode action changes, which decides how its confirm card is drawn.

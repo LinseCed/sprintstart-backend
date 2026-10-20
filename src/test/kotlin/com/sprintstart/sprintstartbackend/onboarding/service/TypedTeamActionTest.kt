@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposalRisk
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -111,5 +111,21 @@ class TypedTeamActionTest {
         }
 
         assertThat(action.recheck(extra, context)).isNull()
+    }
+
+    @Test
+    fun `a label that fits a confirm button is kept as it is`() {
+        val sixty = "x".repeat(60)
+
+        assertThat(sixty.forLabel()).isEqualTo(sixty)
+    }
+
+    @Test
+    fun `a longer label is cut to sixty characters, ellipsis included`() {
+        val label = ("word ".repeat(14) + "end").forLabel()
+
+        assertThat(label).hasSize(60).endsWith("…")
+        assertThat(label).startsWith("word word")
+        assertThat(label.dropLast(1)).doesNotEndWith(" ")
     }
 }

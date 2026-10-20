@@ -1,21 +1,29 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentMessageDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentRequest
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCitationDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyVocabularyDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.ResolvedBuddyCitation
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.completeReply
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.emitAgentReply
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.emitCitationsAndDone
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.endFailureWithErrorEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.relayAgentTurn
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.toolUseEvent
 import com.sprintstart.sprintstartbackend.onboarding.client.BuddyAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.external.event.QuestionAskedEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMessageDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCitationDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyVocabularyDto
 import com.sprintstart.sprintstartbackend.onboarding.model.ContributionWording
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyCitation
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySessionStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.AiResponseException
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toAgentMessage
@@ -461,7 +469,7 @@ class BuddyService(
             outcome.proposal?.let { proposal ->
                 emit(
                     BuddyStreamEvent(
-                        type = ACTION_PROPOSAL,
+                        type = BuddyStreamEventType.ACTION_PROPOSAL,
                         action = proposal.action,
                         label = proposal.label,
                         question = proposal.question,
@@ -522,9 +530,6 @@ class BuddyService(
          */
         const val WINDOW = 20
 
-        const val FALLBACK_REPLY =
-            "I wasn't able to finish answering that one — could you rephrase or add a little detail?"
-
         /**
          * Shown when the hire is on no project: retrieval fails closed on an empty scope, so the turn is
          * refused rather than answered from nothing.
@@ -534,30 +539,6 @@ class BuddyService(
                 "there's nothing for me to search. Once you're added to one, I'll be able to find " +
                 "its docs, code and conventions for you. If you expected to be on a project " +
                 "already, ask your project manager to add you."
-
-        // The stream vocabulary the client switches on, plus one for the opening's suggested next
-        // step. OPENING_ACTION is NOT `action_proposal`: that type is gated on the hire
-        // confirming, whereas this only fills the composer with a question.
-        const val TOKEN = "token"
-        const val DONE = "done"
-
-        /** Terminal like DONE: the turn failed after its stream had started. */
-        const val ERROR = "error"
-
-        /** Team mode only: the words shown so far were not the answer and are to be dropped. */
-        const val RESET = "reset"
-        const val OPENING_ACTION = "opening_action"
-
-        // A change offered for the user's confirmation, and the notice that a tool is running.
-        const val ACTION_PROPOSAL = "action_proposal"
-        const val TOOL_USE = "tool_use"
-        const val TOOL_KIND = "tool"
-
-        /**
-         * Splits after each space, keeping the space on the preceding chunk, so the concatenated tokens
-         * reproduce the answer exactly.
-         */
-        val TOKEN_CHUNK = Regex("(?<= )")
     }
 
     private fun stripQuotedSelection(content: String): String =

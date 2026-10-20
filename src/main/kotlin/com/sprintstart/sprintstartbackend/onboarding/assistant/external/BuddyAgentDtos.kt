@@ -1,9 +1,9 @@
-package com.sprintstart.sprintstartbackend.onboarding.external.model
+package com.sprintstart.sprintstartbackend.onboarding.assistant.external
 
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySessionFilters
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import java.util.UUID
 
 /**
  * DTOs for the AI service's `POST /api/v1/onboarding/buddy/agent` endpoint — the tool-using buddy.
@@ -19,7 +19,19 @@ data class BuddyToolCallDto(
     val name: String,
     /** Opaque to the backend; carried back verbatim. */
     val arguments: JsonObject = JsonObject(emptyMap()),
-)
+) {
+    /** A text argument of a tool call, trimmed; empty when missing or not text. */
+    fun textArgument(name: String): String = arguments.text(name)
+
+    /** A UUID argument of a tool call; null when missing or not a UUID. */
+    fun uuidArgument(name: String): UUID? = arguments.uuid(name)
+
+    /** A boolean argument of a tool call; null when missing or neither `true` nor `false`. */
+    fun booleanArgument(name: String): Boolean? = arguments.boolean(name)
+
+    /** The text entries of an array argument, trimmed, with blanks dropped; empty when missing. */
+    fun textListArgument(name: String): List<String> = arguments.textArray(name)
+}
 
 @Serializable
 data class BuddyAgentMessageDto(

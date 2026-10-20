@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.listener
 
-import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyActionProposalRepository
+import com.sprintstart.sprintstartbackend.onboarding.assistant.repository.BuddyActionProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.GithubHistoryPriorRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.KnowledgeRequestRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.UserCompetencyStateRepository
