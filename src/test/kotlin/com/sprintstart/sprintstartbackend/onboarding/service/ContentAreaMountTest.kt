@@ -6,7 +6,6 @@ import kotlinx.serialization.json.JsonObject
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.ObjectProvider
-import java.time.Clock
 
 /**
  * What opening the content area hands the model, checked through the same mounting the buddy uses.
@@ -51,10 +50,10 @@ class ContentAreaMountTest {
         mockk(),
     )
 
-    private val proposals: BuddyProposalService = run {
+    private val proposals: TeamProposalService = run {
         val provider: ObjectProvider<TeamActionHandler> = mockk()
         every { provider.orderedStream() } answers { handlers.stream() }
-        BuddyProposalService(mockk(), mockk(), provider, Clock.systemUTC())
+        TeamProposalService(mockk(), mockk(), provider)
     }
 
     private fun propertyNames(schema: JsonObject): Set<String> =

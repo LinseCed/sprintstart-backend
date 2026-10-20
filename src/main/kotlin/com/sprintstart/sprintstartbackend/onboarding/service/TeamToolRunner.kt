@@ -1,7 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.toolUseEvent
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
@@ -15,7 +17,7 @@ import org.springframework.stereotype.Component
 @Component
 class TeamToolRunner(
     private val buddyTeamTools: BuddyTeamTools,
-    private val buddyProposalService: BuddyProposalService,
+    private val teamProposalService: TeamProposalService,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -36,12 +38,12 @@ class TeamToolRunner(
         if (call.name in mountedToolNames) {
             buddyTeamTools.areaOf(call.name)?.let { areas.use(it) }
         }
-        if (call.name in mountedToolNames && buddyProposalService.isAction(call.name)) {
-            val outcome = buddyProposalService.propose(call, context)
+        if (call.name in mountedToolNames && teamProposalService.isAction(call.name)) {
+            val outcome = teamProposalService.propose(call, context)
             outcome.proposal?.let { proposal ->
                 emit(
                     BuddyStreamEvent(
-                        type = BuddyService.ACTION_PROPOSAL,
+                        type = BuddyStreamEventType.ACTION_PROPOSAL,
                         action = proposal.action,
                         label = proposal.label,
                         proposalId = proposal.id.toString(),

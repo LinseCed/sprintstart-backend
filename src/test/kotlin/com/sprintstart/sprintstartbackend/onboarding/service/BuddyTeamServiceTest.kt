@@ -1,20 +1,22 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentMessageDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentRequest
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentResponse
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenRequest
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.FALLBACK_REPLY
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposalRisk
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMessageDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyActionProposal
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamSession
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamMessageRepository
@@ -49,7 +51,7 @@ class BuddyTeamServiceTest {
     private val buddyTeamMessageRepository: BuddyTeamMessageRepository = mockk()
     private val agentAiClient: AgentAiClient = mockk()
     private val buddyTeamTools: BuddyTeamTools = mockk()
-    private val buddyProposalService: BuddyProposalService = mockk()
+    private val teamProposalService: TeamProposalService = mockk()
     private val userApi: UserApi = mockk()
     private val buddyCompactionService: BuddyCompactionService = mockk(relaxed = true)
     private val artifactLookupService: ArtifactLookupService = mockk()
@@ -62,7 +64,7 @@ class BuddyTeamServiceTest {
         TeamAgentLoop(
             agentAiClient,
             buddyTeamTools,
-            TeamToolRunner(buddyTeamTools, buddyProposalService),
+            TeamToolRunner(buddyTeamTools, teamProposalService),
             artifactLookupService,
         ),
         userApi,
@@ -87,7 +89,7 @@ class BuddyTeamServiceTest {
         every { buddyTeamMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
         every { buddyTeamMessageRepository.save(any()) } answers { firstArg() }
         every { buddyTeamTools.toolSpecs(any()) } returns listOf(spec(TeamReadTools.GET_TEAM_ATTENTION))
-        every { buddyProposalService.isAction(any()) } returns false
+        every { teamProposalService.isAction(any()) } returns false
         every { buddyTeamTools.areaOf(any()) } returns null
     }
 
@@ -456,7 +458,7 @@ class BuddyTeamServiceTest {
             .contains("call answer_escalation again")
         assertThat(events.single { it.type == "tool_use" }.name).isEqualTo(BuddyTeamTools.OPEN_AREA)
         assertThat(saved.single { it.role == BuddyMessageRole.ASSISTANT }.openedAreas).isEqualTo("KNOWLEDGE")
-        verify(exactly = 0) { buddyProposalService.propose(any(), any()) }
+        verify(exactly = 0) { teamProposalService.propose(any(), any()) }
         verify(exactly = 0) { buddyTeamTools.execute(any(), any(), any()) }
     }
 
@@ -473,7 +475,7 @@ class BuddyTeamServiceTest {
                     if (TeamArea.KNOWLEDGE in opened) listOf(spec("answer_escalation")) else emptyList()
             }
             every { buddyTeamTools.areaOf("answer_escalation") } returns TeamArea.KNOWLEDGE
-            every { buddyProposalService.isAction("answer_escalation") } returns true
+            every { teamProposalService.isAction("answer_escalation") } returns true
             val proposal = BuddyActionProposal(
                 userId = userId,
                 projectId = projectId,
@@ -485,8 +487,8 @@ class BuddyTeamServiceTest {
                 createdAt = Instant.now(),
                 expiresAt = Instant.now().plusSeconds(60),
             )
-            every { buddyProposalService.propose(any(), any()) } returns
-                BuddyProposalService.ProposeOutcome(toolResult = "Offered to the manager.", proposal = proposal)
+            every { teamProposalService.propose(any(), any()) } returns
+                TeamProposalService.ProposeOutcome(toolResult = "Offered to the manager.", proposal = proposal)
             coEvery { agentAiClient.buddyAgentTurnStream(any()) } returnsStreams listOf(
                 toolCall("answer_escalation"),
                 toolCall("answer_escalation"),
@@ -496,7 +498,7 @@ class BuddyTeamServiceTest {
             val events = service.sendMessageForMe(authId, projectId, "You can send it").toList()
 
             assertThat(events.single { it.type == "action_proposal" }.proposalId).isEqualTo(proposal.id.toString())
-            verify(exactly = 1) { buddyProposalService.propose(any(), any()) }
+            verify(exactly = 1) { teamProposalService.propose(any(), any()) }
         }
 
     @Test
@@ -625,10 +627,10 @@ class BuddyTeamServiceTest {
 
         val events = service.sendMessageForMe(authId, projectId, "how is Ada?").toList()
 
-        assertThat(shownAfterLastReset(events)).isEqualTo(BuddyService.FALLBACK_REPLY)
-        assertThat(events.count { it.type == BuddyService.RESET }).isEqualTo(BuddyService.MAX_AGENT_STEPS)
+        assertThat(shownAfterLastReset(events)).isEqualTo(FALLBACK_REPLY)
+        assertThat(events.count { it.type == BuddyStreamEventType.RESET }).isEqualTo(BuddyService.MAX_AGENT_STEPS)
         assertThat(saved.single { it.role == BuddyMessageRole.ASSISTANT }.content)
-            .isEqualTo(BuddyService.FALLBACK_REPLY)
+            .isEqualTo(FALLBACK_REPLY)
         coVerify(exactly = BuddyService.MAX_AGENT_STEPS) { agentAiClient.buddyAgentTurnStream(any()) }
     }
 
@@ -689,7 +691,7 @@ class BuddyTeamServiceTest {
 
         val events = service.sendMessageForMe(authId, projectId, "who is stuck?").toList()
 
-        assertThat(events.map { it.type }).containsExactly(BuddyService.TOKEN, BuddyService.ERROR)
+        assertThat(events.map { it.type }).containsExactly(BuddyStreamEventType.TOKEN, BuddyStreamEventType.ERROR)
         // The provider's text stays in the log; the client gets a fixed sentence.
         assertThat(events.last().message).isNotBlank().doesNotContain("model unavailable")
 
@@ -735,8 +737,8 @@ class BuddyTeamServiceTest {
 
     private fun shownAfterLastReset(events: List<BuddyStreamEvent>): String =
         events
-            .takeLastWhile { it.type != BuddyService.RESET }
-            .filter { it.type == BuddyService.TOKEN }
+            .takeLastWhile { it.type != BuddyStreamEventType.RESET }
+            .filter { it.type == BuddyStreamEventType.TOKEN }
             .joinToString("") { it.content.orEmpty() }
 
     @Test
@@ -874,7 +876,7 @@ class BuddyTeamServiceTest {
     @Test
     fun `an action call becomes a stored proposal event and never runs as a tool`() = runTest {
         every { buddyTeamTools.toolSpecs(any()) } returns listOf(spec("dismiss_escalation"))
-        every { buddyProposalService.isAction("dismiss_escalation") } returns true
+        every { teamProposalService.isAction("dismiss_escalation") } returns true
         val proposal = BuddyActionProposal(
             userId = userId,
             projectId = projectId,
@@ -886,8 +888,8 @@ class BuddyTeamServiceTest {
             createdAt = Instant.now(),
             expiresAt = Instant.now().plusSeconds(60),
         )
-        every { buddyProposalService.propose(any(), any()) } returns
-            BuddyProposalService.ProposeOutcome(toolResult = "Proposed to the manager.", proposal = proposal)
+        every { teamProposalService.propose(any(), any()) } returns
+            TeamProposalService.ProposeOutcome(toolResult = "Proposed to the manager.", proposal = proposal)
         val requests = mutableListOf<BuddyAgentRequest>()
         coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStreams listOf(
             BuddyAgentResponse(

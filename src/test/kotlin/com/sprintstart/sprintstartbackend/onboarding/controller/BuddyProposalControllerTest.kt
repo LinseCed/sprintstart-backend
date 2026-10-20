@@ -2,8 +2,8 @@ package com.sprintstart.sprintstartbackend.onboarding.controller
 
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
-import com.sprintstart.sprintstartbackend.onboarding.service.BuddyProposalService
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyActionResponse
+import com.sprintstart.sprintstartbackend.onboarding.service.TeamProposalService
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -34,7 +34,7 @@ class BuddyProposalControllerTest(
     @Autowired private val mockMvc: MockMvc,
 ) {
     @MockkBean
-    private lateinit var buddyProposalService: BuddyProposalService
+    private lateinit var teamProposalService: TeamProposalService
 
     @MockkBean
     private lateinit var jwtDecoder: JwtDecoder
@@ -61,7 +61,7 @@ class BuddyProposalControllerTest(
 
     @Test
     fun `confirm returns the outcome for the caller's proposal`() {
-        coEvery { buddyProposalService.confirm(authId, proposalId) } returns
+        coEvery { teamProposalService.confirm(authId, proposalId) } returns
             BuddyActionResponse(ok = true, message = "Dismissed the question.")
 
         mockMvc
@@ -73,7 +73,7 @@ class BuddyProposalControllerTest(
 
     @Test
     fun `confirm returns a refusal as ok false, not as an error`() {
-        coEvery { buddyProposalService.confirm(authId, proposalId) } returns
+        coEvery { teamProposalService.confirm(authId, proposalId) } returns
             BuddyActionResponse(ok = false, message = "This was already done.")
 
         mockMvc
@@ -84,7 +84,7 @@ class BuddyProposalControllerTest(
 
     @Test
     fun `confirm returns 404 for a proposal that is not the caller's`() {
-        coEvery { buddyProposalService.confirm(authId, proposalId) } throws
+        coEvery { teamProposalService.confirm(authId, proposalId) } throws
             ResponseStatusException(HttpStatus.NOT_FOUND, "No proposal")
 
         mockMvc
@@ -98,7 +98,7 @@ class BuddyProposalControllerTest(
             .perform(asyncDispatch(confirmAs("PM")))
             .andExpect(status().isForbidden)
 
-        coVerify(exactly = 0) { buddyProposalService.confirm(any(), any()) }
+        coVerify(exactly = 0) { teamProposalService.confirm(any(), any()) }
     }
 
     @Test
@@ -110,7 +110,7 @@ class BuddyProposalControllerTest(
 
     @Test
     fun `dismiss returns the outcome for the caller's proposal`() {
-        every { buddyProposalService.dismiss(authId, proposalId) } returns
+        every { teamProposalService.dismiss(authId, proposalId) } returns
             BuddyActionResponse(ok = true, message = "Dismissed — nothing changed.")
 
         mockMvc

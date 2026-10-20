@@ -1,6 +1,5 @@
-package com.sprintstart.sprintstartbackend.onboarding.service
+package com.sprintstart.sprintstartbackend.onboarding.assistant.external
 
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject

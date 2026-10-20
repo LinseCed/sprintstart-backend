@@ -1,22 +1,24 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentMessageDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentRequest
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentResponse
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCitationDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.FALLBACK_REPLY
 import com.sprintstart.sprintstartbackend.onboarding.client.BuddyAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.external.event.QuestionAskedEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMessageDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentResponse
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCitationDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyCitation
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySessionStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.AiGenerateSessionTitleResponse
@@ -783,7 +785,7 @@ class BuddyServiceTest {
 
             val events = service.sendMessageForMe(authId, session.id, "hi", true, null).toList()
 
-            assertThat(events.map { it.type }).containsExactly(BuddyService.TOKEN, BuddyService.ERROR)
+            assertThat(events.map { it.type }).containsExactly(BuddyStreamEventType.TOKEN, BuddyStreamEventType.ERROR)
             // The provider's text stays in the log; the client gets a fixed sentence.
             assertThat(events.last().message).isNotBlank().doesNotContain("model unavailable")
             verify {
@@ -803,8 +805,8 @@ class BuddyServiceTest {
 
             val events = service.sendMessageForMe(authId, session.id, "hi", true, null).toList()
 
-            assertThat(events.last().type).isEqualTo(BuddyService.ERROR)
-            assertThat(events.map { it.type }).doesNotContain(BuddyService.DONE)
+            assertThat(events.last().type).isEqualTo(BuddyStreamEventType.ERROR)
+            assertThat(events.map { it.type }).doesNotContain(BuddyStreamEventType.DONE)
             verify {
                 buddyMessageRepository.save(
                     match<BuddyMessage> { it.isIncomplete && it.content == "Part of " },
@@ -855,7 +857,7 @@ class BuddyServiceTest {
 
             val reply = saved.single { it.role == BuddyMessageRole.ASSISTANT }
             assertThat(reply.content).startsWith("Looking.\n\nLooking.")
-            assertThat(reply.content).endsWith("\n\n${BuddyService.FALLBACK_REPLY}")
+            assertThat(reply.content).endsWith("\n\n${FALLBACK_REPLY}")
             assertThat(reply.isIncomplete).isFalse()
         }
 
@@ -1424,7 +1426,7 @@ class BuddyServiceTest {
                     null,
                 ).toList()
 
-            assertThat(events.single().type).isEqualTo(BuddyService.ERROR)
+            assertThat(events.single().type).isEqualTo(BuddyStreamEventType.ERROR)
             assertThat(saved.map { it.role }).containsExactly(BuddyMessageRole.USER)
         }
 
@@ -1823,7 +1825,7 @@ class BuddyServiceTest {
                         content = "Where is the architecture documented?",
                         filters = null,
                     ).collect { event ->
-                        if (event.type == BuddyService.TOKEN) {
+                        if (event.type == BuddyStreamEventType.TOKEN) {
                             cancel()
                         }
                     }

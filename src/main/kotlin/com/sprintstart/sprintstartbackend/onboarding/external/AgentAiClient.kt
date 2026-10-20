@@ -1,11 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.external
 
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCompactRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCompactResponse
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentRequest
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCompactRequest
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCompactResponse
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenRequest
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
 import kotlinx.coroutines.flow.Flow

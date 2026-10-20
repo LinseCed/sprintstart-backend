@@ -4,11 +4,11 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.ninjasquad.springmockk.MockkBean
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
 import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyActionResponse
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.SendBuddyMessageRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddySuggestionResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.CreateSessionResponse

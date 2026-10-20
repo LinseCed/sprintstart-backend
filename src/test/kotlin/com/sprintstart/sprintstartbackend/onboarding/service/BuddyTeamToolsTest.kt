@@ -1,9 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.Rigor
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.metrics.AttentionItemResponse
@@ -33,7 +33,7 @@ class BuddyTeamToolsTest {
     private val arrivalStepService: ArrivalStepService = mockk()
     private val projectMembershipApi: ProjectMembershipApi = mockk()
     private val areaToolsProvider: ObjectProvider<TeamAreaTools> = mockk()
-    private val buddyProposalService: BuddyProposalService = mockk()
+    private val teamProposalService: TeamProposalService = mockk()
     private val buddyAppGuideTools: BuddyAppGuideTools = mockk()
 
     private val projectId = UUID.randomUUID()
@@ -45,8 +45,8 @@ class BuddyTeamToolsTest {
         actions: List<TeamActionHandler> = emptyList(),
     ): BuddyTeamTools {
         every { areaToolsProvider.orderedStream() } answers { areas.toList().stream() }
-        every { buddyProposalService.actionAreas() } answers { actions.map { it.area }.toSet() }
-        every { buddyProposalService.actionSpecs(any()) } answers {
+        every { teamProposalService.actionAreas() } answers { actions.map { it.area }.toSet() }
+        every { teamProposalService.actionSpecs(any()) } answers {
             val opened = firstArg<Set<TeamArea>>()
             actions.filter { it.area in opened }.map { it.spec }
         }
@@ -59,7 +59,7 @@ class BuddyTeamToolsTest {
                 projectMembershipApi,
             ),
             areaToolsProvider,
-            buddyProposalService,
+            teamProposalService,
             buddyAppGuideTools,
         )
     }

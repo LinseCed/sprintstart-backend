@@ -1,11 +1,12 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposalRisk
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyProposalStatus
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyActionProposal
-import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyActionProposalRepository
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalStatus
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
+import com.sprintstart.sprintstartbackend.onboarding.assistant.repository.BuddyActionProposalRepository
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.ActionProposalStore
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.every
 import io.mockk.mockk
@@ -29,7 +30,7 @@ import java.time.ZoneOffset
 import java.util.Optional
 import java.util.UUID
 
-class BuddyProposalServiceTest {
+class TeamProposalServiceTest {
     private val repository: BuddyActionProposalRepository = mockk()
     private val userApi: UserApi = mockk()
     private val handlersProvider: ObjectProvider<TeamActionHandler> = mockk()
@@ -76,7 +77,7 @@ class BuddyProposalServiceTest {
     /** Every outcome recorded through `finish`, as (status it ended in, message shown). */
     private val recorded = mutableListOf<Pair<BuddyProposalStatus, String>>()
 
-    private fun service() = BuddyProposalService(repository, userApi, handlersProvider, clock)
+    private fun service() = TeamProposalService(ActionProposalStore(repository, clock), userApi, handlersProvider)
 
     @BeforeEach
     fun setUp() {
@@ -138,13 +139,15 @@ class BuddyProposalServiceTest {
 
         assertThat(outcome.proposal).isNotNull
         with(saved.captured) {
-            assertThat(userId).isEqualTo(this@BuddyProposalServiceTest.userId)
-            assertThat(projectId).isEqualTo(this@BuddyProposalServiceTest.projectId)
+            assertThat(userId).isEqualTo(this@TeamProposalServiceTest.userId)
+            assertThat(projectId).isEqualTo(this@TeamProposalServiceTest.projectId)
             assertThat(action).isEqualTo("dismiss_escalation")
             assertThat(risk).isEqualTo(BuddyProposalRisk.DESTRUCTIVE)
             assertThat(status).isEqualTo(BuddyProposalStatus.PROPOSED)
-            assertThat(expiresAt).isEqualTo(now.plus(BuddyProposalService.TIME_TO_LIVE))
+            assertThat(expiresAt).isEqualTo(now.plus(ActionProposalStore.TIME_TO_LIVE))
             assertThat(params).contains("r-1")
+            assertThat(label).isEqualTo("Dismiss: how do we deploy?")
+            assertThat(preview).isEqualTo("The question disappears from the inbox.")
         }
         assertThat(outcome.toolResult).contains("never say it is done")
         assertThat(action.performed).isEmpty()
@@ -238,6 +241,21 @@ class BuddyProposalServiceTest {
 
         assertThat(response.ok).isFalse()
         assertThat(response.message).contains("no longer manage")
+        assertThat(action.performed).isEmpty()
+        assertThat(recorded.single().first).isEqualTo(BuddyProposalStatus.FAILED)
+    }
+
+    /** A deploy between proposing and confirming may have removed the action the proposal names. */
+    @Test
+    fun `a proposal whose action no longer exists is recorded as failed and runs nothing`() = runTest {
+        val proposal = stored()
+        claimSucceeds(proposal)
+        every { handlersProvider.orderedStream() } answers { emptyList<TeamActionHandler>().stream() }
+
+        val response = service().confirm(authId, proposal.id)
+
+        assertThat(response.ok).isFalse()
+        assertThat(response.message).contains("no longer available")
         assertThat(action.performed).isEmpty()
         assertThat(recorded.single().first).isEqualTo(BuddyProposalStatus.FAILED)
     }
