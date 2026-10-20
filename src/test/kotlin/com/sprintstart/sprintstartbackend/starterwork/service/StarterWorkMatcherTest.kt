@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.starterwork.service
 
-import com.sprintstart.sprintstartbackend.onboarding.service.result
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.TaskType
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test

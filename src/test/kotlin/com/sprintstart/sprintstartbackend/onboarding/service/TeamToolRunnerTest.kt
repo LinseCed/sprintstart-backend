@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.buddy.service.result
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

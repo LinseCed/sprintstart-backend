@@ -1,8 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.mapper
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
+import com.sprintstart.sprintstartbackend.buddy.external.enums.toHistoryRole
+import com.sprintstart.sprintstartbackend.buddy.model.response.buddy.BuddyMessageResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamMessage
-import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
 
 /** A team-mode message in the same client shape as the hire's, so one transcript view renders both. */
 fun BuddyTeamMessage.toResponse(): BuddyMessageResponse =

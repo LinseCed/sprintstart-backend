@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.starterwork.service
 
-import com.sprintstart.sprintstartbackend.onboarding.service.result
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.CompetencyKind
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.starterwork.model.entity.Competency

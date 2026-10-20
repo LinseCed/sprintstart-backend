@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.buddy.service.result
 import com.sprintstart.sprintstartbackend.insights.external.InsightsRefreshApi
 import com.sprintstart.sprintstartbackend.insights.external.KnowledgeGapsRefresh
 import com.sprintstart.sprintstartbackend.knowledge.external.enums.KnowledgeRequestStatus

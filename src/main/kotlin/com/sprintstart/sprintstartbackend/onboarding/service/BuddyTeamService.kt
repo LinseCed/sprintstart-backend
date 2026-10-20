@@ -5,12 +5,15 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.assistant.external.endFailureWithErrorEvent
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
+import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
+import com.sprintstart.sprintstartbackend.buddy.model.response.buddy.BuddyMessageResponse
+import com.sprintstart.sprintstartbackend.buddy.service.BuddyOpeningStream
+import com.sprintstart.sprintstartbackend.buddy.service.OpeningConversation
+import com.sprintstart.sprintstartbackend.buddy.service.sinceLastOpening
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamSession
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toAgentMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyMessageResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamSessionRepository
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId

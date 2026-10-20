@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.repository
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
+import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamSession
 import com.sprintstart.sprintstartbackend.shared.crypto.CryptoConfiguration

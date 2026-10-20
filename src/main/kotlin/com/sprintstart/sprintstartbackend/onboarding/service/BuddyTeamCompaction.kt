@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.buddy.service.BuddyCompactionScheduler
+import com.sprintstart.sprintstartbackend.buddy.service.BuddyCompactionService
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toAgentMessage
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamSessionRepository

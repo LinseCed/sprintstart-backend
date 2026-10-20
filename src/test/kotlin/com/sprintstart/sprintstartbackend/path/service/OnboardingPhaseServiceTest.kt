@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.path.service
 
-import com.sprintstart.sprintstartbackend.onboarding.service.result
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPhase
 import com.sprintstart.sprintstartbackend.path.model.request.phase.CreateOnboardingPhaseRequest

@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.path.service
 
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
-import com.sprintstart.sprintstartbackend.onboarding.service.result
 import com.sprintstart.sprintstartbackend.path.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.SkipStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus

@@ -5,7 +5,6 @@ import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionAp
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.IngestedIssue
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.RepositoryResponsiveness
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.TaskSourceArtifact
-import com.sprintstart.sprintstartbackend.onboarding.service.result
 import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.starterwork.external.StarterWorkAiClient
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.CandidatePoolState

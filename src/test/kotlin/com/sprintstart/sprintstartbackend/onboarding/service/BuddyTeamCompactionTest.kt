@@ -2,12 +2,14 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactResponse
-import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
+import com.sprintstart.sprintstartbackend.buddy.external.AgentAiClient
+import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
+import com.sprintstart.sprintstartbackend.buddy.repository.BuddyMessageRepository
+import com.sprintstart.sprintstartbackend.buddy.repository.BuddySessionRepository
+import com.sprintstart.sprintstartbackend.buddy.service.BuddyCompactionScheduler
+import com.sprintstart.sprintstartbackend.buddy.service.BuddyCompactionService
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamSession
-import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamSessionRepository
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId

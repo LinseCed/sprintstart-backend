@@ -3,7 +3,6 @@ package com.sprintstart.sprintstartbackend.arrival.service
 import com.sprintstart.sprintstartbackend.arrival.external.enums.AttestationState
 import com.sprintstart.sprintstartbackend.arrival.model.entity.Attestation
 import com.sprintstart.sprintstartbackend.arrival.repository.AttestationRepository
-import com.sprintstart.sprintstartbackend.onboarding.service.result
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember

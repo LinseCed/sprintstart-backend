@@ -14,7 +14,10 @@ import com.sprintstart.sprintstartbackend.assistant.external.ResolvedBuddyCitati
 import com.sprintstart.sprintstartbackend.assistant.external.completeReply
 import com.sprintstart.sprintstartbackend.assistant.external.emitCitationsAndDone
 import com.sprintstart.sprintstartbackend.assistant.external.relayAgentTurn
-import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
+import com.sprintstart.sprintstartbackend.buddy.external.AgentAiClient
+import com.sprintstart.sprintstartbackend.buddy.service.ArtifactLookupService
+import com.sprintstart.sprintstartbackend.buddy.service.BuddyService
+import com.sprintstart.sprintstartbackend.buddy.service.parseUuidOrNull
 import kotlinx.coroutines.flow.FlowCollector
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
