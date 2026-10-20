@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.model.request.knowledge
+package com.sprintstart.sprintstartbackend.knowledge.model.request.knowledge
 
 import java.util.UUID
 

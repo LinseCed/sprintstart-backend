@@ -1,8 +1,8 @@
-package com.sprintstart.sprintstartbackend.onboarding.repository
+package com.sprintstart.sprintstartbackend.knowledge.repository
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.KnowledgeRequestStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.KnowledgeRequest
+import com.sprintstart.sprintstartbackend.knowledge.external.enums.KnowledgeRequestStatus
+import com.sprintstart.sprintstartbackend.knowledge.model.entity.CanonicalAnswer
+import com.sprintstart.sprintstartbackend.knowledge.model.entity.KnowledgeRequest
 import com.sprintstart.sprintstartbackend.shared.crypto.CryptoConfiguration
 import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat

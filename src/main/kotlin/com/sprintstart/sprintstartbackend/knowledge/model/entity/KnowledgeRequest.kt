@@ -1,6 +1,6 @@
-package com.sprintstart.sprintstartbackend.onboarding.model.entity
+package com.sprintstart.sprintstartbackend.knowledge.model.entity
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.KnowledgeRequestStatus
+import com.sprintstart.sprintstartbackend.knowledge.external.enums.KnowledgeRequestStatus
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType

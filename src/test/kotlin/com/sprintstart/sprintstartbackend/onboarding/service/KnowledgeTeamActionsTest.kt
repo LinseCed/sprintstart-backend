@@ -4,11 +4,13 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.insights.external.InsightsRefreshApi
 import com.sprintstart.sprintstartbackend.insights.external.KnowledgeGapsRefresh
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.KnowledgeRequestStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.KnowledgeRequest
-import com.sprintstart.sprintstartbackend.onboarding.repository.CanonicalAnswerRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.KnowledgeRequestRepository
+import com.sprintstart.sprintstartbackend.knowledge.external.enums.KnowledgeRequestStatus
+import com.sprintstart.sprintstartbackend.knowledge.model.entity.CanonicalAnswer
+import com.sprintstart.sprintstartbackend.knowledge.model.entity.KnowledgeRequest
+import com.sprintstart.sprintstartbackend.knowledge.repository.CanonicalAnswerRepository
+import com.sprintstart.sprintstartbackend.knowledge.repository.KnowledgeRequestRepository
+import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
+import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeLookup
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -31,9 +33,11 @@ class KnowledgeTeamActionsTest {
     private val projectId = UUID.randomUUID()
     private val context = TeamToolContext(userId = UUID.randomUUID(), authId = "auth|pm", projectId = projectId)
 
-    private val answer = AnswerEscalationAction(knowledgeRequestRepository, knowledgeBaseService)
-    private val dismiss = DismissEscalationAction(knowledgeRequestRepository, knowledgeBaseService)
-    private val edit = EditCanonicalAnswerAction(canonicalAnswerRepository, knowledgeBaseService)
+    private val knowledgeLookup = KnowledgeLookup(knowledgeRequestRepository, canonicalAnswerRepository)
+
+    private val answer = AnswerEscalationAction(knowledgeLookup, knowledgeBaseService)
+    private val dismiss = DismissEscalationAction(knowledgeLookup, knowledgeBaseService)
+    private val edit = EditCanonicalAnswerAction(knowledgeLookup, knowledgeBaseService)
 
     private fun call(name: String, vararg args: Pair<String, String>) =
         BuddyToolCallDto(

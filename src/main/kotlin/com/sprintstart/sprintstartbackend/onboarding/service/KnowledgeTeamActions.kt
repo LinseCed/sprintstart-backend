@@ -4,11 +4,11 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.insights.external.InsightsRefreshApi
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.KnowledgeRequestStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.CanonicalAnswer
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.KnowledgeRequest
-import com.sprintstart.sprintstartbackend.onboarding.repository.CanonicalAnswerRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.KnowledgeRequestRepository
+import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
+import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeLookup
+import com.sprintstart.sprintstartbackend.shared.ids.CanonicalAnswerId
+import com.sprintstart.sprintstartbackend.shared.ids.KnowledgeRequestId
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -51,18 +51,6 @@ data class EditCanonicalAnswerParams(
     @SerialName("seen_updated_at") @Serializable(with = InstantSerializer::class) val seenUpdatedAt: Instant,
 )
 
-/** The request [requestId] names, if it is still open and on [projectId]. */
-private fun KnowledgeRequestRepository.openOn(requestId: UUID?, projectId: UUID): KnowledgeRequest? =
-    requestId
-        ?.let { findById(it).orElse(null) }
-        ?.takeIf { it.projectId == projectId && it.status == KnowledgeRequestStatus.OPEN }
-
-/** The canonical answer [answerId] names, if it is on [projectId]. */
-private fun CanonicalAnswerRepository.on(answerId: UUID?, projectId: UUID): CanonicalAnswer? =
-    answerId
-        ?.let { findById(it).orElse(null) }
-        ?.takeIf { it.projectId == projectId }
-
 private const val NOT_OPEN_HERE =
     "That question is not open on this project. Call list_open_escalations for the ones that are, and pass " +
         "the request_id it gives."
@@ -77,7 +65,7 @@ private const val GONE_SINCE = "That question was answered or dismissed since, s
  */
 @Component
 class AnswerEscalationAction(
-    private val knowledgeRequestRepository: KnowledgeRequestRepository,
+    private val knowledgeLookup: KnowledgeLookup,
     private val knowledgeBaseService: KnowledgeBaseService,
 ) : TypedTeamAction<AnswerEscalationParams>(AnswerEscalationParams.serializer()) {
     override val area = TeamArea.KNOWLEDGE
@@ -97,8 +85,12 @@ class AnswerEscalationAction(
     )
 
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
-        val request = knowledgeRequestRepository.openOn(call.uuidArgument("request_id"), context.projectId)
-            ?: return TeamActionDraft.Refused(NOT_OPEN_HERE)
+        val request =
+            knowledgeLookup.openRequestOn(
+                call.uuidArgument("request_id")?.let(::KnowledgeRequestId),
+                ProjectId(context.projectId),
+            )
+                ?: return TeamActionDraft.Refused(NOT_OPEN_HERE)
         val answer = call.textArgument("answer")
         if (answer.isBlank()) {
             return TeamActionDraft.Refused("No answer was written. Draft it from the docs first, then offer it.")
@@ -114,7 +106,10 @@ class AnswerEscalationAction(
     }
 
     override fun recheckParams(params: AnswerEscalationParams, context: TeamToolContext): String? =
-        GONE_SINCE.takeIf { knowledgeRequestRepository.openOn(params.requestId, context.projectId) == null }
+        GONE_SINCE.takeIf {
+            knowledgeLookup.openRequestOn(KnowledgeRequestId(params.requestId), ProjectId(context.projectId)) ==
+                null
+        }
 
     override suspend fun performParams(params: AnswerEscalationParams, context: TeamToolContext): String {
         knowledgeBaseService.answerOpenOn(
@@ -131,7 +126,7 @@ class AnswerEscalationAction(
 /** Offers to take a question out of the inbox without answering it. */
 @Component
 class DismissEscalationAction(
-    private val knowledgeRequestRepository: KnowledgeRequestRepository,
+    private val knowledgeLookup: KnowledgeLookup,
     private val knowledgeBaseService: KnowledgeBaseService,
 ) : TypedTeamAction<DismissEscalationParams>(DismissEscalationParams.serializer()) {
     override val area = TeamArea.KNOWLEDGE
@@ -148,8 +143,12 @@ class DismissEscalationAction(
     )
 
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
-        val request = knowledgeRequestRepository.openOn(call.uuidArgument("request_id"), context.projectId)
-            ?: return TeamActionDraft.Refused(NOT_OPEN_HERE)
+        val request =
+            knowledgeLookup.openRequestOn(
+                call.uuidArgument("request_id")?.let(::KnowledgeRequestId),
+                ProjectId(context.projectId),
+            )
+                ?: return TeamActionDraft.Refused(NOT_OPEN_HERE)
         return proposed(
             params = DismissEscalationParams(request.id),
             label = "Dismiss: ${request.question.forLabel()}",
@@ -159,7 +158,10 @@ class DismissEscalationAction(
     }
 
     override fun recheckParams(params: DismissEscalationParams, context: TeamToolContext): String? =
-        GONE_SINCE.takeIf { knowledgeRequestRepository.openOn(params.requestId, context.projectId) == null }
+        GONE_SINCE.takeIf {
+            knowledgeLookup.openRequestOn(KnowledgeRequestId(params.requestId), ProjectId(context.projectId)) ==
+                null
+        }
 
     override suspend fun performParams(params: DismissEscalationParams, context: TeamToolContext): String {
         knowledgeBaseService.dismissOpenOn(context.projectId, params.requestId)
@@ -176,7 +178,7 @@ class DismissEscalationAction(
  */
 @Component
 class EditCanonicalAnswerAction(
-    private val canonicalAnswerRepository: CanonicalAnswerRepository,
+    private val knowledgeLookup: KnowledgeLookup,
     private val knowledgeBaseService: KnowledgeBaseService,
 ) : TypedTeamAction<EditCanonicalAnswerParams>(EditCanonicalAnswerParams.serializer()) {
     override val area = TeamArea.KNOWLEDGE
@@ -195,10 +197,14 @@ class EditCanonicalAnswerAction(
     )
 
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
-        val current = canonicalAnswerRepository.on(call.uuidArgument("answer_id"), context.projectId)
-            ?: return TeamActionDraft.Refused(
-                "That answer is not on this project. Call list_canonical_answers and pass the answer_id it gives.",
+        val current =
+            knowledgeLookup.answerOn(
+                call.uuidArgument("answer_id")?.let(::CanonicalAnswerId),
+                ProjectId(context.projectId),
             )
+                ?: return TeamActionDraft.Refused(
+                    "That answer is not on this project. Call list_canonical_answers and pass the answer_id it gives.",
+                )
         val question = call.textArgument("question").ifBlank { current.question }
         val answer = call.textArgument("answer").ifBlank { current.answer }
         if (question == current.question && answer == current.answer) {
@@ -213,7 +219,7 @@ class EditCanonicalAnswerAction(
     }
 
     override fun recheckParams(params: EditCanonicalAnswerParams, context: TeamToolContext): String? {
-        val current = canonicalAnswerRepository.on(params.answerId, context.projectId)
+        val current = knowledgeLookup.answerOn(CanonicalAnswerId(params.answerId), ProjectId(context.projectId))
             ?: return "That answer no longer exists, so nothing was changed."
         return if (current.updatedAt == params.seenUpdatedAt) {
             null

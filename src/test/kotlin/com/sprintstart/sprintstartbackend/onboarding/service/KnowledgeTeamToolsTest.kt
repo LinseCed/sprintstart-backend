@@ -1,10 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.KnowledgeRequestStatus
-import com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge.CanonicalAnswerResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge.EscalationHireResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.knowledge.KnowledgeRequestResponse
+import com.sprintstart.sprintstartbackend.knowledge.external.enums.KnowledgeRequestStatus
+import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.CanonicalAnswerResponse
+import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.EscalationHireResponse
+import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.KnowledgeRequestResponse
+import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
