@@ -4,11 +4,12 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.text
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.request.step.CreateOnboardingStepRequest
 import com.sprintstart.sprintstartbackend.path.model.request.step.UpdateOnboardingStepRequest
 import com.sprintstart.sprintstartbackend.path.model.response.step.GetOnboardingStepResponse
 import com.sprintstart.sprintstartbackend.path.service.OnboardingStepService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.path.service.StepAuthoringService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -52,7 +53,7 @@ class StepTeamActionsTest {
 
     @Nested
     inner class Add {
-        private val action = AddStepAction(f.scope, stepService)
+        private val action = AddStepAction(f.scope, StepAuthoringService(stepService, mockk()))
         private val phaseId = UUID.randomUUID()
 
         private fun inPhaseOf(steps: Int) {
@@ -158,7 +159,7 @@ class StepTeamActionsTest {
 
     @Nested
     inner class Update {
-        private val action = UpdateStepAction(f.scope, stepService)
+        private val action = UpdateStepAction(f.scope, StepAuthoringService(stepService, mockk()))
         private val stepId = UUID.randomUUID()
         private val phaseId = UUID.randomUUID()
 
@@ -245,7 +246,7 @@ class StepTeamActionsTest {
 
     @Nested
     inner class Delete {
-        private val action = DeleteStepAction(f.scope, stepService)
+        private val action = DeleteStepAction(f.scope, StepAuthoringService(stepService, mockk()))
         private val stepId = UUID.randomUUID()
 
         @Test

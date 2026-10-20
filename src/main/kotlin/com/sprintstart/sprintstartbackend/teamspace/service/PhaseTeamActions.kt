@@ -3,11 +3,13 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.path.external.PathReviewApi
+import com.sprintstart.sprintstartbackend.path.external.PhaseAuthoringApi
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.request.phase.CreateOnboardingPhaseRequest
 import com.sprintstart.sprintstartbackend.path.model.request.phase.UpdateOnboardingPhaseRequest
-import com.sprintstart.sprintstartbackend.path.service.OnboardingPhaseService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
-import com.sprintstart.sprintstartbackend.path.service.PathElements
+import com.sprintstart.sprintstartbackend.shared.ids.PhaseId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
@@ -29,8 +31,8 @@ private const val NO_PATH_YET =
 @Component
 class AddPhaseAction(
     private val scope: ContentScope,
-    private val pathElements: PathElements,
-    private val onboardingPhaseService: OnboardingPhaseService,
+    private val pathReviewApi: PathReviewApi,
+    private val phaseAuthoringApi: PhaseAuthoringApi,
 ) : TypedTeamAction<AddPhaseParams>(AddPhaseParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -53,7 +55,8 @@ class AddPhaseAction(
             ?: return TeamActionDraft.Refused(NOT_A_MEMBER_HERE)
         val title = call.textArgument("title")
         if (title.isEmpty()) return TeamActionDraft.Refused("A phase needs a title.")
-        val phases = pathElements.pathOf(owner.userId)?.phases ?: return TeamActionDraft.Refused(NO_PATH_YET)
+        val phases =
+            pathReviewApi.summaryOf(UserId(owner.userId))?.phases ?: return TeamActionDraft.Refused(NO_PATH_YET)
 
         val placeText = call.textArgument("place")
         val position = if (placeText.isEmpty()) phases else placeToPosition(placeText, phases + 1)
@@ -77,7 +80,7 @@ class AddPhaseAction(
 
     override fun recheckParams(params: AddPhaseParams, context: TeamToolContext): String? {
         val owner = scope.member(params.memberId, context.projectId) ?: return LEFT_SINCE_HERE
-        val phases = pathElements.pathOf(owner.userId)?.phases ?: return NO_PATH_YET
+        val phases = pathReviewApi.summaryOf(UserId(owner.userId))?.phases ?: return NO_PATH_YET
         return (
             "The path has fewer phases than it had — that place is gone — so nothing was changed. " +
                 "Offer it again."
@@ -85,8 +88,8 @@ class AddPhaseAction(
     }
 
     override suspend fun performParams(params: AddPhaseParams, context: TeamToolContext): String {
-        onboardingPhaseService.createOnboardingPhaseForUserId(
-            params.memberId,
+        phaseAuthoringApi.createPhase(
+            UserId(params.memberId),
             CreateOnboardingPhaseRequest(
                 position = params.position,
                 title = params.title,
@@ -125,7 +128,7 @@ data class DeletePhaseParams(
 @Component
 class UpdatePhaseAction(
     private val scope: ContentScope,
-    private val onboardingPhaseService: OnboardingPhaseService,
+    private val phaseAuthoringApi: PhaseAuthoringApi,
 ) : TypedTeamAction<UpdatePhaseParams>(UpdatePhaseParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -146,8 +149,8 @@ class UpdatePhaseAction(
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
         val target = scope.element(PathElementKind.PHASE, call.uuidArgument("phase_id"), context.projectId)
             ?: return TeamActionDraft.Refused(notInScope(PathElementKind.PHASE))
-        val current = onboardingPhaseService.getOnboardingPhaseById(target.element.id)
-        val siblings = onboardingPhaseService.getOnboardingPhasesForUser(target.owner.userId).size
+        val current = phaseAuthoringApi.phase(PhaseId(target.element.id))
+        val siblings = phaseAuthoringApi.phasesOf(UserId(target.owner.userId)).size
 
         val placeText = call.textArgument("place")
         val requested = if (placeText.isEmpty()) current.position else placeToPosition(placeText, siblings)
@@ -182,9 +185,9 @@ class UpdatePhaseAction(
         val id = params.phaseId
         // Only what the manager saw is written. Everything else is read fresh, so a change made to the
         // other fields since the preview is not undone by a confirm.
-        val current = onboardingPhaseService.getOnboardingPhaseById(id)
-        onboardingPhaseService.updateOnboardingPhaseById(
-            id,
+        val current = phaseAuthoringApi.phase(PhaseId(id))
+        phaseAuthoringApi.updatePhase(
+            PhaseId(id),
             UpdateOnboardingPhaseRequest(
                 position = params.position ?: current.position,
                 title = params.title ?: current.title,
@@ -199,7 +202,7 @@ class UpdatePhaseAction(
 @Component
 class DeletePhaseAction(
     private val scope: ContentScope,
-    private val onboardingPhaseService: OnboardingPhaseService,
+    private val phaseAuthoringApi: PhaseAuthoringApi,
 ) : TypedTeamAction<DeletePhaseParams>(DeletePhaseParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
@@ -239,7 +242,7 @@ class DeletePhaseAction(
         scope.missing(PathElementKind.PHASE, params.phaseId, context.projectId)
 
     override suspend fun performParams(params: DeletePhaseParams, context: TeamToolContext): String {
-        onboardingPhaseService.deleteOnboardingPhaseById(params.phaseId)
+        phaseAuthoringApi.deletePhase(PhaseId(params.phaseId))
         return "Deleted. The phase and everything in it are gone."
     }
 }

@@ -1,11 +1,12 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.request.question.UpdatePhaseQuestionsRequest
 import com.sprintstart.sprintstartbackend.path.model.response.question.GetPhaseQuestionsResponse
 import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionForAdminResponse
 import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionOptionForAdminResponse
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.path.service.PhaseAuthoringService
 import com.sprintstart.sprintstartbackend.path.service.QuestionAttemptService
 import io.mockk.every
 import io.mockk.mockk
@@ -23,7 +24,7 @@ import java.util.UUID
 class ReplacePhaseChecksActionTest {
     private val f = ContentFixture()
     private val questionService: QuestionAttemptService = mockk(relaxed = true)
-    private val action = ReplacePhaseChecksAction(f.scope, questionService)
+    private val action = ReplacePhaseChecksAction(f.scope, PhaseAuthoringService(mockk(), questionService))
     private val phaseId = UUID.randomUUID()
 
     private val shortId = UUID.randomUUID()

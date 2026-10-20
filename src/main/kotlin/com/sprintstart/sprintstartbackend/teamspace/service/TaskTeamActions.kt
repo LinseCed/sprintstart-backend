@@ -3,11 +3,13 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.path.external.TaskAuthoringApi
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.request.task.CreateOnboardingTaskRequest
 import com.sprintstart.sprintstartbackend.path.model.request.task.UpdateOnboardingTaskRequest
-import com.sprintstart.sprintstartbackend.path.service.OnboardingTaskService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.shared.ids.OnboardingTaskId
+import com.sprintstart.sprintstartbackend.shared.ids.StepId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component
@@ -54,7 +56,7 @@ data class DeleteTaskParams(
 @Component
 class AddTaskAction(
     private val scope: ContentScope,
-    private val onboardingTaskService: OnboardingTaskService,
+    private val taskAuthoringApi: TaskAuthoringApi,
 ) : TypedTeamAction<AddTaskParams>(AddTaskParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -122,8 +124,8 @@ class AddTaskAction(
     }
 
     override suspend fun performParams(params: AddTaskParams, context: TeamToolContext): String {
-        onboardingTaskService.createOnboardingTaskForStepId(
-            params.stepId,
+        taskAuthoringApi.createTask(
+            StepId(params.stepId),
             CreateOnboardingTaskRequest(
                 position = params.position,
                 title = params.title,
@@ -138,7 +140,7 @@ class AddTaskAction(
 @Component
 class UpdateTaskAction(
     private val scope: ContentScope,
-    private val onboardingTaskService: OnboardingTaskService,
+    private val taskAuthoringApi: TaskAuthoringApi,
 ) : TypedTeamAction<UpdateTaskParams>(UpdateTaskParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -160,8 +162,8 @@ class UpdateTaskAction(
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
         val target = scope.element(PathElementKind.TASK, call.uuidArgument("task_id"), context.projectId)
             ?: return TeamActionDraft.Refused(notInScope(PathElementKind.TASK))
-        val current = onboardingTaskService.getOnboardingTaskById(target.element.id)
-        val siblings = onboardingTaskService.getOnboardingTasksByStepId(current.stepId).size
+        val current = taskAuthoringApi.task(OnboardingTaskId(target.element.id))
+        val siblings = taskAuthoringApi.tasksOf(StepId(current.stepId)).size
 
         val placeText = call.textArgument("place")
         val requested = if (placeText.isEmpty()) current.position else placeToPosition(placeText, siblings)
@@ -195,9 +197,9 @@ class UpdateTaskAction(
         val id = params.taskId
         // `finished` is read now and passed back unchanged: the request carries it, and it must never
         // be the thing an edit from here decides.
-        val current = onboardingTaskService.getOnboardingTaskById(id)
-        onboardingTaskService.updateOnboardingTaskById(
-            id,
+        val current = taskAuthoringApi.task(OnboardingTaskId(id))
+        taskAuthoringApi.updateTask(
+            OnboardingTaskId(id),
             UpdateOnboardingTaskRequest(
                 position = params.position ?: current.position,
                 title = params.title ?: current.title,
@@ -213,7 +215,7 @@ class UpdateTaskAction(
 @Component
 class DeleteTaskAction(
     private val scope: ContentScope,
-    private val onboardingTaskService: OnboardingTaskService,
+    private val taskAuthoringApi: TaskAuthoringApi,
 ) : TypedTeamAction<DeleteTaskParams>(DeleteTaskParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
@@ -245,7 +247,7 @@ class DeleteTaskAction(
         scope.missing(PathElementKind.TASK, params.taskId, context.projectId)
 
     override suspend fun performParams(params: DeleteTaskParams, context: TeamToolContext): String {
-        onboardingTaskService.deleteOnboardingTaskById(params.taskId)
+        taskAuthoringApi.deleteTask(OnboardingTaskId(params.taskId))
         return "Deleted. The task is gone."
     }
 }

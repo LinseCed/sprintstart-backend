@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.Can
 import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.EscalationHireResponse
 import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.KnowledgeRequestResponse
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
+import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeReviewService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -17,7 +18,7 @@ import java.util.UUID
 
 class KnowledgeTeamToolsTest {
     private val knowledgeBaseService: KnowledgeBaseService = mockk()
-    private val tools = KnowledgeTeamTools(knowledgeBaseService)
+    private val tools = KnowledgeTeamTools(KnowledgeReviewService(knowledgeBaseService, mockk()))
 
     private val projectId = UUID.randomUUID()
     private val context = TeamToolContext(userId = UUID.randomUUID(), authId = "auth|pm", projectId = projectId)

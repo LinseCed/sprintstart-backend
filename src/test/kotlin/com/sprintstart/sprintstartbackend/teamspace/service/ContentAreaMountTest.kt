@@ -17,7 +17,7 @@ class ContentAreaMountTest {
     private val f = ContentFixture()
 
     private val handlers: List<TeamActionHandler> = listOf(
-        AddPhaseAction(f.scope, f.pathElements, mockk()),
+        AddPhaseAction(f.scope, f.review(), mockk()),
         UpdatePhaseAction(f.scope, mockk()),
         DeletePhaseAction(f.scope, mockk()),
         AddStepAction(f.scope, mockk()),
@@ -34,21 +34,12 @@ class ContentAreaMountTest {
         DenySkipAction(f.scope, mockk()),
         DeleteSkipAction(f.scope, mockk()),
         MarkFeedbackReadAction(f.scope, mockk()),
-        ResetMemberPathAction(f.scope, f.pathElements, mockk()),
+        ResetMemberPathAction(f.scope, f.review()),
         AuthorOrientationPacketAction(f.scope, mockk()),
         RevertOrientationPacketAction(f.scope, mockk()),
     )
 
-    private val reads = ContentTeamTools(
-        f.scope,
-        f.pathElements,
-        mockk(),
-        mockk(),
-        mockk(),
-        mockk(),
-        mockk(),
-        mockk(),
-    )
+    private val reads = ContentTeamTools(f.scope, f.review(), mockk(), mockk(), mockk())
 
     private val proposals: TeamProposalService = run {
         val provider: ObjectProvider<TeamActionHandler> = mockk()

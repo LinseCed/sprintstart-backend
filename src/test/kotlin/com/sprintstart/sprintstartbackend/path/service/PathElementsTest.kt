@@ -2,6 +2,8 @@ package com.sprintstart.sprintstartbackend.path.service
 
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
+import com.sprintstart.sprintstartbackend.path.external.model.PathSummary
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingFeedback
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPhase

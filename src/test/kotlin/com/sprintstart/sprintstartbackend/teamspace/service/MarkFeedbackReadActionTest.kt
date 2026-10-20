@@ -1,8 +1,9 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
+import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.response.feedback.GetAdminOnboardingFeedbackResponse
 import com.sprintstart.sprintstartbackend.path.service.OnboardingFeedbackService
-import com.sprintstart.sprintstartbackend.path.service.PathElementKind
+import com.sprintstart.sprintstartbackend.path.service.PathReviewService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -15,7 +16,7 @@ import java.util.UUID
 class MarkFeedbackReadActionTest {
     private val f = ContentFixture()
     private val feedbackService: OnboardingFeedbackService = mockk(relaxed = true)
-    private val action = MarkFeedbackReadAction(f.scope, feedbackService)
+    private val action = MarkFeedbackReadAction(f.scope, PathReviewService(mockk(), mockk(), mockk(), feedbackService))
     private val feedbackId = UUID.randomUUID()
 
     private fun feedback(read: Boolean = false, stepTitle: String? = "Install") {
