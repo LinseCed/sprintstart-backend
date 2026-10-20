@@ -39,7 +39,7 @@ class BuddyTeamService(
     private val buddyTeamTools: BuddyTeamTools,
     private val teamAgentLoop: TeamAgentLoop,
     private val userApi: UserApi,
-    private val compactionScheduler: BuddyCompactionScheduler,
+    private val teamCompaction: BuddyTeamCompaction,
 ) {
     /**
      * Returns the current visit of the caller's team conversation about [projectId], oldest first.
@@ -82,7 +82,7 @@ class BuddyTeamService(
             OpeningConversation(
                 fallbackGreeting = FALLBACK_TEAM_OPENING,
                 saveOpening = { greeting -> saveOpening(session, greeting) },
-                afterOpening = { compactionScheduler.foldTeamConversation(UserId(userId), ProjectId(projectId)) },
+                afterOpening = { teamCompaction.foldInBackground(UserId(userId), ProjectId(projectId)) },
             ),
         )
     }
@@ -144,7 +144,7 @@ class BuddyTeamService(
                     openedAreas = turn.areas.activeThisTurn.encoded(),
                 ),
             )
-            compactionScheduler.foldTeamConversation(UserId(userId), ProjectId(projectId))
+            teamCompaction.foldInBackground(UserId(userId), ProjectId(projectId))
         }.endFailureWithErrorEvent()
     }
 

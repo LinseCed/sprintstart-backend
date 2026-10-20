@@ -16,6 +16,7 @@ import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyOpeningService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddySuggestionService
+import com.sprintstart.sprintstartbackend.onboarding.service.BuddyTeamConversation
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyTeamService
 import com.sprintstart.sprintstartbackend.shared.ids.AuthId
 import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
@@ -55,7 +56,7 @@ import java.time.Instant
 import java.util.UUID
 
 @WebMvcTest(BuddyController::class)
-@Import(SecurityConfig::class)
+@Import(SecurityConfig::class, BuddyTeamConversation::class)
 @AutoConfigureMockMvc
 class BuddyControllerTest(
     @Autowired private val mockMvc: MockMvc,

@@ -27,10 +27,10 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
-@WebMvcTest(BuddyProposalController::class)
+@WebMvcTest(TeamProposalController::class)
 @Import(SecurityConfig::class)
 @AutoConfigureMockMvc
-class BuddyProposalControllerTest(
+class TeamProposalControllerTest(
     @Autowired private val mockMvc: MockMvc,
 ) {
     @MockkBean

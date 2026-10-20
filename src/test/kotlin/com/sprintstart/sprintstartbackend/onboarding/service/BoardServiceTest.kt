@@ -138,7 +138,7 @@ class BoardServiceTest {
             currentTaskReader,
             starterWorkTaskProposalService,
             myCompetencyService,
-            buddySessionRepository,
+            BuddyMemoryRecapSource(buddySessionRepository),
             boardDiagramService,
             arrivalStepService,
         ),

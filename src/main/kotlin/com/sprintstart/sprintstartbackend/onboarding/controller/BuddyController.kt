@@ -13,9 +13,10 @@ import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyOpeningService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddySuggestionService
-import com.sprintstart.sprintstartbackend.onboarding.service.BuddyTeamService
+import com.sprintstart.sprintstartbackend.onboarding.service.TeamModeConversation
 import com.sprintstart.sprintstartbackend.shared.ids.AuthId
 import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.media.Content
@@ -54,7 +55,7 @@ import java.util.UUID
 class BuddyController(
     private val buddyService: BuddyService,
     private val buddyOpeningService: BuddyOpeningService,
-    private val buddyTeamService: BuddyTeamService,
+    private val teamMode: TeamModeConversation,
     private val buddyActionService: BuddyActionService,
     private val buddySuggestionService: BuddySuggestionService,
 ) {
@@ -112,7 +113,7 @@ class BuddyController(
         if (teamProjectId == null) {
             buddyService.getMessagesForMe(jwt.subject, sessionId)
         } else {
-            buddyTeamService.getMessagesForMe(jwt.subject, teamProjectId)
+            teamMode.messages(AuthId(jwt.subject), ProjectId(teamProjectId))
         }
 
     @Operation(
@@ -225,7 +226,7 @@ class BuddyController(
         if (teamProjectId == null) {
             buddyOpeningService.streamOpenForMe(AuthId(jwt.subject), sessionId?.let(::BuddySessionId))
         } else {
-            buddyTeamService.streamOpenForMe(jwt.subject, teamProjectId)
+            teamMode.open(AuthId(jwt.subject), ProjectId(teamProjectId))
         }
 
     @Operation(
@@ -289,14 +290,7 @@ class BuddyController(
                 request.currentPage,
             )
         } else {
-            buddyTeamService.sendMessageForMe(
-                jwt.subject,
-                teamProjectId,
-                request.content,
-                request.capabilitiesEnabled,
-                request.filters,
-                request.currentPage,
-            )
+            teamMode.send(AuthId(jwt.subject), ProjectId(teamProjectId), request)
         }
     }
 

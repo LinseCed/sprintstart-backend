@@ -15,12 +15,11 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardC
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardPullRequestResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.CompetencyProgressContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.CurrentTaskContent
-import com.sprintstart.sprintstartbackend.onboarding.model.response.board.MemoryRecapContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.OpenPullRequestsContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.starterwork.RankedStarterWorkTaskResponse
-import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import org.springframework.stereotype.Component
 import java.util.UUID
@@ -37,7 +36,7 @@ class BoardCardHydrator(
     private val currentTaskReader: CurrentTaskReader,
     private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
     private val myCompetencyService: MyCompetencyService,
-    private val buddySessionRepository: BuddySessionRepository,
+    private val memoryRecapSource: MemoryRecapSource,
     private val boardDiagramService: BoardDiagramService,
     private val arrivalStepService: ArrivalStepService,
 ) {
@@ -87,7 +86,7 @@ class BoardCardHydrator(
             currentTaskId = currentTaskReader.currentTaskFor(member.userId, projectId.value)?.id,
         )
         BoardCardKind.COMPETENCY_PROGRESS -> competencyProgressContent(member)
-        BoardCardKind.MEMORY_RECAP -> memoryRecapContent(member)
+        BoardCardKind.MEMORY_RECAP -> memoryRecapSource.latestRecap(UserId(member.userId))
         // The one card served from a cache: its content costs a model call.
         // [BoardDiagramService] owns whether that cache is still valid.
         BoardCardKind.DIAGRAM -> boardDiagramService.contentFor(card.subject.orEmpty(), diagram)
@@ -139,22 +138,6 @@ class BoardCardHydrator(
         level = level,
         targetLevel = targetLevel,
     )
-
-    /**
-     * What the mentor remembers, read and never written.
-     *
-     * Not [BuddyService.getOrCreateSession] — hydrating a card must not create a session.
-     */
-    private fun memoryRecapContent(member: ProjectMember): MemoryRecapContent {
-        val session = buddySessionRepository
-            .findByUserIdOrderByCreatedAtDesc(member.userId)
-            .firstOrNull()
-
-        return MemoryRecapContent(
-            memory = session?.summary,
-            messagesRemembered = session?.summarizedCount ?: 0,
-        )
-    }
 
     /**
      * The task the hire is on, read — never assigned.
