@@ -13,6 +13,7 @@ import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyOpeningService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyService
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddySuggestionService
+import com.sprintstart.sprintstartbackend.onboarding.service.BuddyTeamConversation
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyTeamService
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -47,7 +48,7 @@ import java.util.UUID
  * service, that its absence never does, and that the service's refusal reaches the client as a 403.
  */
 @WebMvcTest(BuddyController::class)
-@Import(SecurityConfig::class)
+@Import(SecurityConfig::class, BuddyTeamConversation::class)
 @AutoConfigureMockMvc
 class BuddyControllerTeamModeTest(
     @Autowired private val mockMvc: MockMvc,

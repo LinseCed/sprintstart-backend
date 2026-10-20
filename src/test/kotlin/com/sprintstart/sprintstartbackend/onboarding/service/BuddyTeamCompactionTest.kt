@@ -10,11 +10,15 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepo
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamSessionRepository
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -44,10 +48,16 @@ class BuddyTeamCompactionTest {
     private val service = BuddyCompactionService(
         buddySessionRepository,
         buddyMessageRepository,
-        buddyTeamSessionRepository,
-        buddyTeamMessageRepository,
         agentAiClient,
         transactionManager,
+    )
+
+    // Unconfined runs the background fold inline, so a test sees its outcome as soon as it is scheduled.
+    private val teamCompaction = BuddyTeamCompaction(
+        service,
+        BuddyCompactionScheduler(service, CoroutineScope(Dispatchers.Unconfined)),
+        buddyTeamSessionRepository,
+        buddyTeamMessageRepository,
     )
 
     private val userId = UUID.randomUUID()
@@ -76,10 +86,22 @@ class BuddyTeamCompactionTest {
         coEvery { agentAiClient.compactBuddyMemory(capture(requests)) } returns
             BuddyCompactResponse(memory = "Asked about Sam twice.")
 
-        service.compactTeamIfNeeded(userId, projectId)
+        teamCompaction.compactIfNeeded(UserId(userId), ProjectId(projectId))
 
         assertThat(requests.single().folded.map { it.content }).containsExactly("t1", "t2", "t3", "t4")
         assertThat(session.summary).isEqualTo("Asked about Sam twice.")
+        assertThat(session.summarizedCount).isEqualTo(4)
+    }
+
+    @Test
+    fun `a fold scheduled after a turn runs in the background and folds the team conversation`() {
+        val session = teamSessionWith(messageCount = 24)
+        every { buddyTeamSessionRepository.save(any()) } answers { firstArg() }
+        coEvery { agentAiClient.compactBuddyMemory(any()) } returns BuddyCompactResponse(memory = "Asked about Sam.")
+
+        teamCompaction.foldInBackground(UserId(userId), ProjectId(projectId))
+
+        assertThat(session.summary).isEqualTo("Asked about Sam.")
         assertThat(session.summarizedCount).isEqualTo(4)
     }
 
@@ -90,7 +112,7 @@ class BuddyTeamCompactionTest {
         every { buddyTeamSessionRepository.save(any()) } answers { firstArg() }
         coEvery { agentAiClient.compactBuddyMemory(any()) } returns BuddyCompactResponse(memory = "note")
 
-        service.compactTeamIfNeeded(userId, projectId)
+        teamCompaction.compactIfNeeded(UserId(userId), ProjectId(projectId))
 
         verify(exactly = 0) { buddySessionRepository.findByUserId(any()) }
         verify(exactly = 0) { buddySessionRepository.save(any()) }
@@ -100,7 +122,7 @@ class BuddyTeamCompactionTest {
     fun `does nothing while the team window still fits`() = runTest {
         teamSessionWith(messageCount = 20)
 
-        service.compactTeamIfNeeded(userId, projectId)
+        teamCompaction.compactIfNeeded(UserId(userId), ProjectId(projectId))
 
         coVerify(exactly = 0) { agentAiClient.compactBuddyMemory(any()) }
     }
@@ -114,7 +136,7 @@ class BuddyTeamCompactionTest {
             BuddyCompactResponse(memory = "my note")
         }
 
-        service.compactTeamIfNeeded(userId, projectId)
+        teamCompaction.compactIfNeeded(UserId(userId), ProjectId(projectId))
 
         assertThat(session.summary).isEqualTo("somebody else's note")
         verify(exactly = 0) { buddyTeamSessionRepository.save(any()) }
@@ -124,7 +146,7 @@ class BuddyTeamCompactionTest {
     fun `does nothing when the manager has no team conversation on the project`() = runTest {
         every { buddyTeamSessionRepository.findByUserIdAndProjectId(userId, projectId) } returns null
 
-        service.compactTeamIfNeeded(userId, projectId)
+        teamCompaction.compactIfNeeded(UserId(userId), ProjectId(projectId))
 
         coVerify(exactly = 0) { agentAiClient.compactBuddyMemory(any()) }
     }

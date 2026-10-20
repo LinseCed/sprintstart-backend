@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
-import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -21,8 +20,8 @@ class BuddyCompactionScheduler(
         applicationScope.launch { compaction.compactIfNeeded(user.value, session.value) }
     }
 
-    /** Folds a manager's team conversation about a project. */
-    fun foldTeamConversation(user: UserId, project: ProjectId) {
-        applicationScope.launch { compaction.compactTeamIfNeeded(user.value, project.value) }
+    /** Runs [fold] in the background, for a conversation that builds its own [BuddyCompactionService.Store]. */
+    fun inBackground(fold: suspend () -> Unit) {
+        applicationScope.launch { fold() }
     }
 }

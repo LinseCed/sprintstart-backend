@@ -8,8 +8,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.Onboarding
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toAgentMessage
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamMessageRepository
-import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamSessionRepository
 import org.slf4j.LoggerFactory
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Service
@@ -34,14 +32,13 @@ import java.util.UUID
  * Losing either race discards this fold and leaves the cursor alone; the next turn retries.
  *
  * The hire's own conversation and a manager's team conversation are folded by exactly these rules.
- * They differ only in where the session and its transcript are stored, which is all [Store] captures.
+ * They differ only in where the session and its transcript are stored, which is all [Store] captures;
+ * team mode builds its own in [BuddyTeamCompaction].
  */
 @Service
 class BuddyCompactionService(
     private val buddySessionRepository: BuddySessionRepository,
     private val buddyMessageRepository: BuddyMessageRepository,
-    private val buddyTeamSessionRepository: BuddyTeamSessionRepository,
-    private val buddyTeamMessageRepository: BuddyTeamMessageRepository,
     private val agentAiClient: AgentAiClient,
     transactionManager: PlatformTransactionManager,
 ) {
@@ -73,30 +70,12 @@ class BuddyCompactionService(
     }
 
     /**
-     * Folds a manager's team conversation about one project, if it has a backlog.
+     * Folds the backlog of the conversation [store] holds into its memory note, if it has one.
      *
-     * Same guarantees as [compactIfNeeded]: a no-op while the window fits, and never throws.
-     *
-     * @param userId The manager whose team conversation to compact.
-     * @param projectId The project the conversation is about.
+     * Same guarantees as [compactIfNeeded]: a no-op while the window fits, and never throws. Each kind of
+     * conversation passes its own [Store]; the hire's is [compactIfNeeded].
      */
-    suspend fun compactTeamIfNeeded(userId: UUID, projectId: UUID) {
-        compact(
-            Store(
-                label = "user $userId on project $projectId",
-                find = { buddyTeamSessionRepository.findByUserIdAndProjectId(userId, projectId) },
-                findById = { buddyTeamSessionRepository.findById(it).orElse(null) },
-                transcript = { sessionId ->
-                    buddyTeamMessageRepository
-                        .findAllBySessionIdOrderByCreatedAtAsc(sessionId)
-                        .map { it.toAgentMessage() }
-                },
-                save = { buddyTeamSessionRepository.save(it) },
-            ),
-        )
-    }
-
-    private suspend fun <S : BuddyMemory> compact(store: Store<S>) {
+    suspend fun <S : BuddyMemory> compact(store: Store<S>) {
         val plan = readTxTemplate.execute { planFor(store) } ?: return
 
         val request = BuddyCompactRequest(priorSummary = plan.priorSummary, folded = plan.folded)
@@ -159,7 +138,7 @@ class BuddyCompactionService(
      * Where one kind of conversation is stored: its session, looked up for planning and again by id
      * for the swap, its transcript in order, and how a changed session is written back.
      */
-    private class Store<S : BuddyMemory>(
+    class Store<S : BuddyMemory>(
         val label: String,
         val find: () -> S?,
         val findById: (UUID) -> S?,

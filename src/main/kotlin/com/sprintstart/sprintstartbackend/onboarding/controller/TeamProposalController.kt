@@ -27,7 +27,7 @@ import java.util.UUID
 @RestController
 @RequestMapping("/api/v1/onboarding/me/buddy/proposals")
 @Tag(name = "Onboarding - Buddy", description = "A hire's persistent onboarding companion")
-class BuddyProposalController(
+class TeamProposalController(
     private val teamProposalService: TeamProposalService,
 ) {
     @Operation(

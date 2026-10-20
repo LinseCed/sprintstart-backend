@@ -21,14 +21,14 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamMessa
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamSession
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamSessionRepository
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
@@ -53,7 +53,7 @@ class BuddyTeamServiceTest {
     private val buddyTeamTools: BuddyTeamTools = mockk()
     private val teamProposalService: TeamProposalService = mockk()
     private val userApi: UserApi = mockk()
-    private val buddyCompactionService: BuddyCompactionService = mockk(relaxed = true)
+    private val teamCompaction: BuddyTeamCompaction = mockk(relaxed = true)
     private val artifactLookupService: ArtifactLookupService = mockk()
 
     private val service = BuddyTeamService(
@@ -68,7 +68,7 @@ class BuddyTeamServiceTest {
             artifactLookupService,
         ),
         userApi,
-        BuddyCompactionScheduler(buddyCompactionService, CoroutineScope(Dispatchers.Unconfined)),
+        teamCompaction,
     )
 
     private val authId = "auth|pm"
@@ -795,15 +795,14 @@ class BuddyTeamServiceTest {
         }
     }
 
-    /** The team note is folded; the manager's own onboarding memory is never touched from here. */
+    /** The team note is folded. The manager's own onboarding memory cannot be: team mode has no way to reach it. */
     @Test
     fun `asks for a team fold once the reply is persisted, never the hire's`() = runTest {
         coEvery { agentAiClient.buddyAgentTurnStream(any()) } returnsStream finalReply("Nobody is stuck.")
 
         service.sendMessageForMe(authId, projectId, "who is stuck?").toList()
 
-        coVerify { buddyCompactionService.compactTeamIfNeeded(userId, projectId) }
-        coVerify(exactly = 0) { buddyCompactionService.compactIfNeeded(any(), UUID.randomUUID()) }
+        verify { teamCompaction.foldInBackground(UserId(userId), ProjectId(projectId)) }
     }
 
     @Test
@@ -821,7 +820,7 @@ class BuddyTeamServiceTest {
         assertThat(requests.single().state).contains("Sam is waiting.")
         assertThat(events.last().type).isEqualTo("done")
         verify { buddyTeamMessageRepository.save(match { it.opening && it.content == "Sam has been waiting." }) }
-        coVerify { buddyCompactionService.compactTeamIfNeeded(userId, projectId) }
+        verify { teamCompaction.foldInBackground(UserId(userId), ProjectId(projectId)) }
     }
 
     @Test
