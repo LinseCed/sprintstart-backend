@@ -33,7 +33,7 @@ class BuddyTeamToolsTest {
     private val arrivalStepService: ArrivalStepService = mockk()
     private val projectMembershipApi: ProjectMembershipApi = mockk()
     private val areaToolsProvider: ObjectProvider<TeamAreaTools> = mockk()
-    private val buddyProposalService: BuddyProposalService = mockk()
+    private val teamProposalService: TeamProposalService = mockk()
     private val buddyAppGuideTools: BuddyAppGuideTools = mockk()
 
     private val projectId = UUID.randomUUID()
@@ -45,8 +45,8 @@ class BuddyTeamToolsTest {
         actions: List<TeamActionHandler> = emptyList(),
     ): BuddyTeamTools {
         every { areaToolsProvider.orderedStream() } answers { areas.toList().stream() }
-        every { buddyProposalService.actionAreas() } answers { actions.map { it.area }.toSet() }
-        every { buddyProposalService.actionSpecs(any()) } answers {
+        every { teamProposalService.actionAreas() } answers { actions.map { it.area }.toSet() }
+        every { teamProposalService.actionSpecs(any()) } answers {
             val opened = firstArg<Set<TeamArea>>()
             actions.filter { it.area in opened }.map { it.spec }
         }
@@ -59,7 +59,7 @@ class BuddyTeamToolsTest {
                 projectMembershipApi,
             ),
             areaToolsProvider,
-            buddyProposalService,
+            teamProposalService,
             buddyAppGuideTools,
         )
     }

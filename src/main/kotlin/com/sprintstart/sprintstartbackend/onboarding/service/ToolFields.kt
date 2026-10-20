@@ -1,7 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.textArgument
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
@@ -80,3 +79,18 @@ internal class ChangeLines {
 
     fun preview(): String = lines.joinToString("\n")
 }
+
+/** A JSON schema of string fields, for a tool's definition. */
+internal fun stringFields(vararg fields: Pair<String, String>, required: List<String>): JsonObject =
+    buildJsonObject {
+        put("type", "object")
+        putJsonObject("properties") {
+            fields.forEach { (name, description) ->
+                putJsonObject(name) {
+                    put("type", "string")
+                    put("description", description)
+                }
+            }
+        }
+        putJsonArray("required") { required.forEach { add(it) } }
+    }

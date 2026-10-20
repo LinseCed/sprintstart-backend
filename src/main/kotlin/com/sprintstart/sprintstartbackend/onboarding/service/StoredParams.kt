@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.onboarding.assistant.external
+package com.sprintstart.sprintstartbackend.onboarding.service
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind

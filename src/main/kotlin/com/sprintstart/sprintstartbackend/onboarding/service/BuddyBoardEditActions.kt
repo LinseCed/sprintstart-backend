@@ -1,11 +1,8 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
+import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.text
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.textArgument
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.textListArgument
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.uuidArgument
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardActor
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
@@ -19,7 +16,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardC
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.ChecklistContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.LinkContent
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.NoteContent
-import com.sprintstart.sprintstartbackend.onboarding.model.response.buddy.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService.BuddyActionProposal
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyActionService.ProposeOutcome
 import com.sprintstart.sprintstartbackend.onboarding.service.BuddyBoardWriteActions.BoardWritePayload

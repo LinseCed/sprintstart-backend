@@ -2,7 +2,6 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.textArgument
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -28,19 +27,19 @@ import java.util.UUID
 class BuddyTeamTools(
     private val teamReadTools: TeamReadTools,
     private val areaToolsProvider: ObjectProvider<TeamAreaTools>,
-    private val buddyProposalService: BuddyProposalService,
+    private val teamProposalService: TeamProposalService,
     private val buddyAppGuideTools: BuddyAppGuideTools,
 ) {
     private val areaTools: Map<TeamArea, TeamAreaTools> by lazy {
         areaToolsProvider.orderedStream().toList().associateBy { it.area }
     }
 
-    private val openableAreas: Set<TeamArea> by lazy { areaTools.keys + buddyProposalService.actionAreas() }
+    private val openableAreas: Set<TeamArea> by lazy { areaTools.keys + teamProposalService.actionAreas() }
 
     private val actionAreaByName: Map<String, TeamArea> by lazy {
         TeamArea.entries
             .flatMap { area ->
-                buddyProposalService.actionSpecs(setOf(area)).map { it.name to area }
+                teamProposalService.actionSpecs(setOf(area)).map { it.name to area }
             }.toMap()
     }
 
@@ -61,7 +60,7 @@ class BuddyTeamTools(
             openedAreas.sorted().forEach { area ->
                 areaTools[area]?.let { addAll(it.toolSpecs()) }
             }
-            addAll(buddyProposalService.actionSpecs(openedAreas))
+            addAll(teamProposalService.actionSpecs(openedAreas))
         }
 
     /** The area [toolName] belongs to, as a read tool or an action; `null` for everything else. */
@@ -90,7 +89,7 @@ class BuddyTeamTools(
     }
 
     private fun toolNamesIn(area: TeamArea): List<String> =
-        (areaTools[area]?.toolSpecs().orEmpty() + buddyProposalService.actionSpecs(setOf(area))).map { it.name }
+        (areaTools[area]?.toolSpecs().orEmpty() + teamProposalService.actionSpecs(setOf(area))).map { it.name }
 
     /**
      * Runs one team-mode tool for [context].

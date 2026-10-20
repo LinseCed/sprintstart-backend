@@ -3,7 +3,6 @@ package com.sprintstart.sprintstartbackend.onboarding.assistant.service
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentResponse
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.text
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector

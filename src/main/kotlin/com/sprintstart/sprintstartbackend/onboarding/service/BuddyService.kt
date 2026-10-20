@@ -8,7 +8,6 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStr
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyVocabularyDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.text
 import com.sprintstart.sprintstartbackend.onboarding.assistant.service.ResolvedBuddyCitation
 import com.sprintstart.sprintstartbackend.onboarding.assistant.service.completeReply
 import com.sprintstart.sprintstartbackend.onboarding.assistant.service.emitAgentReply

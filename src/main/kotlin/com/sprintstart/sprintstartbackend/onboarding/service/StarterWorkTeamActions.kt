@@ -5,12 +5,6 @@ import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.IngestedI
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.UuidSerializer
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.booleanArgument
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.forLabel
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.stringFields
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.textArgument
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.uuidArgument
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.onboarding.model.request.starterwork.PromoteStarterWorkCandidateRequest

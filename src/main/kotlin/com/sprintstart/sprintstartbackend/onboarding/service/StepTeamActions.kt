@@ -3,12 +3,6 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.UuidSerializer
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.forLabel
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.stringFields
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.text
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.textArgument
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.uuidArgument
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.model.request.step.CreateOnboardingStepRequest

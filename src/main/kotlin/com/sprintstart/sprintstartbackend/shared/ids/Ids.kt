@@ -37,3 +37,9 @@ value class BoardCardId(
 value class OnboardingTaskId(
     val value: UUID,
 )
+
+/** A change an assistant offered and a user has yet to confirm or dismiss. */
+@JvmInline
+value class ActionProposalId(
+    val value: UUID,
+)

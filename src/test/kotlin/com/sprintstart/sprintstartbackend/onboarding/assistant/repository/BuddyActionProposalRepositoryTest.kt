@@ -3,7 +3,6 @@ package com.sprintstart.sprintstartbackend.onboarding.assistant.repository
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalStatus
 import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
-import com.sprintstart.sprintstartbackend.onboarding.assistant.repository.BuddyActionProposalRepository
 import com.sprintstart.sprintstartbackend.shared.crypto.CryptoConfiguration
 import jakarta.persistence.EntityManager
 import org.assertj.core.api.Assertions.assertThat

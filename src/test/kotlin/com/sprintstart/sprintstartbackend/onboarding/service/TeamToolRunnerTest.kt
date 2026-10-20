@@ -3,7 +3,6 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.TOOL_CALL_WRITTEN_OUT
 import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
 import io.mockk.every
 import io.mockk.mockk
@@ -16,8 +15,8 @@ import java.util.UUID
 
 class TeamToolRunnerTest {
     private val buddyTeamTools: BuddyTeamTools = mockk()
-    private val buddyProposalService: BuddyProposalService = mockk()
-    private val runner = TeamToolRunner(buddyTeamTools, buddyProposalService)
+    private val teamProposalService: TeamProposalService = mockk()
+    private val runner = TeamToolRunner(buddyTeamTools, teamProposalService)
 
     private val context = TeamToolContext(userId = UUID.randomUUID(), authId = "auth|pm", projectId = UUID.randomUUID())
     private val events = mutableListOf<BuddyStreamEvent>()
@@ -43,9 +42,9 @@ class TeamToolRunnerTest {
         val areas = OpenAreas(setOf(TeamArea.KNOWLEDGE))
         val stored = proposal()
         every { buddyTeamTools.areaOf("answer_escalation") } returns TeamArea.KNOWLEDGE
-        every { buddyProposalService.isAction("answer_escalation") } returns true
-        every { buddyProposalService.propose(any(), any()) } returns
-            BuddyProposalService.ProposeOutcome(toolResult = "Offered.", proposal = stored)
+        every { teamProposalService.isAction("answer_escalation") } returns true
+        every { teamProposalService.propose(any(), any()) } returns
+            TeamProposalService.ProposeOutcome(toolResult = "Offered.", proposal = stored)
 
         val result = runner.run(call("answer_escalation"), context, setOf("answer_escalation"), areas, emit)
 
@@ -58,9 +57,9 @@ class TeamToolRunnerTest {
     @Test
     fun `a refused action tells the model why and shows the manager nothing`() = runTest {
         every { buddyTeamTools.areaOf("answer_escalation") } returns TeamArea.KNOWLEDGE
-        every { buddyProposalService.isAction("answer_escalation") } returns true
-        every { buddyProposalService.propose(any(), any()) } returns
-            BuddyProposalService.ProposeOutcome(toolResult = "No such question.", proposal = null)
+        every { teamProposalService.isAction("answer_escalation") } returns true
+        every { teamProposalService.propose(any(), any()) } returns
+            TeamProposalService.ProposeOutcome(toolResult = "No such question.", proposal = null)
 
         val result = runner.run(
             call("answer_escalation"),
@@ -78,7 +77,7 @@ class TeamToolRunnerTest {
     fun `using a tool keeps its area open for the next replies`() = runTest {
         val areas = OpenAreas(setOf(TeamArea.KNOWLEDGE))
         every { buddyTeamTools.areaOf("list_open_escalations") } returns TeamArea.KNOWLEDGE
-        every { buddyProposalService.isAction("list_open_escalations") } returns false
+        every { teamProposalService.isAction("list_open_escalations") } returns false
         every { buddyTeamTools.execute(any(), any(), any()) } returns "Two open questions."
 
         val result = runner.run(call("list_open_escalations"), context, setOf("list_open_escalations"), areas, emit)
@@ -92,7 +91,7 @@ class TeamToolRunnerTest {
     fun `open_area opens the area it names`() = runTest {
         val areas = OpenAreas()
         every { buddyTeamTools.areaOf(BuddyTeamTools.OPEN_AREA) } returns null
-        every { buddyProposalService.isAction(BuddyTeamTools.OPEN_AREA) } returns false
+        every { teamProposalService.isAction(BuddyTeamTools.OPEN_AREA) } returns false
         every { buddyTeamTools.openArea(any()) } returns
             BuddyTeamTools.OpenAreaOutcome(TeamArea.TEAM, "Opened team.")
 
@@ -112,7 +111,7 @@ class TeamToolRunnerTest {
         assertThat(result).contains("belongs to the knowledge area").contains("call answer_escalation again")
         assertThat(areas.mounted).containsExactly(TeamArea.KNOWLEDGE)
         assertThat(events.single().name).isEqualTo(BuddyTeamTools.OPEN_AREA)
-        verify(exactly = 0) { buddyProposalService.propose(any(), any()) }
+        verify(exactly = 0) { teamProposalService.propose(any(), any()) }
         verify(exactly = 0) { buddyTeamTools.execute(any(), any(), any()) }
     }
 
@@ -132,7 +131,7 @@ class TeamToolRunnerTest {
         every { buddyTeamTools.areaOf("answer_escalation") } returns TeamArea.KNOWLEDGE
         every { buddyTeamTools.execute(any(), any(), any()) } returns
             "The tool answer_escalation is not available right now."
-        every { buddyProposalService.isAction(any()) } returns false
+        every { teamProposalService.isAction(any()) } returns false
 
         runner.run(call("answer_escalation"), context, emptySet(), areas, emit)
 

@@ -3,7 +3,6 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.StoredParams
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -108,3 +107,8 @@ abstract class TypedTeamAction<P : Any>(
         const val UNREADABLE = "This proposal could not be read back, so nothing was changed."
     }
 }
+
+private const val LABEL_CHARS = 60
+
+/** Short enough for a confirm button. */
+internal fun String.forLabel(): String = if (length <= LABEL_CHARS) this else take(LABEL_CHARS - 1).trimEnd() + "…"

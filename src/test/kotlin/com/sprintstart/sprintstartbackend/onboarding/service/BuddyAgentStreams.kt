@@ -2,7 +2,6 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentResponse
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.text
 import io.mockk.MockKStubScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
