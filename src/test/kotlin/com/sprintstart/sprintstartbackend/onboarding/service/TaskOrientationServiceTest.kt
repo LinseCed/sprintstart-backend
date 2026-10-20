@@ -17,12 +17,12 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.StarterWorkTas
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskOrientationCitation
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskOrientationPacket
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskOrientationSection
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.AuthorOrientationCitationRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.AuthorOrientationRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.AuthorOrientationSectionRequest
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.TaskOrientationPacketRepository
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.coEvery
@@ -238,7 +238,7 @@ class TaskOrientationServiceTest {
     fun `an unreachable AI service serves the last known good packet`() = runTest {
         hasTask(cached = cachedPacket("fp-old"))
         coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } throws
-            OnboardingAiException(503, "", "AI is down")
+            AiServiceException(503, "", "AI is down")
 
         val result = service.getForHire(hireId, projectId)
 
@@ -252,7 +252,7 @@ class TaskOrientationServiceTest {
     fun `an unreachable AI service with nothing cached says so`() = runTest {
         hasTask()
         coEvery { orientationAiClient.assembleOrientation(any(), any(), any(), any(), any(), any()) } throws
-            OnboardingAiException(503, "", "AI is down")
+            AiServiceException(503, "", "AI is down")
 
         val result = service.getForHire(hireId, projectId)
 
@@ -667,7 +667,7 @@ class TaskOrientationServiceTest {
     fun `a failing AI stream ends in a synthesised error event`() = runTest {
         hasTask()
         every { orientationAiClient.streamOrientation(any(), any(), any(), any(), any(), any()) } returns
-            flow { throw OnboardingAiException(503, "", "AI is down") }
+            flow { throw AiServiceException(503, "", "AI is down") }
 
         val events = service.streamForHire(hireId, projectId).toList()
 

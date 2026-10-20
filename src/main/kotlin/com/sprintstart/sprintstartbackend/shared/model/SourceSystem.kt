@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.ingestion.external.model
+package com.sprintstart.sprintstartbackend.shared.model
 
 enum class SourceSystem {
     CONFLUENCE,

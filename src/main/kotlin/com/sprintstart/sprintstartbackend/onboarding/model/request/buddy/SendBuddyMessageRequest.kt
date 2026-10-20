@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.request.buddy
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
+import com.sprintstart.sprintstartbackend.assistant.external.BuddySessionFilters
 import java.util.UUID
 
 /**

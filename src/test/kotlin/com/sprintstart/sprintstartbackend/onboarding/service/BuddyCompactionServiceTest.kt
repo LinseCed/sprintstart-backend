@@ -1,14 +1,14 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCompactRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCompactResponse
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactResponse
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyMessageRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -158,7 +158,7 @@ class BuddyCompactionServiceTest {
     fun `leaves the cursor alone when the model is unavailable`() = runTest {
         val session = sessionWith(messageCount = 26, summary = "Earlier notes.")
         coEvery { agentAiClient.compactBuddyMemory(any()) } throws
-            OnboardingAiException(503, "model down", "unavailable")
+            AiServiceException(503, "model down", "unavailable")
 
         service.compactIfNeeded(userId, session.id)
 
@@ -172,7 +172,7 @@ class BuddyCompactionServiceTest {
     fun `swallows an AI failure rather than surfacing it`() = runTest {
         val session = sessionWith(messageCount = 26)
         coEvery { agentAiClient.compactBuddyMemory(any()) } throws
-            OnboardingAiException(500, "boom", "exploded")
+            AiServiceException(500, "boom", "exploded")
 
         service.compactIfNeeded(userId, session.id)
     }

@@ -1,7 +1,7 @@
-package com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity
+package com.sprintstart.sprintstartbackend.assistant.model.entity
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalStatus
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalStatus
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType

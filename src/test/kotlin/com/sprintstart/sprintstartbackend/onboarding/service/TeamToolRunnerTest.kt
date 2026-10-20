@@ -1,17 +1,17 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.ActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventType
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import java.time.Instant
 import java.util.UUID
 
 class TeamToolRunnerTest {
@@ -26,16 +26,15 @@ class TeamToolRunnerTest {
     private fun call(name: String) = BuddyToolCallDto(id = "c1", name = name)
 
     private fun proposal() =
-        BuddyActionProposal(
+        ActionProposal(
+            id = UUID.randomUUID(),
             userId = context.userId,
             projectId = context.projectId,
             action = "answer_escalation",
-            params = "{}",
+            params = JsonObject(emptyMap()),
             label = "Answer: how do we deploy?",
             preview = "The answer is published.",
             risk = BuddyProposalRisk.STANDARD,
-            createdAt = Instant.now(),
-            expiresAt = Instant.now().plusSeconds(60),
         )
 
     @Test

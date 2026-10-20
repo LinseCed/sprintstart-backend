@@ -1,10 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyActionResponse
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
-import com.sprintstart.sprintstartbackend.onboarding.assistant.service.ActionProposalStore
+import com.sprintstart.sprintstartbackend.assistant.external.ActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.ActionProposalApi
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.ProposalOffer
 import com.sprintstart.sprintstartbackend.shared.ids.ActionProposalId
 import com.sprintstart.sprintstartbackend.shared.ids.AuthId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
@@ -22,14 +23,14 @@ import java.util.UUID
  * Proposing changes nothing but the stored proposal. Confirming runs, in order:
  *
  * 1. **Owner.** Only the manager the proposal was made for can decide it; anybody else gets a 404.
- * 2. **Still open**, and claimed exactly once, through [ActionProposalStore.claim].
+ * 2. **Still open**, and claimed exactly once, through [ActionProposalApi.confirm].
  * 3. **Still the manager**, through [UserApi.canManageProject].
  * 4. **Still valid**, through [TeamActionHandler.recheck].
  * 5. **Perform**, then record `CONFIRMED` or `FAILED`, even if the action throws.
  */
 @Service
 class TeamProposalService(
-    private val proposals: ActionProposalStore,
+    private val proposals: ActionProposalApi,
     private val userApi: UserApi,
     private val handlersProvider: ObjectProvider<TeamActionHandler>,
 ) {
@@ -59,7 +60,7 @@ class TeamProposalService(
                 proposal = proposals.open(
                     userId = UserId(context.userId),
                     projectId = ProjectId(context.projectId),
-                    offer = ActionProposalStore.Offer(
+                    offer = ProposalOffer(
                         action = handler.spec.name,
                         risk = handler.risk,
                         params = draft.params,
@@ -78,9 +79,9 @@ class TeamProposalService(
      * @throws ResponseStatusException 404 when the caller does not exist or the proposal is not theirs.
      */
     suspend fun confirm(authId: String, proposalId: UUID): BuddyActionResponse {
-        val proposal = proposals.owned(resolveUserId(AuthId(authId)), ActionProposalId(proposalId))
-        proposals.claim(proposal)?.let { return it }
-        return proposals.settle(ActionProposalId(proposal.id)) { attempt(proposal, authId) }
+        return proposals.confirm(resolveUserId(AuthId(authId)), ActionProposalId(proposalId)) { proposal ->
+            attempt(proposal, authId)
+        }
     }
 
     /**
@@ -89,9 +90,9 @@ class TeamProposalService(
      * @throws ResponseStatusException 404 when the caller does not exist or the proposal is not theirs.
      */
     fun dismiss(authId: String, proposalId: UUID): BuddyActionResponse =
-        proposals.dismiss(proposals.owned(resolveUserId(AuthId(authId)), ActionProposalId(proposalId)))
+        proposals.dismiss(resolveUserId(AuthId(authId)), ActionProposalId(proposalId))
 
-    private suspend fun attempt(proposal: BuddyActionProposal, authId: String): BuddyActionResponse {
+    private suspend fun attempt(proposal: ActionProposal, authId: String): BuddyActionResponse {
         if (!userApi.canManageProject(authId, proposal.projectId)) {
             return BuddyActionResponse(ok = false, message = "You no longer manage this project, so this was not done.")
         }
@@ -100,7 +101,7 @@ class TeamProposalService(
                 ok = false,
                 message = "This action is no longer available, so nothing was done.",
             )
-        val params = proposals.params(proposal)
+        val params = proposal.params
         val context = TeamToolContext(userId = proposal.userId, authId = authId, projectId = proposal.projectId)
         handler.recheck(params, context)?.let { return BuddyActionResponse(ok = false, message = it) }
         return BuddyActionResponse(ok = true, message = handler.perform(params, context))
@@ -114,6 +115,6 @@ class TeamProposalService(
 
     data class ProposeOutcome(
         val toolResult: String,
-        val proposal: BuddyActionProposal?,
+        val proposal: ActionProposal?,
     )
 }

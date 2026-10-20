@@ -12,13 +12,13 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskOrientatio
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskOrientationPacket
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskOrientationSection
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.TaskOrientationSource
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.request.orientation.AuthorOrientationRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.MyOrientationResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.orientation.OrientationPacketResponse
 import com.sprintstart.sprintstartbackend.onboarding.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.TaskOrientationPacketRepository
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -105,7 +105,7 @@ class TaskOrientationService(
                 touchedPaths = emptyList(),
                 lastFingerprint = context.cachedFingerprint,
             )
-        } catch (e: OnboardingAiException) {
+        } catch (e: AiServiceException) {
             logger.warn("Orientation assembly unavailable for task {}: {}", context.proposalId, e.message)
             return context.cachedOrEmpty("Orientation is temporarily unavailable")
         }

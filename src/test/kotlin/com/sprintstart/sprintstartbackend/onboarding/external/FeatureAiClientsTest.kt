@@ -1,10 +1,10 @@
 package com.sprintstart.sprintstartbackend.onboarding.external
 
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyCompactRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssemblePhaseRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.shared.config.AiConfig
 import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
 import com.sprintstart.sprintstartbackend.shared.config.BitbucketConfig
@@ -77,10 +77,10 @@ class FeatureAiClientsTest {
     }
 
     @Test
-    fun `a failed call becomes an OnboardingAiException with the upstream status and body`() = runTest {
+    fun `a failed call becomes an AiServiceException with the upstream status and body`() = runTest {
         json("""{"detail":"model down"}""", status = 503)
 
-        val error = assertThrows<OnboardingAiException> {
+        val error = assertThrows<AiServiceException> {
             DiagramAiClient(calls).assembleDiagram("deploy flow", listOf(projectId))
         }
 
@@ -159,10 +159,10 @@ class FeatureAiClientsTest {
     }
 
     @Test
-    fun `a rejected agent turn becomes an OnboardingAiException`() = runTest {
+    fun `a rejected agent turn becomes an AiServiceException`() = runTest {
         json("""{"detail":"overloaded"}""", status = 503)
 
-        val error = assertThrows<OnboardingAiException> {
+        val error = assertThrows<AiServiceException> {
             AgentAiClient(calls).buddyAgentTurnStream(BuddyAgentRequest(messages = emptyList())).toList()
         }
 

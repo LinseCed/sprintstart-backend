@@ -1,20 +1,19 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.ingestion.external.model.SourceSystem
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentMessageDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentResponse
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAgentStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenRequest
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyOpenStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyProposalRisk
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddySessionFilters
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEventType
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
-import com.sprintstart.sprintstartbackend.onboarding.assistant.service.FALLBACK_REPLY
+import com.sprintstart.sprintstartbackend.assistant.external.ActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentResponse
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
+import com.sprintstart.sprintstartbackend.assistant.external.BuddySessionFilters
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventType
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.FALLBACK_REPLY
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamMessage
@@ -23,6 +22,7 @@ import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamMessage
 import com.sprintstart.sprintstartbackend.onboarding.repository.BuddyTeamSessionRepository
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.shared.model.SourceSystem
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -41,7 +41,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.web.server.ResponseStatusException
-import java.time.Instant
 import java.util.Optional
 import java.util.UUID
 
@@ -476,16 +475,15 @@ class BuddyTeamServiceTest {
             }
             every { buddyTeamTools.areaOf("answer_escalation") } returns TeamArea.KNOWLEDGE
             every { teamProposalService.isAction("answer_escalation") } returns true
-            val proposal = BuddyActionProposal(
+            val proposal = ActionProposal(
+                id = UUID.randomUUID(),
                 userId = userId,
                 projectId = projectId,
                 action = "answer_escalation",
-                params = "{}",
+                params = JsonObject(emptyMap()),
                 label = "Answer: how do we deploy?",
                 preview = "The answer is published.",
                 risk = BuddyProposalRisk.STANDARD,
-                createdAt = Instant.now(),
-                expiresAt = Instant.now().plusSeconds(60),
             )
             every { teamProposalService.propose(any(), any()) } returns
                 TeamProposalService.ProposeOutcome(toolResult = "Offered to the manager.", proposal = proposal)
@@ -876,16 +874,15 @@ class BuddyTeamServiceTest {
     fun `an action call becomes a stored proposal event and never runs as a tool`() = runTest {
         every { buddyTeamTools.toolSpecs(any()) } returns listOf(spec("dismiss_escalation"))
         every { teamProposalService.isAction("dismiss_escalation") } returns true
-        val proposal = BuddyActionProposal(
+        val proposal = ActionProposal(
+            id = UUID.randomUUID(),
             userId = userId,
             projectId = projectId,
             action = "dismiss_escalation",
-            params = "{}",
+            params = JsonObject(emptyMap()),
             label = "Dismiss: how do we deploy?",
             preview = "The question disappears from the inbox.",
             risk = BuddyProposalRisk.DESTRUCTIVE,
-            createdAt = Instant.now(),
-            expiresAt = Instant.now().plusSeconds(60),
         )
         every { teamProposalService.propose(any(), any()) } returns
             TeamProposalService.ProposeOutcome(toolResult = "Proposed to the manager.", proposal = proposal)

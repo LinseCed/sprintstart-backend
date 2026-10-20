@@ -10,7 +10,6 @@ import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardDiagramEd
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardDiagramNodePayload
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardDiagramPayload
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardDiagramSourcePayload
-import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardDiagramCitationResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardDiagramEdgeResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardDiagramNodeResponse
@@ -19,6 +18,7 @@ import com.sprintstart.sprintstartbackend.onboarding.model.response.board.Diagra
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardDiagramRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.BoardRepository
+import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.coroutines.CoroutineDispatcher
@@ -111,7 +111,7 @@ class BoardDiagramService(
                 projectIds = listOf(context.projectId),
                 lastFingerprint = context.fingerprint,
             )
-        } catch (e: OnboardingAiException) {
+        } catch (e: AiServiceException) {
             logger.warn("Diagram assembly unavailable for card {}: {}", cardId.value, e.message)
             // No evidence about staleness, so the last picture drawn stands.
             return context.served(UNAVAILABLE)
