@@ -8,7 +8,7 @@ import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.Blue
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPhase
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPhaseRequirement
 import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.mapper.toSnapshot
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.PhaseContentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AssemblePhaseRequest
@@ -61,7 +61,7 @@ import kotlin.test.assertTrue
 class OnboardingPersonalizationServiceTest {
     private val onboardingPathRepository: OnboardingPathRepository = mockk()
     private val blueprintApi: BlueprintApi = mockk()
-    private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val phaseContentAiClient: PhaseContentAiClient = mockk()
     private val userApi: UserApi = mockk()
     private val projectIndustryApi: ProjectIndustryApi = mockk(relaxed = true)
     private val entityManager: EntityManager = mockk(relaxed = true)
@@ -171,7 +171,7 @@ class OnboardingPersonalizationServiceTest {
                 .contains("No active blueprint"),
         )
         verify(exactly = 0) { onboardingPathRepository.deleteByUserId(any()) }
-        verify(exactly = 0) { onboardingAiClient.streamPhase(any()) }
+        verify(exactly = 0) { phaseContentAiClient.streamPhase(any()) }
     }
 
     @Test
@@ -252,11 +252,11 @@ class OnboardingPersonalizationServiceTest {
         every { blueprintApi.snapshot(BlueprintId(path.id)) } answers { path.toSnapshot() }
         every { onboardingPathRepository.deleteByUserId(userId) } just runs
         every { onboardingPathRepository.flush() } just runs
-        every { onboardingAiClient.streamPhase(any()) } returns flowOf(doneEvent())
+        every { phaseContentAiClient.streamPhase(any()) } returns flowOf(doneEvent())
 
         val events = service.personalize(authId, projectId).toList()
 
-        verify(exactly = 1) { onboardingAiClient.streamPhase(match { it.phaseTitle == "Included" }) }
+        verify(exactly = 1) { phaseContentAiClient.streamPhase(match { it.phaseTitle == "Included" }) }
         val pathEvent = events.firstOrNull { it.type == "path" }
         assertEquals(listOf("Included"), pathEvent?.path?.phases?.map { it.title })
         assertTrue(
@@ -296,7 +296,7 @@ class OnboardingPersonalizationServiceTest {
 
         val events = service.personalize(authId, projectId).toList()
 
-        verify(exactly = 0) { onboardingAiClient.streamPhase(any()) }
+        verify(exactly = 0) { phaseContentAiClient.streamPhase(any()) }
         assertEquals(listOf("path", "done"), events.map { it.type })
         assertEquals(
             listOf("Authored"),
@@ -343,7 +343,7 @@ class OnboardingPersonalizationServiceTest {
         every { onboardingPathRepository.deleteByUserId(userId) } just runs
         every { onboardingPathRepository.flush() } just runs
         every {
-            onboardingAiClient.streamPhase(any())
+            phaseContentAiClient.streamPhase(any())
         } returns flowOf(
             AiProgressEvent(type = AiProgressEvent.DONE, result = json.encodeToJsonElement(outcome)),
         )
@@ -360,7 +360,7 @@ class OnboardingPersonalizationServiceTest {
         assertEquals(GenerationStatus.GENERATED, phase?.generationStatus)
         val generationIssues = pathEvent?.path?.generationIssues.orEmpty()
         assertTrue(generationIssues.isEmpty())
-        verify { onboardingAiClient.streamPhase(any()) }
+        verify { phaseContentAiClient.streamPhase(any()) }
     }
 
     @Test
@@ -373,7 +373,7 @@ class OnboardingPersonalizationServiceTest {
         every { blueprintApi.snapshot(BlueprintId(blueprint.id)) } answers { blueprint.toSnapshot() }
         every { onboardingPathRepository.deleteByUserId(userId) } just runs
         every { onboardingPathRepository.flush() } just runs
-        every { onboardingAiClient.streamPhase(any()) } returns flowOf()
+        every { phaseContentAiClient.streamPhase(any()) } returns flowOf()
 
         val events = service.personalize(authId, projectId).toList()
 
@@ -391,7 +391,7 @@ class OnboardingPersonalizationServiceTest {
         var active = 0
         var maxActive = 0
         expectBlueprint(blueprint)
-        every { onboardingAiClient.streamPhase(any()) } answers {
+        every { phaseContentAiClient.streamPhase(any()) } answers {
             flow {
                 active += 1
                 if (active > maxActive) maxActive = active
@@ -414,7 +414,7 @@ class OnboardingPersonalizationServiceTest {
     fun `marks a slow phase as timed out while siblings are still persisted`() = runTest {
         val blueprint = aiEnhancedBlueprint(listOf("Slow", "Fast"))
         expectBlueprint(blueprint)
-        every { onboardingAiClient.streamPhase(any()) } answers {
+        every { phaseContentAiClient.streamPhase(any()) } answers {
             if (firstArg<AssemblePhaseRequest>().phaseTitle == "Slow") {
                 flow { delay(1_400_000L) }
             } else {
@@ -443,7 +443,7 @@ class OnboardingPersonalizationServiceTest {
         val blueprint = aiEnhancedBlueprint(listOf("P0", "P1", "P2", "P3", "P4"))
         val service = serviceWith(OnboardingConfig(totalTimeoutSeconds = 1, phaseConcurrency = 2))
         expectBlueprint(blueprint)
-        every { onboardingAiClient.streamPhase(any()) } answers {
+        every { phaseContentAiClient.streamPhase(any()) } answers {
             flow { delay(600_000L) }
         }
 
@@ -459,7 +459,7 @@ class OnboardingPersonalizationServiceTest {
     fun `a failed phase does not prevent siblings from being persisted`() = runTest {
         val blueprint = aiEnhancedBlueprint(listOf("Broken", "Healthy"))
         expectBlueprint(blueprint)
-        every { onboardingAiClient.streamPhase(any()) } answers {
+        every { phaseContentAiClient.streamPhase(any()) } answers {
             if (firstArg<AssemblePhaseRequest>().phaseTitle == "Broken") {
                 flowOf(AiProgressEvent(type = AiProgressEvent.ERROR, message = "upstream exploded"))
             } else {
@@ -482,7 +482,7 @@ class OnboardingPersonalizationServiceTest {
     fun `keeps blueprint phase order when phases complete out of order`() = runTest {
         val blueprint = aiEnhancedBlueprint(listOf("Slow0", "Fast1", "Medium2"))
         expectBlueprint(blueprint)
-        every { onboardingAiClient.streamPhase(any()) } answers {
+        every { phaseContentAiClient.streamPhase(any()) } answers {
             when (firstArg<AssemblePhaseRequest>().phaseTitle) {
                 "Slow0" -> flow {
                     delay(200L)
@@ -512,14 +512,14 @@ class OnboardingPersonalizationServiceTest {
         val blueprint = aiEnhancedBlueprint(listOf("Phase1", "Phase2"))
         expectBlueprint(blueprint)
         coEvery { projectIndustryApi.getOrEvaluateIndustry(projectId) } returns "Fintech / Banking"
-        every { onboardingAiClient.streamPhase(any()) } returns flowOf(doneEvent())
+        every { phaseContentAiClient.streamPhase(any()) } returns flowOf(doneEvent())
 
         val events = service.personalize(authId, projectId).toList()
 
         assertTrue(events.any { it.type == "path" })
         coVerify(exactly = 1) { projectIndustryApi.getOrEvaluateIndustry(projectId) }
         coVerify(exactly = 2) {
-            onboardingAiClient.streamPhase(match { it.industry == "Fintech / Banking" })
+            phaseContentAiClient.streamPhase(match { it.industry == "Fintech / Banking" })
         }
     }
 
@@ -528,14 +528,14 @@ class OnboardingPersonalizationServiceTest {
         val blueprint = aiEnhancedBlueprint(listOf("Overview"))
         expectBlueprint(blueprint)
         coEvery { projectIndustryApi.getOrEvaluateIndustry(projectId) } returns null
-        every { onboardingAiClient.streamPhase(any()) } returns flowOf(doneEvent())
+        every { phaseContentAiClient.streamPhase(any()) } returns flowOf(doneEvent())
 
         val events = service.personalize(authId, projectId).toList()
 
         assertTrue(events.any { it.type == "path" })
         coVerify(exactly = 1) { projectIndustryApi.getOrEvaluateIndustry(projectId) }
         coVerify(exactly = 1) {
-            onboardingAiClient.streamPhase(match { it.industry == null })
+            phaseContentAiClient.streamPhase(match { it.industry == null })
         }
     }
 
@@ -544,7 +544,7 @@ class OnboardingPersonalizationServiceTest {
             onboardingPathRepository = onboardingPathRepository,
             blueprintApi = blueprintApi,
             onboardingPathFactory = OnboardingPathFromBlueprintFactory(),
-            onboardingAiClient = onboardingAiClient,
+            phaseContentAiClient = phaseContentAiClient,
             userApi = userApi,
             projectIndustryApi = projectIndustryApi,
             json = json,

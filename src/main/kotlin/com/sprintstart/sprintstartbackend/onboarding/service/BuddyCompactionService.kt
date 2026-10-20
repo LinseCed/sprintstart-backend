@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyCompactRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyMemory
@@ -42,7 +42,7 @@ class BuddyCompactionService(
     private val buddyMessageRepository: BuddyMessageRepository,
     private val buddyTeamSessionRepository: BuddyTeamSessionRepository,
     private val buddyTeamMessageRepository: BuddyTeamMessageRepository,
-    private val onboardingAiClient: OnboardingAiClient,
+    private val agentAiClient: AgentAiClient,
     transactionManager: PlatformTransactionManager,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -101,7 +101,7 @@ class BuddyCompactionService(
 
         val request = BuddyCompactRequest(priorSummary = plan.priorSummary, folded = plan.folded)
         val memory = try {
-            onboardingAiClient.compactBuddyMemory(request).memory
+            agentAiClient.compactBuddyMemory(request).memory
         } catch (@Suppress("SwallowedException") e: OnboardingAiException) {
             // The note shapes the prompt and is not the record, so a failed fold costs only a
             // longer prompt next turn. Warned, not retried.

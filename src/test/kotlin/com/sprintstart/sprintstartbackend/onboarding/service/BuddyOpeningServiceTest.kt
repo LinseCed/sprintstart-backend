@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenActionDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
@@ -37,7 +37,7 @@ import kotlin.collections.emptyList
 class BuddyOpeningServiceTest {
     private val buddySessionRepository: BuddySessionRepository = mockk()
     private val buddyMessageRepository: BuddyMessageRepository = mockk()
-    private val onboardingAiClient: OnboardingAiClient = mockk()
+    private val agentAiClient: AgentAiClient = mockk()
     private val buddyToolExecutor: BuddyToolExecutor = mockk()
     private val sessionActivityService: SessionActivityApi = mockk()
     private val userApi: UserApi = mockk()
@@ -50,7 +50,7 @@ class BuddyOpeningServiceTest {
         userApi,
         sessionActivityService,
         buddyToolExecutor,
-        BuddyOpeningStream(onboardingAiClient),
+        BuddyOpeningStream(agentAiClient),
         BuddyCompactionScheduler(buddyCompactionService, CoroutineScope(Dispatchers.Unconfined)),
     )
 
@@ -71,7 +71,7 @@ class BuddyOpeningServiceTest {
         } returns session
         every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
         every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
-        every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
+        every { agentAiClient.streamBuddyOpen(any()) } returns flowOf(
             BuddyOpenStreamEvent(type = "token", content = "Welcome "),
             BuddyOpenStreamEvent(type = "token", content = "back!"),
             BuddyOpenStreamEvent(type = "done", greeting = "Welcome back!", memory = "m"),
@@ -104,7 +104,7 @@ class BuddyOpeningServiceTest {
         } returns session
         every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
         every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
-        every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
+        every { agentAiClient.streamBuddyOpen(any()) } returns flowOf(
             BuddyOpenStreamEvent(type = "token", content = "Hi!"),
             BuddyOpenStreamEvent(
                 type = "done",
@@ -145,7 +145,7 @@ class BuddyOpeningServiceTest {
             BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "hi"),
         )
         every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
-        every { onboardingAiClient.streamBuddyOpen(any()) } returns flow {
+        every { agentAiClient.streamBuddyOpen(any()) } returns flow {
             emit(BuddyOpenStreamEvent(type = "token", content = "Welcome ba"))
             throw OnboardingAiException(503, "", "AI went away")
         }
@@ -188,7 +188,7 @@ class BuddyOpeningServiceTest {
             BuddyMessage(session = session, role = BuddyMessageRole.USER, content = "hi"),
         )
         every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
-        every { onboardingAiClient.streamBuddyOpen(any()) } throws
+        every { agentAiClient.streamBuddyOpen(any()) } throws
             OnboardingAiException(503, "", "AI is down")
         every {
             sessionActivityService.recordVisit(userId)
@@ -220,7 +220,7 @@ class BuddyOpeningServiceTest {
             BuddyMessage(session = session, role = BuddyMessageRole.ASSISTANT, content = "use ./gradlew"),
         )
         every { buddyToolExecutor.stateSnapshot(userId) } returns "2 closed PRs"
-        every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
+        every { agentAiClient.streamBuddyOpen(any()) } returns flowOf(
             BuddyOpenStreamEvent(type = "token", content = "Welcome back, Sam!"),
             BuddyOpenStreamEvent(type = "done", greeting = "Welcome back, Sam!"),
         )
@@ -255,7 +255,7 @@ class BuddyOpeningServiceTest {
         } returns session
         every { buddyMessageRepository.findAllBySessionIdOrderByCreatedAtAsc(session.id) } returns emptyList()
         every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
-        every { onboardingAiClient.streamBuddyOpen(any()) } returns flowOf(
+        every { agentAiClient.streamBuddyOpen(any()) } returns flowOf(
             BuddyOpenStreamEvent(type = "done", greeting = "Hello!"),
         )
         every { buddyMessageRepository.save(any()) } answers { firstArg() }
@@ -288,7 +288,7 @@ class BuddyOpeningServiceTest {
         )
         every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
         val requests = mutableListOf<BuddyOpenRequest>()
-        every { onboardingAiClient.streamBuddyOpen(capture(requests)) } returns flowOf(
+        every { agentAiClient.streamBuddyOpen(capture(requests)) } returns flowOf(
             BuddyOpenStreamEvent(type = "done", greeting = "Hello!"),
         )
         every { buddyMessageRepository.save(any()) } answers { firstArg() }
@@ -347,7 +347,7 @@ class BuddyOpeningServiceTest {
 
         assertThat(events.filter { it.type == "token" }.map { it.content })
             .containsExactly("Hi again!")
-        verify(exactly = 0) { onboardingAiClient.streamBuddyOpen(any()) }
+        verify(exactly = 0) { agentAiClient.streamBuddyOpen(any()) }
         verify(exactly = 0) { buddyMessageRepository.save(any()) }
     }
 
@@ -384,7 +384,7 @@ class BuddyOpeningServiceTest {
 
         assertThat(events.filter { it.type == "TOKEN" }).isEmpty()
         verify(exactly = 0) {
-            onboardingAiClient.streamBuddyOpen(any())
+            agentAiClient.streamBuddyOpen(any())
         }
     }
 
@@ -416,7 +416,7 @@ class BuddyOpeningServiceTest {
         every { buddyToolExecutor.stateSnapshot(userId) } returns "state"
 
         every {
-            onboardingAiClient.streamBuddyOpen(any())
+            agentAiClient.streamBuddyOpen(any())
         } returns flowOf(
             BuddyOpenStreamEvent(type = "token", content = "Welcome back!"),
             BuddyOpenStreamEvent(type = "done", greeting = "Welcome back!"),
@@ -430,7 +430,7 @@ class BuddyOpeningServiceTest {
             .isEqualTo("Welcome back!")
 
         verify {
-            onboardingAiClient.streamBuddyOpen(any())
+            agentAiClient.streamBuddyOpen(any())
         }
     }
 
@@ -482,7 +482,7 @@ class BuddyOpeningServiceTest {
         )
 
         verify(exactly = 0) {
-            onboardingAiClient.streamBuddyOpen(any())
+            agentAiClient.streamBuddyOpen(any())
         }
     }
 }

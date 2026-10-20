@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.OrientationAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.OrientationStep
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
@@ -69,7 +69,7 @@ class TaskOrientationService(
     private val starterWorkTaskProposalRepository: StarterWorkTaskProposalRepository,
     private val projectMembershipApi: ProjectMembershipApi,
     private val artifactIngestionApi: ArtifactIngestionApi,
-    private val onboardingAiClient: OnboardingAiClient,
+    private val orientationAiClient: OrientationAiClient,
     private val json: Json,
     transactionManager: PlatformTransactionManager,
     private val clock: Clock = Clock.systemUTC(),
@@ -96,7 +96,7 @@ class TaskOrientationService(
             ?.let { return context.respond(it) }
 
         val outcome = try {
-            onboardingAiClient.assembleOrientation(
+            orientationAiClient.assembleOrientation(
                 taskTitle = context.title,
                 projectIds = listOf(projectId),
                 taskBody = context.body,
@@ -138,7 +138,7 @@ class TaskOrientationService(
             )
         }
 
-        return onboardingAiClient
+        return orientationAiClient
             .streamOrientation(
                 taskTitle = context.title,
                 projectIds = listOf(projectId),

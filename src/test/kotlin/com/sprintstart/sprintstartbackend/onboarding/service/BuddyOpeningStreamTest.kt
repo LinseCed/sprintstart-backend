@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.external.OnboardingAiClient
+import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenActionDto
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.onboarding.external.model.BuddyOpenStreamEvent
@@ -17,7 +17,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class BuddyOpeningStreamTest {
-    private val ai: OnboardingAiClient = mockk()
+    private val ai: AgentAiClient = mockk()
     private val stream = BuddyOpeningStream(ai)
     private val request = BuddyOpenRequest(memory = "note", state = "state")
 
