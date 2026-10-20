@@ -11,7 +11,7 @@
                 "arrival :: api", "arrival :: api-services", "arrival :: api-enums", "arrival :: api-responses",
                 "starterwork :: api-services", "starterwork :: api-enums", "starterwork :: api-requests",
                 "starterwork :: api-responses",
-                "knowledge :: api-services", "knowledge :: api-responses", "insights :: api", "insights :: api-services", "insights :: api-responses",
+                "knowledge :: api", "knowledge :: api-model", "knowledge :: api-responses", "insights :: api", "insights :: api-services", "insights :: api-responses",
                 "buddy :: api", "buddy :: api-services", "buddy :: api-enums", "buddy :: api-requests",
                 "buddy :: api-responses"
         }

@@ -12,6 +12,7 @@ import com.sprintstart.sprintstartbackend.knowledge.repository.CanonicalAnswerRe
 import com.sprintstart.sprintstartbackend.knowledge.repository.KnowledgeRequestRepository
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeLookup
+import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeReviewService
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -34,11 +35,14 @@ class KnowledgeTeamActionsTest {
     private val projectId = UUID.randomUUID()
     private val context = TeamToolContext(userId = UUID.randomUUID(), authId = "auth|pm", projectId = projectId)
 
-    private val knowledgeLookup = KnowledgeLookup(knowledgeRequestRepository, canonicalAnswerRepository)
+    private val review = KnowledgeReviewService(
+        knowledgeBaseService,
+        KnowledgeLookup(knowledgeRequestRepository, canonicalAnswerRepository),
+    )
 
-    private val answer = AnswerEscalationAction(knowledgeLookup, knowledgeBaseService)
-    private val dismiss = DismissEscalationAction(knowledgeLookup, knowledgeBaseService)
-    private val edit = EditCanonicalAnswerAction(knowledgeLookup, knowledgeBaseService)
+    private val answer = AnswerEscalationAction(review)
+    private val dismiss = DismissEscalationAction(review)
+    private val edit = EditCanonicalAnswerAction(review)
 
     private fun call(name: String, vararg args: Pair<String, String>) =
         BuddyToolCallDto(

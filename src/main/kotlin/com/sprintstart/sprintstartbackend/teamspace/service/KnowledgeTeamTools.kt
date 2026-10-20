@@ -2,7 +2,8 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
+import com.sprintstart.sprintstartbackend.knowledge.external.KnowledgeReviewApi
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.springframework.stereotype.Component
@@ -18,7 +19,7 @@ import java.util.UUID
  */
 @Component
 class KnowledgeTeamTools(
-    private val knowledgeBaseService: KnowledgeBaseService,
+    private val knowledgeReviewApi: KnowledgeReviewApi,
 ) : TeamAreaTools {
     override val area = TeamArea.KNOWLEDGE
 
@@ -35,7 +36,7 @@ class KnowledgeTeamTools(
         }
 
     private fun openEscalations(projectId: UUID): String {
-        val open = knowledgeBaseService.listOpen(projectId)
+        val open = knowledgeReviewApi.openRequests(ProjectId(projectId))
         if (open.isEmpty()) {
             return "Nobody on this project has a question waiting for an answer."
         }
@@ -54,7 +55,7 @@ class KnowledgeTeamTools(
 
     /** Full text, not excerpts: editing an answer means reading all of it first. */
     private fun canonicalAnswers(projectId: UUID): String {
-        val answers = knowledgeBaseService.listAnswers(projectId)
+        val answers = knowledgeReviewApi.answers(ProjectId(projectId))
         if (answers.isEmpty()) {
             return "Nobody has written a canonical answer on this project yet."
         }
