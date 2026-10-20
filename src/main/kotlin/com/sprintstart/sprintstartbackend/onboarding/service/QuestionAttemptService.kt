@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.PhaseCheckAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.GradeAnswerItem

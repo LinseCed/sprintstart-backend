@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.onboarding.security
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintApi
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPhase
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.PhaseCheckQuestion

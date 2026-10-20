@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintApi
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.model.mapper.toGetForUserResponse
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.CurrentPhaseDto

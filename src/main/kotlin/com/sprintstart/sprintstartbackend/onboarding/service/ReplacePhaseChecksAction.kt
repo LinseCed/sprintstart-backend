@@ -6,7 +6,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.assistant.external.boolean
 import com.sprintstart.sprintstartbackend.assistant.external.text
 import com.sprintstart.sprintstartbackend.assistant.external.uuid
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.model.request.question.UpdateOptionRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.question.UpdatePhaseQuestionsRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.question.UpdateQuestionRequest

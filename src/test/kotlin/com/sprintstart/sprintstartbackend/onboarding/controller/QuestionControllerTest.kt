@@ -2,8 +2,8 @@ package com.sprintstart.sprintstartbackend.onboarding.controller
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.ninjasquad.springmockk.MockkBean
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.config.SecurityConfig
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.request.question.SubmitQuestionAttemptRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.request.question.UpdateOptionRequest

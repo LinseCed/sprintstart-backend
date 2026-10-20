@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.factory
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 
 /** AI-generated content for one `AI_ENHANCED` blueprint phase, filled at personalization time. */
 data class GeneratedPhaseContent(

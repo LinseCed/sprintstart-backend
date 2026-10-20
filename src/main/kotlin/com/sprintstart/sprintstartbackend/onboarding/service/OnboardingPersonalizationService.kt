@@ -1,9 +1,9 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintSnapshot
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintPhaseType
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.CheckQuestionType
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintApi
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintSnapshot
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.BlueprintPhaseType
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.onboarding.external.PhaseContentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent

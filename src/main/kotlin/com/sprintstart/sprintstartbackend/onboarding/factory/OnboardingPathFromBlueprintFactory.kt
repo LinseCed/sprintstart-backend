@@ -1,14 +1,14 @@
 package com.sprintstart.sprintstartbackend.onboarding.factory
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintCheckOptionSnapshot
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintCheckQuestionSnapshot
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintPhaseSnapshot
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintResourceSnapshot
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintSnapshot
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintStepSnapshot
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintTaskSnapshot
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintPhaseType
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.StepType
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintCheckOptionSnapshot
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintCheckQuestionSnapshot
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintPhaseSnapshot
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintResourceSnapshot
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintSnapshot
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintStepSnapshot
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintTaskSnapshot
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.BlueprintPhaseType
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath

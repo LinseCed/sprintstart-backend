@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.security
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintApi
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.onboarding.repository.OnboardingPhaseRepository
 import com.sprintstart.sprintstartbackend.onboarding.repository.PhaseCheckQuestionRepository

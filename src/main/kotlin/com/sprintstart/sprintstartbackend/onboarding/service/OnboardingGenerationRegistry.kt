@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintApi
 import com.sprintstart.sprintstartbackend.onboarding.model.response.path.OnboardingSseEvent
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import kotlinx.coroutines.CancellationException

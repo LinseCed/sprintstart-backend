@@ -1,13 +1,13 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.BlueprintApi
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintPhaseType
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.BlueprintStatus
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.external.enums.RequirementType
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPath
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPhase
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.entity.BlueprintPhaseRequirement
-import com.sprintstart.sprintstartbackend.onboarding.blueprint.model.mapper.toSnapshot
+import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintApi
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.BlueprintPhaseType
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.BlueprintStatus
+import com.sprintstart.sprintstartbackend.blueprint.external.enums.RequirementType
+import com.sprintstart.sprintstartbackend.blueprint.model.entity.BlueprintPath
+import com.sprintstart.sprintstartbackend.blueprint.model.entity.BlueprintPhase
+import com.sprintstart.sprintstartbackend.blueprint.model.entity.BlueprintPhaseRequirement
+import com.sprintstart.sprintstartbackend.blueprint.model.mapper.toSnapshot
 import com.sprintstart.sprintstartbackend.onboarding.external.PhaseContentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.onboarding.external.model.AiProgressEvent
