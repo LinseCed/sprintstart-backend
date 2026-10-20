@@ -1,15 +1,17 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardOwner
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.HighlightColor
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardStructurePayload
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.CardMarkPayload
-import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCardResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardStructureResponse
-import com.sprintstart.sprintstartbackend.onboarding.model.response.board.NoteContent
+import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
+import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardOwner
+import com.sprintstart.sprintstartbackend.board.external.enums.HighlightColor
+import com.sprintstart.sprintstartbackend.board.external.model.BoardStructurePayload
+import com.sprintstart.sprintstartbackend.board.external.model.CardMarkPayload
+import com.sprintstart.sprintstartbackend.board.model.response.board.BoardCardResponse
+import com.sprintstart.sprintstartbackend.board.model.response.board.BoardResponse
+import com.sprintstart.sprintstartbackend.board.model.response.board.BoardStructureResponse
+import com.sprintstart.sprintstartbackend.board.model.response.board.NoteContent
+import com.sprintstart.sprintstartbackend.board.service.BoardService
+import com.sprintstart.sprintstartbackend.board.service.BoardStructureService
 import com.sprintstart.sprintstartbackend.path.service.PathStepReader
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId

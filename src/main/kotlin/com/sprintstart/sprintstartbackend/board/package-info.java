@@ -1,0 +1,18 @@
+/**
+ * The hire's board: the cards that show where they stand, live reads of path, arrival and starter work,
+ * plus the cards people author and the diagrams drawn for them. An L3 view: it reads the L2 features and
+ * below, never the assistants.
+ */
+@ApplicationModule(
+        allowedDependencies = {
+                "shared :: shared", "shared :: ids", "shared :: ai", "shared :: annotations", "user :: api", "user :: api-events",
+                "ingestion :: api", "ingestion :: api.model",
+                "path :: api-services", "path :: api-enums", "path :: api-responses",
+                "arrival :: api-services", "arrival :: api-enums", "arrival :: api-responses",
+                "starterwork :: api-services", "starterwork :: api-enums", "starterwork :: api-events",
+                "starterwork :: api-model", "starterwork :: api-responses"
+        }
+)
+package com.sprintstart.sprintstartbackend.board;
+
+import org.springframework.modulith.ApplicationModule;

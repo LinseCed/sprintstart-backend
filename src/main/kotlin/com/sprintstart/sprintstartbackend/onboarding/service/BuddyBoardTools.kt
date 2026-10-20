@@ -2,10 +2,13 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardCardKind
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardStage
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BoardStructurePayload
-import com.sprintstart.sprintstartbackend.onboarding.model.response.board.BoardCardResponse
+import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
+import com.sprintstart.sprintstartbackend.board.external.enums.BoardStage
+import com.sprintstart.sprintstartbackend.board.external.model.BoardStructurePayload
+import com.sprintstart.sprintstartbackend.board.model.response.board.BoardCardResponse
+import com.sprintstart.sprintstartbackend.board.service.BoardReading
+import com.sprintstart.sprintstartbackend.board.service.BoardService
+import com.sprintstart.sprintstartbackend.board.service.BoardStructureService
 import com.sprintstart.sprintstartbackend.path.service.PathStepReader
 import com.sprintstart.sprintstartbackend.path.service.isDone
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId

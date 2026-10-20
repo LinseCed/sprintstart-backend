@@ -1,10 +1,11 @@
 package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardActor
-import com.sprintstart.sprintstartbackend.onboarding.model.request.board.AuthoredCardRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.board.ChecklistCardRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.request.board.NoteCardRequest
+import com.sprintstart.sprintstartbackend.board.external.enums.BoardActor
+import com.sprintstart.sprintstartbackend.board.model.request.board.AuthoredCardRequest
+import com.sprintstart.sprintstartbackend.board.model.request.board.ChecklistCardRequest
+import com.sprintstart.sprintstartbackend.board.model.request.board.NoteCardRequest
+import com.sprintstart.sprintstartbackend.board.service.BoardService
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
