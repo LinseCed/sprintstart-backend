@@ -2,7 +2,7 @@ package com.sprintstart.sprintstartbackend.onboarding.service
 
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BoardActor
+import com.sprintstart.sprintstartbackend.onboarding.external.enums.GoalClaimant
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.ProficiencyLevel
 import com.sprintstart.sprintstartbackend.onboarding.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.onboarding.model.response.goal.GoalView
@@ -590,7 +590,7 @@ class BuddyActionServiceTest {
         asHire()
         onOneProject()
         val taskId = UUID.randomUUID()
-        every { userGoalService.claimForMe(authId, projectId, taskId, BoardActor.BUDDY) } returns GoalView(
+        every { userGoalService.claimForMe(authId, projectId, taskId, GoalClaimant.BUDDY) } returns GoalView(
             proposalId = taskId,
             title = "Fix the login redirect",
             summary = null,
@@ -608,7 +608,7 @@ class BuddyActionServiceTest {
         asHire()
         onOneProject()
         val taskId = UUID.randomUUID()
-        every { userGoalService.claimForMe(authId, projectId, taskId, BoardActor.BUDDY) } returns GoalView(
+        every { userGoalService.claimForMe(authId, projectId, taskId, GoalClaimant.BUDDY) } returns GoalView(
             proposalId = taskId,
             title = "Fix the login redirect",
             summary = null,
@@ -627,7 +627,7 @@ class BuddyActionServiceTest {
         asHire()
         onOneProject()
         val taskId = UUID.randomUUID()
-        every { userGoalService.claimForMe(authId, projectId, taskId, BoardActor.BUDDY) } throws
+        every { userGoalService.claimForMe(authId, projectId, taskId, GoalClaimant.BUDDY) } throws
             ResponseStatusException(HttpStatus.CONFLICT, "only a live task can be claimed as a goal")
 
         val result = service.perform(BuddyActionRequest(action = "claim_goal", taskId = taskId), jwt)
