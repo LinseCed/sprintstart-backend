@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.starterwork.service
 
-import com.sprintstart.sprintstartbackend.onboarding.service.result
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.GoalClaimant

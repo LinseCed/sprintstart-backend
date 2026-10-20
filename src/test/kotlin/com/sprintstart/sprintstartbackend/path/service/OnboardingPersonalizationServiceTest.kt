@@ -8,7 +8,6 @@ import com.sprintstart.sprintstartbackend.blueprint.model.entity.BlueprintPath
 import com.sprintstart.sprintstartbackend.blueprint.model.entity.BlueprintPhase
 import com.sprintstart.sprintstartbackend.blueprint.model.entity.BlueprintPhaseRequirement
 import com.sprintstart.sprintstartbackend.blueprint.model.mapper.toSnapshot
-import com.sprintstart.sprintstartbackend.onboarding.service.result
 import com.sprintstart.sprintstartbackend.path.external.PhaseContentAiClient
 import com.sprintstart.sprintstartbackend.path.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent

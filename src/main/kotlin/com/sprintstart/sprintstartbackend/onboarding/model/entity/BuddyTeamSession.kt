@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.entity
 
+import com.sprintstart.sprintstartbackend.buddy.external.BuddyMemory
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id

@@ -2,7 +2,6 @@ package com.sprintstart.sprintstartbackend.path.service
 
 import com.sprintstart.sprintstartbackend.blueprint.external.BlueprintApi
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
-import com.sprintstart.sprintstartbackend.onboarding.service.result
 import com.sprintstart.sprintstartbackend.path.external.enums.GenerationStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPath

@@ -7,7 +7,6 @@ import com.sprintstart.sprintstartbackend.knowledge.model.entity.KnowledgeReques
 import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.toResponse
 import com.sprintstart.sprintstartbackend.knowledge.repository.CanonicalAnswerRepository
 import com.sprintstart.sprintstartbackend.knowledge.repository.KnowledgeRequestRepository
-import com.sprintstart.sprintstartbackend.onboarding.service.result
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPhase

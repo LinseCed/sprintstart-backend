@@ -42,10 +42,11 @@ import com.sprintstart.sprintstartbackend.board.service.BoardReading
 import com.sprintstart.sprintstartbackend.board.service.BoardService
 import com.sprintstart.sprintstartbackend.board.service.OpenPullRequestReader
 import com.sprintstart.sprintstartbackend.board.service.decodedPayload
+import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddySession
+import com.sprintstart.sprintstartbackend.buddy.repository.BuddySessionRepository
+import com.sprintstart.sprintstartbackend.buddy.service.BuddyMemoryRecapSource
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
-import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddySession
-import com.sprintstart.sprintstartbackend.onboarding.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPath
 import com.sprintstart.sprintstartbackend.path.model.entity.OnboardingPhase

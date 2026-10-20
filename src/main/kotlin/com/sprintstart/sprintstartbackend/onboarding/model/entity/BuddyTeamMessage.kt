@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.onboarding.model.entity
 
-import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
+import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
