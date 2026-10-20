@@ -15,6 +15,7 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToo
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.TOOL_CALL_WRITTEN_OUT
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.text
 import com.sprintstart.sprintstartbackend.onboarding.assistant.model.entity.BuddyActionProposal
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.FALLBACK_REPLY
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.onboarding.model.entity.BuddyTeamMessage
@@ -627,10 +628,10 @@ class BuddyTeamServiceTest {
 
         val events = service.sendMessageForMe(authId, projectId, "how is Ada?").toList()
 
-        assertThat(shownAfterLastReset(events)).isEqualTo(BuddyService.FALLBACK_REPLY)
-        assertThat(events.count { it.type == BuddyService.RESET }).isEqualTo(BuddyService.MAX_AGENT_STEPS)
+        assertThat(shownAfterLastReset(events)).isEqualTo(FALLBACK_REPLY)
+        assertThat(events.count { it.type == BuddyStreamEvent.RESET }).isEqualTo(BuddyService.MAX_AGENT_STEPS)
         assertThat(saved.single { it.role == BuddyMessageRole.ASSISTANT }.content)
-            .isEqualTo(BuddyService.FALLBACK_REPLY)
+            .isEqualTo(FALLBACK_REPLY)
         coVerify(exactly = BuddyService.MAX_AGENT_STEPS) { agentAiClient.buddyAgentTurnStream(any()) }
     }
 
@@ -691,7 +692,7 @@ class BuddyTeamServiceTest {
 
         val events = service.sendMessageForMe(authId, projectId, "who is stuck?").toList()
 
-        assertThat(events.map { it.type }).containsExactly(BuddyService.TOKEN, BuddyService.ERROR)
+        assertThat(events.map { it.type }).containsExactly(BuddyStreamEvent.TOKEN, BuddyStreamEvent.ERROR)
         // The provider's text stays in the log; the client gets a fixed sentence.
         assertThat(events.last().message).isNotBlank().doesNotContain("model unavailable")
 
@@ -737,8 +738,8 @@ class BuddyTeamServiceTest {
 
     private fun shownAfterLastReset(events: List<BuddyStreamEvent>): String =
         events
-            .takeLastWhile { it.type != BuddyService.RESET }
-            .filter { it.type == BuddyService.TOKEN }
+            .takeLastWhile { it.type != BuddyStreamEvent.RESET }
+            .filter { it.type == BuddyStreamEvent.TOKEN }
             .joinToString("") { it.content.orEmpty() }
 
     @Test

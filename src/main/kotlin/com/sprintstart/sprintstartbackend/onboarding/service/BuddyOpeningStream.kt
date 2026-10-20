@@ -42,8 +42,8 @@ class BuddyOpeningStream(
     /** The visit's existing greeting, sent again whole instead of asking the model for another. */
     fun replay(greeting: String): Flow<BuddyStreamEvent> =
         flowOf(
-            BuddyStreamEvent(type = BuddyService.TOKEN, content = greeting),
-            BuddyStreamEvent(type = BuddyService.DONE),
+            BuddyStreamEvent(type = BuddyStreamEvent.TOKEN, content = greeting),
+            BuddyStreamEvent(type = BuddyStreamEvent.DONE),
         )
 
     /** Streams a new greeting for [request] and settles it in [conversation]. */
@@ -66,7 +66,7 @@ class BuddyOpeningStream(
                 when (event.type) {
                     BuddyOpenStreamEvent.TOKEN -> event.content?.let {
                         shown.append(it)
-                        emit(BuddyStreamEvent(type = BuddyService.TOKEN, content = it))
+                        emit(BuddyStreamEvent(type = BuddyStreamEvent.TOKEN, content = it))
                     }
 
                     BuddyOpenStreamEvent.DONE -> closing = event
@@ -84,15 +84,15 @@ class BuddyOpeningStream(
     ) {
         val greeting = relayed.closing?.greeting?.takeIf { it.isNotBlank() } ?: relayed.shown
         if (greeting.isBlank()) {
-            emit(BuddyStreamEvent(type = BuddyService.TOKEN, content = conversation.fallbackGreeting))
-            emit(BuddyStreamEvent(type = BuddyService.DONE))
+            emit(BuddyStreamEvent(type = BuddyStreamEvent.TOKEN, content = conversation.fallbackGreeting))
+            emit(BuddyStreamEvent(type = BuddyStreamEvent.DONE))
             return
         }
         conversation.saveOpening(greeting)
         relayed.closing?.action?.let {
-            emit(BuddyStreamEvent(type = BuddyService.OPENING_ACTION, label = it.label, question = it.question))
+            emit(BuddyStreamEvent(type = BuddyStreamEvent.OPENING_ACTION, label = it.label, question = it.question))
         }
-        emit(BuddyStreamEvent(type = BuddyService.DONE))
+        emit(BuddyStreamEvent(type = BuddyStreamEvent.DONE))
     }
 
     private class RelayedOpening(

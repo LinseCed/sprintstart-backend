@@ -97,4 +97,24 @@ data class BuddyStreamEvent(
     /** Team-mode `action_proposal`: `STANDARD`, `DESTRUCTIVE` or `BULK`, deciding how the card is drawn. */
     val risk: String? = null,
     val reasoning: String? = null,
-)
+) {
+    companion object {
+        // The stream vocabulary the client switches on, plus one for the opening's suggested next
+        // step. OPENING_ACTION is NOT `action_proposal`: that type is gated on the hire
+        // confirming, whereas this only fills the composer with a question.
+        const val TOKEN = "token"
+        const val DONE = "done"
+
+        /** Terminal like DONE: the turn failed after its stream had started. */
+        const val ERROR = "error"
+
+        /** Team mode only: the words shown so far were not the answer and are to be dropped. */
+        const val RESET = "reset"
+        const val OPENING_ACTION = "opening_action"
+
+        // A change offered for the user's confirmation, and the notice that a tool is running.
+        const val ACTION_PROPOSAL = "action_proposal"
+        const val TOOL_USE = "tool_use"
+        const val TOOL_KIND = "tool"
+    }
+}

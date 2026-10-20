@@ -39,9 +39,9 @@ class BuddyOpeningStreamTest {
     private fun done(greeting: String?, action: BuddyOpenActionDto? = null) =
         BuddyOpenStreamEvent(type = BuddyOpenStreamEvent.DONE, greeting = greeting, action = action)
 
-    private fun tokenEvent(text: String) = BuddyStreamEvent(type = BuddyService.TOKEN, content = text)
+    private fun tokenEvent(text: String) = BuddyStreamEvent(type = BuddyStreamEvent.TOKEN, content = text)
 
-    private val doneEvent = BuddyStreamEvent(type = BuddyService.DONE)
+    private val doneEvent = BuddyStreamEvent(type = BuddyStreamEvent.DONE)
 
     @Test
     fun `replays an existing greeting whole, then ends the stream`() = runTest {
@@ -67,7 +67,7 @@ class BuddyOpeningStreamTest {
 
         assertThat(events).containsExactly(
             tokenEvent("Hi"),
-            BuddyStreamEvent(type = BuddyService.OPENING_ACTION, label = "Find a task", question = "What next?"),
+            BuddyStreamEvent(type = BuddyStreamEvent.OPENING_ACTION, label = "Find a task", question = "What next?"),
             doneEvent,
         )
     }

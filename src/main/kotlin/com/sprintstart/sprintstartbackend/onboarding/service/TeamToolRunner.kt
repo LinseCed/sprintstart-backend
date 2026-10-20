@@ -45,7 +45,7 @@ class TeamToolRunner(
             outcome.proposal?.let { proposal ->
                 emit(
                     BuddyStreamEvent(
-                        type = BuddyService.ACTION_PROPOSAL,
+                        type = BuddyStreamEvent.ACTION_PROPOSAL,
                         action = proposal.action,
                         label = proposal.label,
                         proposalId = proposal.id.toString(),

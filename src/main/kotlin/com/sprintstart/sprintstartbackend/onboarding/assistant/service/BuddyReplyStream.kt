@@ -5,7 +5,6 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyAge
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.text
 import com.sprintstart.sprintstartbackend.onboarding.model.exceptions.OnboardingAiException
-import com.sprintstart.sprintstartbackend.onboarding.service.BuddyService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.catch
@@ -93,11 +92,11 @@ internal fun Flow<BuddyStreamEvent>.endFailureWithErrorEvent(): Flow<BuddyStream
         var answered = false
         emitAll(
             upstream
-                .onEach { if (it.type == BuddyService.DONE) answered = true }
+                .onEach { if (it.type == BuddyStreamEvent.DONE) answered = true }
                 .catch { e ->
                     if (e is CancellationException || answered) throw e
                     logger.error("Buddy turn failed after its stream started", e)
-                    emit(BuddyStreamEvent(type = BuddyService.ERROR, message = TURN_FAILED_MESSAGE))
+                    emit(BuddyStreamEvent(type = BuddyStreamEvent.ERROR, message = TURN_FAILED_MESSAGE))
                 },
         )
     }
@@ -113,7 +112,7 @@ internal fun Flow<BuddyStreamEvent>.endFailureWithErrorEvent(): Flow<BuddyStream
  */
 internal suspend fun FlowCollector<BuddyStreamEvent>.completeReply(answer: String?, emittedContent: StringBuilder) {
     val missing = when {
-        answer.isNullOrBlank() -> BuddyService.FALLBACK_REPLY
+        answer.isNullOrBlank() -> FALLBACK_REPLY
         emittedContent.isBlank() -> answer
         else -> return
     }
@@ -152,17 +151,17 @@ internal suspend fun FlowCollector<BuddyStreamEvent>.emitCitationsAndDone(citati
             ),
         )
     }
-    emit(BuddyStreamEvent(type = BuddyService.DONE))
+    emit(BuddyStreamEvent(type = BuddyStreamEvent.DONE))
 }
 
 private suspend fun FlowCollector<BuddyStreamEvent>.emitWords(text: String, emittedContent: StringBuilder) {
-    for (chunk in BuddyService.TOKEN_CHUNK.split(text).filter { it.isNotEmpty() }) {
+    for (chunk in TOKEN_CHUNK.split(text).filter { it.isNotEmpty() }) {
         emitToken(chunk, emittedContent)
     }
 }
 
 private suspend fun FlowCollector<BuddyStreamEvent>.emitToken(content: String, emittedContent: StringBuilder) {
-    emit(BuddyStreamEvent(type = BuddyService.TOKEN, content = content))
+    emit(BuddyStreamEvent(type = BuddyStreamEvent.TOKEN, content = content))
     emittedContent.append(content)
 }
 
@@ -176,7 +175,7 @@ private val logger = LoggerFactory.getLogger(
 
 /** The stream event that tells the client the buddy is running the tool [name]. */
 internal fun toolUseEvent(name: String?): BuddyStreamEvent =
-    BuddyStreamEvent(type = BuddyService.TOOL_USE, name = name, kind = BuddyService.TOOL_KIND)
+    BuddyStreamEvent(type = BuddyStreamEvent.TOOL_USE, name = name, kind = BuddyStreamEvent.TOOL_KIND)
 
 internal data class ResolvedBuddyCitation(
     val artifactId: UUID,
@@ -185,3 +184,13 @@ internal data class ResolvedBuddyCitation(
     val startLine: Int?,
     val startPage: Int?,
 )
+
+/** What a turn shows when it ends without an answer of its own. */
+internal const val FALLBACK_REPLY =
+    "I wasn't able to finish answering that one — could you rephrase or add a little detail?"
+
+/**
+ * Splits after each space, keeping the space on the preceding chunk, so the concatenated tokens
+ * reproduce the answer exactly.
+ */
+private val TOKEN_CHUNK = Regex("(?<= )")

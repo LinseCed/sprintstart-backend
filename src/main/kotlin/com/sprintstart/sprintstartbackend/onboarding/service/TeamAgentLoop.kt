@@ -84,7 +84,7 @@ class TeamAgentLoop(
         tools: List<BuddyToolSpecDto>,
     ) {
         logger.warn("Team buddy wrote a tool call out as its reply; asking again")
-        emit(BuddyStreamEvent(type = BuddyService.RESET))
+        emit(BuddyStreamEvent(type = BuddyStreamEvent.RESET))
         turn.emittedContent.setLength(0)
         val retry = teamToolRunner.openAreasWrittenOut(
             response.text,

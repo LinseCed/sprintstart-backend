@@ -52,7 +52,7 @@ class BuddyOpeningService(
 
         return when {
             !longAbsence && latestOpening != null -> openingStream.replay(latestOpening.content)
-            !longAbsence && !firstConversation -> flowOf(BuddyStreamEvent(type = BuddyService.DONE))
+            !longAbsence && !firstConversation -> flowOf(BuddyStreamEvent(type = BuddyStreamEvent.DONE))
             else -> openingStream.open(openRequest(session, messages, user), conversationOf(session, user))
         }
     }

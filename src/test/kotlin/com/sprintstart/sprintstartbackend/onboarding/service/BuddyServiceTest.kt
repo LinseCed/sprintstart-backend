@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyStr
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.onboarding.assistant.external.text
+import com.sprintstart.sprintstartbackend.onboarding.assistant.service.FALLBACK_REPLY
 import com.sprintstart.sprintstartbackend.onboarding.client.BuddyAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.onboarding.external.enums.BuddyMessageRole
@@ -784,7 +785,7 @@ class BuddyServiceTest {
 
             val events = service.sendMessageForMe(authId, session.id, "hi", true, null).toList()
 
-            assertThat(events.map { it.type }).containsExactly(BuddyService.TOKEN, BuddyService.ERROR)
+            assertThat(events.map { it.type }).containsExactly(BuddyStreamEvent.TOKEN, BuddyStreamEvent.ERROR)
             // The provider's text stays in the log; the client gets a fixed sentence.
             assertThat(events.last().message).isNotBlank().doesNotContain("model unavailable")
             verify {
@@ -804,8 +805,8 @@ class BuddyServiceTest {
 
             val events = service.sendMessageForMe(authId, session.id, "hi", true, null).toList()
 
-            assertThat(events.last().type).isEqualTo(BuddyService.ERROR)
-            assertThat(events.map { it.type }).doesNotContain(BuddyService.DONE)
+            assertThat(events.last().type).isEqualTo(BuddyStreamEvent.ERROR)
+            assertThat(events.map { it.type }).doesNotContain(BuddyStreamEvent.DONE)
             verify {
                 buddyMessageRepository.save(
                     match<BuddyMessage> { it.isIncomplete && it.content == "Part of " },
@@ -856,7 +857,7 @@ class BuddyServiceTest {
 
             val reply = saved.single { it.role == BuddyMessageRole.ASSISTANT }
             assertThat(reply.content).startsWith("Looking.\n\nLooking.")
-            assertThat(reply.content).endsWith("\n\n${BuddyService.FALLBACK_REPLY}")
+            assertThat(reply.content).endsWith("\n\n${FALLBACK_REPLY}")
             assertThat(reply.isIncomplete).isFalse()
         }
 
@@ -1425,7 +1426,7 @@ class BuddyServiceTest {
                     null,
                 ).toList()
 
-            assertThat(events.single().type).isEqualTo(BuddyService.ERROR)
+            assertThat(events.single().type).isEqualTo(BuddyStreamEvent.ERROR)
             assertThat(saved.map { it.role }).containsExactly(BuddyMessageRole.USER)
         }
 
@@ -1824,7 +1825,7 @@ class BuddyServiceTest {
                         content = "Where is the architecture documented?",
                         filters = null,
                     ).collect { event ->
-                        if (event.type == BuddyService.TOKEN) {
+                        if (event.type == BuddyStreamEvent.TOKEN) {
                             cancel()
                         }
                     }
