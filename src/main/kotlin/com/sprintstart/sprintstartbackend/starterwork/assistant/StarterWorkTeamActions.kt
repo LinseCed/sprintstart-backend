@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.teamspace.service
+package com.sprintstart.sprintstartbackend.starterwork.assistant
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
