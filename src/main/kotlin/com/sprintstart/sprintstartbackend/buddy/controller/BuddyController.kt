@@ -298,7 +298,7 @@ class BuddyController(
         summary = "Confirm a buddy-proposed action",
         description = "Runs an action the buddy proposed, on the hire's explicit confirmation — for example " +
             "claim a task, open the task packet, tick off a step of their path, flag a question to the PM, or " +
-            "keep, extend, tick or reword a checklist on the hire's board. The full set is `BuddyActionType`. " +
+            "keep, extend, tick or reword a checklist on the hire's board. The full set is the `HireAction` beans. " +
             "The action is re-scoped to the caller server-side. Returns a single line to relay; a handled " +
             "failure is `ok = false`, not an error.",
     )

@@ -59,9 +59,7 @@ class BuddyBoardEditActionsTest {
     private val userApi: UserApi = mockk()
 
     private val service = BuddyActionService(
-        mockk(relaxed = true),
         userApi,
-        mockk(relaxed = true),
         boardActionsOver(boardService),
     )
 

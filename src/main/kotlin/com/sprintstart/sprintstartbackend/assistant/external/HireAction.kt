@@ -67,6 +67,9 @@ interface HireAction {
 
 /** Where each feature's hire actions sit in the list the reasoner sees, lowest first. */
 object HireActionOrder {
+    const val FLAG_TO_PM = 100
+    const val REQUEST_ATTESTATION = 110
+    const val SET_GITHUB_LOGIN = 120
     const val OPEN_ORIENTATION = 200
     const val CLAIM_GOAL = 300
     const val RECORD_ASSESSMENT = 600

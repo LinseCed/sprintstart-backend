@@ -19,7 +19,6 @@
     <ID>CyclomaticComplexMethod:BoardCardHydrator.kt:BoardCardHydrator$private fun hydrate( card: BoardCard, member: ProjectMember, projectId: ProjectId, diagram: BoardDiagram?, arrivalSteps: List&lt;ArrivalStepResponse&gt;, pathSteps: Map&lt;UUID, ResolvedPathStep&gt;, matches: () -&gt; List&lt;RankedStarterWorkTaskResponse&gt;, ): BoardCardContent</ID>
     <ID>CyclomaticComplexMethod:BoardService.kt:BoardService$@Transactional fun place( userId: UserId, projectId: ProjectId, kind: BoardCardKind, subject: String? = null, by: BoardActor = BoardActor.BUDDY, ): PlacementOutcome</ID>
     <ID>CyclomaticComplexMethod:BoardService.kt:BoardService$private fun editableCardOrThrow( userId: UserId, cardId: BoardCardId, kind: BoardCardKind, ): Pair&lt;BoardCard, Board&gt;</ID>
-    <ID>CyclomaticComplexMethod:BuddyActionService.kt:BuddyActionService$suspend fun perform(request: HireActionRequest, jwt: Jwt): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
     <ID>CyclomaticComplexMethod:ConfluenceRestrictionPageMetadata.kt:private fun validateSharedRestrictionMetadata( users: ConfluenceRestrictedUsersResponse, groups: ConfluenceRestrictedGroupsResponse, requestedStart: Int, requestedLimit: Int, requestContext: String, )</ID>
     <ID>CyclomaticComplexMethod:ConfluenceStorageFormatParser.kt:InlineMarkdown$fun renderNode(node: Node): String</ID>
@@ -67,8 +66,6 @@
     <ID>LongMethod:BoardActionSupport.kt:internal fun HireBoardApi.namedCards(call: BuddyToolCallDto, board: HireBoard): Found&lt;List&lt;BoardCardResponse&gt;&gt;</ID>
     <ID>LongMethod:BoardDiagramService.kt:BoardDiagramService$private fun store( context: DiagramContext, outcome: DiagramOutcome, schema: DiagramSchema, ): DiagramContent</ID>
     <ID>LongMethod:BoardService.kt:BoardService$@Transactional fun place( userId: UserId, projectId: ProjectId, kind: BoardCardKind, subject: String? = null, by: BoardActor = BoardActor.BUDDY, ): PlacementOutcome</ID>
-    <ID>LongMethod:BuddyActionService.kt:BuddyActionService$@Suppress("CyclomaticComplexMethod") // The person-scoped gates first, then one branch per action. fun propose(call: BuddyToolCallDto, userId: UUID): HireActionOutcome</ID>
-    <ID>LongMethod:BuddyActionService.kt:BuddyActionService$suspend fun perform(request: HireActionRequest, jwt: Jwt): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
     <ID>LongMethod:BuddyReplyStream.kt:internal suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.relayAgentTurn( events: Flow&lt;BuddyAgentStreamEvent&gt;, emittedContent: StringBuilder, ): BuddyAgentResponse</ID>
     <ID>LongMethod:BuddyService.kt:BuddyService$@Suppress("CyclomaticComplexMethod", "ThrowsCount") suspend fun sendMessageForMe( authId: String, sessionId: UUID?, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters?, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
