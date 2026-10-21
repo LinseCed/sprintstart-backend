@@ -74,8 +74,8 @@ the Buddy through `HirePathApi` and `HirePathActionsApi`, team mode through `Pat
 implemented by one facade in `path/service` over the services that own the calls. Detekt's limits
 (11 functions per interface, 4 parameters) split a large caller once more. `path/service` is no
 longer a named interface, so `ModuleBoundariesTest` keeps every caller on the API.
-`knowledge` (#247), `arrival` (#248), `starterwork` (#249) and `board` (#250) followed the same way;
-`insights` is next. Team mode uses the Buddy's conversation machinery rather than its features, so that
+`knowledge` (#247), `arrival` (#248), `starterwork` (#249), `board` (#250) and `insights` (#251)
+followed the same way. Team mode uses the Buddy's conversation machinery rather than its features, so that
 moves into the `assistant` kernel instead of behind a Buddy API
 ([ADR-proposed-004](../adrs-proposed/adr-proposed-004-assistant-kernel-and-tool-spi.md)).
 
