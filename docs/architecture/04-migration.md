@@ -81,8 +81,9 @@ moves into the `assistant` kernel instead of behind a Buddy API
 pieces in #252, compaction in #253. `buddy/service` is no longer a named interface. With that, `assistant` uses the platform (user, ingestion, upload) and
 sits in L1 rather than L0.
 
-Not yet declared: `shared`, `user`, `connectors`, `config` (the composition root) and `health`.
-They depend on nothing above them today, but nothing enforces it.
+Every module now declares its allowed dependencies (#254): `shared` and `health` none, `user` →
+`shared`, `connectors` and `upload` → `user` and `shared`, `config` → `user`'s API. `ModuleBoundariesTest`
+therefore checks the whole application against the layering, not only the feature modules.
 
 ### Stage D: decisions that need the new structure
 
