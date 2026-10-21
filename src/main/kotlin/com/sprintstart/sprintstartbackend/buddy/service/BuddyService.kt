@@ -1,6 +1,8 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
 import com.sprintstart.sprintstartbackend.arrival.external.ContributionWording
+import com.sprintstart.sprintstartbackend.assistant.external.AgentAiClient
+import com.sprintstart.sprintstartbackend.assistant.external.ArtifactLookupService
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCitationDto
@@ -10,15 +12,16 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventTyp
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyVocabularyDto
+import com.sprintstart.sprintstartbackend.assistant.external.MAX_AGENT_STEPS
 import com.sprintstart.sprintstartbackend.assistant.external.ResolvedBuddyCitation
 import com.sprintstart.sprintstartbackend.assistant.external.completeReply
 import com.sprintstart.sprintstartbackend.assistant.external.emitAgentReply
 import com.sprintstart.sprintstartbackend.assistant.external.emitCitationsAndDone
 import com.sprintstart.sprintstartbackend.assistant.external.endFailureWithErrorEvent
 import com.sprintstart.sprintstartbackend.assistant.external.relayAgentTurn
+import com.sprintstart.sprintstartbackend.assistant.external.sinceLastOpening
 import com.sprintstart.sprintstartbackend.assistant.external.toolUseEvent
 import com.sprintstart.sprintstartbackend.buddy.client.BuddyAiClient
-import com.sprintstart.sprintstartbackend.buddy.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddyCitation
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddyMessage
@@ -41,6 +44,7 @@ import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.QuestionId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.shared.ids.parseUuidOrNull
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -513,12 +517,6 @@ class BuddyService(
 
     companion object {
         /**
-         * How many backend-tool round trips a turn may take before it answers with what it has; the team
-         * buddy's loop shares the budget.
-         */
-        const val MAX_AGENT_STEPS = 5
-
-        /**
          * The most messages the AI is ever sent; older turns reach it only through the running summary.
          * Compaction folds back down to the same number, so the prompt stays within budget.
          */
@@ -587,10 +585,3 @@ class BuddyService(
         buddySessionRepository.save(session)
     }
 }
-
-internal fun parseUuidOrNull(value: String): UUID? =
-    try {
-        UUID.fromString(value)
-    } catch (_: IllegalArgumentException) {
-        null
-    }

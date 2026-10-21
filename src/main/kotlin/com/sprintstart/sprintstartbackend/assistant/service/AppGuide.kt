@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.assistant.service
 
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 

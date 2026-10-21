@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.buddy.service
 
 import com.sprintstart.sprintstartbackend.arrival.external.ArrivalReadApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAppGuideTools
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.board.service.OpenPullRequestReader

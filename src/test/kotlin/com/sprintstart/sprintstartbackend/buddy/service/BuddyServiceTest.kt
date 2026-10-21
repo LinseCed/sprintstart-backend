@@ -1,5 +1,7 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
+import com.sprintstart.sprintstartbackend.assistant.external.AgentAiClient
+import com.sprintstart.sprintstartbackend.assistant.external.ArtifactLookupService
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentResponse
@@ -11,8 +13,8 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventTyp
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.assistant.external.FALLBACK_REPLY
+import com.sprintstart.sprintstartbackend.assistant.external.ResolvedArtifact
 import com.sprintstart.sprintstartbackend.buddy.client.BuddyAiClient
-import com.sprintstart.sprintstartbackend.buddy.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddyCitation
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddyMessage

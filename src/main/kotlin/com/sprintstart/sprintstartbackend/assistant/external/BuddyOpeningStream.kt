@@ -1,10 +1,10 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.assistant.external
 
+import com.sprintstart.sprintstartbackend.assistant.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenStreamEvent
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventType
-import com.sprintstart.sprintstartbackend.buddy.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.shared.ai.AiServiceException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
@@ -103,6 +103,6 @@ class BuddyOpeningStream(
 }
 
 /** The messages of the current visit: everything from the last opening on, or all of them if none was opened. */
-internal fun <T> List<T>.sinceLastOpening(isOpening: (T) -> Boolean): List<T> = drop(
+fun <T> List<T>.sinceLastOpening(isOpening: (T) -> Boolean): List<T> = drop(
     indexOfLast(isOpening).coerceAtLeast(0),
 )

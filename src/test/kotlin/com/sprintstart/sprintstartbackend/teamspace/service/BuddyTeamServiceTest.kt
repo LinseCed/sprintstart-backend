@@ -1,12 +1,15 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.ActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.AgentAiClient
+import com.sprintstart.sprintstartbackend.assistant.external.ArtifactLookupService
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentStreamEvent
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpeningStream
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
@@ -14,11 +17,8 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventTyp
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.assistant.external.FALLBACK_REPLY
-import com.sprintstart.sprintstartbackend.buddy.external.AgentAiClient
+import com.sprintstart.sprintstartbackend.assistant.external.MAX_AGENT_STEPS
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
-import com.sprintstart.sprintstartbackend.buddy.service.ArtifactLookupService
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyOpeningStream
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyService
 import com.sprintstart.sprintstartbackend.buddy.service.reasoning
 import com.sprintstart.sprintstartbackend.buddy.service.result
 import com.sprintstart.sprintstartbackend.buddy.service.returnsStream
@@ -636,10 +636,10 @@ class BuddyTeamServiceTest {
         val events = service.sendMessageForMe(authId, projectId, "how is Ada?").toList()
 
         assertThat(shownAfterLastReset(events)).isEqualTo(FALLBACK_REPLY)
-        assertThat(events.count { it.type == BuddyStreamEventType.RESET }).isEqualTo(BuddyService.MAX_AGENT_STEPS)
+        assertThat(events.count { it.type == BuddyStreamEventType.RESET }).isEqualTo(MAX_AGENT_STEPS)
         assertThat(saved.single { it.role == BuddyMessageRole.ASSISTANT }.content)
             .isEqualTo(FALLBACK_REPLY)
-        coVerify(exactly = BuddyService.MAX_AGENT_STEPS) { agentAiClient.buddyAgentTurnStream(any()) }
+        coVerify(exactly = MAX_AGENT_STEPS) { agentAiClient.buddyAgentTurnStream(any()) }
     }
 
     @Test

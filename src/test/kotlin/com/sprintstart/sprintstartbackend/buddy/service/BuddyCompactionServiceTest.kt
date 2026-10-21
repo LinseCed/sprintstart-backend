@@ -1,8 +1,8 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
+import com.sprintstart.sprintstartbackend.assistant.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactResponse
-import com.sprintstart.sprintstartbackend.buddy.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddySession

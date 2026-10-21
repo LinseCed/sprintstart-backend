@@ -5,10 +5,10 @@ import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepService
 import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.arrival.service.ResolvedArrivalStep
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAppGuideTools
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyAppGuideTools
 import com.sprintstart.sprintstartbackend.buddy.service.result
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.AttentionItemResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.AttentionSeverity

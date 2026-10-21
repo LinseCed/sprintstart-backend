@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepService
 import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.arrival.service.ResolvedArrivalStep
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyAppGuideTools
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.board.service.OpenPullRequestReader

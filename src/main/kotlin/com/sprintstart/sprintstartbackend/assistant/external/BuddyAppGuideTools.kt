@@ -1,6 +1,8 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.assistant.external
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.service.AppGuide
+import com.sprintstart.sprintstartbackend.assistant.service.AppGuidePage
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import kotlinx.serialization.json.buildJsonObject

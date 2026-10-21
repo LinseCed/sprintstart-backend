@@ -2,14 +2,14 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpeningStream
 import com.sprintstart.sprintstartbackend.assistant.external.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.OpeningConversation
 import com.sprintstart.sprintstartbackend.assistant.external.endFailureWithErrorEvent
+import com.sprintstart.sprintstartbackend.assistant.external.sinceLastOpening
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.buddy.model.response.buddy.BuddyMessageResponse
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyOpeningStream
-import com.sprintstart.sprintstartbackend.buddy.service.OpeningConversation
-import com.sprintstart.sprintstartbackend.buddy.service.sinceLastOpening
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.teamspace.model.entity.BuddyTeamMessage

@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.assistant.external
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
