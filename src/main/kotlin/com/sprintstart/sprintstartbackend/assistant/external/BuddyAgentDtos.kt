@@ -170,7 +170,7 @@ data class BuddyOpenRequest(
  *
  * Nobody is waiting on this call, which is the whole reason it is one. Folding on the agent
  * hop instead puts the fold *before* the agent loop, so once a visit's active window outgrows
- * `BuddyService.WINDOW`, every further turn pays an extra serialized model call to compress one
+ * [CONVERSATION_WINDOW], every further turn pays an extra serialized model call to compress one
  * exchange ahead of the answer the hire is waiting for. Keep it off the answering path.
  *
  * The cursor is this side's: [folded] is exactly the slice to advance past once the fold succeeds.

@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.assistant.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactResponse
+import com.sprintstart.sprintstartbackend.assistant.external.ConversationCompaction
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddySession
@@ -14,6 +15,8 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -47,8 +50,7 @@ class BuddyCompactionServiceTest {
     private val service = BuddyCompactionService(
         buddySessionRepository,
         buddyMessageRepository,
-        agentAiClient,
-        transactionManager,
+        ConversationCompaction(agentAiClient, CoroutineScope(Dispatchers.Unconfined), transactionManager),
     )
 
     private val userId = UUID.randomUUID()

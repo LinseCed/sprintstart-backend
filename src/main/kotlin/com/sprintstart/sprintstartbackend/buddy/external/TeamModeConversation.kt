@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.buddy.external
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.SendBuddyMessageRequest

@@ -12,6 +12,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventTyp
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyVocabularyDto
+import com.sprintstart.sprintstartbackend.assistant.external.CONVERSATION_WINDOW
 import com.sprintstart.sprintstartbackend.assistant.external.MAX_AGENT_STEPS
 import com.sprintstart.sprintstartbackend.assistant.external.ResolvedBuddyCitation
 import com.sprintstart.sprintstartbackend.assistant.external.completeReply
@@ -172,7 +173,7 @@ class BuddyService(
      * [BuddySession.summarizedCount] cursor, plus the running summary standing in for the rest.
      *
      * This turn must never ask the AI to fold. A fold runs before the reply is composed, and
-     * since the cursor advances by exactly what it folds, the window would then sit at [WINDOW]
+     * since the cursor advances by exactly what it folds, the window would then sit at [CONVERSATION_WINDOW]
      * permanently — an extra serialized model call on every turn. [BuddyCompactionService] folds
      * afterward instead; a fold that has not happened yet just means a longer window this turn.
      *
@@ -516,12 +517,6 @@ class BuddyService(
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
 
     companion object {
-        /**
-         * The most messages the AI is ever sent; older turns reach it only through the running summary.
-         * Compaction folds back down to the same number, so the prompt stays within budget.
-         */
-        const val WINDOW = 20
-
         /**
          * Shown when the hire is on no project: retrieval fails closed on an empty scope, so the turn is
          * refused rather than answered from nothing.

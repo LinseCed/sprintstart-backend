@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenStreamEvent
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpeningStream
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.ConversationCompaction
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddySession
@@ -52,7 +53,14 @@ class BuddyOpeningServiceTest {
         sessionActivityService,
         buddyToolExecutor,
         BuddyOpeningStream(agentAiClient),
-        BuddyCompactionScheduler(buddyCompactionService, CoroutineScope(Dispatchers.Unconfined)),
+        BuddyCompactionScheduler(
+            buddyCompactionService,
+            ConversationCompaction(
+                mockk(relaxed = true),
+                CoroutineScope(Dispatchers.Unconfined),
+                mockk(relaxed = true),
+            ),
+        ),
     )
 
     private val userId = UUID.randomUUID()

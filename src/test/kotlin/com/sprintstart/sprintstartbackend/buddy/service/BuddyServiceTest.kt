@@ -12,6 +12,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.ConversationCompaction
 import com.sprintstart.sprintstartbackend.assistant.external.FALLBACK_REPLY
 import com.sprintstart.sprintstartbackend.assistant.external.ResolvedArtifact
 import com.sprintstart.sprintstartbackend.buddy.client.BuddyAiClient
@@ -87,7 +88,14 @@ class BuddyServiceTest {
         buddyActionService,
         userApi,
         artifactLookupService,
-        BuddyCompactionScheduler(buddyCompactionService, CoroutineScope(Dispatchers.Unconfined)),
+        BuddyCompactionScheduler(
+            buddyCompactionService,
+            ConversationCompaction(
+                mockk(relaxed = true),
+                CoroutineScope(Dispatchers.Unconfined),
+                mockk(relaxed = true),
+            ),
+        ),
         buddyAiClient,
         questionLog,
         clock,

@@ -12,7 +12,7 @@
                 "starterwork :: api", "starterwork :: api-enums", "starterwork :: api-model", "starterwork :: api-requests",
                 "starterwork :: api-responses",
                 "knowledge :: api", "knowledge :: api-model", "knowledge :: api-responses", "insights :: api", "insights :: api-services", "insights :: api-responses",
-                "buddy :: api", "buddy :: api-services", "buddy :: api-enums", "buddy :: api-requests",
+                "buddy :: api", "buddy :: api-enums", "buddy :: api-requests",
                 "buddy :: api-responses"
         }
 )

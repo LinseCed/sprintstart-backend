@@ -1,6 +1,6 @@
 package com.sprintstart.sprintstartbackend.teamspace.model.entity
 
-import com.sprintstart.sprintstartbackend.buddy.external.BuddyMemory
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyMemory
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id

@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyCompactionScheduler
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyCompactionService
+import com.sprintstart.sprintstartbackend.assistant.external.CompactionStore
+import com.sprintstart.sprintstartbackend.assistant.external.ConversationCompaction
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.teamspace.model.mapper.toAgentMessage
@@ -15,20 +15,19 @@ import org.springframework.stereotype.Component
  */
 @Component
 class BuddyTeamCompaction(
-    private val compaction: BuddyCompactionService,
-    private val scheduler: BuddyCompactionScheduler,
+    private val compaction: ConversationCompaction,
     private val buddyTeamSessionRepository: BuddyTeamSessionRepository,
     private val buddyTeamMessageRepository: BuddyTeamMessageRepository,
 ) {
     /** Folds the conversation in the background once the turn that grew it is stored. */
     fun foldInBackground(user: UserId, project: ProjectId) {
-        scheduler.inBackground { compactIfNeeded(user, project) }
+        compaction.inBackground { compactIfNeeded(user, project) }
     }
 
-    /** A no-op while the window fits, and never throws, as [BuddyCompactionService.compact] promises. */
+    /** A no-op while the window fits, and never throws, as [ConversationCompaction.compact] promises. */
     suspend fun compactIfNeeded(user: UserId, project: ProjectId) {
         compaction.compact(
-            BuddyCompactionService.Store(
+            CompactionStore(
                 label = "user ${user.value} on project ${project.value}",
                 find = { buddyTeamSessionRepository.findByUserIdAndProjectId(user.value, project.value) },
                 findById = { buddyTeamSessionRepository.findById(it).orElse(null) },
