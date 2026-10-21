@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
 import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.model.request.question.SubmitQuestionAttemptRequest
@@ -30,7 +31,7 @@ import org.springframework.stereotype.Component
  */
 @Component
 class BuddyQuestionActions(
-    private val buddyPathTools: BuddyPathTools,
+    private val myPathTool: MyPathTool,
     private val hirePathActionsApi: HirePathActionsApi,
 ) {
     /**
@@ -38,7 +39,7 @@ class BuddyQuestionActions(
      *
      * ### Why the mentor passes words and not option ids
      *
-     * The mentor is not told which option is correct (see [BuddyPathTools]), so what it passes here
+     * The mentor is not told which option is correct (see [MyPathTool]), so what it passes here
      * is what the hire said — "the retro", or "Git" and "Docker" as two picks — and the match to
      * options happens server-side in [matchOption]. An option id from the mentor would be the mentor
      * choosing, and the point is that the hire chooses.
@@ -66,7 +67,7 @@ class BuddyQuestionActions(
                 "No question_id was provided. Read get_my_onboarding_path and pass the question_id " +
                     "of the question they are answering.",
             )
-        val question = buddyPathTools.findQuestion(userId.value, questionId)
+        val question = myPathTool.findQuestion(userId.value, questionId)
             ?: return notProposed(
                 "No question of this hire's own path has that id. Read get_my_onboarding_path again.",
             )
@@ -142,7 +143,7 @@ class BuddyQuestionActions(
         if (questionId == null || answer.isNullOrBlank()) {
             return BuddyActionResponse(ok = false, message = "No answer was proposed to send.")
         }
-        val question = buddyPathTools.findQuestion(userId.value, questionId)
+        val question = myPathTool.findQuestion(userId.value, questionId)
             ?: return BuddyActionResponse(ok = false, message = "That question isn't on your path.")
 
         // Checked again at confirm time, for the same reason completing a step checks its lock: the

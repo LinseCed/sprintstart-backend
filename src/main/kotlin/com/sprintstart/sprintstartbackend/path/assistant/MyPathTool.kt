@@ -1,6 +1,12 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.path.assistant
 
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireSnapshotOrder
+import com.sprintstart.sprintstartbackend.assistant.external.HireTool
+import com.sprintstart.sprintstartbackend.assistant.external.HireToolContext
+import com.sprintstart.sprintstartbackend.assistant.external.HireToolOrder
+import com.sprintstart.sprintstartbackend.assistant.external.HireToolSuggestion
 import com.sprintstart.sprintstartbackend.path.external.HirePathApi
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseForUserResponse
@@ -14,6 +20,7 @@ import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
 import java.util.Locale
 import java.util.UUID
@@ -33,8 +40,8 @@ import java.util.UUID
  * - The **blueprint** is the PM's. The buddy never touches it; a mentor that could rewrite the
  *   curriculum is a mentor whose team stops trusting the curriculum.
  * - The **hire's copy** is the hire's, and the buddy may propose changes to it -- see
- *   [BuddyPathActions], where every one of them waits for a button.
- * - **Reading really is free of consequence here**, unlike [BuddyBoardTools.execute]'s board read,
+ *   the Buddy's path actions, where every one of them waits for a button.
+ * - **Reading really is free of consequence here**, unlike the Buddy's board read,
  *   which brings a board's baseline cards up to date by looking. Nothing is created by asking.
  *
  * ### What this deliberately does not do
@@ -50,27 +57,38 @@ import java.util.UUID
  * mentor cannot know it either.
  */
 @Component
+@Order(HireToolOrder.PATH)
 @Suppress("TooManyFunctions")
-class BuddyPathTools(
+class MyPathTool(
     private val hirePathApi: HirePathApi,
-) {
+) : HireTool {
+    override val spec = READ_MY_PATH_SPEC
+
+    override val snapshotPosition = HireSnapshotOrder.PATH
+
+    /** Asks where they are rather than for the plan: the plan is a page they already have. */
+    override val suggestion = HireToolSuggestion(
+        label = "Where am I on my path?",
+        question = "Where am I in my onboarding path, and what should I do next?",
+    )
+
     /**
-     * The path tool, mounted only for a hire who has a path.
+     * Mounted only for a hire who has a path.
      *
      * "Absent, never empty", the same rule the arrival and pull-request tools follow: a tool whose
      * only possible answer is "there is no path" is one the mentor will raise the path with anyway.
      * Asked as a row count rather than as a read -- see [OnboardingPathService.hasPath].
      */
-    fun toolSpecs(userId: UUID): List<BuddyToolSpecDto> =
-        if (hirePathApi.hasPath(UserId(userId))) listOf(READ_MY_PATH_SPEC) else emptyList()
+    override fun isMountedFor(hire: UserId): Boolean = hirePathApi.hasPath(hire)
 
-    /** Whether [toolName] is this component's tool. */
-    fun handles(toolName: String): Boolean = toolName == READ_MY_PATH
+    override fun execute(call: BuddyToolCallDto, context: HireToolContext): String = execute(context.hire.value)
+
+    override fun snapshotFor(hire: UserId): String? = snapshotFor(hire.value)
 
     /**
      * Whether this hire has a path at all.
      *
-     * Exposed so that [BuddyPathActions] gates its path actions on the same question this gates
+     * Exposed so that the Buddy's path actions are gated on the same question this gates
      * its read tool on, answered by the same call. Two components deciding separately whether a path
      * exists is how a mentor ends up holding an action for a plan its read tool says is not there.
      */
@@ -228,7 +246,7 @@ class BuddyPathTools(
      * a proposal can never be aimed at somebody else's onboarding. [findStep] and [findQuestion]
      * are the same idea for the other two kinds of node.
      *
-     * Used by [BuddyPathActions] to check a proposal *before* the hire sees a button, and to put
+     * Used by the Buddy's path actions to check a proposal *before* the hire sees a button, and to put
      * the real title on it. A button that names the thing it will change is the last chance anybody
      * has to notice the mentor meant a different step.
      *
@@ -282,11 +300,6 @@ class BuddyPathTools(
                 answer.takeIf { it.isNotBlank() }?.let { question.id to it.take(ANSWER_SHOWN) }
             }.toMap()
 
-    /**
-     * Not private, for the same reason [BuddyToolExecutor]'s tool names are not: the chip catalog in
-     * [BuddySuggestionService] binds to this constant, so renaming the tool stops that catalog
-     * compiling rather than quietly offering the hire a doorway the mentor cannot walk through.
-     */
     companion object {
         const val READ_MY_PATH = "get_my_onboarding_path"
 
@@ -312,7 +325,7 @@ class BuddyPathTools(
          * A link in a conversation is for finding something, not for doing it.
          *
          * They are a contract with the router, which is why they are named here and asserted in
-         * `BuddyPathToolsTest`: a route rename that forgets this file produces links that 404, and a
+         * `MyPathToolTest`: a route rename that forgets this file produces links that 404, and a
          * mentor has no way to notice.
          */
         const val STEP_LINK = "/onboarding?step="

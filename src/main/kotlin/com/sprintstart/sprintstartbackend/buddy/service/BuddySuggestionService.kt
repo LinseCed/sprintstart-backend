@@ -48,34 +48,11 @@ class BuddySuggestionService(
             .orElse(emptyList())
 
     /**
-     * The chips this hire should see, in mounted order.
+     * The chips this hire should see, in mounted order: each mounted tool's own chip, if it has one.
      *
-     * A tool with no entry in the catalog contributes nothing, so adding a tool never silently adds
-     * a chip — the wording for a hire is a separate decision from what the mentor can read.
+     * A tool without a chip contributes nothing, so adding a tool never silently adds a chip — the
+     * wording for a hire is a separate decision from what the mentor can read.
      */
     fun forHire(userId: UUID): List<BuddySuggestionResponse> =
-        buddyToolExecutor.toolSpecs(userId).mapNotNull { CATALOG[it.name] ?: toolChips[it.name] }
-
-    private companion object {
-        /**
-         * Tool name → the chip offered for it.
-         *
-         * Wording may only assume what the chip's own gate guarantees. A chip is offered exactly
-         * when its tool is mounted, so a chip whose tool mounts for everybody must be true of a
-         * designer, a Scrum Master and a developer alike — no "clone", "repository", "commit" or
-         * "pull request" in it. `BuddySuggestionServiceTest` greps for exactly that vocabulary.
-         *
-         * The label is what the chip says; the question is what lands in the composer. They differ
-         * only in length — a chip is a doorway, and one that promised something other than the
-         * question it writes would be putting words in the hire's mouth.
-         */
-        val CATALOG: Map<String, BuddySuggestionResponse> = mapOf(
-            // Mounted only for a hire with a path. Asks where they are rather than for the plan: the plan is
-            // a page they already have.
-            BuddyPathTools.READ_MY_PATH to BuddySuggestionResponse(
-                label = "Where am I on my path?",
-                question = "Where am I in my onboarding path, and what should I do next?",
-            ),
-        )
-    }
+        buddyToolExecutor.toolSpecs(userId).mapNotNull { toolChips[it.name] }
 }

@@ -5,6 +5,8 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
+import com.sprintstart.sprintstartbackend.path.assistant.hasPendingSkip
 import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
 import com.sprintstart.sprintstartbackend.path.external.HirePathApi
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
@@ -48,7 +50,7 @@ import java.util.UUID
  */
 @Component
 class BuddyPathActions(
-    private val buddyPathTools: BuddyPathTools,
+    private val myPathTool: MyPathTool,
     private val hirePathActionsApi: HirePathActionsApi,
     private val edits: BuddyPathEditActions,
     private val hirePathApi: HirePathApi,
@@ -62,11 +64,11 @@ class BuddyPathActions(
      * Gated on the path's existence and on nothing else — never on how far along it they are. A
      * mentor that may only propose something once some further condition holds is one whose refusals
      * the hire has to learn; each proposal checks its own preconditions, where the reason can be a
-     * sentence. Asked of [BuddyPathTools], so the read tool and these actions can never disagree
+     * sentence. Asked of [MyPathTool], so the read tool and these actions can never disagree
      * about whether there is a path.
      */
     fun specs(userId: UUID): List<BuddyToolSpecDto> =
-        if (!buddyPathTools.hasPath(userId)) {
+        if (!myPathTool.hasPath(userId)) {
             emptyList()
         } else {
             listOf(
@@ -143,7 +145,7 @@ class BuddyPathActions(
                 "No step_id was provided. Read get_my_onboarding_path and pass the step_id of the " +
                     "step they mean.",
             )
-        val step = buddyPathTools.findStep(userId, stepId)
+        val step = myPathTool.findStep(userId, stepId)
             ?: return notProposed(
                 "No step of this hire's own path has that id. Read get_my_onboarding_path again — an " +
                     "id from anywhere else is not theirs to tick off.",
@@ -222,7 +224,7 @@ class BuddyPathActions(
             )
         }
         // The task route does not check locks; the page does, by never opening a locked step.
-        if (buddyPathTools.findStep(userId, task.stepId)?.locked == true) {
+        if (myPathTool.findStep(userId, task.stepId)?.locked == true) {
             return notProposed(
                 "The step that “${task.title}” belongs to is locked, so nothing on its checklist can be " +
                     "ticked yet. Say what the step is waiting on instead.",
@@ -246,13 +248,13 @@ class BuddyPathActions(
      * One checklist line of the hire's own path, or null.
      *
      * Ownership is the *step's*: a line belongs to this hire exactly when the step it hangs on is on
-     * their path, which [BuddyPathTools.findStep] answers. That is why the unscoped read by id is safe
+     * their path, which [MyPathTool.findStep] answers. That is why the unscoped read by id is safe
      * here and would not be on its own.
      */
     private fun findTask(userId: UUID, taskId: UUID): GetOnboardingTaskResponse? {
         val task = runCatching { hirePathApi.task(OnboardingTaskId(taskId)) }.getOrNull()
             ?: return null
-        return task.takeIf { buddyPathTools.findStep(userId, it.stepId) != null }
+        return task.takeIf { myPathTool.findStep(userId, it.stepId) != null }
     }
 
     /**
@@ -267,7 +269,7 @@ class BuddyPathActions(
             return BuddyActionResponse(ok = false, message = "No checklist line was proposed to tick off.")
         }
         val task = hirePathApi.myTask(AuthId(authId), OnboardingTaskId(taskId))
-        if (buddyPathTools.findStep(resolveUserId(authId), task.stepId)?.locked == true) {
+        if (myPathTool.findStep(resolveUserId(authId), task.stepId)?.locked == true) {
             return BuddyActionResponse(
                 ok = false,
                 message = "That step is locked right now, so its checklist can't be ticked yet.",
@@ -302,7 +304,7 @@ class BuddyPathActions(
         if (stepId == null) {
             return BuddyActionResponse(ok = false, message = "No step was proposed to complete.")
         }
-        val current = buddyPathTools.findStep(resolveUserId(authId), stepId)
+        val current = myPathTool.findStep(resolveUserId(authId), stepId)
             ?: return BuddyActionResponse(ok = false, message = "That step isn't on your path.")
         if (current.locked) {
             return BuddyActionResponse(

@@ -61,7 +61,7 @@ enum class BuddyActionType(
      * Sends the hire's own answer to a knowledge question.
      *
      * The hire's words, never the mentor's. The mentor is not told which option is correct (see
-     * `BuddyPathTools`), so it cannot answer for them even if it tried — and the button shows the
+     * `MyPathTool`), so it cannot answer for them even if it tried — and the button shows the
      * answer that will be sent, because an attempt is recorded whether it is right or not.
      */
     ANSWER_QUESTION("answer_question", "Send this answer"),

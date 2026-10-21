@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.path.assistant
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
