@@ -18,7 +18,6 @@
     <ID>CyclomaticComplexMethod:BoardCardHydrator.kt:BoardCardHydrator$private fun hydrate( card: BoardCard, member: ProjectMember, projectId: ProjectId, diagram: BoardDiagram?, arrivalSteps: List&lt;ArrivalStepResponse&gt;, pathSteps: Map&lt;UUID, ResolvedPathStep&gt;, matches: () -&gt; List&lt;RankedStarterWorkTaskResponse&gt;, ): BoardCardContent</ID>
     <ID>CyclomaticComplexMethod:BoardService.kt:BoardService$@Transactional fun place( userId: UserId, projectId: ProjectId, kind: BoardCardKind, subject: String? = null, by: BoardActor = BoardActor.BUDDY, ): PlacementOutcome</ID>
     <ID>CyclomaticComplexMethod:BoardService.kt:BoardService$private fun editableCardOrThrow( userId: UserId, cardId: BoardCardId, kind: BoardCardKind, ): Pair&lt;BoardCard, Board&gt;</ID>
-    <ID>CyclomaticComplexMethod:BoardTools.kt:ReadBoardTool$private fun readBoard(userId: UserId): String</ID>
     <ID>CyclomaticComplexMethod:BuddyActionService.kt:BuddyActionService$suspend fun perform(request: BuddyActionRequest, jwt: Jwt): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
     <ID>CyclomaticComplexMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
@@ -41,6 +40,7 @@
     <ID>CyclomaticComplexMethod:PhaseText.kt:internal fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
     <ID>CyclomaticComplexMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Evaluating project industry automatically") override suspend fun evaluateIndustryAutomatically(projectId: UUID)</ID>
     <ID>CyclomaticComplexMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Getting or lazily evaluating project industry") override suspend fun getOrEvaluateIndustry(projectId: UUID): String?</ID>
+    <ID>CyclomaticComplexMethod:ReadBoardTool.kt:ReadBoardTool$private fun readBoard(userId: UserId): String</ID>
     <ID>CyclomaticComplexMethod:StarterWorkPoolReconciler.kt:StarterWorkPoolReconciler$@Transactional fun reconcile(): PoolReconciliation</ID>
     <ID>CyclomaticComplexMethod:StepTeamActions.kt:AddStepAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>CyclomaticComplexMethod:StepTeamActions.kt:UpdateStepAction$private fun badArgument(call: BuddyToolCallDto, slots: Int): String?</ID>
@@ -80,7 +80,6 @@
     <ID>LongMethod:BlueprintSeeder.kt:BlueprintSeeder$fun seed()</ID>
     <ID>LongMethod:BoardDiagramService.kt:BoardDiagramService$private fun store( context: DiagramContext, outcome: DiagramOutcome, schema: DiagramSchema, ): DiagramContent</ID>
     <ID>LongMethod:BoardService.kt:BoardService$@Transactional fun place( userId: UserId, projectId: ProjectId, kind: BoardCardKind, subject: String? = null, by: BoardActor = BoardActor.BUDDY, ): PlacementOutcome</ID>
-    <ID>LongMethod:BoardTools.kt:ReadBoardTool$private fun readBoard(userId: UserId): String</ID>
     <ID>LongMethod:BuddyActionService.kt:BuddyActionService$@Suppress("CyclomaticComplexMethod") // The person-scoped gates first, then one branch per action. fun propose(call: BuddyToolCallDto, userId: UUID): ProposeOutcome</ID>
     <ID>LongMethod:BuddyActionService.kt:BuddyActionService$private suspend fun dispatch( type: BuddyActionType, resolved: CallerContext.Resolved, authId: String, request: BuddyActionRequest, ): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyActionService.kt:BuddyActionService$suspend fun perform(request: BuddyActionRequest, jwt: Jwt): BuddyActionResponse</ID>
@@ -152,6 +151,7 @@
     <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Evaluating project industry automatically") override suspend fun evaluateIndustryAutomatically(projectId: UUID)</ID>
     <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Getting or lazily evaluating project industry") override suspend fun getOrEvaluateIndustry(projectId: UUID): String?</ID>
     <ID>LongMethod:ProjectRoleService.kt:ProjectRoleService$@Tracked("Suggesting skills for project role") suspend fun suggestSkillsForRole( roleId: UUID, request: SuggestSkillsRequest? = null, ): List&lt;SkillSuggestionItemResponse&gt;</ID>
+    <ID>LongMethod:ReadBoardTool.kt:ReadBoardTool$private fun readBoard(userId: UserId): String</ID>
     <ID>LongMethod:RunArtifactsIngestionService.kt:RunArtifactsIngestionService$@Tracked("Dispatching AI sync for run") suspend fun ingestRunArtifacts(runId: UUID)</ID>
     <ID>LongMethod:StarterWorkMatcher.kt:StarterWorkMatcher$@Suppress("CyclomaticComplexMethod") fun score( profile: HireProfile, task: TaskFeatures, responsiveness: Responsiveness?, ): Score</ID>
     <ID>LongMethod:StarterWorkPoolReconciler.kt:StarterWorkPoolReconciler$@Transactional fun reconcile(): PoolReconciliation</ID>
