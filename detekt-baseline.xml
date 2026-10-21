@@ -24,7 +24,6 @@
     <ID>CyclomaticComplexMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun perform(authId: String, userId: UserId, request: BuddyActionRequest): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, userId: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>CyclomaticComplexMethod:BuddySkipActions.kt:BuddySkipActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
-    <ID>CyclomaticComplexMethod:BuddyToolExecutor.kt:BuddyToolExecutor$fun execute(call: BuddyToolCallDto, userId: UUID, currentPage: String? = null): String</ID>
     <ID>CyclomaticComplexMethod:ConfluenceRestrictionPageMetadata.kt:private fun validateSharedRestrictionMetadata( users: ConfluenceRestrictedUsersResponse, groups: ConfluenceRestrictedGroupsResponse, requestedStart: Int, requestedLimit: Int, requestContext: String, )</ID>
     <ID>CyclomaticComplexMethod:ConfluenceStorageFormatParser.kt:InlineMarkdown$fun renderNode(node: Node): String</ID>
     <ID>CyclomaticComplexMethod:ContentTeamTools.kt:ContentTeamTools$private fun memberPath(memberId: UUID?, projectId: UUID): String</ID>
@@ -84,7 +83,6 @@
     <ID>LongMethod:BuddyService.kt:BuddyService$private suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.runToolCall( call: BuddyToolCallDto, userId: UUID, currentPage: String?, ): String</ID>
     <ID>LongMethod:BuddySkipActions.kt:BuddySkipActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyTeamService.kt:BuddyTeamService$fun sendMessageForMe( authId: String, projectId: UUID, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters? = null, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
-    <ID>LongMethod:BuddyToolExecutor.kt:BuddyToolExecutor$private fun getSuggestedTasks(userId: UUID): String</ID>
     <ID>LongMethod:CompetencyPlacementService.kt:CompetencyPlacementService$@Transactional fun record(userId: UUID, competencyKey: String, level: ProficiencyLevel): PlacementResult</ID>
     <ID>LongMethod:ConfluenceArtifactBatchService.kt:ConfluenceArtifactBatchService$fun persist(command: ConfluenceArtifactBatchCommand): ConfluenceArtifactBatchResult</ID>
     <ID>LongMethod:ConfluenceArtifactItemPersistenceService.kt:ConfluenceArtifactItemPersistenceService$private fun metadataJson(command: ConfluencePageArtifactCommand): String</ID>
