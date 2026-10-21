@@ -75,6 +75,17 @@ object HireActionOrder {
     const val ANSWER_QUESTION = 720
     const val ADD_PATH_STEP = 730
     const val REQUEST_SKIP = 740
+    const val PLACE_CHECKLIST = 800
+    const val AMEND_CHECKLIST = 810
+    const val TICK_CHECKLIST_ITEMS = 820
+    const val REWORD_CHECKLIST_ITEM = 830
+    const val PLACE_NOTE = 840
+    const val PLACE_LINK = 850
+    const val EDIT_NOTE = 860
+    const val EDIT_LINK = 870
+    const val EDIT_CHECKLIST = 880
+    const val DISMISS_CARDS = 890
+    const val REORDER_CARDS = 900
 }
 
 /**
