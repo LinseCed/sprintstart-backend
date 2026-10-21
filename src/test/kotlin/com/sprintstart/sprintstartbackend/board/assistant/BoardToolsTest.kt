@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.board.assistant
 
+import com.sprintstart.sprintstartbackend.arrival.assistant.NO_SUCH_STEP
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.HireTool
 import com.sprintstart.sprintstartbackend.assistant.external.HireToolContext
@@ -21,7 +22,6 @@ import com.sprintstart.sprintstartbackend.path.service.HirePathService
 import com.sprintstart.sprintstartbackend.path.service.PathStepReader
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
-import com.sprintstart.sprintstartbackend.teamspace.service.NO_SUCH_STEP
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto

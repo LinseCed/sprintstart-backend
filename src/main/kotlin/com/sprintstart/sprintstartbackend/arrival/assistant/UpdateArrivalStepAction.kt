@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.teamspace.service
+package com.sprintstart.sprintstartbackend.arrival.assistant
 
 import com.sprintstart.sprintstartbackend.arrival.external.ArrivalAuthoringApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ArrivalDerivation
@@ -8,6 +8,11 @@ import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.Arrival
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.TeamActionDraft
+import com.sprintstart.sprintstartbackend.assistant.external.TeamArea
+import com.sprintstart.sprintstartbackend.assistant.external.TeamToolContext
+import com.sprintstart.sprintstartbackend.assistant.external.TypedTeamAction
+import com.sprintstart.sprintstartbackend.assistant.external.forLabel
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

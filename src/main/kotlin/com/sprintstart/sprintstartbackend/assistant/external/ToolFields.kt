@@ -1,6 +1,5 @@
-package com.sprintstart.sprintstartbackend.teamspace.service
+package com.sprintstart.sprintstartbackend.assistant.external
 
-import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
