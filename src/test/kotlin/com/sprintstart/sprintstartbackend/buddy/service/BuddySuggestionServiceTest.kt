@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
+import com.sprintstart.sprintstartbackend.arrival.assistant.ArrivalStepsTool
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAppGuideTools
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -15,7 +16,7 @@ class BuddySuggestionServiceTest {
     private val buddyToolExecutor: BuddyToolExecutor = mockk()
     private val userApi: UserApi = mockk()
 
-    private val service = BuddySuggestionService(buddyToolExecutor, userApi)
+    private val service = BuddySuggestionService(buddyToolExecutor, userApi, listOf(ArrivalStepsTool(mockk())))
 
     private val userId = UUID.randomUUID()
     private val authId = "auth-1"
@@ -87,7 +88,7 @@ class BuddySuggestionServiceTest {
     @Test
     fun `no chip a non-developer sees mentions developer work`() {
         mounted(
-            BuddyToolExecutor.GET_ARRIVAL_STEPS,
+            ArrivalStepsTool.GET_ARRIVAL_STEPS,
             BuddyToolExecutor.GET_MY_METRICS,
             BuddyToolExecutor.GET_MY_COMPETENCIES,
             BuddyToolExecutor.GET_SUGGESTED_TASKS,
@@ -114,7 +115,7 @@ class BuddySuggestionServiceTest {
     fun `keeps the order the tools are mounted in`() {
         mounted(
             BuddyPathTools.READ_MY_PATH,
-            BuddyToolExecutor.GET_ARRIVAL_STEPS,
+            ArrivalStepsTool.GET_ARRIVAL_STEPS,
             BuddyToolExecutor.GET_MY_METRICS,
             BuddyToolExecutor.GET_SUGGESTED_TASKS,
         )

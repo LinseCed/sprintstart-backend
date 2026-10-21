@@ -1,10 +1,11 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
-import com.sprintstart.sprintstartbackend.arrival.external.ArrivalReadApi
-import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAppGuideTools
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireTool
+import com.sprintstart.sprintstartbackend.assistant.external.HireToolContext
+import com.sprintstart.sprintstartbackend.assistant.external.noArgumentsSchema
 import com.sprintstart.sprintstartbackend.board.external.HireBoardApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.insights.external.InsightsReadApi
@@ -45,7 +46,7 @@ class BuddyToolExecutor(
     private val buddyBoardTools: BuddyBoardTools,
     private val hireBoard: HireBoardApi,
     private val projectMembershipApi: ProjectMembershipApi,
-    private val arrivalSteps: ArrivalReadApi,
+    private val hireTools: List<HireTool>,
     private val buddyPathTools: BuddyPathTools,
     private val buddyAppGuideTools: BuddyAppGuideTools,
 ) {
@@ -71,12 +72,8 @@ class BuddyToolExecutor(
         // not read it answers "what should I do next" out of the work pool while the hire is looking
         // at a page that says something else. Mounted only when a path exists.
         addAll(buddyPathTools.toolSpecs(userId))
-        // Setup is not part of the onboarding -- an account or an access grant is something to
-        // chase whatever phase somebody is in. Mounted only when a step applies -- "absent, never
-        // empty", read from the same service the board card uses so the two cannot disagree.
-        if (arrivalSteps.forHire(UserId(userId)).isNotEmpty()) {
-            add(GET_ARRIVAL_STEPS_SPEC)
-        }
+        // The tools the features contribute, each mounted on its own condition and in its own order.
+        hireTools.filter { it.isMountedFor(UserId(userId)) }.forEach { add(it.spec) }
         add(GET_MY_METRICS_SPEC)
         add(GET_MY_COMPETENCIES_SPEC)
         // Mounted only while something is still unplaced, on the same "absent, never empty" rule
@@ -113,22 +110,23 @@ class BuddyToolExecutor(
      * say about it.
      */
     fun stateSnapshot(userId: UUID): String =
-        listOfNotNull(
+        buildList {
             // Absent entirely for a hire with no path, so a greeting can never open by discussing
             // one they have not got.
-            buddyPathTools.snapshotFor(userId),
-            ("Before they can work:\n" + getArrivalSteps(userId))
-                .takeIf { arrivalSteps.forHire(UserId(userId)).isNotEmpty() },
-            "Progress:\n" + getMyMetrics(userId),
+            add(buddyPathTools.snapshotFor(userId))
+            addAll(hireTools.map { it.snapshotFor(UserId(userId)) })
+            add("Progress:\n" + getMyMetrics(userId))
             // Omitted for somebody whose work cannot be found at all, on the same rule as the
             // tool: a greeting handed "Open pull requests: you have not set a GitHub username"
             // will open by asking for one, whoever they are.
-            ("Open pull requests:\n" + getMyOpenPullRequests(userId))
-                .takeUnless { userApi.getGithubLoginByUserId(userId).isNullOrBlank() },
-            "Suggested tasks:\n" + getSuggestedTasks(userId),
-            "Competencies:\n" + getMyCompetencies(userId),
-            unplacedForGreeting(userId),
-        ).joinToString("\n\n")
+            add(
+                ("Open pull requests:\n" + getMyOpenPullRequests(userId))
+                    .takeUnless { userApi.getGithubLoginByUserId(userId).isNullOrBlank() },
+            )
+            add("Suggested tasks:\n" + getSuggestedTasks(userId))
+            add("Competencies:\n" + getMyCompetencies(userId))
+            add(unplacedForGreeting(userId))
+        }.filterNotNull().joinToString("\n\n")
 
     /**
      * What the greeting may offer to place, or null when there is nothing left to place.
@@ -150,12 +148,14 @@ class BuddyToolExecutor(
      *
      * @param currentPage The app path the caller was on when they spoke, for the app guide.
      */
-    fun execute(call: BuddyToolCallDto, userId: UUID, currentPage: String? = null): String =
-        when {
+    fun execute(call: BuddyToolCallDto, userId: UUID, currentPage: String? = null): String {
+        hireTools
+            .firstOrNull { it.spec.name == call.name }
+            ?.let { return it.execute(call, HireToolContext(UserId(userId), currentPage)) }
+        return when {
             buddyBoardTools.handles(call.name) -> buddyBoardTools.execute(call, userId)
             buddyPathTools.handles(call.name) -> buddyPathTools.execute(userId)
             else -> when (call.name) {
-                GET_ARRIVAL_STEPS -> getArrivalSteps(userId)
                 GET_MY_METRICS -> getMyMetrics(userId)
                 GET_MY_COMPETENCIES -> getMyCompetencies(userId)
                 GET_COMPETENCIES_TO_ASSESS -> getCompetenciesToAssess(userId)
@@ -167,6 +167,7 @@ class BuddyToolExecutor(
                 else -> "Unknown tool: ${call.name}."
             }
         }
+    }
 
     /**
      * Who else is on the hire's projects, by id and name.
@@ -215,52 +216,6 @@ class BuddyToolExecutor(
      * proceed". Saying otherwise here would reintroduce the gate in the one place nobody would
      * think to look for it — the model's own words.
      */
-    private fun getArrivalSteps(userId: UUID): String {
-        val steps = arrivalSteps.forHire(UserId(userId))
-        if (steps.isEmpty()) {
-            return "Nobody has written an arrival list for this hire, so there is nothing outstanding."
-        }
-
-        val (settled, outstanding) = steps.partition { it.settled }
-
-        return buildString {
-            if (outstanding.isEmpty()) {
-                appendLine("Nothing is outstanding — every arrival step is settled.")
-            } else {
-                appendLine("Still outstanding (none of this stops them working):")
-                outstanding.forEach { resolved ->
-                    append("- ${resolved.title}")
-                    // Which project's step this is, for the same reason the card needs a heading:
-                    // a hire on two projects can be told "get staging access" twice, and a mentor
-                    // that cannot say which one is asking them to guess.
-                    resolved.projectName?.let { append(" (on $it)") }
-                    resolved.description?.let { append(" — $it") }
-                    resolved.href?.let { append(" ($it)") }
-                    // Whether the hire can settle it themselves decides what the buddy may offer.
-                    // Offering to tick a step the backend refuses would end in an error the hire
-                    // never caused.
-                    if (!resolved.selfConfirmable) {
-                        append(" [we check this one ourselves; they cannot mark it done]")
-                    }
-                    appendLine()
-                }
-            }
-
-            if (settled.isNotEmpty()) {
-                appendLine()
-                appendLine("Already settled:")
-                settled.forEach { resolved ->
-                    val how = if (resolved.rigor == Rigor.OBSERVED) {
-                        "we confirmed this"
-                    } else {
-                        "they told us"
-                    }
-                    appendLine("- ${resolved.title} ($how)")
-                }
-            }
-        }.trim()
-    }
-
     private fun getMyMetrics(userId: UUID): String {
         val projects = userApi
             .getUsersByIds(listOf(userId))
@@ -452,7 +407,6 @@ class BuddyToolExecutor(
      * mentor cannot answer.
      */
     companion object {
-        const val GET_ARRIVAL_STEPS = "get_arrival_steps"
         const val GET_MY_METRICS = "get_my_metrics"
         const val GET_MY_COMPETENCIES = "get_my_competencies"
         const val GET_COMPETENCIES_TO_ASSESS = "get_competencies_to_assess"
@@ -468,25 +422,6 @@ class BuddyToolExecutor(
 
         // No-argument JSON schema shared by every caller-scoped tool: the agent never says whose
         // data to read, so there is nothing to pass.
-        private fun noArgs() = buildJsonObject {
-            put("type", "object")
-            put("properties", buildJsonObject { })
-        }
-
-        val GET_ARRIVAL_STEPS_SPEC = BuddyToolSpecDto(
-            name = GET_ARRIVAL_STEPS,
-            description = "What has to be true before this hire can work — accounts, access, a " +
-                "working setup — and which of it they have settled. Read this before " +
-                "suggesting a task: somebody still waiting on an access grant does not need a " +
-                "good first task, they need the access. Use it for 'what do I still need to do?', " +
-                "'how do I get set up?', or whenever they say they are stuck getting started. " +
-                "None of it blocks them — an outstanding step is a thing to chase, never a " +
-                "reason they may not claim work or ask you something. Never total the steps up or " +
-                "give a fraction: what the system confirmed and what they told us are different " +
-                "facts. Takes no arguments — it always reads the caller.",
-            parameters = noArgs(),
-        )
-
         val GET_MY_METRICS_SPEC = BuddyToolSpecDto(
             name = GET_MY_METRICS,
             description = "How the hire's own work is going on their project(s): open and merged pull " +
@@ -494,7 +429,7 @@ class BuddyToolExecutor(
                 "is stalled, and review rework. Use this for 'is my PR stuck?' or 'how is my work " +
                 "going?'. It says nothing about their onboarding -- that is their path. Takes no " +
                 "arguments — it always reads the caller.",
-            parameters = noArgs(),
+            parameters = noArgumentsSchema(),
         )
 
         val GET_MY_COMPETENCIES_SPEC = BuddyToolSpecDto(
@@ -504,7 +439,7 @@ class BuddyToolExecutor(
                 "not yet met. Use this for questions about where the hire stands or what they have " +
                 "shown, e.g. 'where do I stand?' or 'what have I proven so far?'. Takes no " +
                 "arguments — it always reads the caller.",
-            parameters = noArgs(),
+            parameters = noArgumentsSchema(),
         )
 
         val GET_COMPETENCIES_TO_ASSESS_SPEC = BuddyToolSpecDto(
@@ -516,7 +451,7 @@ class BuddyToolExecutor(
                 "list of skills that exist here, so never invent a skill that is not on it. Ask " +
                 "about a few in conversation, not all of them, and record each one with " +
                 "record_assessment as you go. Takes no arguments — it always reads the caller.",
-            parameters = noArgs(),
+            parameters = noArgumentsSchema(),
         )
 
         val GET_MY_OPEN_PULL_REQUESTS_SPEC = BuddyToolSpecDto(
@@ -528,7 +463,7 @@ class BuddyToolExecutor(
                 "specific pull request that is stuck — `get_my_metrics` only gives the count and " +
                 "the longest wait, not the identifiers. Takes no arguments — it always reads the " +
                 "caller.",
-            parameters = noArgs(),
+            parameters = noArgumentsSchema(),
         )
 
         val GET_SUGGESTED_TASKS_SPEC = BuddyToolSpecDto(
@@ -541,7 +476,7 @@ class BuddyToolExecutor(
                 "further. Present the reasons, never a score. When the hire picks one, offer to " +
                 "claim it as their goal with claim_goal. Takes no arguments -- it always ranks " +
                 "for the caller.",
-            parameters = noArgs(),
+            parameters = noArgumentsSchema(),
         )
 
         val GET_TEAMMATES_SPEC = BuddyToolSpecDto(
@@ -550,7 +485,7 @@ class BuddyToolExecutor(
                 "before offering request_attestation, so the hire can pick who should confirm " +
                 "their work and you pass that person's real id. The hire is never in this list — " +
                 "work confirmed by the person who did it is not evidence.",
-            parameters = noArgs(),
+            parameters = noArgumentsSchema(),
         )
 
         val SEARCH_CANONICAL_ANSWERS_SPEC = BuddyToolSpecDto(

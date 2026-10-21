@@ -5,9 +5,8 @@ import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.noArgumentsSchema
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.springframework.stereotype.Component
 import java.util.UUID
 
@@ -103,7 +102,7 @@ class ArrivalTeamTools(
             description = "This project's arrival list in order: what a new hire needs in place, each with its " +
                 "key, how it gets settled, and any link. Read it before changing the list, and use the keys it " +
                 "gives when you do. $NOT_A_GATE Takes no arguments — it always reads this project.",
-            parameters = noArgs(),
+            parameters = noArgumentsSchema(),
         )
 
         val LIST_DERIVABLE_STEPS_SPEC = BuddyToolSpecDto(
@@ -111,12 +110,7 @@ class ArrivalTeamTools(
             description = "The arrival steps the system can check for itself, and whether each is already on " +
                 "this project's list. Suggest one of these before inventing a step with the same meaning: a " +
                 "derived step settles on real evidence instead of somebody ticking a box. Takes no arguments.",
-            parameters = noArgs(),
+            parameters = noArgumentsSchema(),
         )
-
-        private fun noArgs() = buildJsonObject {
-            put("type", "object")
-            put("properties", buildJsonObject { })
-        }
     }
 }
