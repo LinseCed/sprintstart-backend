@@ -5,7 +5,7 @@ import java.util.UUID
 /**
  * A hire confirming a buddy-proposed action.
  *
- * [action] is the proposed action's tool name (see `BuddyActionType`). The project is not
+ * [action] is the proposed action's tool name (a [HireAction]'s `spec.name`). The project is not
  * carried here — it is re-resolved server-side from the caller, so a client can never confirm an
  * action against a project the buddy did not scope it to. The remaining fields are the per-action
  * confirm payloads the proposal carried, echoed back verbatim — for example [question] for

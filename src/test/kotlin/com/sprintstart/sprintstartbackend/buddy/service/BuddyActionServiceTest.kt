@@ -1,12 +1,16 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
+import com.sprintstart.sprintstartbackend.arrival.assistant.RequestAttestationAction
 import com.sprintstart.sprintstartbackend.arrival.service.AttestationService
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
 import com.sprintstart.sprintstartbackend.board.assistant.boardActionsOver
 import com.sprintstart.sprintstartbackend.board.service.BoardService
+import com.sprintstart.sprintstartbackend.knowledge.assistant.FlagToPmAction
 import com.sprintstart.sprintstartbackend.knowledge.service.HireKnowledgeService
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.starterwork.assistant.ClaimGoalAction
 import com.sprintstart.sprintstartbackend.starterwork.assistant.OpenOrientationAction
 import com.sprintstart.sprintstartbackend.starterwork.assistant.RecordAssessmentAction
@@ -59,10 +63,11 @@ class BuddyActionServiceTest {
 
     // The starter-work actions are the real ones over the same mocks, so these cases still cover them.
     private val service = BuddyActionService(
-        HireKnowledgeService(knowledgeBaseService),
         userApi,
-        attestationService,
         listOf(
+            FlagToPmAction(HireKnowledgeService(knowledgeBaseService)),
+            RequestAttestationAction(attestationService),
+            SetGithubLoginAction(userApi),
             OpenOrientationAction(hireStarterWork),
             ClaimGoalAction(hireStarterWorkActions),
             RecordAssessmentAction(hireStarterWork, hireStarterWorkActions),
@@ -526,6 +531,56 @@ class BuddyActionServiceTest {
 
         assertThat(result.ok).isTrue()
         verify(exactly = 1) { knowledgeBaseService.escalate(authId, projectId, "How do we deploy?") }
+    }
+
+    @Test
+    fun `confirming an attestation files it for the hire on their project`() = runTest {
+        asHire()
+        onOneProject()
+        val attesterId = UUID.randomUUID()
+        every {
+            attestationService.requestAttestation(
+                UserId(userId),
+                ProjectId(projectId),
+                "Ran the retro",
+                UserId(attesterId),
+            )
+        } returns "Ran the retro"
+
+        val result = service.perform(
+            HireActionRequest(action = "request_attestation", title = "Ran the retro", attesterId = attesterId),
+            jwt,
+        )
+
+        assertThat(result.ok).isTrue()
+        assertThat(result.message).contains("“Ran the retro”")
+    }
+
+    @Test
+    fun `an attestation the arrival rules refuse comes back as their sentence`() = runTest {
+        asHire()
+        onOneProject()
+        every { attestationService.requestAttestation(any(), any(), any(), any()) } throws
+            ResponseStatusException(HttpStatus.BAD_REQUEST, "You can't confirm your own work.")
+
+        val result = service.perform(
+            HireActionRequest(action = "request_attestation", title = "Ran the retro", attesterId = userId),
+            jwt,
+        )
+
+        assertThat(result.ok).isFalse()
+        assertThat(result.message).isEqualTo("You can't confirm your own work.")
+    }
+
+    @Test
+    fun `an attestation confirm missing its attester files nothing`() = runTest {
+        asHire()
+        onOneProject()
+
+        val result = service.perform(HireActionRequest(action = "request_attestation", title = "Ran the retro"), jwt)
+
+        assertThat(result.ok).isFalse()
+        verify(exactly = 0) { attestationService.requestAttestation(any(), any(), any(), any()) }
     }
 
     @Test

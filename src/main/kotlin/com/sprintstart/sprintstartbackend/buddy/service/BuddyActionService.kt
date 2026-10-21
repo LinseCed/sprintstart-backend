@@ -1,30 +1,20 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
-import com.sprintstart.sprintstartbackend.arrival.external.HireArrivalApi
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.assistant.external.HireAction
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionContext
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionOutcome
-import com.sprintstart.sprintstartbackend.assistant.external.HireActionProposal
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionScope
 import com.sprintstart.sprintstartbackend.assistant.external.HireProject
-import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.knowledge.external.HireKnowledgeApi
 import com.sprintstart.sprintstartbackend.shared.ids.AuthId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
-import org.springframework.http.HttpStatus
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
@@ -35,25 +25,18 @@ import java.util.UUID
  * explicit confirmation.
  *
  * The one rule that makes this safe: a tool call never mutates. When the AI reasoner calls an
- * action tool during a turn, [propose] resolves the concrete action and hands back a proposal the
- * frontend renders as a confirm button — nothing changes. Only [perform], reached by a separate
- * confirm request after the hire clicks, runs the real `/me/...` operation. Both ends read the same
- * [BuddyActionType] catalog, so the proposal and the execution can never name different actions.
+ * action tool during a turn, [propose] hands back a proposal the frontend renders as a confirm button —
+ * nothing changes. Only [perform], reached by a separate confirm request after the hire clicks, runs the
+ * real operation.
  *
- * Every action is executed strictly on behalf of the resolved caller and scoped to the caller's own
- * project, re-resolved server-side at confirm time — a client can never confirm an action against a
- * project the buddy did not scope it to, nor act as another hire.
- *
- * The three actions left here each wrap an existing `/me/...` operation one for one, with a propose and
- * a perform half — hence the suppressed function count. The features' own actions, the path's and the
- * board's among them, arrive as [HireAction] beans.
+ * Every action is a [HireAction] bean a feature contributes from its `assistant/` package; this class only
+ * mounts them and puts the project gate in front. A project-scoped action runs on the caller's one project,
+ * re-resolved server-side at confirm time — a client can never confirm an action against a project the
+ * buddy did not scope it to, nor act as another hire.
  */
 @Service
-@Suppress("TooManyFunctions")
 class BuddyActionService(
-    private val hireKnowledgeApi: HireKnowledgeApi,
     private val userApi: UserApi,
-    private val hireArrivalApi: HireArrivalApi,
     private val hireActions: List<HireAction>,
 ) {
     /**
@@ -64,325 +47,28 @@ class BuddyActionService(
      * with no onboarding path will offer to tick a step off a plan they have not got.
      */
     fun actionSpecs(userId: UUID): List<BuddyToolSpecDto> =
-        listOf(FLAG_TO_PM_SPEC, REQUEST_ATTESTATION_SPEC, SET_GITHUB_LOGIN_SPEC) +
-            hireActions.filter { it.isMountedFor(UserId(userId)) }.map { it.spec }
+        hireActions.filter { it.isMountedFor(UserId(userId)) }.map { it.spec }
 
     /** Whether [toolName] is an action tool (handled by [propose]) rather than a read-only tool. */
-    fun isAction(toolName: String): Boolean =
-        BuddyActionType.fromToolName(toolName) != null || hireActions.any { it.spec.name == toolName }
+    fun isAction(toolName: String): Boolean = hireActions.any { it.spec.name == toolName }
 
     /**
      * Turns an action tool call into a proposal for the hire to confirm — without mutating.
      *
      * Returns the [HireActionOutcome.toolResult] to feed back to the AI (so it relays "I can do X —
      * confirm below", never "done"), and a [HireActionOutcome.proposal] to emit to the client when the
-     * action can be offered. When it can't (no project, or a missing question), there is no proposal
+     * action can be offered. When it can't (no project, or a missing argument), there is no proposal
      * and the tool result is the legible reason.
      */
-    @Suppress("CyclomaticComplexMethod") // The person-scoped gates first, then one branch per action.
     fun propose(call: BuddyToolCallDto, userId: UUID): HireActionOutcome {
-        hireActions.firstOrNull { it.spec.name == call.name }?.let {
-            return proposeContributed(it, call, UserId(userId))
-        }
-        val type = BuddyActionType.fromToolName(call.name)
+        val action = hireActions.firstOrNull { it.spec.name == call.name }
             ?: return HireActionOutcome("Unknown action: ${call.name}.", null)
-
-        // Before the project gate: a GitHub login is a fact about a person, and a hire on day one may be on
-        // no project yet.
-        if (type == BuddyActionType.SET_GITHUB_LOGIN) {
-            return proposeGithubLogin(call, type)
-        }
-
-        val project = when (val resolution = resolveProject(userId)) {
-            is ProjectResolution.Resolved -> resolution
-            ProjectResolution.None ->
-                return HireActionOutcome(
-                    "The hire is not on a project yet, so there is nothing to ${type.gerund()} for them.",
-                    null,
-                )
-            ProjectResolution.Ambiguous ->
-                return HireActionOutcome(
-                    "The hire is onboarding on more than one project. Ask which one before offering to " +
-                        "${type.gerund()}.",
-                    null,
-                )
-        }
-
-        return when (type) {
-            BuddyActionType.FLAG_TO_PM -> {
-                val question = call.textArgument("question")
-                if (question.isBlank()) {
-                    HireActionOutcome(
-                        "No question was provided to flag. Ask the hire what they want answered first.",
-                        null,
-                    )
-                } else {
-                    proposed(type, project.name, question = question)
-                }
-            }
-            BuddyActionType.REQUEST_ATTESTATION -> proposeAttestation(call, type, project.name)
-            // Not project-scoped, so it returns before the project gate.
-            BuddyActionType.SET_GITHUB_LOGIN -> error("handled above")
-        }
-    }
-
-    /**
-     * Offers to record the GitHub account the hire named, without a project and without mutating.
-     *
-     * Only the *shape* is checked here — that a username was actually supplied. Whether it is a
-     * possible GitHub name, and whether somebody else already claims it, stay with
-     * [com.sprintstart.sprintstartbackend.user.service.GithubLoginService] at confirm time: it owns
-     * those rules for every other writer, and a second opinion here would be one more place for
-     * them to drift.
-     */
-    private fun proposeGithubLogin(call: BuddyToolCallDto, type: BuddyActionType): HireActionOutcome {
-        val login = call.textArgument("login")
-        if (login.isBlank()) {
-            return HireActionOutcome(
-                "No username was provided. Ask the hire for their GitHub username before offering " +
-                    "to save it.",
-                null,
-            )
-        }
-        return HireActionOutcome(
-            toolResult = "Proposed to the hire: save “$login” as their GitHub username. They will " +
-                "see a confirm button; it is saved only if they click it. Offer it — do not claim " +
-                "it is done.",
-            proposal = HireActionProposal(
-                action = type.toolName,
-                label = type.label,
-                question = null,
-                githubLogin = login,
-            ),
-        )
-    }
-
-    /**
-     * Records the confirmed username through the one writer that owns it.
-     *
-     * ### Why this action exists
-     *
-     * A hire testing the buddy said *"my GitHub username is …"* and nothing was recorded, because
-     * no tool could. The model went looking through the corpus for how to store one. Meanwhile the
-     * login is what artifact verification compares a pull request's author against, so the failure
-     * is not cosmetic: work they really do goes on not being credited, and they read as calm rather
-     * than blocked.
-     *
-     * [com.sprintstart.sprintstartbackend.user.service.GithubLoginService] stays the single writer —
-     * the conversation is a second *entry point*, never a second source of truth. That is also what
-     * keeps the normalisation, the uniqueness check and the rule that a changed login discards
-     * the old verification verdict true here without restating any of them.
-     */
-    private fun setGithubLogin(authId: String, login: String?): BuddyActionResponse {
-        if (login.isNullOrBlank()) {
-            return BuddyActionResponse(ok = false, message = "No username was proposed to save.")
-        }
-        val userId = userApi.getUserIdByAuthId(authId).orElse(null)
-            ?: return BuddyActionResponse(ok = false, message = "I couldn't find your account.")
-
-        val saved = userApi.setGithubLogin(userId, login)
-        return BuddyActionResponse(
-            ok = true,
-            message = "Saved — your work will be attributed to @$saved from now on. If that is not " +
-                "right, you can change it in Settings any time.",
-        )
-    }
-
-    /**
-     * Both halves of an attestation proposal must be real before the hire sees a button: what work,
-     * and which teammate. A missing one comes back as guidance the buddy can act on rather than a
-     * proposal it cannot honour.
-     */
-    private fun proposeAttestation(
-        call: BuddyToolCallDto,
-        type: BuddyActionType,
-        projectName: String,
-    ): HireActionOutcome {
-        val title = call.textArgument("title")
-        val attesterId = call.uuidArgument("attester_id")
-        return when {
-            title.isBlank() ->
-                HireActionOutcome("No title was provided. Ask the hire what work they want confirmed.", null)
-            attesterId == null ->
-                HireActionOutcome(
-                    "No attester_id was provided. Read get_teammates and ask the hire which of " +
-                        "them should confirm it, then pass that person's id.",
-                    null,
-                )
-            else -> proposed(type, projectName, question = null, title = title, attesterId = attesterId)
-        }
-    }
-
-    /**
-     * Runs a confirmed action on behalf of [jwt]'s user, scoped to their re-resolved project.
-     *
-     * Never throws for a handled outcome: an expected precondition failure ("no current task",
-     * "not a member") comes back as `ok = false` with a legible message, so the buddy always has a
-     * line to relay. Only a genuinely unexpected failure propagates. Blocking work runs on the IO
-     * dispatcher; opening orientation is itself suspend and manages its own transactions.
-     */
-    suspend fun perform(request: HireActionRequest, jwt: Jwt): BuddyActionResponse {
-        val authId = jwt.subject
-
-        hireActions.firstOrNull { it.spec.name == request.action }?.let {
-            return performContributed(it, request, AuthId(authId))
-        }
-        val type = BuddyActionType.fromToolName(request.action)
-            ?: return BuddyActionResponse(ok = false, message = "That action isn't recognised.")
-
-        // Same reason as in propose: not project-scoped, so not behind the project gate.
-        if (type == BuddyActionType.SET_GITHUB_LOGIN) {
-            return try {
-                withContext(Dispatchers.IO) { setGithubLogin(authId, request.githubLogin) }
-            } catch (ex: ResponseStatusException) {
-                // 400 for a syntactically impossible username, 409 when another hire already
-                // claims it. Both are things the hire can act on, so they come back as the
-                // sentence GithubLoginService wrote rather than as a failed confirm.
-                BuddyActionResponse(ok = false, message = ex.reason ?: "That username could not be saved.")
-            }
-        }
-
-        val context = withContext(Dispatchers.IO) { resolveContext(authId) }
-        val resolved = when (context) {
-            is CallerContext.Resolved -> context
-            CallerContext.NoProject ->
-                return BuddyActionResponse(ok = false, message = "You're not on a project yet.")
-            CallerContext.MultipleProjects ->
-                return BuddyActionResponse(
-                    ok = false,
-                    message = "You're onboarding on more than one project — tell me which one and I'll set it up.",
-                )
-        }
-
-        return try {
-            dispatch(type, resolved, authId, request)
-        } catch (ex: ResponseStatusException) {
-            // A precondition the underlying route enforces (not a member, blank question, …). Relay
-            // its reason rather than failing the whole confirm with an HTTP error.
-            BuddyActionResponse(ok = false, message = ex.reason ?: "That didn't go through — try again in a moment.")
-        }
-    }
-
-    /** Runs the confirmed action itself. Suspend operations manage their own transactions. */
-    private suspend fun dispatch(
-        type: BuddyActionType,
-        resolved: CallerContext.Resolved,
-        authId: String,
-        request: HireActionRequest,
-    ): BuddyActionResponse =
-        withContext(Dispatchers.IO) {
-            when (type) {
-                BuddyActionType.FLAG_TO_PM -> flagToPm(authId, resolved.projectId, request.question)
-                BuddyActionType.REQUEST_ATTESTATION -> requestAttestation(resolved, request.title, request.attesterId)
-                // Not project-scoped, so it returns before the project gate this dispatch sits behind.
-                BuddyActionType.SET_GITHUB_LOGIN -> error("handled above")
-            }
-        }
-
-    /**
-     * Asks a named colleague to confirm a piece of the hire's work.
-     *
-     * The buddy relays; it never confirms. Every rule that makes an attestation worth anything —
-     * not the hire, on this project — is enforced by [HireArrivalApi.requestAttestation], so a buddy that got the
-     * person wrong produces a legible refusal rather than weak evidence.
-     */
-    private fun requestAttestation(
-        resolved: CallerContext.Resolved,
-        title: String?,
-        attesterId: UUID?,
-    ): BuddyActionResponse {
-        if (title.isNullOrBlank() || attesterId == null) {
-            return BuddyActionResponse(ok = false, message = "I need to know what work to confirm and who to ask.")
-        }
-        return try {
-            val stored = hireArrivalApi.requestAttestation(
-                hireId = UserId(resolved.userId),
-                projectId = ProjectId(resolved.projectId),
-                title = title,
-                attesterId = UserId(attesterId),
-            )
-            BuddyActionResponse(
-                ok = true,
-                message = "Asked them to confirm “$stored”. " +
-                    "It counts once they do — you will see it in what you have shown.",
-            )
-        } catch (e: ResponseStatusException) {
-            // A handled precondition ("not on this project", "that is you") is a sentence the buddy
-            // can relay, not a stack trace.
-            BuddyActionResponse(ok = false, message = e.reason ?: "That request could not be filed.")
-        }
-    }
-
-    private fun flagToPm(authId: String, projectId: UUID, question: String?): BuddyActionResponse {
-        val trimmed = question?.trim().orEmpty()
-        if (trimmed.isBlank()) {
-            return BuddyActionResponse(ok = false, message = "I need the question to flag — tell me what to ask.")
-        }
-        hireKnowledgeApi.escalate(AuthId(authId), ProjectId(projectId), trimmed)
-        return BuddyActionResponse(
-            ok = true,
-            message = "Flagged to your PM. Their answer will show up here once they reply.",
-        )
-    }
-
-    /**
-     * What the model is told when it offers an action, and what it must not do afterwards.
-     *
-     * The second half of this text is not decoration. **The model never finds out what happened to
-     * a proposal**: the hire confirms out-of-band, the outcome lands in the client's own message
-     * state, and nothing about it comes back into the conversation. So the model is blind here, and
-     * a blind model that believes a button is still on screen starts pointing at it — a hire once
-     * spent a whole exchange being told to click a button that had been spent on a failed confirm
-     * several turns earlier, ending with the mentor guessing aloud where on their screen it might
-     * be hiding. Telling somebody they must be missing something they can see is not there is the
-     * worst thing this surface can do: it makes them distrust the app rather than the sentence.
-     *
-     * Hence the rule the text carries — never describe the button, and when the hire says it did
-     * not work, call the tool again instead of insisting. A fresh proposal costs one click and puts
-     * a real control back on screen; describing the old one cannot.
-     */
-    private fun proposed(
-        type: BuddyActionType,
-        projectName: String,
-        question: String?,
-        taskId: UUID? = null,
-        title: String? = null,
-        attesterId: UUID? = null,
-        githubLogin: String? = null,
-        checklistTitle: String? = null,
-        checklistItems: List<String>? = null,
-        cardId: UUID? = null,
-        noteText: String? = null,
-    ): HireActionOutcome =
-        HireActionOutcome(
-            toolResult = "Proposed to the hire on $projectName: “${type.label}”. They will see a confirm " +
-                "button; the action runs only if they click it. Offer it — do not claim it is done. " +
-                "You will never be told whether they confirmed it or what came of it, and a confirmed " +
-                "proposal leaves the screen. So do not describe the button, tell them where to find " +
-                "it, or ask them to click it again. If they say nothing happened or they cannot see " +
-                "it, believe them and call this tool again to offer it afresh.",
-            proposal = HireActionProposal(
-                action = type.toolName,
-                label = type.label,
-                question = question,
-                taskId = taskId,
-                title = title,
-                attesterId = attesterId?.toString(),
-                githubLogin = githubLogin,
-                checklistTitle = checklistTitle,
-                checklistItems = checklistItems,
-                cardId = cardId,
-                noteText = noteText,
-            ),
-        )
-
-    /** Offers a feature's [action], resolving the hire's one project first when the action needs it. */
-    private fun proposeContributed(action: HireAction, call: BuddyToolCallDto, hire: UserId): HireActionOutcome {
+        val hire = UserId(userId)
         val project = if (action.scope == HireActionScope.PERSON) {
             null
         } else {
-            when (val resolution = resolveProject(hire.value)) {
-                is ProjectResolution.Resolved -> HireProject(ProjectId(resolution.projectId), resolution.name)
+            when (val resolution = resolveProject(userId)) {
+                is ProjectResolution.Resolved -> resolution.project
                 ProjectResolution.None -> return HireActionOutcome(
                     "The hire is not on a project yet, so there is nothing to ${action.gerund} for them.",
                     null,
@@ -398,21 +84,23 @@ class BuddyActionService(
     }
 
     /**
-     * Runs a feature's confirmed [action] for the caller behind [authId], with the same project gate as
-     * [proposeContributed]. A precondition the action's service refuses comes back as its sentence.
+     * Runs a confirmed action on behalf of [jwt]'s user, scoped to their re-resolved project.
+     *
+     * Never throws for a handled outcome: an expected precondition failure ("no current task",
+     * "not a member") comes back as `ok = false` with a legible message, so the buddy always has a
+     * line to relay. Only a genuinely unexpected failure propagates. The action runs on the IO dispatcher.
      */
-    private suspend fun performContributed(
-        action: HireAction,
-        request: HireActionRequest,
-        authId: AuthId,
-    ): BuddyActionResponse {
+    suspend fun perform(request: HireActionRequest, jwt: Jwt): BuddyActionResponse {
+        val action = hireActions.firstOrNull { it.spec.name == request.action }
+            ?: return BuddyActionResponse(ok = false, message = "That action isn't recognised.")
+        val authId = AuthId(jwt.subject)
         val userId = withContext(Dispatchers.IO) { userApi.getUserIdByAuthId(authId.value).orElse(null) }
             ?: return BuddyActionResponse(ok = false, message = "I couldn't find your account.")
         val project = if (action.scope == HireActionScope.PERSON) {
             null
         } else {
             when (val resolution = withContext(Dispatchers.IO) { resolveProject(userId) }) {
-                is ProjectResolution.Resolved -> HireProject(ProjectId(resolution.projectId), resolution.name)
+                is ProjectResolution.Resolved -> resolution.project
                 ProjectResolution.None -> return BuddyActionResponse(
                     ok = false,
                     message = "You're not on a project yet.",
@@ -427,6 +115,8 @@ class BuddyActionService(
         return try {
             withContext(Dispatchers.IO) { action.perform(request, context, authId) }
         } catch (ex: ResponseStatusException) {
+            // A precondition the underlying route enforces (not a member, blank question, …). Relay
+            // its reason rather than failing the whole confirm with an HTTP error.
             BuddyActionResponse(ok = false, message = ex.reason ?: "That didn't go through — try again in a moment.")
         }
     }
@@ -440,129 +130,17 @@ class BuddyActionService(
         return when {
             projects.isEmpty() -> ProjectResolution.None
             projects.size > 1 -> ProjectResolution.Ambiguous
-            else -> projects.first().let { ProjectResolution.Resolved(it.projectId, it.name) }
+            else -> projects.first().let { ProjectResolution.Resolved(HireProject(ProjectId(it.projectId), it.name)) }
         }
     }
-
-    /** Resolves the caller's id and single onboarding project in one read, for the confirm path. */
-    private fun resolveContext(authId: String): CallerContext {
-        val userId = resolveUserId(authId)
-        return when (val resolution = resolveProject(userId)) {
-            is ProjectResolution.Resolved -> CallerContext.Resolved(userId, resolution.projectId, resolution.name)
-            ProjectResolution.None -> CallerContext.NoProject
-            ProjectResolution.Ambiguous -> CallerContext.MultipleProjects
-        }
-    }
-
-    private fun resolveUserId(authId: String): UUID =
-        userApi
-            .getUserIdByAuthId(authId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
-
-    /** A verb phrase for the reason lines, e.g. "claim a goal", "flag this to a PM". */
-    private fun BuddyActionType.gerund(): String =
-        when (this) {
-            BuddyActionType.FLAG_TO_PM -> "flag this to a PM"
-            BuddyActionType.REQUEST_ATTESTATION -> "ask somebody to confirm your work"
-            // Never reaches the no-project reason lines: it is not project-scoped.
-            BuddyActionType.SET_GITHUB_LOGIN -> "save a GitHub username"
-        }
 
     private sealed interface ProjectResolution {
         data class Resolved(
-            val projectId: UUID,
-            val name: String,
+            val project: HireProject,
         ) : ProjectResolution
 
         data object None : ProjectResolution
 
         data object Ambiguous : ProjectResolution
-    }
-
-    private sealed interface CallerContext {
-        data class Resolved(
-            val userId: UUID,
-            val projectId: UUID,
-            val projectName: String,
-        ) : CallerContext
-
-        data object NoProject : CallerContext
-
-        data object MultipleProjects : CallerContext
-    }
-
-    private companion object {
-        val FLAG_TO_PM_SPEC = BuddyToolSpecDto(
-            name = BuddyActionType.FLAG_TO_PM.toolName,
-            description = "Offer to pass something from the hire to their project's PM. Two cases: " +
-                "(1) the hire ASKS you to flag, raise or pass something to their PM — a question, a problem, a " +
-                "blocker, feedback on their path. Their asking is the reason: offer it straight away, and never " +
-                "decide for them that it is not a PM matter or that the docs answer it first. " +
-                "(2) Neither the docs nor the canonical answers cover a question, as the last resort when you " +
-                "genuinely cannot ground an answer. " +
-                "This does NOT send anything — it shows the hire a confirm button, and only they can send it. " +
-                "Put what should reach the PM in `question`, phrased clearly and in the hire's sense.",
-            parameters = buildJsonObject {
-                put("type", "object")
-                putJsonObject("properties") {
-                    putJsonObject("question") {
-                        put("type", "string")
-                        put(
-                            "description",
-                            "What to send to the PM — a question, or what the hire wants them to know — phrased " +
-                                "clearly for a person to answer.",
-                        )
-                    }
-                }
-                putJsonArray("required") { add("question") }
-            },
-        )
-
-        val SET_GITHUB_LOGIN_SPEC = BuddyToolSpecDto(
-            name = BuddyActionType.SET_GITHUB_LOGIN.toolName,
-            description = "Offer to save the hire's GitHub username. Use this the moment they tell " +
-                "you one -- 'my GitHub is octocat', 'I'm @octocat on GitHub' -- rather than sending " +
-                "them to Settings. It matters: this is the account their pull requests are matched " +
-                "against, so until it is set, work they really do is not credited to them and " +
-                "nothing says so. Pass exactly what they gave you, without the @. Proposing does " +
-                "not save it; they confirm.",
-            parameters = buildJsonObject {
-                put("type", "object")
-                putJsonObject("properties") {
-                    putJsonObject("login") {
-                        put("type", "string")
-                        put("description", "The GitHub username the hire gave, without a leading @.")
-                    }
-                }
-                putJsonArray("required") { add("login") }
-            },
-        )
-
-        val REQUEST_ATTESTATION_SPEC = BuddyToolSpecDto(
-            name = BuddyActionType.REQUEST_ATTESTATION.toolName,
-            description = "Offer to ask a named colleague to confirm a piece of work the hire has " +
-                "done — a facilitated ceremony, a published plan, anything no system can see. " +
-                "This does NOT confirm anything by itself; it shows the hire a confirm button and " +
-                "runs only if they click, and the colleague still has to agree. Use for work that " +
-                "leaves no trace a tool can read. Read get_teammates first and ask the hire who " +
-                "should confirm it — never guess, and never name the hire themselves.",
-            parameters = buildJsonObject {
-                put("type", "object")
-                putJsonObject("properties") {
-                    putJsonObject("title") {
-                        put("type", "string")
-                        put("description", "What the hire did, in their words.")
-                    }
-                    putJsonObject("attester_id") {
-                        put("type", "string")
-                        put("description", "The user id of the teammate the hire picked to confirm it.")
-                    }
-                }
-                putJsonArray("required") {
-                    add("title")
-                    add("attester_id")
-                }
-            },
-        )
     }
 }

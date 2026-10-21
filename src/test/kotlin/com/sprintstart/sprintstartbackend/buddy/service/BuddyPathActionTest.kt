@@ -90,9 +90,7 @@ class BuddyPathActionTest {
     )
 
     private val service = BuddyActionService(
-        hireKnowledgeApi = mockk(relaxed = true),
         userApi = userApi,
-        hireArrivalApi = mockk(relaxed = true),
         hireActions = pathActions,
     )
 
