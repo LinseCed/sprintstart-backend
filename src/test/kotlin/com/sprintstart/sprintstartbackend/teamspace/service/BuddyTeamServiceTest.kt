@@ -192,7 +192,8 @@ class BuddyTeamServiceTest {
     fun `cites only the sources it can resolve, with their file names`() = runTest {
         val found = UUID.randomUUID()
         val gone = UUID.randomUUID()
-        every { artifactLookupService.resolve(found) } returns ResolvedArtifact(filename = "runbook.md", sourceUrl = null)
+        every { artifactLookupService.resolve(found) } returns
+            ResolvedArtifact(filename = "runbook.md", sourceUrl = null)
         every { artifactLookupService.resolve(gone) } returns null
         coEvery { agentAiClient.buddyAgentTurnStream(any()) } returnsStream BuddyAgentResponse(
             final = true,
