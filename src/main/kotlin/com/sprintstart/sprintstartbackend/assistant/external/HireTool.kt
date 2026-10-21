@@ -1,6 +1,8 @@
 package com.sprintstart.sprintstartbackend.assistant.external
 
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.user.external.UserApi
+import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -34,6 +36,12 @@ interface HireTool {
     fun snapshotFor(hire: UserId): String? = null
 
     /**
+     * Where [snapshotFor]'s section sits in the greeting, lowest first (see [HireSnapshotOrder]). The
+     * greeting has an order of its own: it opens on what is missing, then how work is going.
+     */
+    val snapshotPosition: Int get() = Int.MAX_VALUE
+
+    /**
      * The chip offered for this tool whenever it is mounted, or null for none. Adding a tool never
      * silently adds a chip: the wording for a hire is a separate decision from what the mentor can read.
      */
@@ -50,12 +58,33 @@ data class HireToolSuggestion(
 )
 
 /**
- * Where each feature's hire tools sit in the list the reasoner sees, lowest first. Gaps leave room to
- * place a new tool between two others without renumbering.
+ * Where each feature's hire tools sit in the list the reasoner sees, lowest first. The path comes before
+ * all of them; gaps leave room to place a new tool between two others without renumbering.
  */
 object HireToolOrder {
-    /** What has to be true before the hire can work: after the path, before every other state tool. */
+    /** What has to be true before the hire can work: before every other state tool. */
     const val ARRIVAL = 200
+    const val METRICS = 300
+    const val COMPETENCIES = 400
+    const val COMPETENCIES_TO_ASSESS = 500
+    const val OPEN_PULL_REQUESTS = 600
+    const val SUGGESTED_TASKS = 700
+    const val CANONICAL_ANSWERS = 800
+    const val TEAMMATES = 900
+
+    /** Last of the hire tools: it is about the app rather than the hire's onboarding. */
+    const val APP_GUIDE = 1000
+}
+
+/** Where each section of the opening greeting's snapshot sits, after the path, lowest first. */
+object HireSnapshotOrder {
+    /** Setup before progress: a greeting grounded in progress greets a hire who cannot get in. */
+    const val ARRIVAL = 200
+    const val PROGRESS = 300
+    const val OPEN_PULL_REQUESTS = 400
+    const val SUGGESTED_TASKS = 500
+    const val COMPETENCIES = 600
+    const val UNPLACED = 700
 }
 
 /** The parameter schema of a tool that takes no arguments. */
@@ -64,3 +93,7 @@ fun noArgumentsSchema(): JsonObject =
         put("type", "object")
         put("properties", buildJsonObject { })
     }
+
+/** The projects [hire] is a member of; empty when they are on none or do not exist. */
+fun UserApi.projectsOf(hire: UserId): Set<ProjectDto> =
+    getUsersByIds(listOf(hire.value)).firstOrNull()?.projects.orEmpty()

@@ -1,6 +1,5 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
-import com.sprintstart.sprintstartbackend.assistant.external.BuddyAppGuideTools
 import com.sprintstart.sprintstartbackend.assistant.external.HireTool
 import com.sprintstart.sprintstartbackend.buddy.model.response.buddy.BuddySuggestionResponse
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -76,40 +75,6 @@ class BuddySuggestionService(
             BuddyPathTools.READ_MY_PATH to BuddySuggestionResponse(
                 label = "Where am I on my path?",
                 question = "Where am I in my onboarding path, and what should I do next?",
-            ),
-            // Asks for the pool and nothing else, so the mentor does not read it as the path's question.
-            BuddyToolExecutor.GET_SUGGESTED_TASKS to BuddySuggestionResponse(
-                label = "Anything I can pick up?",
-                question = "Is there something in the work pool I could pick up?",
-            ),
-            BuddyToolExecutor.GET_MY_OPEN_PULL_REQUESTS to BuddySuggestionResponse(
-                label = "Is my PR stuck?",
-                question = "Are any of my pull requests stuck waiting on a review?",
-            ),
-            // About their work, not their onboarding: the metrics are contributions and reviews, and a
-            // chip asking how onboarding is going would send that question here instead of to the
-            // path, which is the one that can answer it.
-            BuddyToolExecutor.GET_MY_METRICS to BuddySuggestionResponse(
-                label = "How's my work going?",
-                question = "How is my work going so far — is anything waiting on someone?",
-            ),
-            // Names the competency ledger, so it cannot be mistaken for the path chip.
-            BuddyToolExecutor.GET_MY_COMPETENCIES to BuddySuggestionResponse(
-                label = "What have I shown?",
-                question = "What have I shown so far — where does my ledger stand?",
-            ),
-            // Mounted with attestation, so it is only offered where somebody could actually be
-            // asked. The chip stops at naming people: whether that ends in request_attestation is
-            // the mentor's call and the hire's confirmation, not the chip's.
-            BuddyToolExecutor.GET_TEAMMATES to BuddySuggestionResponse(
-                label = "Who's on my team?",
-                question = "Who else is on my project?",
-            ),
-            // Last, because it is about the app rather than the hire's onboarding. "This page" is
-            // the one the chip was pressed on: the client sends it with the message.
-            BuddyAppGuideTools.GET_APP_GUIDE to BuddySuggestionResponse(
-                label = "What can I do here?",
-                question = "What can I do on this page?",
             ),
         )
     }

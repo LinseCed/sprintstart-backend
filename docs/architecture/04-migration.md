@@ -89,7 +89,7 @@ therefore checks the whole application against the layering, not only the featur
 
 | Item | Note |
 |---|---|
-| Tool SPI ([ADR-proposed-004](../adrs-proposed/adr-proposed-004-assistant-kernel-and-tool-spi.md)) | Features contribute their tools and actions from `<feature>/assistant/`. This replaces the hand-written routers and absorbs ADR-proposed-001 option 2. Started in #256: `HireTool` (spec, mount condition, snapshot, chip, `@Order` from `HireToolOrder`) for the hire's read tools, with `arrival` the first feature to contribute one. Next: the remaining hire read tools, team mode's areas and actions, then the hire's actions. |
+| Tool SPI ([ADR-proposed-004](../adrs-proposed/adr-proposed-004-assistant-kernel-and-tool-spi.md)) | Features contribute their tools and actions from `<feature>/assistant/`. This replaces the hand-written routers and absorbs ADR-proposed-001 option 2. Started in #256: `HireTool` (spec, mount condition, snapshot, chip, `@Order` from `HireToolOrder`) for the hire's read tools, with `arrival` the first feature to contribute one. #257 moves the rest of the hire's read tools to their features (`insights`, `starterwork`, `board`, `knowledge`, `arrival`, and the kernel's app guide); the Buddy keeps only the path's and the board's prose tools. Next: those two, team mode's areas and actions, then the hire's actions. |
 | `@ApplicationModuleListener` for AI-calling and sync listeners | Needs Modulith's event publication table, i.e. a schema change. |
 | Versioned schema migrations | Not planned (decided 2026-10-21): the schema stays on `ddl-auto: update`. |
 | Second split of `blueprint` / `path` | Decide from the measured sizes after stage C. |

@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireSnapshotOrder
 import com.sprintstart.sprintstartbackend.assistant.external.HireTool
 import com.sprintstart.sprintstartbackend.assistant.external.HireToolContext
 import com.sprintstart.sprintstartbackend.assistant.external.HireToolOrder
@@ -18,7 +19,13 @@ import org.springframework.stereotype.Component
  * The hire's arrival steps, for the Buddy: what has to be true before they can work, and what is settled.
  *
  * Mounted only when a step applies to the hire, read from the same steps the board card shows, so the two
- * cannot disagree.
+ * cannot disagree. The part a checklist cannot do is the reason this is a tool and not just a card: a hire
+ * can ask *why* a step exists, say they are stuck on one, and be told who to chase.
+ *
+ * Two things this text refuses to say. No total and no fraction: "2 of 5 done" over a mix of what the
+ * system observed and what the hire told us is meaningless, and a model handed such a number repeats it.
+ * And nothing is described as blocking: an outstanding step never stopped anybody claiming work or asking
+ * a question, and saying otherwise here would put the gate back in the model's own words.
  */
 @Component
 @Order(HireToolOrder.ARRIVAL)
@@ -31,6 +38,8 @@ class ArrivalStepsTool(
         label = "What do I still need?",
         question = "What do I still need to get set up?",
     )
+
+    override val snapshotPosition = HireSnapshotOrder.ARRIVAL
 
     override fun isMountedFor(hire: UserId): Boolean = arrivalSteps.forHire(hire).isNotEmpty()
 
