@@ -18,13 +18,10 @@ import com.sprintstart.sprintstartbackend.board.model.response.board.OpenPullReq
 import com.sprintstart.sprintstartbackend.path.external.model.ResolvedPathStep
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.starterwork.external.HireStarterWorkApi
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.starterwork.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.RankedStarterWorkTaskResponse
-import com.sprintstart.sprintstartbackend.starterwork.service.CurrentTaskReader
-import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
-import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
-import com.sprintstart.sprintstartbackend.starterwork.service.currentTaskOf
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import org.springframework.stereotype.Component
 import java.util.UUID
@@ -38,9 +35,7 @@ import java.util.UUID
 @Component
 class BoardCardHydrator(
     private val openPullRequestReader: OpenPullRequestReader,
-    private val currentTaskReader: CurrentTaskReader,
-    private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
-    private val myCompetencyService: MyCompetencyService,
+    private val hireStarterWork: HireStarterWorkApi,
     private val memoryRecapSource: MemoryRecapSource,
     private val boardDiagramService: BoardDiagramService,
     private val arrivalSteps: ArrivalReadApi,
@@ -61,7 +56,7 @@ class BoardCardHydrator(
         arrivalSteps: List<ArrivalStepResponse> = this.arrivalSteps.forHire(UserId(member.userId)),
         pathSteps: Map<UUID, ResolvedPathStep> = emptyMap(),
         matches: () -> List<RankedStarterWorkTaskResponse> = {
-            starterWorkTaskProposalService.matchForUserId(member.userId, projectId.value)
+            hireStarterWork.rankedTasksFor(UserId(member.userId), projectId)
         },
     ): BoardCardResponse = BoardCardResponse(
         id = card.id,
@@ -88,7 +83,7 @@ class BoardCardHydrator(
         BoardCardKind.SUGGESTED_TASKS -> BoardTaskCards.suggested(matches())
         BoardCardKind.TASK_POOL -> BoardTaskCards.pool(
             matches(),
-            currentTaskId = currentTaskReader.currentTaskOf(UserId(member.userId), projectId)?.id,
+            currentTaskId = hireStarterWork.currentTaskOf(UserId(member.userId), projectId)?.id,
         )
         BoardCardKind.COMPETENCY_PROGRESS -> competencyProgressContent(member)
         BoardCardKind.MEMORY_RECAP -> memoryRecapSource.latestRecap(UserId(member.userId))
@@ -125,8 +120,8 @@ class BoardCardHydrator(
      * filtered out here. The ledger is global, not per project.
      */
     private fun competencyProgressContent(member: ProjectMember): CompetencyProgressContent {
-        val (held, inProgress) = myCompetencyService
-            .getCompetenciesForUser(member.userId)
+        val (held, inProgress) = hireStarterWork
+            .competenciesOf(UserId(member.userId))
             .filter { it.level > 0 }
             .partition { it.level >= it.targetLevel }
         return CompetencyProgressContent(
@@ -145,13 +140,13 @@ class BoardCardHydrator(
     /**
      * The task the hire is on, read — never assigned.
      *
-     * Read through [CurrentTaskReader], the same read the task packet uses, so the card and the
+     * Read through [HireStarterWorkApi.currentTaskOf], the same read the task packet uses, so the card and the
      * packet cannot be about different tasks.
      *
      * A card with no task on it is a real state and says so.
      */
     private fun currentTaskContent(member: ProjectMember, projectId: ProjectId): CurrentTaskContent {
-        val task = currentTaskReader.currentTaskOf(UserId(member.userId), projectId)
+        val task = hireStarterWork.currentTaskOf(UserId(member.userId), projectId)
         return CurrentTaskContent(
             taskId = task?.id,
             title = task?.title,

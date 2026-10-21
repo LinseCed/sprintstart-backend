@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.starterwork.service
 
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.starterwork.external.model.PoolReconciliation
 import com.sprintstart.sprintstartbackend.starterwork.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.starterwork.repository.StarterWorkTaskProposalRepository
 import org.slf4j.LoggerFactory
@@ -39,35 +40,16 @@ class StarterWorkPoolReconciler(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
-     * What one pass changed. Returned rather than only logged so a caller — a test, or an admin
-     * endpoint later — can assert on it.
-     */
-    data class Outcome(
-        val examined: Int,
-        val markedStale: Int,
-        val revived: Int,
-        val assigneeChanged: Int,
-        /**
-         * Rows whose issue the corpus no longer holds, so nothing could be compared.
-         *
-         * Counted separately because it is the one number here that is a problem rather than a
-         * result: a pool row whose source has vanished stays claimable forever on the strength of
-         * whatever was true when it was mined.
-         */
-        val skipped: Int = 0,
-    )
-
-    /**
      * Compares every reconcilable row against its source and writes back what changed.
      *
      * [ProposalStatus.LIVE] and [ProposalStatus.STALE] are both examined: the first so it can go
      * stale, the second so it can come back. Rejected rows are not even loaded.
      */
     @Transactional
-    fun reconcile(): Outcome {
+    fun reconcile(): PoolReconciliation {
         val rows = starterWorkTaskProposalRepository
             .findAllByStatusIn(listOf(ProposalStatus.LIVE, ProposalStatus.STALE))
-        if (rows.isEmpty()) return Outcome(0, 0, 0, 0)
+        if (rows.isEmpty()) return PoolReconciliation(0, 0, 0, 0)
 
         var markedStale = 0
         var revived = 0
@@ -106,7 +88,7 @@ class StarterWorkPoolReconciler(
             starterWorkTaskProposalRepository.markSourceChecked(unchanged, now)
         }
 
-        val outcome = Outcome(rows.size, markedStale, revived, assigneeChanged, skipped)
+        val outcome = PoolReconciliation(rows.size, markedStale, revived, assigneeChanged, skipped)
         if (markedStale > 0 || revived > 0 || assigneeChanged > 0) {
             logger.info(
                 "Starter-work reconciliation examined {} rows: {} went stale, {} came back, {} changed assignee",

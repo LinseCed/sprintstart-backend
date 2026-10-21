@@ -9,10 +9,9 @@ import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredP
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsService
 import com.sprintstart.sprintstartbackend.knowledge.external.HireKnowledgeApi
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
-import com.sprintstart.sprintstartbackend.starterwork.service.CompetencyPlacementService
-import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
-import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
+import com.sprintstart.sprintstartbackend.starterwork.external.HireStarterWorkApi
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.serialization.json.add
@@ -39,15 +38,13 @@ import java.util.UUID
 @Component
 class BuddyToolExecutor(
     private val onboardingMetricsService: OnboardingMetricsService,
-    private val myCompetencyService: MyCompetencyService,
-    private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
+    private val hireStarterWork: HireStarterWorkApi,
     private val hireKnowledgeApi: HireKnowledgeApi,
     private val userApi: UserApi,
     private val buddyBoardTools: BuddyBoardTools,
     private val openPullRequestReader: OpenPullRequestReader,
     private val projectMembershipApi: ProjectMembershipApi,
     private val arrivalSteps: ArrivalReadApi,
-    private val competencyPlacementService: CompetencyPlacementService,
     private val buddyPathTools: BuddyPathTools,
     private val buddyAppGuideTools: BuddyAppGuideTools,
 ) {
@@ -84,7 +81,7 @@ class BuddyToolExecutor(
         // Mounted only while something is still unplaced, on the same "absent, never empty" rule
         // as the arrival tool: a mentor handed an empty topic list will find a way to offer the
         // assessment anyway, and there is nothing left to assess.
-        if (competencyPlacementService.topicsFor(userId).isNotEmpty()) {
+        if (hireStarterWork.placementTopicsFor(UserId(userId)).isNotEmpty()) {
             add(GET_COMPETENCIES_TO_ASSESS_SPEC)
         }
         // Position matters: the spec order is the order the reasoner sees.
@@ -141,7 +138,7 @@ class BuddyToolExecutor(
      * exists, so an opener can never offer an assessment with nothing in it.
      */
     private fun unplacedForGreeting(userId: UUID): String? {
-        val topics = competencyPlacementService.topicsFor(userId)
+        val topics = hireStarterWork.placementTopicsFor(UserId(userId))
         if (topics.isEmpty()) return null
         val named = topics.take(GREETING_TOPICS).joinToString(", ") { it.label }
         return "Never placed on (a short chat would settle these, and you may offer one): $named"
@@ -354,7 +351,7 @@ class BuddyToolExecutor(
     private fun getMyCompetencies(userId: UUID): String {
         // Level-0 rows are placed-but-unknown, not evidence of a skill — exclude them, matching how
         // the skills rail treats them, so the buddy never reports a competency the hire hasn't shown.
-        val ledger = myCompetencyService.getCompetenciesForUser(userId).filter { it.level > 0 }
+        val ledger = hireStarterWork.competenciesOf(UserId(userId)).filter { it.level > 0 }
         if (ledger.isEmpty()) {
             return "You have no demonstrated competencies on your ledger yet — that's normal early on."
         }
@@ -383,7 +380,7 @@ class BuddyToolExecutor(
      * team than they joined.
      */
     private fun getCompetenciesToAssess(userId: UUID): String {
-        val topics = competencyPlacementService.topicsFor(userId)
+        val topics = hireStarterWork.placementTopicsFor(UserId(userId))
         if (topics.isEmpty()) {
             return "There's nothing left to place — every competency this team tracks already has " +
                 "something behind it for this hire."
@@ -412,8 +409,8 @@ class BuddyToolExecutor(
             return "You are not a member of any project yet, so there are no suggested tasks."
         }
         val sections = projects.mapNotNull { project ->
-            val ranked = starterWorkTaskProposalService
-                .matchForUserId(userId, project.projectId)
+            val ranked = hireStarterWork
+                .rankedTasksFor(UserId(userId), ProjectId(project.projectId))
                 .take(MAX_SUGGESTED_TASKS)
             if (ranked.isEmpty()) {
                 null

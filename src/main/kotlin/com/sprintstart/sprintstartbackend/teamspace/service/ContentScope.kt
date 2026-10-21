@@ -5,8 +5,8 @@ import com.sprintstart.sprintstartbackend.path.external.model.PathElement
 import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.StarterWorkTaskId
+import com.sprintstart.sprintstartbackend.starterwork.external.StarterWorkPoolApi
 import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkTaskProposalResponse
-import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPool
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -35,7 +35,7 @@ class ContentScope(
     private val pathReviewApi: PathReviewApi,
     private val projectMembershipApi: ProjectMembershipApi,
     private val userApi: UserApi,
-    private val starterWorkPool: StarterWorkPool,
+    private val starterWorkPool: StarterWorkPoolApi,
 ) {
     /**
      * The [kind] element [id] names, if it sits on the path of a member of [projectId].

@@ -9,13 +9,13 @@ import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionR
 import com.sprintstart.sprintstartbackend.knowledge.external.HireKnowledgeApi
 import com.sprintstart.sprintstartbackend.shared.ids.AuthId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.StarterWorkTaskId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.starterwork.external.HireStarterWorkActionsApi
+import com.sprintstart.sprintstartbackend.starterwork.external.HireStarterWorkApi
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.GoalClaimant
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProficiencyLevel
 import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.MyOrientationResponse
-import com.sprintstart.sprintstartbackend.starterwork.service.CompetencyPlacementService
-import com.sprintstart.sprintstartbackend.starterwork.service.TaskOrientationService
-import com.sprintstart.sprintstartbackend.starterwork.service.UserGoalService
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -53,12 +53,11 @@ import java.util.UUID
 @Service
 @Suppress("TooManyFunctions")
 class BuddyActionService(
-    private val taskOrientationService: TaskOrientationService,
+    private val hireStarterWork: HireStarterWorkApi,
     private val hireKnowledgeApi: HireKnowledgeApi,
-    private val userGoalService: UserGoalService,
+    private val hireStarterWorkActions: HireStarterWorkActionsApi,
     private val userApi: UserApi,
     private val hireArrivalApi: HireArrivalApi,
-    private val competencyPlacementService: CompetencyPlacementService,
     private val buddyPathActions: BuddyPathActions,
     private val boardWrites: BuddyBoardWriteActions,
 ) {
@@ -240,7 +239,7 @@ class BuddyActionService(
      */
     private fun proposeAssessment(call: BuddyToolCallDto, type: BuddyActionType): ProposeOutcome {
         val key = call.textArgument("competency_key")
-        val label = key.takeIf { it.isNotBlank() }?.let { competencyPlacementService.labelFor(it) }
+        val label = key.takeIf { it.isNotBlank() }?.let { hireStarterWork.competencyLabel(it) }
             ?: return ProposeOutcome(
                 "No competency matched “$key”. Read get_competencies_to_assess and pass a " +
                     "competency_key exactly as it appears there.",
@@ -271,7 +270,7 @@ class BuddyActionService(
      * Writes the placement the hire confirmed.
      *
      * The level is re-read from the word here rather than trusted as a rank, so a client cannot
-     * confirm a level the scale does not have. [CompetencyPlacementService] owns every rule about
+     * confirm a level the scale does not have. [HireStarterWorkActionsApi] owns every rule about
      * what a placement may overwrite; this only relays the sentence it produced.
      */
     private fun recordAssessment(authId: String, competencyKey: String?, level: String?): BuddyActionResponse {
@@ -284,7 +283,7 @@ class BuddyActionService(
         val userId = userApi.getUserIdByAuthId(authId).orElse(null)
             ?: return BuddyActionResponse(ok = false, message = "I couldn't find your account.")
 
-        val outcome = competencyPlacementService.record(userId, competencyKey, resolvedLevel)
+        val outcome = hireStarterWorkActions.recordPlacement(UserId(userId), competencyKey, resolvedLevel)
         return BuddyActionResponse(ok = outcome.recorded, message = outcome.message)
     }
 
@@ -438,7 +437,7 @@ class BuddyActionService(
         }
 
     private suspend fun openOrientation(userId: UUID, projectId: UUID): BuddyActionResponse {
-        val orientation = taskOrientationService.getForHire(userId, projectId)
+        val orientation = hireStarterWork.orientationFor(UserId(userId), ProjectId(projectId))
         return if (orientation.packet != null) {
             BuddyActionResponse(
                 ok = true,
@@ -480,9 +479,14 @@ class BuddyActionService(
         if (taskId == null) {
             return BuddyActionResponse(ok = false, message = "No task was proposed to claim.")
         }
-        // Claiming also pins the current-task card (see `UserGoalService.claimForMe`), so the
+        // Claiming also pins the current-task card (see `HireStarterWorkActionsApi.claimGoal`), so the
         // message below can promise it is on the board.
-        val goal = userGoalService.claimForMe(authId, projectId, taskId, GoalClaimant.BUDDY)
+        val goal = hireStarterWorkActions.claimGoal(
+            AuthId(authId),
+            ProjectId(projectId),
+            StarterWorkTaskId(taskId),
+            GoalClaimant.BUDDY,
+        )
         return BuddyActionResponse(
             ok = true,
             message = "You're now working toward “${goal.title}” — I'll shape your next steps around it. " +

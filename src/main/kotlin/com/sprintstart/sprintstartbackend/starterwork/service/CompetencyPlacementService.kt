@@ -3,6 +3,8 @@ package com.sprintstart.sprintstartbackend.starterwork.service
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProficiencyLevel
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.starterwork.external.model.PlacementResult
+import com.sprintstart.sprintstartbackend.starterwork.external.model.PlacementTopic
 import com.sprintstart.sprintstartbackend.starterwork.model.entity.Competency
 import com.sprintstart.sprintstartbackend.starterwork.model.entity.UserCompetencyState
 import com.sprintstart.sprintstartbackend.starterwork.repository.CompetencyRepository
@@ -149,21 +151,21 @@ class CompetencyPlacementService(
      * Records where the assessment placed [userId] on one competency.
      *
      * Never throws for a placement it will not make: an unknown key, an unusable level or a
-     * competency already proven by real work all come back as [PlacementOutcome] with `recorded =
+     * competency already proven by real work all come back as [PlacementResult] with `recorded =
      * false` and a sentence the mentor can relay. The hire confirmed a button; a stack trace is not
      * an answer to that.
      */
     @Transactional
-    fun record(userId: UUID, competencyKey: String, level: ProficiencyLevel): PlacementOutcome {
+    fun record(userId: UUID, competencyKey: String, level: ProficiencyLevel): PlacementResult {
         val competency = competencyRepository.findByKey(competencyKey)
-            ?: return PlacementOutcome(
+            ?: return PlacementResult(
                 recorded = false,
                 message = "I couldn't find that skill in this team's list, so I haven't recorded anything.",
             )
 
         val existing = userCompetencyStateRepository.findByUserIdAndCompetencyKey(userId, competencyKey)
         if (existing?.source == CompetencySource.VERIFIED) {
-            return PlacementOutcome(
+            return PlacementResult(
                 recorded = false,
                 message = "Your own accepted work already proves “${competency.label}” — I'd only be " +
                     "writing over something stronger, so I've left it as it is.",
@@ -187,7 +189,7 @@ class CompetencyPlacementService(
             )
         }
 
-        return PlacementOutcome(
+        return PlacementResult(
             recorded = true,
             message = "Noted — “${competency.label}” at ${level.word}. It's a starting point, not a " +
                 "verdict: your work here is what will move it.",
@@ -206,22 +208,6 @@ class CompetencyPlacementService(
             .findAllByStatus(ProposalStatus.LIVE)
             .flatMap { it.competencyKeys }
             .toSet()
-
-    /** One competency an assessment could place the hire on. */
-    data class PlacementTopic(
-        val key: String,
-        val label: String,
-        val description: String?,
-        val kind: String,
-        /** Whether a task the hire could claim right now exercises it. */
-        val neededByAvailableWork: Boolean,
-    )
-
-    /** What came of a confirmed placement, and the line to tell the hire. */
-    data class PlacementOutcome(
-        val recorded: Boolean,
-        val message: String,
-    )
 
     companion object {
         /** The most competencies one assessment is ever offered. */

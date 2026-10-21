@@ -10,9 +10,11 @@ import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.external.model.PathElementKind
 import com.sprintstart.sprintstartbackend.path.model.response.question.QuestionForAdminResponse
 import com.sprintstart.sprintstartbackend.shared.ids.PhaseId
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.StarterWorkTaskId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
+import com.sprintstart.sprintstartbackend.starterwork.external.OrientationAuthoringApi
 import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.OrientationPacketResponse
-import com.sprintstart.sprintstartbackend.starterwork.service.TaskOrientationService
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.springframework.stereotype.Component
@@ -76,7 +78,7 @@ class ContentTeamTools(
     private val pathReviewApi: PathReviewApi,
     private val stepAuthoringApi: StepAuthoringApi,
     private val phaseAuthoringApi: PhaseAuthoringApi,
-    private val taskOrientationService: TaskOrientationService,
+    private val orientationAuthoring: OrientationAuthoringApi,
 ) : TeamAreaTools {
     override val area = TeamArea.CONTENT
 
@@ -202,7 +204,7 @@ class ContentTeamTools(
     /** The orientation packet a hire gets for a task, or the fact that there is none. */
     private fun orientationPacket(taskId: UUID?, projectId: UUID): String {
         val task = scope.proposal(taskId, projectId) ?: return TASK_NOT_HERE
-        val packet = taskOrientationService.getForAuthoring(task.id, projectId).packet
+        val packet = orientationAuthoring.packetForAuthoring(StarterWorkTaskId(task.id), ProjectId(projectId)).packet
             ?: return "There is no orientation packet for “${task.title}” on this project yet. One is assembled " +
                 "from the docs the first time a hire opens the task, or a person can write it."
         return renderPacket(packet)

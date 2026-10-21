@@ -5,13 +5,15 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.assistant.external.objectArray
 import com.sprintstart.sprintstartbackend.assistant.external.text
+import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.StarterWorkTaskId
+import com.sprintstart.sprintstartbackend.starterwork.external.OrientationAuthoringApi
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.OrientationOrigin
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.OrientationStep
 import com.sprintstart.sprintstartbackend.starterwork.model.request.orientation.AuthorOrientationCitationRequest
 import com.sprintstart.sprintstartbackend.starterwork.model.request.orientation.AuthorOrientationRequest
 import com.sprintstart.sprintstartbackend.starterwork.model.request.orientation.AuthorOrientationSectionRequest
 import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.OrientationPacketResponse
-import com.sprintstart.sprintstartbackend.starterwork.service.TaskOrientationService
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -57,8 +59,11 @@ internal fun OrientationOrigin.author(): String = if (this ==
 /** What identifies the packet a preview was written against; changes whenever the packet is replaced. */
 private fun OrientationPacketResponse?.version(): String = this?.assembledAt?.toString().orEmpty()
 
-private fun currentPacket(service: TaskOrientationService, taskId: UUID, projectId: UUID): OrientationPacketResponse? =
-    service.getForAuthoring(taskId, projectId).packet
+private fun currentPacket(
+    service: OrientationAuthoringApi,
+    taskId: UUID,
+    projectId: UUID,
+): OrientationPacketResponse? = service.packetForAuthoring(StarterWorkTaskId(taskId), ProjectId(projectId)).packet
 
 /** The sections the model gave, or the reason they cannot be used. */
 private fun readSections(raw: List<JsonObject>): Pair<List<AuthorOrientationSectionRequest>?, String?> {
@@ -195,7 +200,7 @@ private fun orientationSectionSchema() =
 @Component
 class AuthorOrientationPacketAction(
     private val scope: ContentScope,
-    private val taskOrientationService: TaskOrientationService,
+    private val orientationAuthoring: OrientationAuthoringApi,
 ) : TypedTeamAction<AuthorOrientationPacketParams>(AuthorOrientationPacketParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.STANDARD
@@ -235,7 +240,7 @@ class AuthorOrientationPacketAction(
         val (sections, problem) = readSections(call.arguments.objectArray("sections"))
         if (sections == null) return TeamActionDraft.Refused(problem.orEmpty())
         val request = AuthorOrientationRequest(call.textArgument("summary").takeIf { it.isNotEmpty() }, sections)
-        val existing = currentPacket(taskOrientationService, task.id, context.projectId)
+        val existing = currentPacket(orientationAuthoring, task.id, context.projectId)
 
         return proposed(
             // The version is what the packet was when this was written, so a confirm can tell it was replaced since.
@@ -256,12 +261,16 @@ class AuthorOrientationPacketAction(
 
     override fun recheckParams(params: AuthorOrientationPacketParams, context: TeamToolContext): String? {
         val task = scope.proposal(params.taskId, context.projectId) ?: return TASK_NOT_HERE
-        val now = currentPacket(taskOrientationService, task.id, context.projectId).version()
+        val now = currentPacket(orientationAuthoring, task.id, context.projectId).version()
         return PACKET_CHANGED.takeIf { now != params.baseVersion }
     }
 
     override suspend fun performParams(params: AuthorOrientationPacketParams, context: TeamToolContext): String {
-        taskOrientationService.authorPacket(params.taskId, context.projectId, params.packet.toRequest())
+        orientationAuthoring.authorPacket(
+            StarterWorkTaskId(params.taskId),
+            ProjectId(context.projectId),
+            params.packet.toRequest(),
+        )
         return "Saved. Hires get exactly this text for the task."
     }
 }
@@ -270,7 +279,7 @@ class AuthorOrientationPacketAction(
 @Component
 class RevertOrientationPacketAction(
     private val scope: ContentScope,
-    private val taskOrientationService: TaskOrientationService,
+    private val orientationAuthoring: OrientationAuthoringApi,
 ) : TypedTeamAction<RevertOrientationPacketParams>(RevertOrientationPacketParams.serializer()) {
     override val area = TeamArea.CONTENT
     override val risk = BuddyProposalRisk.DESTRUCTIVE
@@ -289,7 +298,7 @@ class RevertOrientationPacketAction(
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
         val task = scope.proposal(call.uuidArgument("task_id"), context.projectId)
             ?: return TeamActionDraft.Refused(TASK_NOT_HERE)
-        val existing = currentPacket(taskOrientationService, task.id, context.projectId)
+        val existing = currentPacket(orientationAuthoring, task.id, context.projectId)
             ?: return TeamActionDraft.Refused("There is no packet for that task, so there is nothing to drop.")
 
         return proposed(
@@ -310,12 +319,12 @@ class RevertOrientationPacketAction(
 
     override fun recheckParams(params: RevertOrientationPacketParams, context: TeamToolContext): String? {
         val task = scope.proposal(params.taskId, context.projectId) ?: return TASK_NOT_HERE
-        val now = currentPacket(taskOrientationService, task.id, context.projectId).version()
+        val now = currentPacket(orientationAuthoring, task.id, context.projectId).version()
         return PACKET_CHANGED.takeIf { now != params.baseVersion }
     }
 
     override suspend fun performParams(params: RevertOrientationPacketParams, context: TeamToolContext): String {
-        taskOrientationService.revertToAi(params.taskId, context.projectId)
+        orientationAuthoring.revertToAi(StarterWorkTaskId(params.taskId), ProjectId(context.projectId))
         return "Dropped. The next hire gets a packet assembled from the docs."
     }
 }

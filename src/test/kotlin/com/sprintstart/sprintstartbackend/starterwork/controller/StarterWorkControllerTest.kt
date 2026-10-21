@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.CandidatePoolState
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.TaskType
+import com.sprintstart.sprintstartbackend.starterwork.external.model.PoolReconciliation
 import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.GenerateStarterWorkResponse
 import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkCandidateResponse
@@ -490,7 +491,7 @@ class StarterWorkControllerTest(
     @Test
     fun `reconcile should return 200 and the counts for a PM`() {
         every { starterWorkPoolReconciler.reconcile() } returns
-            StarterWorkPoolReconciler.Outcome(
+            PoolReconciliation(
                 examined = 3,
                 markedStale = 1,
                 revived = 0,

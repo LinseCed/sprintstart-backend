@@ -3,13 +3,11 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
-import com.sprintstart.sprintstartbackend.starterwork.external.enums.CandidatePoolState
+import com.sprintstart.sprintstartbackend.starterwork.external.StarterWorkPoolApi
+import com.sprintstart.sprintstartbackend.starterwork.external.StarterWorkReviewApi
+import com.sprintstart.sprintstartbackend.starterwork.external.model.githubRepositoryOf
 import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkCandidateResponse
 import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkTaskProposalResponse
-import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPool
-import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkScope
-import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
-import com.sprintstart.sprintstartbackend.starterwork.service.githubRepositoryOf
 import org.springframework.stereotype.Component
 import java.util.UUID
 
@@ -17,15 +15,14 @@ import java.util.UUID
  * The read tools of team mode's starter-work area: the pool of tasks hires can be suggested, the part
  * of it nobody has vouched for, and the open issues that could join it.
  *
- * All three show only work from repositories linked to the turn's project, through [StarterWorkScope].
- * The ids they print are how the starter-work actions name their targets, and every action asks the
- * scope again.
+ * All three show only work from repositories linked to the turn's project, through [StarterWorkPoolApi] and
+ * [StarterWorkReviewApi]. The ids they print are how the starter-work actions name their targets, and every
+ * action asks the scope again.
  */
 @Component
 class StarterWorkTeamTools(
-    private val starterWorkPool: StarterWorkPool,
-    private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
-    private val starterWorkScope: StarterWorkScope,
+    private val starterWorkPool: StarterWorkPoolApi,
+    private val starterWorkReview: StarterWorkReviewApi,
 ) : TeamAreaTools {
     override val area = TeamArea.STARTER_WORK
 
@@ -79,11 +76,8 @@ class StarterWorkTeamTools(
 
     /** Open issues only, and only those not already in the pool or removed from it: promotable ones. */
     private fun candidates(projectId: UUID, search: String): String {
-        val open = starterWorkTaskProposalService
-            .listCandidates(projectId)
-            .filter { it.poolState == CandidatePoolState.AVAILABLE }
-        val matching = starterWorkScope
-            .onProject(open, projectId) { it.sourceId }
+        val matching = starterWorkReview
+            .promotableIssuesOn(ProjectId(projectId))
             .filter { search.isBlank() || it.matches(search) }
         if (matching.isEmpty()) {
             return if (search.isBlank()) {
