@@ -1,13 +1,6 @@
 package com.sprintstart.sprintstartbackend.insights.assistant
 
-import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
-import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.assistant.external.TeamActionDraft
-import com.sprintstart.sprintstartbackend.assistant.external.TeamActionHandler
-import com.sprintstart.sprintstartbackend.assistant.external.TeamArea
 import com.sprintstart.sprintstartbackend.assistant.external.TeamToolContext
-import com.sprintstart.sprintstartbackend.assistant.external.stringFields
 import com.sprintstart.sprintstartbackend.insights.external.InsightsRefreshApi
 import kotlinx.serialization.json.JsonObject
 import org.springframework.stereotype.Component
@@ -16,28 +9,15 @@ import org.springframework.stereotype.Component
 @Component
 class RefreshFaqAction(
     private val insightsRefreshApi: InsightsRefreshApi,
-) : TeamActionHandler {
-    override val area = TeamArea.KNOWLEDGE
-    override val risk = BuddyProposalRisk.BULK
-    override val spec = BuddyToolSpecDto(
+) : RefreshAction(
         name = "refresh_faq",
         description = "Offer to rebuild this project's FAQ: every question asked here regrouped into recurring " +
             "questions. It asks the AI service and takes a while. Offer it when the manager wants the FAQ up to " +
             "date, not as a way to answer a question. Takes no arguments.",
-        parameters = stringFields(required = emptyList()),
-    )
-
-    override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft =
-        TeamActionDraft.Proposed(
-            params = JsonObject(emptyMap()),
-            label = "Refresh the FAQ",
-            preview = "Rebuild this project's FAQ: every question asked here is regrouped into recurring " +
-                "questions, replacing the current groups. It asks the AI service and can take a while.",
-        )
-
-    /** A refresh rebuilds from what is there at the confirm, so nothing can have gone stale since the offer. */
-    override fun recheck(params: JsonObject, context: TeamToolContext): String? = null
-
+        label = "Refresh the FAQ",
+        preview = "Rebuild this project's FAQ: every question asked here is regrouped into recurring " +
+            "questions, replacing the current groups. It asks the AI service and can take a while.",
+    ) {
     override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
         val groups = insightsRefreshApi.refreshFaq(context.projectId)
         return "Refreshed the FAQ: $groups recurring-question groups."
