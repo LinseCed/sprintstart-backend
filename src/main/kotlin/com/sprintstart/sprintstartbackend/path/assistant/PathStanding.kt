@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.path.assistant
 
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
@@ -10,7 +10,7 @@ import java.util.UUID
  * Where the hire stands on a path whose phases run side by side, and what comes next in a phase.
  *
  * Both are the hire's own page's rules (`resolveNextAction` and `nextItemInPhase` in the frontend),
- * restated here so the mentor and the page cannot disagree about them. Split out of [BuddyPathTools],
+ * restated here so the mentor and the page cannot disagree about them. Split out of [MyPathTool],
  * which turns the answer into text; this only decides it.
  */
 internal sealed interface PathStanding {
@@ -81,9 +81,9 @@ internal fun nextItemIn(phase: GetOnboardingPhaseForUserResponse): NextPathItem?
     phase.steps.firstOrNull { it.id == id }?.let { return stepItem(it) }
     val question = phase.questions.first { it.id == id }
     return NextPathItem(
-        plain = "the question ${BuddyPathTools.quoted(question.question)}",
-        withIds = "the question ${BuddyPathTools.quoted(question.question)} " +
-            "[question_id: ${question.id}] [link: ${BuddyPathTools.QUESTION_LINK}${question.id}]",
+        plain = "the question ${MyPathTool.quoted(question.question)}",
+        withIds = "the question ${MyPathTool.quoted(question.question)} " +
+            "[question_id: ${question.id}] [link: ${MyPathTool.QUESTION_LINK}${question.id}]",
     )
 }
 
@@ -115,9 +115,9 @@ private fun nextIdIn(phase: GetOnboardingPhaseForUserResponse): UUID? {
 }
 
 private fun stepItem(step: GetOnboardingStepsResponse) = NextPathItem(
-    plain = "the step ${BuddyPathTools.quoted(step.title)}",
-    withIds = "the step ${BuddyPathTools.quoted(step.title)} [step_id: ${step.id}] " +
-        "[link: ${BuddyPathTools.STEP_LINK}${step.id}]",
+    plain = "the step ${MyPathTool.quoted(step.title)}",
+    withIds = "the step ${MyPathTool.quoted(step.title)} [step_id: ${step.id}] " +
+        "[link: ${MyPathTool.STEP_LINK}${step.id}]",
 )
 
 /**

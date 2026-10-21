@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.SkipStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepOrigin
@@ -48,7 +49,7 @@ import java.util.UUID
  */
 class BuddyPathStepActionTest {
     // No other phase waits on the ones in these cases unless a case says so.
-    private val buddyPathTools: BuddyPathTools = mockk {
+    private val myPathTool: MyPathTool = mockk {
         every { phasesOf(any()) } returns emptyList()
     }
     private val onboardingStepService: OnboardingStepService = mockk()
@@ -70,12 +71,12 @@ class BuddyPathStepActionTest {
     )
 
     private val pathActions = BuddyPathActions(
-        buddyPathTools = buddyPathTools,
+        myPathTool = myPathTool,
         hirePathActionsApi = hirePathActions,
-        edits = BuddyPathEditActions(buddyPathTools, hirePathActions),
+        edits = BuddyPathEditActions(myPathTool, hirePathActions),
         hirePathApi = HirePathService(mockk(), onboardingTaskService, mockk(), mockk()),
-        questions = BuddyQuestionActions(buddyPathTools, hirePathActions),
-        skips = BuddySkipActions(buddyPathTools, hirePathActions),
+        questions = BuddyQuestionActions(myPathTool, hirePathActions),
+        skips = BuddySkipActions(myPathTool, hirePathActions),
         userApi = userApi,
     )
 
@@ -102,7 +103,7 @@ class BuddyPathStepActionTest {
     fun `a skip request without a reason sends the mentor back to ask why`() {
         // The PM decides on the reason; a request with none is one that sits.
         val step = step("Set up the VPN", StepStatus.WAITING)
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
 
         val outcome = service.propose(call("request_skip", "step_id" to step.id.toString()), userId)
 
@@ -113,7 +114,7 @@ class BuddyPathStepActionTest {
     @Test
     fun `a step already waiting on a skip decision cannot get a second request`() {
         val step = step("Set up the VPN", StepStatus.WAITING).copy(skip = skip(accepted = null))
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
 
         val outcome = service.propose(
             call("request_skip", "step_id" to step.id.toString(), "reason" to "I already have access."),
@@ -129,7 +130,7 @@ class BuddyPathStepActionTest {
     @Test
     fun `the skip proposal carries the reason, and proposing sends nothing`() {
         val step = step("Set up the VPN", StepStatus.WAITING)
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
 
         val outcome = service.propose(
             call("request_skip", "step_id" to step.id.toString(), "reason" to "I already have VPN access."),
@@ -146,7 +147,7 @@ class BuddyPathStepActionTest {
     fun `asking again after a decline puts the PM's comment in front of the mentor`() {
         val step = step("Set up the VPN", StepStatus.WAITING)
             .copy(skip = skip(accepted = false, reviewComment = "Everyone needs the company VPN."))
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
 
         val outcome = service.propose(
             call("request_skip", "step_id" to step.id.toString(), "reason" to "I work on-site only."),
@@ -162,7 +163,7 @@ class BuddyPathStepActionTest {
     fun `a confirmed skip request goes through the hire's own skip route`() = runTest {
         val step = step("Set up the VPN", StepStatus.WAITING)
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
         val sent = slot<CreateOnboardingSkipRequest>()
         every { onboardingSkipService.createOnboardingSkipForMe(authId, step.id, capture(sent)) } returns
             CreateOnboardingSkipResponse(
@@ -187,7 +188,7 @@ class BuddyPathStepActionTest {
     fun `completing a step with a pending skip says on the button that it withdraws the request`() {
         // The completion route drops a pending skip. Allowed, but never silently.
         val step = step("Set up the VPN", StepStatus.IN_PROGRESS).copy(skip = skip(accepted = null))
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
 
         val outcome = service.propose(call("complete_step", "step_id" to step.id.toString()), userId)
 
@@ -200,7 +201,7 @@ class BuddyPathStepActionTest {
     @Test
     fun `a step with no description is refused, because a title alone is a guess`() {
         val phase = phase("Deployment")
-        every { buddyPathTools.findPhase(userId, phase.id) } returns phase
+        every { myPathTool.findPhase(userId, phase.id) } returns phase
 
         val outcome = service.propose(
             call("add_path_step", "phase_id" to phase.id.toString(), "title" to "Learn the deploy"),
@@ -214,7 +215,7 @@ class BuddyPathStepActionTest {
     @Test
     fun `a step already on the path is not added a second time`() {
         val phase = phase("Setup", steps = listOf(step("Clone the repository", StepStatus.WAITING)))
-        every { buddyPathTools.findPhase(userId, phase.id) } returns phase
+        every { myPathTool.findPhase(userId, phase.id) } returns phase
 
         val outcome = service.propose(
             call(
@@ -233,7 +234,7 @@ class BuddyPathStepActionTest {
     @Test
     fun `the proposal carries the phase, the title and the description`() {
         val phase = phase("Deployment")
-        every { buddyPathTools.findPhase(userId, phase.id) } returns phase
+        every { myPathTool.findPhase(userId, phase.id) } returns phase
 
         val outcome = service.propose(
             call(
@@ -256,9 +257,9 @@ class BuddyPathStepActionTest {
     fun `a confirmed step with no placement lands at the end of the phase, as a task`() = runTest {
         val phase = phase("Deployment", steps = listOf(step("Read the runbook", StepStatus.FINISHED)))
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findPhase(userId, phase.id) } returns phase
+        every { myPathTool.findPhase(userId, phase.id) } returns phase
         // Finished, but nothing waits on it: adding a step reopens no other phase.
-        every { buddyPathTools.phasesOf(userId) } returns listOf(phase)
+        every { myPathTool.phasesOf(userId) } returns listOf(phase)
         val created = slot<CreateOnboardingStepRequest>()
         every {
             onboardingStepPlacementService.createConnectedStepForMe(
@@ -297,7 +298,7 @@ class BuddyPathStepActionTest {
     fun `an unconnected step is proposed with a warning that it is never what comes next`() {
         // Testing found a refresher the hire asked to do next floating unconnected in the graph.
         val phase = phase("Deployment")
-        every { buddyPathTools.findPhase(userId, phase.id) } returns phase
+        every { myPathTool.findPhase(userId, phase.id) } returns phase
 
         val outcome = service.propose(
             call(
@@ -318,7 +319,7 @@ class BuddyPathStepActionTest {
         val later = step("Deploy to staging", StepStatus.WAITING, locked = true)
             .copy(position = 1, blockerIds = setOf(current.id))
         val phase = phase("Deployment", steps = listOf(current, later))
-        every { buddyPathTools.findPhase(userId, phase.id) } returns phase
+        every { myPathTool.findPhase(userId, phase.id) } returns phase
 
         val outcome = service.propose(
             placedCall(phase.id, "Walk through a release", waitsOn = listOf(current.id), unlocks = listOf(later.id)),
@@ -340,7 +341,7 @@ class BuddyPathStepActionTest {
         val question = question("What does the runbook cover?", QuestionStatus.OPEN)
             .copy(blockerIds = setOf(current.id))
         val phase = phase("Deployment", steps = listOf(current)).copy(questions = listOf(question))
-        every { buddyPathTools.findPhase(userId, phase.id) } returns phase
+        every { myPathTool.findPhase(userId, phase.id) } returns phase
 
         val outcome = service.propose(
             placedCall(phase.id, "Refresher", waitsOn = emptyList(), unlocks = listOf(question.id)),
@@ -359,7 +360,7 @@ class BuddyPathStepActionTest {
         val finished = step("Read the runbook", StepStatus.FINISHED).copy(completedAt = Instant.EPOCH)
         val question = question("What does the runbook cover?", QuestionStatus.OPEN)
         val phase = phase("Deployment", steps = listOf(finished)).copy(questions = listOf(question))
-        every { buddyPathTools.findPhase(userId, phase.id) } returns phase
+        every { myPathTool.findPhase(userId, phase.id) } returns phase
 
         val outcome = service.propose(
             placedCall(phase.id, "Refresher", waitsOn = emptyList(), unlocks = listOf(question.id)),
@@ -377,8 +378,8 @@ class BuddyPathStepActionTest {
         val done = step("Read the runbook", StepStatus.FINISHED)
         val finished = phase("Setup", steps = listOf(done))
         val current = phase("First change").copy(blockerIds = setOf(finished.id))
-        every { buddyPathTools.findPhase(userId, finished.id) } returns finished
-        every { buddyPathTools.phasesOf(userId) } returns listOf(finished, current)
+        every { myPathTool.findPhase(userId, finished.id) } returns finished
+        every { myPathTool.phasesOf(userId) } returns listOf(finished, current)
 
         val outcome = service.propose(
             call(
@@ -404,8 +405,8 @@ class BuddyPathStepActionTest {
         val finished = phase("Setup", steps = listOf(done))
         val current = phase("First change").copy(blockerIds = setOf(finished.id))
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findPhase(userId, finished.id) } returns finished
-        every { buddyPathTools.phasesOf(userId) } returns listOf(finished, current)
+        every { myPathTool.findPhase(userId, finished.id) } returns finished
+        every { myPathTool.phasesOf(userId) } returns listOf(finished, current)
 
         val result = service.perform(
             BuddyActionRequest(
@@ -428,7 +429,7 @@ class BuddyPathStepActionTest {
     fun `a placement in front of something already done is refused`() {
         val done = step("Read the runbook", StepStatus.FINISHED)
         val phase = phase("Deployment", steps = listOf(done))
-        every { buddyPathTools.findPhase(userId, phase.id) } returns phase
+        every { myPathTool.findPhase(userId, phase.id) } returns phase
 
         val outcome = service.propose(
             placedCall(phase.id, "Refresher", waitsOn = emptyList(), unlocks = listOf(done.id)),
@@ -446,7 +447,7 @@ class BuddyPathStepActionTest {
         val current = step("Read the runbook", StepStatus.WAITING)
         val later = step("Deploy to staging", StepStatus.WAITING).copy(blockerIds = setOf(current.id))
         val phase = phase("Deployment", steps = listOf(current, later))
-        every { buddyPathTools.findPhase(userId, phase.id) } returns phase
+        every { myPathTool.findPhase(userId, phase.id) } returns phase
 
         val outcome = service.propose(
             placedCall(phase.id, "Refresher", waitsOn = listOf(later.id), unlocks = listOf(current.id)),
@@ -463,7 +464,7 @@ class BuddyPathStepActionTest {
         val later = step("Deploy to staging", StepStatus.WAITING).copy(position = 1, blockerIds = setOf(current.id))
         val phase = phase("Deployment", steps = listOf(current, later))
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findPhase(userId, phase.id) } returns phase
+        every { myPathTool.findPhase(userId, phase.id) } returns phase
         val created = slot<CreateOnboardingStepRequest>()
         every {
             onboardingStepPlacementService.createConnectedStepForMe(

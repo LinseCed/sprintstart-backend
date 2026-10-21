@@ -6,6 +6,8 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
+import com.sprintstart.sprintstartbackend.path.assistant.PathStepPlacement
 import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepOrigin
@@ -33,7 +35,7 @@ import java.util.UUID
  */
 @Component
 class BuddyPathEditActions(
-    private val buddyPathTools: BuddyPathTools,
+    private val myPathTool: MyPathTool,
     private val hirePathActionsApi: HirePathActionsApi,
 ) {
     /**
@@ -57,7 +59,7 @@ class BuddyPathEditActions(
                 "No phase_id was provided. Read get_my_onboarding_path and pass the phase_id of the " +
                     "phase the step belongs in.",
             )
-        val phase = buddyPathTools.findPhase(user.value, phaseId)
+        val phase = myPathTool.findPhase(user.value, phaseId)
             ?: return notProposed(
                 "No phase of this hire's own path has that id. Read get_my_onboarding_path again.",
             )
@@ -135,7 +137,7 @@ class BuddyPathEditActions(
             phase.steps.all { it.status == StepStatus.FINISHED || it.status == StepStatus.SKIPPED } &&
             phase.questions.all { it.status == QuestionStatus.PASSED }
         if (!finished) return null
-        val waiting = buddyPathTools.phasesOf(userId).filter { phase.id in it.blockerIds }
+        val waiting = myPathTool.phasesOf(userId).filter { phase.id in it.blockerIds }
         if (waiting.isEmpty()) return null
         return "“${phase.title}” is finished, and ${waiting.joinToString(", ") { "“${it.title}”" }} " +
             "waits on it: a new step there would lock that again until it is done. Put the step in the " +
@@ -149,7 +151,7 @@ class BuddyPathEditActions(
             return BuddyActionResponse(ok = false, message = "No step was proposed to add.")
         }
         val userId = user.value
-        val phase = buddyPathTools.findPhase(userId, phaseId)
+        val phase = myPathTool.findPhase(userId, phaseId)
             ?: return BuddyActionResponse(ok = false, message = "That phase isn't on your path.")
 
         // Checked again: the path can change between the button and the click, and a placement

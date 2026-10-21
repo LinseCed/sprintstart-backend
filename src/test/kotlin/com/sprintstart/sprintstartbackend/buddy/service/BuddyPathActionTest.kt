@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.request.question.SubmitQuestionAttemptRequest
@@ -52,7 +53,7 @@ import java.util.UUID
  *    says "no" is one the model relays to the hire as a broken feature.
  */
 class BuddyPathActionTest {
-    private val buddyPathTools: BuddyPathTools = mockk()
+    private val myPathTool: MyPathTool = mockk()
     private val onboardingStepService: OnboardingStepService = mockk()
     private val onboardingStepPlacementService: OnboardingStepPlacementService = mockk()
     private val onboardingTaskService: OnboardingTaskService = mockk()
@@ -72,12 +73,12 @@ class BuddyPathActionTest {
     )
 
     private val pathActions = BuddyPathActions(
-        buddyPathTools = buddyPathTools,
+        myPathTool = myPathTool,
         hirePathActionsApi = hirePathActions,
-        edits = BuddyPathEditActions(buddyPathTools, hirePathActions),
+        edits = BuddyPathEditActions(myPathTool, hirePathActions),
         hirePathApi = HirePathService(mockk(), onboardingTaskService, mockk(), mockk()),
-        questions = BuddyQuestionActions(buddyPathTools, hirePathActions),
-        skips = BuddySkipActions(buddyPathTools, hirePathActions),
+        questions = BuddyQuestionActions(myPathTool, hirePathActions),
+        skips = BuddySkipActions(myPathTool, hirePathActions),
         userApi = userApi,
     )
 
@@ -111,7 +112,7 @@ class BuddyPathActionTest {
     @Test
     fun `a step that is not on the hire's own path cannot be ticked off`() {
         val strangerStep = UUID.randomUUID()
-        every { buddyPathTools.findStep(userId, strangerStep) } returns null
+        every { myPathTool.findStep(userId, strangerStep) } returns null
 
         val outcome = service.propose(call("complete_step", "step_id" to strangerStep.toString()), userId)
 
@@ -124,7 +125,7 @@ class BuddyPathActionTest {
         // It had been telling hires to confirm something that was never rendered. From inside the
         // model a refusal written as advice reads a lot like the offer having been made.
         val done = step("Clone the repository", StepStatus.FINISHED)
-        every { buddyPathTools.findStep(userId, done.id) } returns done
+        every { myPathTool.findStep(userId, done.id) } returns done
 
         val outcome = service.propose(call("complete_step", "step_id" to done.id.toString()), userId)
 
@@ -135,7 +136,7 @@ class BuddyPathActionTest {
     @Test
     fun `a step that is already done is not offered again`() {
         val step = step("Clone the repository", StepStatus.FINISHED)
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
 
         val outcome = service.propose(call("complete_step", "step_id" to step.id.toString()), userId)
 
@@ -146,7 +147,7 @@ class BuddyPathActionTest {
     @Test
     fun `a locked step is explained rather than offered`() {
         val step = step("Deploy to staging", StepStatus.WAITING, locked = true)
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
 
         val outcome = service.propose(call("complete_step", "step_id" to step.id.toString()), userId)
 
@@ -157,7 +158,7 @@ class BuddyPathActionTest {
     @Test
     fun `the button names the step, and proposing completes nothing`() {
         val step = step("Clone the repository", StepStatus.IN_PROGRESS)
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
 
         val outcome = service.propose(call("complete_step", "step_id" to step.id.toString()), userId)
 
@@ -173,7 +174,7 @@ class BuddyPathActionTest {
     fun `a confirmed completion goes through the hire's own endpoint`() = runTest {
         val step = step("Clone the repository", StepStatus.IN_PROGRESS)
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
         every { onboardingStepService.completeOnboardingStepForMe(authId, step.id) } returns
             completed("Clone the repository")
 
@@ -192,7 +193,7 @@ class BuddyPathActionTest {
         // button -- so a proposal clicked after the path around it changed has to be caught here.
         val step = step("Deploy to staging", StepStatus.WAITING, locked = true)
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
 
         val result = service.perform(BuddyActionRequest(action = "complete_step", stepId = step.id), jwt)
 
@@ -209,7 +210,7 @@ class BuddyPathActionTest {
         val step = step("Deploy to staging", StepStatus.WAITING, locked = true)
         val task = task("Run the deploy script", finished = false, stepId = step.id)
         every { onboardingTaskService.getOnboardingTaskById(task.id) } returns task
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
 
         val outcome = service.propose(call("complete_task", "task_id" to task.id.toString()), userId)
 
@@ -224,7 +225,7 @@ class BuddyPathActionTest {
         val step = step("Clone the repository", StepStatus.IN_PROGRESS)
         val task = task("Install git", finished = false, stepId = step.id)
         every { onboardingTaskService.getOnboardingTaskById(task.id) } returns task
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
 
         val outcome = service.propose(call("complete_task", "task_id" to task.id.toString()), userId)
 
@@ -238,7 +239,7 @@ class BuddyPathActionTest {
         // Ownership is the step's: the task read is by id, and this is what makes that safe.
         val task = task("Install git", finished = false, stepId = UUID.randomUUID())
         every { onboardingTaskService.getOnboardingTaskById(task.id) } returns task
-        every { buddyPathTools.findStep(userId, task.stepId) } returns null
+        every { myPathTool.findStep(userId, task.stepId) } returns null
 
         val outcome = service.propose(call("complete_task", "task_id" to task.id.toString()), userId)
 
@@ -251,7 +252,7 @@ class BuddyPathActionTest {
         val step = step("Clone the repository", StepStatus.IN_PROGRESS)
         val task = task("Install git", finished = true, stepId = step.id)
         every { onboardingTaskService.getOnboardingTaskById(task.id) } returns task
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
 
         val outcome = service.propose(call("complete_task", "task_id" to task.id.toString()), userId)
 
@@ -265,7 +266,7 @@ class BuddyPathActionTest {
         val task = task("Install git", finished = false, stepId = step.id)
         every { onboardingTaskService.getOnboardingTaskForMe(authId, task.id) } returns task
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findStep(userId, step.id) } returns step
+        every { myPathTool.findStep(userId, step.id) } returns step
         val written = slot<UpdateOnboardingTaskRequest>()
         every {
             onboardingTaskService.updateOnboardingTaskForMe(authId, task.id, capture(written))
@@ -290,7 +291,7 @@ class BuddyPathActionTest {
     @Test
     fun `an answer the hire did not give is refused before the button`() {
         val question = question("Who runs the retro?", QuestionStatus.OPEN)
-        every { buddyPathTools.findQuestion(userId, question.id) } returns question
+        every { myPathTool.findQuestion(userId, question.id) } returns question
 
         val outcome = service.propose(
             call("answer_question", "question_id" to question.id.toString(), "answer" to "  "),
@@ -304,7 +305,7 @@ class BuddyPathActionTest {
     @Test
     fun `a question already passed is not asked again`() {
         val question = question("Who runs the retro?", QuestionStatus.PASSED)
-        every { buddyPathTools.findQuestion(userId, question.id) } returns question
+        every { myPathTool.findQuestion(userId, question.id) } returns question
 
         val outcome = service.propose(
             call("answer_question", "question_id" to question.id.toString(), "answer" to "the SM"),
@@ -322,7 +323,7 @@ class BuddyPathActionTest {
             QuestionStatus.OPEN,
             options = listOf("Sprint planning", "Retro"),
         )
-        every { buddyPathTools.findQuestion(userId, question.id) } returns question
+        every { myPathTool.findQuestion(userId, question.id) } returns question
 
         val outcome = service.propose(
             call("answer_question", "question_id" to question.id.toString(), "answer" to "the daily"),
@@ -340,7 +341,7 @@ class BuddyPathActionTest {
             QuestionStatus.OPEN,
             options = listOf("Sprint planning", "Retro"),
         )
-        every { buddyPathTools.findQuestion(userId, question.id) } returns question
+        every { myPathTool.findQuestion(userId, question.id) } returns question
 
         val outcome = service.propose(
             call("answer_question", "question_id" to question.id.toString(), "answer" to "planning"),
@@ -366,7 +367,7 @@ class BuddyPathActionTest {
         )
         val planning = question.options.first { it.label == "Sprint planning" }
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findQuestion(userId, question.id) } returns question
+        every { myPathTool.findQuestion(userId, question.id) } returns question
         val submitted = slot<SubmitQuestionAttemptRequest>()
         every {
             questionAttemptService.submitQuestionAttemptForMe(authId, question.id, capture(submitted))
@@ -394,7 +395,7 @@ class BuddyPathActionTest {
     fun `a wrong answer is a recorded attempt, not a failed action`() = runTest {
         val question = question("Who runs the retro?", QuestionStatus.OPEN, options = listOf("The SM", "The PO"))
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findQuestion(userId, question.id) } returns question
+        every { myPathTool.findQuestion(userId, question.id) } returns question
         every { questionAttemptService.submitQuestionAttemptForMe(authId, question.id, any()) } returns
             graded(correct = false, feedback = "Not the product owner.")
 
@@ -421,7 +422,7 @@ class BuddyPathActionTest {
         // nothing, and a wrong one would read as having lost the pass.
         val question = question("Who runs the retro?", QuestionStatus.PASSED, options = listOf("The SM", "The PO"))
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findQuestion(userId, question.id) } returns question
+        every { myPathTool.findQuestion(userId, question.id) } returns question
 
         val result = service.perform(
             BuddyActionRequest(action = "answer_question", questionId = question.id, answer = "The SM"),
@@ -443,7 +444,7 @@ class BuddyPathActionTest {
             options = listOf("Git", "Docker", "Excel"),
         )
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findQuestion(userId, question.id) } returns question
+        every { myPathTool.findQuestion(userId, question.id) } returns question
         val submitted = slot<SubmitQuestionAttemptRequest>()
         every {
             questionAttemptService.submitQuestionAttemptForMe(authId, question.id, capture(submitted))
@@ -488,7 +489,7 @@ class BuddyPathActionTest {
             QuestionStatus.OPEN,
             options = listOf("Git", "Docker", "Excel"),
         )
-        every { buddyPathTools.findQuestion(userId, question.id) } returns question
+        every { myPathTool.findQuestion(userId, question.id) } returns question
 
         val outcome = service.propose(
             call("answer_question", "question_id" to question.id.toString(), "answer" to "Git and Docker"),
@@ -516,7 +517,7 @@ class BuddyPathActionTest {
             },
         )
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findQuestion(userId, now.id) } returns now
+        every { myPathTool.findQuestion(userId, now.id) } returns now
 
         val result = service.perform(
             BuddyActionRequest(
@@ -537,7 +538,7 @@ class BuddyPathActionTest {
     fun `a multiple-choice confirm without the resolved options sends nothing`() = runTest {
         val question = question("Who runs the retro?", QuestionStatus.OPEN, options = listOf("The SM", "The PO"))
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findQuestion(userId, question.id) } returns question
+        every { myPathTool.findQuestion(userId, question.id) } returns question
 
         val result = service.perform(
             BuddyActionRequest(action = "answer_question", questionId = question.id, answer = "The SM"),
@@ -553,7 +554,7 @@ class BuddyPathActionTest {
         val question = question("What is your definition of done?", QuestionStatus.RETRY)
             .copy(type = CheckQuestionType.SHORT_TEXT, options = emptyList())
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
-        every { buddyPathTools.findQuestion(userId, question.id) } returns question
+        every { myPathTool.findQuestion(userId, question.id) } returns question
         val submitted = slot<SubmitQuestionAttemptRequest>()
         every {
             questionAttemptService.submitQuestionAttemptForMe(authId, question.id, capture(submitted))

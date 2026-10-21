@@ -5,6 +5,8 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
+import com.sprintstart.sprintstartbackend.path.assistant.hasPendingSkip
 import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.request.skip.CreateOnboardingSkipRequest
@@ -27,7 +29,7 @@ import org.springframework.stereotype.Component
  */
 @Component
 class BuddySkipActions(
-    private val buddyPathTools: BuddyPathTools,
+    private val myPathTool: MyPathTool,
     private val hirePathActionsApi: HirePathActionsApi,
 ) {
     /**
@@ -51,7 +53,7 @@ class BuddySkipActions(
                 "No step_id was provided. Read get_my_onboarding_path and pass the step_id of the " +
                     "step they want to skip.",
             )
-        val step = buddyPathTools.findStep(user.value, stepId)
+        val step = myPathTool.findStep(user.value, stepId)
             ?: return notProposed(
                 "No step of this hire's own path has that id. Read get_my_onboarding_path again.",
             )
@@ -66,7 +68,7 @@ class BuddySkipActions(
             step.hasPendingSkip() ->
                 "They already asked to skip “${step.title}” and their PM has not decided yet. A second " +
                     "request cannot be sent; they can change the reason on the step's own page " +
-                    "(${BuddyPathTools.STEP_PAGE_LINK}${step.id})."
+                    "(${MyPathTool.STEP_PAGE_LINK}${step.id})."
             reason.isBlank() ->
                 "No reason was provided. Their PM decides on the reason, so ask why they want to skip " +
                     "it — already know it, not relevant to their role, covered elsewhere — and put " +
@@ -111,7 +113,7 @@ class BuddySkipActions(
         if (stepId == null || reason.isNullOrBlank()) {
             return BuddyActionResponse(ok = false, message = "No skip request was proposed to send.")
         }
-        val step = buddyPathTools.findStep(user.value, stepId)
+        val step = myPathTool.findStep(user.value, stepId)
             ?: return BuddyActionResponse(ok = false, message = "That step isn't on your path.")
 
         hirePathActionsApi.requestSkip(AuthId(authId), StepId(stepId), CreateOnboardingSkipRequest(reason = reason))

@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.path.assistant
 
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.path.external.enums.GenerationStatus
@@ -28,10 +28,10 @@ import java.util.UUID
  * Hidden from the hire's own path and reported only as generation issues -- which is right for the
  * page, and was wrong for the mentor: the read told it to repair such a phase with add_path_step and
  * gave it neither the id to do that with nor a lookup that could find the phase. Kept apart from
- * [BuddyPathToolsTest] because this is the one part of the read that is about phases that are *not*
+ * [MyPathToolTest] because this is the one part of the read that is about phases that are *not*
  * on the path.
  */
-class BuddyPathToolsRepairTest {
+class MyPathToolRepairTest {
     private val onboardingPathService: OnboardingPathService = mockk()
     private val onboardingTaskService: OnboardingTaskService = mockk {
         every { getOnboardingTasksByStepId(any()) } returns emptyList()
@@ -40,7 +40,7 @@ class BuddyPathToolsRepairTest {
         every { lastAttempt(any(), any()) } returns null
     }
     private val tools =
-        BuddyPathTools(HirePathService(onboardingPathService, onboardingTaskService, mockk(), questionAttemptReader))
+        MyPathTool(HirePathService(onboardingPathService, onboardingTaskService, mockk(), questionAttemptReader))
 
     private val userId = UUID.randomUUID()
 

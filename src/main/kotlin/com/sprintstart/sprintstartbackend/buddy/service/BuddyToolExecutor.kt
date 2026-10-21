@@ -16,14 +16,13 @@ import java.util.UUID
  * can see. Each tool is executed strictly on behalf of the resolved caller — the agent never
  * supplies whose data to read, so one hire can never read another's metrics through the buddy.
  *
- * Most tools come from the features as [HireTool] beans, each mounted on its own condition and in its own
- * order. The path's and the board's tools are still the Buddy's own.
+ * The tools come from the features as [HireTool] beans, each mounted on its own condition and in its own
+ * order, the path first. The board's tools are still the Buddy's own.
  */
 @Component
 class BuddyToolExecutor(
     private val buddyBoardTools: BuddyBoardTools,
     private val hireTools: List<HireTool>,
-    private val buddyPathTools: BuddyPathTools,
 ) {
     /**
      * The backend tools the AI reasoner is told it may call, for this hire.
@@ -43,10 +42,6 @@ class BuddyToolExecutor(
      * mounted here.
      */
     fun toolSpecs(userId: UUID): List<BuddyToolSpecDto> = buildList {
-        // First: the path *is* the onboarding, and the buddy is the tutor along it. A mentor that has
-        // not read it answers "what should I do next" out of the work pool while the hire is looking
-        // at a page that says something else. Mounted only when a path exists.
-        addAll(buddyPathTools.toolSpecs(userId))
         hireTools.filter { it.isMountedFor(UserId(userId)) }.forEach { add(it.spec) }
         addAll(buddyBoardTools.toolSpecs())
     }
@@ -63,12 +58,10 @@ class BuddyToolExecutor(
      * say about it.
      */
     fun stateSnapshot(userId: UUID): String =
-        buildList {
-            // Absent entirely for a hire with no path, so a greeting can never open by discussing
-            // one they have not got.
-            add(buddyPathTools.snapshotFor(userId))
-            addAll(hireTools.sortedBy { it.snapshotPosition }.map { it.snapshotFor(UserId(userId)) })
-        }.filterNotNull().joinToString("\n\n")
+        hireTools
+            .sortedBy { it.snapshotPosition }
+            .mapNotNull { it.snapshotFor(UserId(userId)) }
+            .joinToString("\n\n")
 
     /**
      * Executes [call] on behalf of [userId], returning a plain-text result for the model.
@@ -81,7 +74,6 @@ class BuddyToolExecutor(
             ?.let { return it.execute(call, HireToolContext(UserId(userId), currentPage)) }
         return when {
             buddyBoardTools.handles(call.name) -> buddyBoardTools.execute(call, userId)
-            buddyPathTools.handles(call.name) -> buddyPathTools.execute(userId)
             else -> "Unknown tool: ${call.name}."
         }
     }

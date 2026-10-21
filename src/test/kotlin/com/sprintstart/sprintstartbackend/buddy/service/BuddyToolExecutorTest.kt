@@ -9,7 +9,6 @@ import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.arrival.service.ResolvedArrivalStep
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAppGuideTools
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.board.assistant.OpenPullRequestsTool
 import com.sprintstart.sprintstartbackend.board.service.OpenPullRequestReader
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
@@ -22,6 +21,9 @@ import com.sprintstart.sprintstartbackend.knowledge.assistant.CanonicalAnswersTo
 import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.CanonicalAnswerResponse
 import com.sprintstart.sprintstartbackend.knowledge.service.HireKnowledgeService
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
+import com.sprintstart.sprintstartbackend.path.external.HirePathApi
+import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.starterwork.assistant.CompetenciesToAssessTool
 import com.sprintstart.sprintstartbackend.starterwork.assistant.MyCompetenciesTool
 import com.sprintstart.sprintstartbackend.starterwork.assistant.SuggestedTasksTool
@@ -79,13 +81,14 @@ class BuddyToolExecutorTest {
         every { topicsFor(any()) } returns emptyList()
     }
 
-    // Pathless, and explicitly rather than relaxed: a relaxed mock would put an empty greeting
-    // section into the snapshot these cases assert on.
-    private val buddyPathTools: BuddyPathTools = mockk {
-        every { toolSpecs(any()) } returns emptyList()
-        every { snapshotFor(any()) } returns null
-        every { handles(any()) } returns false
+    // Pathless by default: every case here is about a tool that reads something other than the
+    // onboarding path, and "no path" is what keeps the path tool out of their expectations. Explicitly
+    // rather than relaxed: a relaxed mock would put an empty greeting section into the snapshot.
+    private val hirePathApi: HirePathApi = mockk {
+        every { hasPath(any()) } returns false
+        every { pathOf(any()) } returns null
     }
+    private val myPathTool: MyPathTool = spyk(MyPathTool(hirePathApi))
 
     private val hireStarterWork = hireStarterWorkOver(
         starterWorkTaskProposalService = starterWorkTaskProposalService,
@@ -98,6 +101,7 @@ class BuddyToolExecutorTest {
     private val executor = BuddyToolExecutor(
         buddyBoardTools,
         listOf(
+            myPathTool,
             ArrivalStepsTool(ArrivalSteps(arrivalStepService)),
             MyMetricsTool(userApi, InsightsReadService(onboardingMetricsService, mockk())),
             MyCompetenciesTool(hireStarterWork),
@@ -110,9 +114,6 @@ class BuddyToolExecutorTest {
             TeammatesTool(userApi, projectMembershipApi),
             buddyAppGuideTools,
         ),
-        // Pathless by default: every case here is about a tool that reads something other than the
-        // onboarding path, and "no path" is what keeps the path tool out of their expectations.
-        buddyPathTools,
     )
 
     private val userId = UUID.randomUUID()
@@ -339,9 +340,7 @@ class BuddyToolExecutorTest {
      */
     @Test
     fun `the path comes first, and arrival before every other hire-state tool`() {
-        every { buddyPathTools.toolSpecs(userId) } returns listOf(
-            BuddyToolSpecDto(name = "get_my_onboarding_path", description = "", parameters = buildJsonObject { }),
-        )
+        every { hirePathApi.hasPath(UserId(userId)) } returns true
         every { arrivalStepService.forHire(userId) } returns listOf(resolvedStep())
 
         assertThat(executor.toolSpecs(userId).map { it.name })
@@ -415,7 +414,7 @@ class BuddyToolExecutorTest {
      */
     @Test
     fun `the opening greeting is grounded in the path, then what is missing, then progress`() {
-        every { buddyPathTools.snapshotFor(userId) } returns "Onboarding path: phase 1 of 3"
+        every { myPathTool.snapshotFor(userId) } returns "Onboarding path: phase 1 of 3"
         every { arrivalStepService.forHire(userId) } returns listOf(resolvedStep())
         every { userApi.getUsersByIds(listOf(userId)) } returns listOf(userWith())
         // No projects, so metrics and suggestions short-circuit; only the ledger is reached.

@@ -1,9 +1,9 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.path.assistant
 
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyPathTools.Companion.ITEMS_SHOWN
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyPathTools.Companion.NEWLINE
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyPathTools.Companion.STEP_LINK
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyPathTools.Companion.quoted
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool.Companion.ITEMS_SHOWN
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool.Companion.NEWLINE
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool.Companion.STEP_LINK
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool.Companion.quoted
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseForUserResponse
@@ -117,7 +117,7 @@ internal fun StringBuilder.appendReadyToClose(
  * prompt would bury the path it is meant to describe.
  *
  * Read by step id rather than through an authorizing read, because the step came out of the
- * hire's own path a moment ago: the resolution in [BuddyPathTools.findStep] is what proves it is theirs, and
+ * hire's own path a moment ago: the resolution in [MyPathTool.findStep] is what proves it is theirs, and
  * doing it twice would not make it truer.
  */
 internal fun StringBuilder.appendCurrentTasks(

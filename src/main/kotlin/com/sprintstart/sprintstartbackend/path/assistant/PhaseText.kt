@@ -1,8 +1,8 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.path.assistant
 
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyPathTools.Companion.ITEMS_SHOWN
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyPathTools.Companion.PHASE_LINK
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyPathTools.Companion.quoted
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool.Companion.ITEMS_SHOWN
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool.Companion.PHASE_LINK
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool.Companion.quoted
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.response.phase.GetOnboardingPhaseForUserResponse

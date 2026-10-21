@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.board.assistant.OpenPullRequestsTool
 import com.sprintstart.sprintstartbackend.insights.assistant.MyMetricsTool
 import com.sprintstart.sprintstartbackend.knowledge.assistant.CanonicalAnswersTool
+import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
 import com.sprintstart.sprintstartbackend.starterwork.assistant.MyCompetenciesTool
 import com.sprintstart.sprintstartbackend.starterwork.assistant.SuggestedTasksTool
 import com.sprintstart.sprintstartbackend.user.external.UserApi
@@ -26,6 +27,7 @@ class BuddySuggestionServiceTest {
         buddyToolExecutor,
         userApi,
         listOf(
+            MyPathTool(mockk()),
             ArrivalStepsTool(mockk()),
             MyMetricsTool(mockk(), mockk()),
             MyCompetenciesTool(mockk()),
@@ -63,7 +65,7 @@ class BuddySuggestionServiceTest {
 
         // The read tool is mounted only for a hire who has a path, so the chip inherits that gate --
         // nobody is offered a doorway into a plan they have not got.
-        mounted(BuddyPathTools.READ_MY_PATH, MyMetricsTool.GET_MY_METRICS)
+        mounted(MyPathTool.READ_MY_PATH, MyMetricsTool.GET_MY_METRICS)
         assertThat(service.forHire(userId).map { it.label }).contains("Where am I on my path?")
     }
 
@@ -132,7 +134,7 @@ class BuddySuggestionServiceTest {
     @Test
     fun `keeps the order the tools are mounted in`() {
         mounted(
-            BuddyPathTools.READ_MY_PATH,
+            MyPathTool.READ_MY_PATH,
             ArrivalStepsTool.GET_ARRIVAL_STEPS,
             MyMetricsTool.GET_MY_METRICS,
             SuggestedTasksTool.GET_SUGGESTED_TASKS,

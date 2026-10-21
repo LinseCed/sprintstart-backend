@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.path.assistant
 
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
@@ -36,7 +36,7 @@ import java.util.UUID
  * The other half is what the tool refuses to carry: no correct answers, and no blended progress
  * figure.
  */
-class BuddyPathToolsTest {
+class MyPathToolTest {
     private val onboardingPathService: OnboardingPathService = mockk()
 
     // Checklists are read per step, so a phase with no started step never reaches it. Empty by
@@ -50,7 +50,7 @@ class BuddyPathToolsTest {
         every { lastAttempt(any(), any()) } returns null
     }
     private val tools =
-        BuddyPathTools(HirePathService(onboardingPathService, onboardingTaskService, mockk(), questionAttemptReader))
+        MyPathTool(HirePathService(onboardingPathService, onboardingTaskService, mockk(), questionAttemptReader))
 
     private val userId = UUID.randomUUID()
 
@@ -60,7 +60,7 @@ class BuddyPathToolsTest {
     fun `a hire with no path is offered no path tool at all`() {
         every { onboardingPathService.hasPath(userId) } returns false
 
-        assertThat(tools.toolSpecs(userId)).isEmpty()
+        assertThat(tools.isMountedFor(UserId(userId))).isFalse()
         assertThat(tools.hasPath(userId)).isFalse()
     }
 
@@ -68,7 +68,8 @@ class BuddyPathToolsTest {
     fun `a hire with a path is offered exactly the read tool`() {
         every { onboardingPathService.hasPath(userId) } returns true
 
-        assertThat(tools.toolSpecs(userId).map { it.name }).containsExactly("get_my_onboarding_path")
+        assertThat(tools.isMountedFor(UserId(userId))).isTrue()
+        assertThat(tools.spec.name).isEqualTo("get_my_onboarding_path")
     }
 
     @Test

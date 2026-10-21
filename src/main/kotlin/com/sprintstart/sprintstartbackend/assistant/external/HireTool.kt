@@ -49,8 +49,13 @@ interface HireTool {
 }
 
 /**
- * A suggestion chip. [label] is what the chip says; [question] is what lands in the composer. Wording may
- * only assume what the tool's mount condition guarantees.
+ * A suggestion chip. [label] is what the chip says; [question] is what lands in the composer.
+ *
+ * Wording may only assume what the tool's mount condition guarantees. A chip is offered exactly when its
+ * tool is mounted, so a chip whose tool mounts for everybody must be true of a designer, a Scrum Master and
+ * a developer alike: no "clone", "repository", "commit" or "pull request" in it. The label and the question
+ * differ only in length; a chip that promised something other than the question it writes would be putting
+ * words in the hire's mouth.
  */
 data class HireToolSuggestion(
     val label: String,
@@ -58,10 +63,13 @@ data class HireToolSuggestion(
 )
 
 /**
- * Where each feature's hire tools sit in the list the reasoner sees, lowest first. The path comes before
- * all of them; gaps leave room to place a new tool between two others without renumbering.
+ * Where each feature's hire tools sit in the list the reasoner sees, lowest first. Gaps leave room to
+ * place a new tool between two others without renumbering.
  */
 object HireToolOrder {
+    /** The path *is* the onboarding, and the Buddy the tutor along it: first, before every other tool. */
+    const val PATH = 100
+
     /** What has to be true before the hire can work: before every other state tool. */
     const val ARRIVAL = 200
     const val METRICS = 300
@@ -76,8 +84,11 @@ object HireToolOrder {
     const val APP_GUIDE = 1000
 }
 
-/** Where each section of the opening greeting's snapshot sits, after the path, lowest first. */
+/** Where each section of the opening greeting's snapshot sits, lowest first. */
 object HireSnapshotOrder {
+    /** The greeting opens on the onboarding. */
+    const val PATH = 100
+
     /** Setup before progress: a greeting grounded in progress greets a hire who cannot get in. */
     const val ARRIVAL = 200
     const val PROGRESS = 300
