@@ -1,10 +1,11 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
+import com.sprintstart.sprintstartbackend.assistant.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenActionDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpeningStream
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.buddy.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddySession

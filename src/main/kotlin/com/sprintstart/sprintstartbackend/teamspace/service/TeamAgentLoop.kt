@@ -1,6 +1,8 @@
 package com.sprintstart.sprintstartbackend.teamspace.service
 
 import com.sprintstart.sprintstartbackend.arrival.external.ContributionWording
+import com.sprintstart.sprintstartbackend.assistant.external.AgentAiClient
+import com.sprintstart.sprintstartbackend.assistant.external.ArtifactLookupService
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentResponse
@@ -10,14 +12,12 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventType
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyVocabularyDto
+import com.sprintstart.sprintstartbackend.assistant.external.MAX_AGENT_STEPS
 import com.sprintstart.sprintstartbackend.assistant.external.ResolvedBuddyCitation
 import com.sprintstart.sprintstartbackend.assistant.external.completeReply
 import com.sprintstart.sprintstartbackend.assistant.external.emitCitationsAndDone
 import com.sprintstart.sprintstartbackend.assistant.external.relayAgentTurn
-import com.sprintstart.sprintstartbackend.buddy.external.AgentAiClient
-import com.sprintstart.sprintstartbackend.buddy.service.ArtifactLookupService
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyService
-import com.sprintstart.sprintstartbackend.buddy.service.parseUuidOrNull
+import com.sprintstart.sprintstartbackend.shared.ids.parseUuidOrNull
 import kotlinx.coroutines.flow.FlowCollector
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
@@ -158,5 +158,5 @@ class TeamAgentTurn(
     var step = 0
 
     val isFinished: Boolean
-        get() = answer != null || step >= BuddyService.MAX_AGENT_STEPS
+        get() = answer != null || step >= MAX_AGENT_STEPS
 }

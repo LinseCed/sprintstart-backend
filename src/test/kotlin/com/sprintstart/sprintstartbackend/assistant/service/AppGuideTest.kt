@@ -1,5 +1,6 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.assistant.service
 
+import com.sprintstart.sprintstartbackend.assistant.service.AppGuide
 import com.sprintstart.sprintstartbackend.user.external.enums.Role
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test

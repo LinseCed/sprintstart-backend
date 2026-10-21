@@ -44,9 +44,9 @@ flowchart TB
         connectors[connectors]
         upload[upload]
         user[user]
+        assistant[assistant<br/>agent protocol, tool SPI, proposals]
     end
     subgraph L0[Kernel]
-        assistant[assistant<br/>agent protocol, tool SPI, proposals]
         shared[shared]
     end
     buddy --> board & path & starter & arrival & knowledge & assistant
@@ -59,6 +59,7 @@ flowchart TB
     blueprint --> user
     L2 --> L1
     ingestion --> connectors & upload
+    assistant --> user & ingestion & upload
     L1 --> L0
 ```
 
@@ -69,8 +70,8 @@ The arrows show the main dependencies only. The full rule:
 | L4 assistants | `buddy`, `teamspace` | Everything below. `teamspace` may use `buddy`'s API, not the other way round. |
 | L3 views | `board`, `insights` | L2 and below |
 | L2 onboarding features | `blueprint`, `path`, `arrival`, `starterwork`, `knowledge` | `path` → `blueprint`. `arrival`, `starterwork` and `knowledge` → `path`. All of them → L1 and L0. No other dependencies within L2. |
-| L1 platform | `user`, `connectors`, `upload`, `ingestion` | `ingestion` → `connectors` and `upload`. `connectors` and `upload` → `user`. All of them → L0. |
-| L0 kernel | `shared`, `assistant` | Nothing above. `assistant` → `shared`, and `user`'s events, to erase the proposals it stores (P5). |
+| L1 platform | `user`, `connectors`, `upload`, `ingestion`, `assistant` | `ingestion` → `connectors` and `upload`. `connectors` and `upload` → `user`. `assistant` → `user` (its events erase the proposals it stores), `ingestion` and `upload` (resolving a cited artifact). All of them → L0. |
+| L0 kernel | `shared` | Nothing above. |
 | Composition root | `config` (security, CORS, OpenAPI wiring) | May use any module's API. Nothing depends on it. |
 
 Expected sizes, taken from today's code: `blueprint` ~13k lines, `path` ~12.7k, `buddy` ~7.6k,
