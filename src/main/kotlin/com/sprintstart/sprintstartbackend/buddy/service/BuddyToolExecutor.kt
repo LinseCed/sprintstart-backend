@@ -5,10 +5,10 @@ import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAppGuideTools
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.board.service.OpenPullRequestReader
+import com.sprintstart.sprintstartbackend.board.external.HireBoardApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
+import com.sprintstart.sprintstartbackend.insights.external.InsightsReadApi
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
-import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsService
 import com.sprintstart.sprintstartbackend.knowledge.external.HireKnowledgeApi
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
@@ -38,12 +38,12 @@ import java.util.UUID
 @Suppress("TooManyFunctions")
 @Component
 class BuddyToolExecutor(
-    private val onboardingMetricsService: OnboardingMetricsService,
+    private val insightsRead: InsightsReadApi,
     private val hireStarterWork: HireStarterWorkApi,
     private val hireKnowledgeApi: HireKnowledgeApi,
     private val userApi: UserApi,
     private val buddyBoardTools: BuddyBoardTools,
-    private val openPullRequestReader: OpenPullRequestReader,
+    private val hireBoard: HireBoardApi,
     private val projectMembershipApi: ProjectMembershipApi,
     private val arrivalSteps: ArrivalReadApi,
     private val buddyPathTools: BuddyPathTools,
@@ -271,8 +271,8 @@ class BuddyToolExecutor(
             return "You are not a member of any project yet, so there are no work metrics."
         }
         val described = projects.mapNotNull { project ->
-            onboardingMetricsService
-                .getHireTimeline(userId, project.projectId)
+            insightsRead
+                .hireTimeline(UserId(userId), ProjectId(project.projectId))
                 ?.let { describe(project.name, it) }
         }
         return described
@@ -325,7 +325,7 @@ class BuddyToolExecutor(
         val sections = projects.mapNotNull { project ->
             // Which pull requests count as open, and which leads, are decided in one place --
             // the board shows the same list as cards and the two must not disagree.
-            val open = openPullRequestReader.openFor(project.projectId, login)
+            val open = hireBoard.openPullRequests(ProjectId(project.projectId), login)
             if (open.isEmpty()) {
                 null
             } else {
@@ -343,7 +343,7 @@ class BuddyToolExecutor(
     private fun StringBuilder.appendPullRequest(pr: AuthoredPullRequest) {
         val id = pr.number?.let { "#$it" } ?: "(number unknown)"
         appendLine("- $id ${pr.title ?: "(untitled)"}")
-        openPullRequestReader.waitingHours(pr)?.let {
+        hireBoard.waitingHours(pr)?.let {
             appendLine("    · waiting $it hours for a first review")
         }
         pr.sourceUrl?.let { appendLine("    ($it)") }

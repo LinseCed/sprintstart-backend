@@ -12,9 +12,9 @@
                 "arrival :: api", "arrival :: api-model", "arrival :: api-enums", "arrival :: api-responses",
                 "starterwork :: api", "starterwork :: api-enums", "starterwork :: api-model", "starterwork :: api-responses",
                 "knowledge :: api", "knowledge :: api-model", "knowledge :: api-responses",
-                "board :: api-services", "board :: api-enums", "board :: api-model", "board :: api-requests",
+                "board :: api", "board :: api-enums", "board :: api-model", "board :: api-requests",
                 "board :: api-responses",
-                "insights :: api-services", "insights :: api-responses"
+                "insights :: api", "insights :: api-responses"
         }
 )
 package com.sprintstart.sprintstartbackend.buddy;

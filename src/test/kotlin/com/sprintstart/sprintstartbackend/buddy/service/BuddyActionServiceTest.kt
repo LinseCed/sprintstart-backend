@@ -4,6 +4,8 @@ import com.sprintstart.sprintstartbackend.arrival.service.AttestationService
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.board.service.BoardService
+import com.sprintstart.sprintstartbackend.board.service.HireBoardActionsService
+import com.sprintstart.sprintstartbackend.board.service.hireBoardOver
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.knowledge.service.HireKnowledgeService
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
@@ -66,7 +68,10 @@ class BuddyActionServiceTest {
         userApi,
         attestationService,
         buddyPathActions,
-        BuddyBoardWriteActions(boardService, BuddyBoardEditActions(boardService)),
+        BuddyBoardWriteActions(
+            HireBoardActionsService(boardService),
+            BuddyBoardEditActions(hireBoardOver(boardService), HireBoardActionsService(boardService)),
+        ),
     )
 
     private val userId = UUID.randomUUID()

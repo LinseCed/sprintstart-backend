@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.board.service
+package com.sprintstart.sprintstartbackend.board.external
 
 import com.sprintstart.sprintstartbackend.board.model.response.board.MemoryRecapContent
 import com.sprintstart.sprintstartbackend.shared.ids.UserId

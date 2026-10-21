@@ -14,6 +14,7 @@ import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.At
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.AttentionSeverity
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.ProjectAttentionResponse
+import com.sprintstart.sprintstartbackend.insights.service.InsightsReadService
 import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsService
 import com.sprintstart.sprintstartbackend.insights.service.ProjectAttentionService
 import com.sprintstart.sprintstartbackend.starterwork.model.response.competency.MyCompetencyResponse
@@ -61,8 +62,7 @@ class BuddyTeamToolsTest {
         }
         return BuddyTeamTools(
             TeamReadTools(
-                projectAttentionService,
-                onboardingMetricsService,
+                InsightsReadService(onboardingMetricsService, projectAttentionService),
                 hireStarterWorkOver(myCompetencyService = myCompetencyService),
                 ArrivalSteps(arrivalStepService),
                 projectMembershipApi,
