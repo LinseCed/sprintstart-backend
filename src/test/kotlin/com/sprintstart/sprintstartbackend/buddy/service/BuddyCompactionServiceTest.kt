@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.assistant.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactResponse
+import com.sprintstart.sprintstartbackend.assistant.external.ConversationCompaction
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddySession
@@ -14,11 +15,14 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.TransactionStatus
 import org.springframework.transaction.support.SimpleTransactionStatus
 import java.util.Optional
@@ -47,8 +51,7 @@ class BuddyCompactionServiceTest {
     private val service = BuddyCompactionService(
         buddySessionRepository,
         buddyMessageRepository,
-        agentAiClient,
-        transactionManager,
+        ConversationCompaction(agentAiClient, CoroutineScope(Dispatchers.Unconfined), transactionManager),
     )
 
     private val userId = UUID.randomUUID()
@@ -147,6 +150,32 @@ class BuddyCompactionServiceTest {
         // 30 messages, 5 already covered, window 20: five more slide out, starting at m6.
         assertThat(requests.single().folded.map { it.content })
             .containsExactly("m6", "m7", "m8", "m9", "m10")
+        assertThat(session.summarizedCount).isEqualTo(10)
+    }
+
+    @Test
+    fun `writes nothing when the session is gone by the time the fold is ready`() = runTest {
+        val session = sessionWith(messageCount = 26)
+        every { buddySessionRepository.findById(session.id) } returns Optional.empty()
+        coEvery { agentAiClient.compactBuddyMemory(any()) } returns BuddyCompactResponse(memory = "note")
+
+        service.compactIfNeeded(userId, session.id)
+
+        verify(exactly = 0) { buddySessionRepository.save(any()) }
+        assertThat(session.summarizedCount).isZero()
+    }
+
+    @Test
+    fun `plans under a read-only transaction and swaps under a writable one`() = runTest {
+        val session = sessionWith(messageCount = 26)
+        every { buddySessionRepository.save(any()) } answers { firstArg() }
+        coEvery { agentAiClient.compactBuddyMemory(any()) } returns BuddyCompactResponse(memory = "note")
+        val definitions = mutableListOf<TransactionDefinition>()
+        every { transactionManager.getTransaction(capture(definitions)) } returns SimpleTransactionStatus()
+
+        service.compactIfNeeded(userId, session.id)
+
+        assertThat(definitions.map { it.isReadOnly }).containsExactly(true, false)
     }
 
     /**

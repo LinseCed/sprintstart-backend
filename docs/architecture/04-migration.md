@@ -78,7 +78,7 @@ longer a named interface, so `ModuleBoundariesTest` keeps every caller on the AP
 followed the same way. Team mode uses the Buddy's conversation machinery rather than its features, so that
 moves into the `assistant` kernel instead of behind a Buddy API
 ([ADR-proposed-004](../adrs-proposed/adr-proposed-004-assistant-kernel-and-tool-spi.md)): the agent loop's
-pieces in #252, compaction next. With that, `assistant` uses the platform (user, ingestion, upload) and
+pieces in #252, compaction in #253. `buddy/service` is no longer a named interface. With that, `assistant` uses the platform (user, ingestion, upload) and
 sits in L1 rather than L0.
 
 Not yet declared: `shared`, `user`, `connectors`, `config` (the composition root) and `health`.

@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.buddy.controller
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.buddy.external.TeamModeConversation
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.CreateSessionRequest
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.SendBuddyMessageRequest
@@ -13,7 +14,6 @@ import com.sprintstart.sprintstartbackend.buddy.service.BuddyActionService
 import com.sprintstart.sprintstartbackend.buddy.service.BuddyOpeningService
 import com.sprintstart.sprintstartbackend.buddy.service.BuddyService
 import com.sprintstart.sprintstartbackend.buddy.service.BuddySuggestionService
-import com.sprintstart.sprintstartbackend.buddy.service.TeamModeConversation
 import com.sprintstart.sprintstartbackend.shared.ids.AuthId
 import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId

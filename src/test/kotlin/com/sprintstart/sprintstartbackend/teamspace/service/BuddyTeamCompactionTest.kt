@@ -3,11 +3,10 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 import com.sprintstart.sprintstartbackend.assistant.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCompactResponse
+import com.sprintstart.sprintstartbackend.assistant.external.ConversationCompaction
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.buddy.repository.BuddyMessageRepository
 import com.sprintstart.sprintstartbackend.buddy.repository.BuddySessionRepository
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyCompactionScheduler
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyCompactionService
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.teamspace.model.entity.BuddyTeamMessage
@@ -47,17 +46,12 @@ class BuddyTeamCompactionTest {
         every { rollback(any<TransactionStatus>()) } returns Unit
     }
 
-    private val service = BuddyCompactionService(
-        buddySessionRepository,
-        buddyMessageRepository,
-        agentAiClient,
-        transactionManager,
-    )
+    private val compaction =
+        ConversationCompaction(agentAiClient, CoroutineScope(Dispatchers.Unconfined), transactionManager)
 
     // Unconfined runs the background fold inline, so a test sees its outcome as soon as it is scheduled.
     private val teamCompaction = BuddyTeamCompaction(
-        service,
-        BuddyCompactionScheduler(service, CoroutineScope(Dispatchers.Unconfined)),
+        compaction,
         buddyTeamSessionRepository,
         buddyTeamMessageRepository,
     )
