@@ -2,7 +2,6 @@ package com.sprintstart.sprintstartbackend.buddy.service
 
 import com.sprintstart.sprintstartbackend.arrival.service.AttestationService
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
 import com.sprintstart.sprintstartbackend.board.service.BoardService
 import com.sprintstart.sprintstartbackend.board.service.HireBoardActionsService
@@ -53,14 +52,6 @@ class BuddyActionServiceTest {
     private val boardService: BoardService = mockk(relaxed = true)
     private val competencyPlacementService: CompetencyPlacementService = mockk()
 
-    // The path half of the buddy, which owns its own three actions. These cases are about the
-    // project-scoped ones; `BuddyPathActionTest` covers the other half against the real component.
-    // Answers "not mine" for every action here, which is what these cases are: the path component
-    // is asked first for every proposal and every confirm, so a mock that could not say no would
-    // make every case below a stubbing error.
-    private val buddyPathActions: BuddyPathActions = mockk {
-        every { handles(any()) } returns false
-    }
     private val hireStarterWork = hireStarterWorkOver(
         taskOrientationService = taskOrientationService,
         competencyPlacementService = competencyPlacementService,
@@ -72,7 +63,6 @@ class BuddyActionServiceTest {
         HireKnowledgeService(knowledgeBaseService),
         userApi,
         attestationService,
-        buddyPathActions,
         BuddyBoardWriteActions(
             HireBoardActionsService(boardService),
             BuddyBoardEditActions(hireBoardOver(boardService), HireBoardActionsService(boardService)),
@@ -120,9 +110,7 @@ class BuddyActionServiceTest {
     // -- specs / dispatch -------------------------------------------------------------------------
 
     @Test
-    fun `exposes the project-scoped action tools, and no path action without a path`() {
-        every { buddyPathActions.specs(userId) } returns emptyList()
-
+    fun `exposes the project-scoped action tools`() {
         assertThat(service.actionSpecs(userId).map { it.name }).containsExactlyInAnyOrder(
             "flag_to_pm",
             "open_orientation",
@@ -145,18 +133,8 @@ class BuddyActionServiceTest {
     }
 
     @Test
-    fun `mounts whatever path actions the path component offers for this hire`() {
-        every { buddyPathActions.specs(userId) } returns listOf(
-            BuddyToolSpecDto(name = "complete_step", description = "", parameters = buildJsonObject { }),
-        )
-
-        assertThat(service.actionSpecs(userId).map { it.name }).contains("complete_step")
-    }
-
-    @Test
     fun `tells the mentor that a hire asking to flag something is reason enough`() {
         // "Last resort" alone had the mentor refuse an explicit "flag this to my PM".
-        every { buddyPathActions.specs(userId) } returns emptyList()
         val flag = service.actionSpecs(userId).single { it.name == "flag_to_pm" }
 
         assertThat(flag.description).contains("the hire ASKS you to flag")
@@ -225,7 +203,6 @@ class BuddyActionServiceTest {
     @Test
     fun `every board write can say what it cannot do for a hire on no project`() {
         every { userApi.getUsersByIds(listOf(userId)) } returns listOf(userWith())
-        every { buddyPathActions.specs(userId) } returns emptyList()
         val boardWrites = service.actionSpecs(userId).map { it.name }.filter { name ->
             name.contains("checklist") ||
                 name.contains("card") ||

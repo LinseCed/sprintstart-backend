@@ -70,6 +70,11 @@ object HireActionOrder {
     const val OPEN_ORIENTATION = 200
     const val CLAIM_GOAL = 300
     const val RECORD_ASSESSMENT = 600
+    const val COMPLETE_STEP = 700
+    const val COMPLETE_TASK = 710
+    const val ANSWER_QUESTION = 720
+    const val ADD_PATH_STEP = 730
+    const val REQUEST_SKIP = 740
 }
 
 /**

@@ -52,7 +52,6 @@ class BuddyBoardWriteActionsTest {
         userApi = userApi,
         hireArrivalApi = mockk(relaxed = true),
         hireActions = emptyList(),
-        buddyPathActions = mockk(relaxed = true),
         boardWrites = boardWrites,
     )
 

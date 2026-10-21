@@ -1,15 +1,16 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.path.assistant
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireAction
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionContext
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionOrder
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionOutcome
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionProposal
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionScope
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
-import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
-import com.sprintstart.sprintstartbackend.path.assistant.PathStepPlacement
 import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepOrigin
@@ -25,6 +26,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
+import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
 import java.util.UUID
 
@@ -32,14 +34,20 @@ import java.util.UUID
  * The buddy's path edit: offering to add a step to the hire's own copy of their path, and adding it
  * once they confirm.
  *
- * [BuddyPathActions] routes to it and keeps the propose/confirm contract. Like every path action it
- * writes to the hire's copy only, never to the blueprint it was generated from.
+ * Like every path action it writes to the hire's copy only, never to the blueprint it was generated from.
  */
 @Component
-class BuddyPathEditActions(
+@Order(HireActionOrder.ADD_PATH_STEP)
+class AddPathStepAction(
     private val myPathTool: MyPathTool,
     private val hirePathActionsApi: HirePathActionsApi,
-) {
+) : HireAction {
+    override val spec = SPEC
+    override val scope = HireActionScope.PERSON
+    override val gerund = "add a step to your path"
+
+    override fun isMountedFor(hire: UserId): Boolean = myPathTool.hasPath(hire.value)
+
     /**
      * Offers to add a step the conversation produced to a phase of the hire's own path.
      *
@@ -51,11 +59,8 @@ class BuddyPathEditActions(
      * guess at, and the phase it lands in is usually one that came back empty — precisely the case
      * where the hire has nothing else to go on.
      */
-    fun propose(
-        call: BuddyToolCallDto,
-        type: BuddyActionType,
-        user: UserId,
-    ): HireActionOutcome {
+    override fun propose(call: BuddyToolCallDto, context: HireActionContext): HireActionOutcome {
+        val user = context.hire
         val phaseId = call.uuidArgument("phase_id")
             ?: return notProposed(
                 "No phase_id was provided. Read get_my_onboarding_path and pass the phase_id of the " +
@@ -114,7 +119,7 @@ class BuddyPathEditActions(
                 "untouched — and they can edit or remove it afterwards. Say what the step is for " +
                 "and where it goes before you offer it.$connection$entry$relocks",
             proposal = HireActionProposal(
-                action = type.toolName,
+                action = ADD_PATH_STEP,
                 label = if (where.isEmpty()) "Add “$title” to your path" else "Add “$title” $where",
                 question = null,
                 phaseId = phase.id,
@@ -146,7 +151,12 @@ class BuddyPathEditActions(
             "phase they are standing in instead."
     }
 
-    fun perform(authId: String, user: UserId, request: HireActionRequest): BuddyActionResponse {
+    override suspend fun perform(
+        request: HireActionRequest,
+        context: HireActionContext,
+        authId: AuthId,
+    ): BuddyActionResponse {
+        val user = context.hire
         val phaseId = request.phaseId
         val title = request.title
         if (phaseId == null || title.isNullOrBlank()) {
@@ -169,7 +179,7 @@ class BuddyPathEditActions(
         }
 
         val created = hirePathActionsApi.placeMyStep(
-            authId = AuthId(authId),
+            authId = authId,
             phaseId = PhaseId(phaseId),
             step = NewConnectedStep(
                 step = CreateOnboardingStepRequest(
@@ -198,6 +208,8 @@ class BuddyPathEditActions(
     }
 
     companion object {
+        const val ADD_PATH_STEP = "add_path_step"
+
         /**
          * The estimate a step the buddy added carries.
          *
@@ -208,7 +220,7 @@ class BuddyPathEditActions(
         private const val ADDED_STEP_MINUTES = 15
 
         val SPEC = BuddyToolSpecDto(
-            name = BuddyActionType.ADD_PATH_STEP.toolName,
+            name = ADD_PATH_STEP,
             description = "Offer to add one step to a phase of the hire's OWN copy of their " +
                 "onboarding path. Read get_my_onboarding_path for the phase_id. This does NOT add " +
                 "anything by itself; the hire confirms, and afterwards the step is theirs to edit, " +
