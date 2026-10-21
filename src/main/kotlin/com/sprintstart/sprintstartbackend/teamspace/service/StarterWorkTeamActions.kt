@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.IngestedIssue
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.SourceId
 import com.sprintstart.sprintstartbackend.shared.ids.StarterWorkTaskId
 import com.sprintstart.sprintstartbackend.starterwork.external.StarterWorkPoolApi
 import com.sprintstart.sprintstartbackend.starterwork.external.StarterWorkReviewApi
@@ -70,7 +71,7 @@ private fun StarterWorkPoolApi.liveOn(taskId: UUID?, context: TeamToolContext): 
 private fun StarterWorkPoolApi.goneSince(taskId: UUID, context: TeamToolContext): String? =
     TASK_GONE_SINCE.takeIf { liveOn(taskId, context) == null }
 
-private fun StarterWorkTaskProposalResponse.named(): String = "“$title” (${githubRepositoryOf(sourceId)})"
+private fun StarterWorkTaskProposalResponse.named(): String = "“$title” (${githubRepositoryOf(SourceId(sourceId))})"
 
 private const val NOT_IN_POOL_HERE =
     "That task is not in this project's starter-work pool. Call list_starter_work_pool for the tasks that are, " +
@@ -156,7 +157,7 @@ class RejectStarterWorkAction(
             preview = buildString {
                 append("Remove ${task.named()} from the starter-work pool for good.\n\n")
                 append("No hire is suggested it again, mining never proposes it again, and it cannot be put back ")
-                append("from the open issues. Every project linked to ${githubRepositoryOf(task.sourceId)} ")
+                append("from the open issues. Every project linked to ${githubRepositoryOf(SourceId(task.sourceId))} ")
                 append("loses it, not only this one.")
                 if (reason.isNotBlank()) append("\n\nReason recorded: $reason")
             },
@@ -202,7 +203,7 @@ class PromoteCandidateAction(
     )
 
     override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft {
-        val sourceId = call.textArgument("source_id")
+        val sourceId = SourceId(call.textArgument("source_id"))
         val issue = openIssueOn(sourceId, context.projectId)
             ?: return TeamActionDraft.Refused(
                 "That is not an open issue from this project's repositories. Call list_starter_work_candidates " +
@@ -213,7 +214,7 @@ class PromoteCandidateAction(
         val summary = call.textArgument("summary")
         val repository = githubRepositoryOf(sourceId)
         return proposed(
-            params = PromoteCandidateParams(sourceId, summary),
+            params = PromoteCandidateParams(sourceId.value, summary),
             label = "Add to pool: ${title.forLabel()}",
             preview = buildString {
                 append("Put the issue “$title” ($repository) into the starter-work pool as a reviewed task.\n\n")
@@ -225,10 +226,10 @@ class PromoteCandidateAction(
     }
 
     override fun recheckParams(params: PromoteCandidateParams, context: TeamToolContext): String? {
-        if (openIssueOn(params.sourceId, context.projectId) == null) {
+        if (openIssueOn(SourceId(params.sourceId), context.projectId) == null) {
             return "That issue was closed, or its repository is no longer linked to this project, so nothing was added."
         }
-        return poolRefusal(params.sourceId)?.let { "$it Nothing was added." }
+        return poolRefusal(SourceId(params.sourceId))?.let { "$it Nothing was added." }
     }
 
     override suspend fun performParams(params: PromoteCandidateParams, context: TeamToolContext): String {
@@ -249,15 +250,15 @@ class PromoteCandidateAction(
         return "Added “${added.title}” to the starter-work pool as a reviewed task."
     }
 
-    private fun openIssueOn(sourceId: String, projectId: UUID): IngestedIssue? {
-        if (sourceId.isBlank() || !starterWorkPool.covers(sourceId, ProjectId(projectId))) return null
+    private fun openIssueOn(sourceId: SourceId, projectId: UUID): IngestedIssue? {
+        if (sourceId.value.isBlank() || !starterWorkPool.covers(sourceId, ProjectId(projectId))) return null
         return artifactIngestionApi
             .getIssue(sourceId)
             ?.takeIf { !CLOSED_STATE.equals(it.state, ignoreCase = true) && !it.title.isNullOrBlank() }
     }
 
     /** Why the issue cannot join the pool, or null when it can — a stale row is revived, not refused. */
-    private fun poolRefusal(sourceId: String): String? =
+    private fun poolRefusal(sourceId: SourceId): String? =
         when (starterWorkPool.statusOf(sourceId)) {
             ProposalStatus.LIVE -> "That issue is already in the starter-work pool."
             ProposalStatus.REJECTED ->
@@ -321,7 +322,7 @@ class SetTaskZeroEligibleAction(
             preview = if (eligible) {
                 "Flag ${task.named()} as a Task 0 candidate.\n\nIt is a label on the pool, not an assignment: " +
                     "hires still pick their own work. The label shows on every project linked to " +
-                    "${githubRepositoryOf(task.sourceId)}, not only this one."
+                    "${githubRepositoryOf(SourceId(task.sourceId))}, not only this one."
             } else {
                 "Take the Task 0 flag off ${task.named()}.\n\nOnly the label goes; a hire who already " +
                     "claimed it keeps it."

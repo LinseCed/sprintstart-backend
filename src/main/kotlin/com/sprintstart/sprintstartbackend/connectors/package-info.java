@@ -5,6 +5,7 @@
 @ApplicationModule(
         allowedDependencies = {
                 "shared :: shared", "shared :: annotations", "shared :: config", "shared :: crypto", "shared :: git",
+                "shared :: ids",
                 "user :: api", "user :: api-events"
         }
 )
