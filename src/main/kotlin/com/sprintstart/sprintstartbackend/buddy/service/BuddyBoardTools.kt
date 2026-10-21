@@ -97,15 +97,13 @@ class BuddyBoardTools(
         // Asked first, because reading a board that does not exist is what creates it. A hire who
         // has never opened the page should not end up with a board because they asked the mentor a
         // question about one.
-        if (!hireBoard.hasBoard(HireBoard(userId, project.projectId))) {
-            return "The hire has not opened their board yet, so there is nothing on it to read. " +
+        val whose = HireBoard(userId, project.projectId).takeIf(hireBoard::hasBoard)
+            ?: return "The hire has not opened their board yet, so there is nothing on it to read. " +
                 "Talk about the work itself rather than about their board."
-        }
 
-        val board = hireBoard.boardOf(HireBoard(userId, project.projectId))
+        val board = hireBoard.boardOf(whose)
             ?: return "The hire is not a member of that project, so there is no board to read."
-        val structure =
-            hireBoard.structureOf(HireBoard(userId, project.projectId))?.structure ?: BoardStructurePayload()
+        val structure = hireBoard.structureOf(whose)?.structure ?: BoardStructurePayload()
         val cards = board.cards
 
         if (cards.isEmpty()) {
