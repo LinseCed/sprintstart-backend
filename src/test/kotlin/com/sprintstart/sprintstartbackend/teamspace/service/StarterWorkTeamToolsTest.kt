@@ -10,6 +10,7 @@ import com.sprintstart.sprintstartbackend.starterwork.repository.StarterWorkTask
 import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPool
 import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkScope
 import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
+import com.sprintstart.sprintstartbackend.starterwork.service.starterWorkReviewOver
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.serialization.json.JsonObject
@@ -23,7 +24,7 @@ class StarterWorkTeamToolsTest {
     private val repository: StarterWorkTaskProposalRepository = mockk()
     private val service: StarterWorkTaskProposalService = mockk()
     private val scope: StarterWorkScope = mockk()
-    private val tools = StarterWorkTeamTools(StarterWorkPool(repository, scope), service, scope)
+    private val tools = StarterWorkTeamTools(StarterWorkPool(repository, scope), starterWorkReviewOver(service, scope))
 
     private val projectId = UUID.randomUUID()
     private val context = TeamToolContext(userId = UUID.randomUUID(), authId = "auth|pm", projectId = projectId)

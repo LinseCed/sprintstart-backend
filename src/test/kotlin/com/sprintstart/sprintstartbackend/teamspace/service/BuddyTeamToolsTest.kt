@@ -18,6 +18,7 @@ import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsServ
 import com.sprintstart.sprintstartbackend.insights.service.ProjectAttentionService
 import com.sprintstart.sprintstartbackend.starterwork.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
+import com.sprintstart.sprintstartbackend.starterwork.service.hireStarterWorkOver
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every
@@ -62,7 +63,7 @@ class BuddyTeamToolsTest {
             TeamReadTools(
                 projectAttentionService,
                 onboardingMetricsService,
-                myCompetencyService,
+                hireStarterWorkOver(myCompetencyService = myCompetencyService),
                 ArrivalSteps(arrivalStepService),
                 projectMembershipApi,
             ),

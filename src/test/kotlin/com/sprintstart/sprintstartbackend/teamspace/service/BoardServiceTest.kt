@@ -72,6 +72,7 @@ import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork
 import com.sprintstart.sprintstartbackend.starterwork.service.CurrentTaskReader
 import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
 import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
+import com.sprintstart.sprintstartbackend.starterwork.service.hireStarterWorkOver
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import io.mockk.every
@@ -142,19 +143,18 @@ class BoardServiceTest {
     private val hire = UserId(hireId)
     private val projectId: UUID = UUID.randomUUID()
     private val project = ProjectId(projectId)
+    private val hireStarterWork =
+        hireStarterWorkOver(currentTaskReader, starterWorkTaskProposalService, myCompetencyService)
 
     private val service = BoardService(
         boardRepository,
         boardCardRepository,
         projectMembershipApi,
-        currentTaskReader,
-        starterWorkTaskProposalService,
+        hireStarterWork,
         boardDiagramRepository,
         BoardCardHydrator(
             OpenPullRequestReader(artifactIngestionApi, Clock.fixed(now, ZoneOffset.UTC)),
-            currentTaskReader,
-            starterWorkTaskProposalService,
-            myCompetencyService,
+            hireStarterWork,
             BuddyMemoryRecapSource(buddySessionRepository),
             boardDiagramService,
             ArrivalSteps(arrivalStepService),

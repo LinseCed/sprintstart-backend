@@ -74,6 +74,8 @@ the Buddy through `HirePathApi` and `HirePathActionsApi`, team mode through `Pat
 implemented by one facade in `path/service` over the services that own the calls. Detekt's limits
 (11 functions per interface, 4 parameters) split a large caller once more. `path/service` is no
 longer a named interface, so `ModuleBoundariesTest` keeps every caller on the API.
+`knowledge` (#247), `arrival` (#248) and `starterwork` (#249) followed the same way; `board`,
+`insights` and `buddy` are next.
 
 Not yet declared: `shared`, `user`, `connectors`, `config` (the composition root) and `health`.
 They depend on nothing above them today, but nothing enforces it.

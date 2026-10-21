@@ -63,7 +63,6 @@ class BuddyBoardEditActionsTest {
         userApi,
         mockk(relaxed = true),
         mockk(relaxed = true),
-        mockk(relaxed = true),
         BuddyBoardWriteActions(boardService, BuddyBoardEditActions(boardService)),
     )
 

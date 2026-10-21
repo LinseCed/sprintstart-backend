@@ -19,12 +19,14 @@ import com.sprintstart.sprintstartbackend.starterwork.external.enums.CompetencyK
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.CompetencySource
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.TaskType
+import com.sprintstart.sprintstartbackend.starterwork.external.model.PlacementTopic
 import com.sprintstart.sprintstartbackend.starterwork.model.response.competency.MyCompetencyResponse
 import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.RankedStarterWorkTaskResponse
 import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkTaskProposalResponse
 import com.sprintstart.sprintstartbackend.starterwork.service.CompetencyPlacementService
 import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
 import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
+import com.sprintstart.sprintstartbackend.starterwork.service.hireStarterWorkOver
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
@@ -76,8 +78,11 @@ class BuddyToolExecutorTest {
 
     private val executor = BuddyToolExecutor(
         onboardingMetricsService,
-        myCompetencyService,
-        starterWorkTaskProposalService,
+        hireStarterWorkOver(
+            starterWorkTaskProposalService = starterWorkTaskProposalService,
+            myCompetencyService = myCompetencyService,
+            competencyPlacementService = competencyPlacementService,
+        ),
         HireKnowledgeService(knowledgeBaseService),
         userApi,
         buddyBoardTools,
@@ -86,7 +91,6 @@ class BuddyToolExecutorTest {
         OpenPullRequestReader(artifactIngestionApi),
         projectMembershipApi,
         ArrivalSteps(arrivalStepService),
-        competencyPlacementService,
         // Pathless by default: every case here is about a tool that reads something other than the
         // onboarding path, and "no path" is what keeps the path tool out of their expectations.
         buddyPathTools,
@@ -107,7 +111,7 @@ class BuddyToolExecutorTest {
         label: String = "Kotlin",
         description: String? = null,
         neededByAvailableWork: Boolean = false,
-    ) = CompetencyPlacementService.PlacementTopic(
+    ) = PlacementTopic(
         key = key,
         label = label,
         description = description,

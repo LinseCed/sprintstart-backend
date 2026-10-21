@@ -1,6 +1,8 @@
 package com.sprintstart.sprintstartbackend.starterwork.service
 
 import com.sprintstart.sprintstartbackend.connectors.git.github.external.GithubRepositoryApi
+import com.sprintstart.sprintstartbackend.starterwork.external.model.GithubRepositoryName
+import com.sprintstart.sprintstartbackend.starterwork.external.model.githubRepositoryOf
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

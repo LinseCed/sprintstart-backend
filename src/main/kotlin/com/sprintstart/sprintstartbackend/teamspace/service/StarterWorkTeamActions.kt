@@ -7,14 +7,12 @@ import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionAp
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.IngestedIssue
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.StarterWorkTaskId
+import com.sprintstart.sprintstartbackend.starterwork.external.StarterWorkPoolApi
+import com.sprintstart.sprintstartbackend.starterwork.external.StarterWorkReviewApi
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.starterwork.external.model.githubRepositoryOf
 import com.sprintstart.sprintstartbackend.starterwork.model.request.starterwork.PromoteStarterWorkCandidateRequest
 import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork.StarterWorkTaskProposalResponse
-import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPool
-import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPoolReconciler
-import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkScope
-import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
-import com.sprintstart.sprintstartbackend.starterwork.service.githubRepositoryOf
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -33,7 +31,7 @@ import java.util.UUID
  * The actions of team mode's starter-work area.
  *
  * The pool has no project, and the services behind these actions load a task by id alone. So every action
- * resolves its target through StarterWorkScope, at draft and again at confirm. A repository can be linked
+ * resolves its target through StarterWorkPoolApi, at draft and again at confirm. A repository can be linked
  * to several projects that share the same rows, and the previews say so where that reaches past this one.
  */
 
@@ -65,11 +63,11 @@ data class SetTaskZeroEligibleParams(
 )
 
 /** The live pool task [taskId] names on [TeamToolContext.projectId], if any. */
-private fun StarterWorkPool.liveOn(taskId: UUID?, context: TeamToolContext): StarterWorkTaskProposalResponse? =
+private fun StarterWorkPoolApi.liveOn(taskId: UUID?, context: TeamToolContext): StarterWorkTaskProposalResponse? =
     liveOn(taskId?.let(::StarterWorkTaskId), ProjectId(context.projectId))
 
 /** The refusal for a stored proposal whose task is no longer live on [TeamToolContext.projectId]. */
-private fun StarterWorkPool.goneSince(taskId: UUID, context: TeamToolContext): String? =
+private fun StarterWorkPoolApi.goneSince(taskId: UUID, context: TeamToolContext): String? =
     TASK_GONE_SINCE.takeIf { liveOn(taskId, context) == null }
 
 private fun StarterWorkTaskProposalResponse.named(): String = "“$title” (${githubRepositoryOf(sourceId)})"
@@ -90,8 +88,8 @@ private fun taskIdOnly(description: String): JsonObject =
 /** Offers to record that somebody looked at a task and is happy to hand it to a newcomer. */
 @Component
 class MarkStarterWorkReviewedAction(
-    private val starterWorkPool: StarterWorkPool,
-    private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
+    private val starterWorkPool: StarterWorkPoolApi,
+    private val starterWorkReview: StarterWorkReviewApi,
 ) : TypedTeamAction<MarkStarterWorkReviewedParams>(MarkStarterWorkReviewedParams.serializer()) {
     override val area = TeamArea.STARTER_WORK
     override val risk = BuddyProposalRisk.STANDARD
@@ -122,7 +120,7 @@ class MarkStarterWorkReviewedAction(
         starterWorkPool.goneSince(params.taskId, context)
 
     override suspend fun performParams(params: MarkStarterWorkReviewedParams, context: TeamToolContext): String {
-        starterWorkTaskProposalService.markReviewed(params.taskId)
+        starterWorkReview.markReviewed(StarterWorkTaskId(params.taskId))
         return "Marked reviewed. Hires' suggestions no longer rank it lower for being unreviewed."
     }
 }
@@ -130,8 +128,8 @@ class MarkStarterWorkReviewedAction(
 /** Offers to take a task out of the pool, permanently. */
 @Component
 class RejectStarterWorkAction(
-    private val starterWorkPool: StarterWorkPool,
-    private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
+    private val starterWorkPool: StarterWorkPoolApi,
+    private val starterWorkReview: StarterWorkReviewApi,
 ) : TypedTeamAction<RejectStarterWorkParams>(RejectStarterWorkParams.serializer()) {
     override val area = TeamArea.STARTER_WORK
     override val risk = BuddyProposalRisk.DESTRUCTIVE
@@ -169,8 +167,8 @@ class RejectStarterWorkAction(
         starterWorkPool.goneSince(params.taskId, context)
 
     override suspend fun performParams(params: RejectStarterWorkParams, context: TeamToolContext): String {
-        starterWorkTaskProposalService.reject(
-            params.taskId,
+        starterWorkReview.reject(
+            StarterWorkTaskId(params.taskId),
             params.reason.ifBlank { null },
         )
         return "Removed from the starter-work pool for good."
@@ -186,9 +184,8 @@ class RejectStarterWorkAction(
 @Component
 class PromoteCandidateAction(
     private val artifactIngestionApi: ArtifactIngestionApi,
-    private val starterWorkPool: StarterWorkPool,
-    private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
-    private val starterWorkScope: StarterWorkScope,
+    private val starterWorkPool: StarterWorkPoolApi,
+    private val starterWorkReview: StarterWorkReviewApi,
 ) : TypedTeamAction<PromoteCandidateParams>(PromoteCandidateParams.serializer()) {
     override val area = TeamArea.STARTER_WORK
     override val risk = BuddyProposalRisk.STANDARD
@@ -236,7 +233,7 @@ class PromoteCandidateAction(
 
     override suspend fun performParams(params: PromoteCandidateParams, context: TeamToolContext): String {
         val added = try {
-            starterWorkTaskProposalService.promoteCandidate(
+            starterWorkReview.promoteCandidate(
                 PromoteStarterWorkCandidateRequest(
                     sourceId = params.sourceId,
                     summary = params.summary.ifBlank { null },
@@ -253,7 +250,7 @@ class PromoteCandidateAction(
     }
 
     private fun openIssueOn(sourceId: String, projectId: UUID): IngestedIssue? {
-        if (sourceId.isBlank() || !starterWorkScope.covers(sourceId, projectId)) return null
+        if (sourceId.isBlank() || !starterWorkPool.covers(sourceId, ProjectId(projectId))) return null
         return artifactIngestionApi
             .getIssue(sourceId)
             ?.takeIf { !CLOSED_STATE.equals(it.state, ignoreCase = true) && !it.title.isNullOrBlank() }
@@ -277,8 +274,8 @@ class PromoteCandidateAction(
  */
 @Component
 class SetTaskZeroEligibleAction(
-    private val starterWorkPool: StarterWorkPool,
-    private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
+    private val starterWorkPool: StarterWorkPoolApi,
+    private val starterWorkReview: StarterWorkReviewApi,
 ) : TypedTeamAction<SetTaskZeroEligibleParams>(SetTaskZeroEligibleParams.serializer()) {
     override val area = TeamArea.STARTER_WORK
     override val risk = BuddyProposalRisk.STANDARD
@@ -336,7 +333,7 @@ class SetTaskZeroEligibleAction(
         starterWorkPool.goneSince(params.taskId, context)
 
     override suspend fun performParams(params: SetTaskZeroEligibleParams, context: TeamToolContext): String {
-        starterWorkTaskProposalService.setTaskZeroEligibility(params.taskId, params.eligible)
+        starterWorkReview.setTaskZeroEligibility(StarterWorkTaskId(params.taskId), params.eligible)
         return if (params.eligible) "Flagged as a Task 0 candidate." else "The Task 0 flag is off."
     }
 }
@@ -349,7 +346,7 @@ class SetTaskZeroEligibleAction(
  */
 @Component
 class ReconcileStarterWorkAction(
-    private val starterWorkPoolReconciler: StarterWorkPoolReconciler,
+    private val starterWorkReview: StarterWorkReviewApi,
 ) : TeamActionHandler {
     override val area = TeamArea.STARTER_WORK
     override val risk = BuddyProposalRisk.BULK
@@ -372,7 +369,7 @@ class ReconcileStarterWorkAction(
         )
 
     override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val outcome = starterWorkPoolReconciler.reconcile()
+        val outcome = starterWorkReview.reconcile()
         return buildString {
             append("Checked ${outcome.examined} tasks across the whole pool: ${outcome.markedStale} left because ")
             append("their issue closed, ${outcome.revived} came back because it reopened.")
