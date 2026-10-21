@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
+import com.sprintstart.sprintstartbackend.shared.ids.SourceId
 import com.sprintstart.sprintstartbackend.starterwork.external.StarterWorkPoolApi
 import com.sprintstart.sprintstartbackend.starterwork.external.StarterWorkReviewApi
 import com.sprintstart.sprintstartbackend.starterwork.external.model.githubRepositoryOf
@@ -63,7 +64,7 @@ class StarterWorkTeamTools(
         return buildString {
             appendLine(heading)
             tasks.take(LIST_LIMIT).forEach { task ->
-                append("- “${task.title}” [task_id: ${task.id}] — ${githubRepositoryOf(task.sourceId)}")
+                append("- “${task.title}” [task_id: ${task.id}] — ${githubRepositoryOf(SourceId(task.sourceId))}")
                 append(if (task.reviewed) ", reviewed" else ", not reviewed")
                 if (task.taskZeroEligible) append(", Task 0 candidate")
                 appendLine()
@@ -92,7 +93,7 @@ class StarterWorkTeamTools(
                     "most recently changed first:",
             )
             matching.take(LIST_LIMIT).forEach { issue ->
-                val repository = githubRepositoryOf(issue.sourceId)
+                val repository = githubRepositoryOf(SourceId(issue.sourceId))
                 append("- “${issue.title}” [source_id: ${issue.sourceId}] — $repository")
                 if (issue.labels.isNotEmpty()) append(", labels: ${issue.labels.joinToString()}")
                 appendLine()

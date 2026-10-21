@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.buddy.service.result
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.IngestedIssue
+import com.sprintstart.sprintstartbackend.shared.ids.SourceId
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
 import com.sprintstart.sprintstartbackend.starterwork.external.model.PoolReconciliation
 import com.sprintstart.sprintstartbackend.starterwork.model.entity.StarterWorkTaskProposal
@@ -94,7 +95,7 @@ class StarterWorkTeamActionsTest {
             state = state,
             hasAssignee = null,
             updatedAtSource = null,
-        ).also { every { ingestion.getIssue(sourceId) } returns it }
+        ).also { every { ingestion.getIssue(SourceId(sourceId)) } returns it }
 
     private fun TeamActionDraft.proposed(): TeamActionDraft.Proposed {
         assertThat(this).isInstanceOf(TeamActionDraft.Proposed::class.java)
@@ -206,7 +207,7 @@ class StarterWorkTeamActionsTest {
     @Test
     fun `promoting refuses a closed issue and one that is not ingested`() {
         issue(state = "CLOSED")
-        every { ingestion.getIssue("github:acme/shop:ISSUE:99") } returns null
+        every { ingestion.getIssue(SourceId("github:acme/shop:ISSUE:99")) } returns null
 
         promote.draft(call("promote_candidate", "source_id" to mineSource), context).refusal()
         promote.draft(call("promote_candidate", "source_id" to "github:acme/shop:ISSUE:99"), context).refusal()
