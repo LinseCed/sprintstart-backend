@@ -12,6 +12,7 @@ import com.sprintstart.sprintstartbackend.board.service.hireBoardOver
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
+import com.sprintstart.sprintstartbackend.insights.service.InsightsReadService
 import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsService
 import com.sprintstart.sprintstartbackend.knowledge.model.response.knowledge.CanonicalAnswerResponse
 import com.sprintstart.sprintstartbackend.knowledge.service.HireKnowledgeService
@@ -78,7 +79,7 @@ class BuddyToolExecutorTest {
     }
 
     private val executor = BuddyToolExecutor(
-        onboardingMetricsService,
+        InsightsReadService(onboardingMetricsService, mockk()),
         hireStarterWorkOver(
             starterWorkTaskProposalService = starterWorkTaskProposalService,
             myCompetencyService = myCompetencyService,
