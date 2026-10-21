@@ -111,7 +111,7 @@ enum class BuddyActionType(
      * finishes two steps and asks what comes next should get the answer on the card they are
      * already ticking, not on a second one beside it.
      *
-     * Append-only, and that is enforced in `BoardService.appendChecklistItems` rather than asked of
+     * Append-only, and that is enforced in `HireBoardActionsApi.appendChecklistItems` rather than asked of
      * the mentor. Their existing lines come back untouched — same words, same ids, same ticks — and
      * the confirm shows only what would be added, because a change you cannot see is one you cannot
      * agree to.

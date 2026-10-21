@@ -1,7 +1,7 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
+import com.sprintstart.sprintstartbackend.board.external.MemoryRecapSource
 import com.sprintstart.sprintstartbackend.board.model.response.board.MemoryRecapContent
-import com.sprintstart.sprintstartbackend.board.service.MemoryRecapSource
 import com.sprintstart.sprintstartbackend.buddy.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import org.springframework.stereotype.Component

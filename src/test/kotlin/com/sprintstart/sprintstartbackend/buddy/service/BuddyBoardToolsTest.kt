@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.board.external.enums.HighlightColor
+import com.sprintstart.sprintstartbackend.board.external.enums.PlacementOutcome
 import com.sprintstart.sprintstartbackend.board.external.model.BoardStructurePayload
 import com.sprintstart.sprintstartbackend.board.external.model.CardMarkPayload
 import com.sprintstart.sprintstartbackend.board.model.response.board.BoardCardResponse
@@ -12,6 +13,8 @@ import com.sprintstart.sprintstartbackend.board.model.response.board.BoardStruct
 import com.sprintstart.sprintstartbackend.board.model.response.board.NoteContent
 import com.sprintstart.sprintstartbackend.board.service.BoardService
 import com.sprintstart.sprintstartbackend.board.service.BoardStructureService
+import com.sprintstart.sprintstartbackend.board.service.HireBoardActionsService
+import com.sprintstart.sprintstartbackend.board.service.hireBoardOver
 import com.sprintstart.sprintstartbackend.path.service.HirePathService
 import com.sprintstart.sprintstartbackend.path.service.PathStepReader
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
@@ -40,8 +43,8 @@ class BuddyBoardToolsTest {
     private val pathStepReader: PathStepReader = mockk()
     private val tools =
         BuddyBoardTools(
-            boardService,
-            boardStructureService,
+            hireBoardOver(boardService, boardStructureService),
+            HireBoardActionsService(boardService),
             userApi,
             HirePathService(mockk(), mockk(), pathStepReader, mockk()),
         )
@@ -102,7 +105,7 @@ class BuddyBoardToolsTest {
                 "how auth flows here",
             )
         } returns
-            BoardService.PlacementOutcome.PLACED
+            PlacementOutcome.PLACED
 
         val result = tools.execute(placeCall("DIAGRAM", "how auth flows here"), userId)
 
@@ -122,7 +125,7 @@ class BuddyBoardToolsTest {
     @Test
     fun `a diagram with no subject comes back as a sentence, not silence`() {
         every { boardService.place(UserId(userId), ProjectId(projectId), BoardCardKind.DIAGRAM, null) } returns
-            BoardService.PlacementOutcome.NEEDS_A_SUBJECT
+            PlacementOutcome.NEEDS_A_SUBJECT
 
         val result = tools.execute(placeCall("DIAGRAM"), userId)
 
@@ -149,7 +152,7 @@ class BuddyBoardToolsTest {
         every {
             boardService.place(UserId(userId), ProjectId(projectId), BoardCardKind.PATH_STEP, "Set up your laptop")
         } returns
-            BoardService.PlacementOutcome.PLACED
+            PlacementOutcome.PLACED
 
         val result = tools.execute(placeCall("PATH_STEP", "Set up your laptop"), userId)
 
@@ -174,7 +177,7 @@ class BuddyBoardToolsTest {
                 "Deploy pipeline",
             )
         } returns
-            BoardService.PlacementOutcome.NO_SUCH_STEP
+            PlacementOutcome.NO_SUCH_STEP
         every { pathStepReader.titlesFor(userId) } returns listOf("Set up your laptop", "Meet your team")
 
         val result = tools.execute(placeCall("PATH_STEP", "Deploy pipeline"), userId)
@@ -187,7 +190,7 @@ class BuddyBoardToolsTest {
     @Test
     fun `places a card and tells the mentor it will stay there`() {
         every { boardService.place(UserId(userId), ProjectId(projectId), BoardCardKind.SUGGESTED_TASKS) } returns
-            BoardService.PlacementOutcome.PLACED
+            PlacementOutcome.PLACED
 
         val result = tools.execute(placeCall("SUGGESTED_TASKS"), userId)
 
@@ -199,7 +202,7 @@ class BuddyBoardToolsTest {
     @Test
     fun `a card already there is not reported as newly added`() {
         every { boardService.place(any(), any(), any()) } returns
-            BoardService.PlacementOutcome.ALREADY_THERE
+            PlacementOutcome.ALREADY_THERE
 
         // The distinction matters: a mentor that cannot tell "added" from "was already there" will
         // claim it added something on every turn.
@@ -210,7 +213,7 @@ class BuddyBoardToolsTest {
     @Test
     fun `a dismissed card comes back as a refusal the mentor is told not to retry`() {
         every { boardService.place(any(), any(), any()) } returns
-            BoardService.PlacementOutcome.DISMISSED_BY_HIRE
+            PlacementOutcome.DISMISSED_BY_HIRE
 
         val result = tools.execute(placeCall("SUGGESTED_TASKS"), userId)
 

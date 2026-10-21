@@ -3,9 +3,13 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.board.external.enums.BoardActor
+import com.sprintstart.sprintstartbackend.board.external.BoardCardVersion
+import com.sprintstart.sprintstartbackend.board.external.BoardReading
+import com.sprintstart.sprintstartbackend.board.external.HireBoardActionsApi
+import com.sprintstart.sprintstartbackend.board.external.HireBoardApi
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardOwner
+import com.sprintstart.sprintstartbackend.board.external.model.HireBoard
 import com.sprintstart.sprintstartbackend.board.model.request.board.AuthoredCardRequest
 import com.sprintstart.sprintstartbackend.board.model.request.board.ChecklistCardRequest
 import com.sprintstart.sprintstartbackend.board.model.request.board.ChecklistItemRequest
@@ -15,9 +19,6 @@ import com.sprintstart.sprintstartbackend.board.model.response.board.BoardCardRe
 import com.sprintstart.sprintstartbackend.board.model.response.board.ChecklistContent
 import com.sprintstart.sprintstartbackend.board.model.response.board.LinkContent
 import com.sprintstart.sprintstartbackend.board.model.response.board.NoteContent
-import com.sprintstart.sprintstartbackend.board.service.BoardCardVersion
-import com.sprintstart.sprintstartbackend.board.service.BoardReading
-import com.sprintstart.sprintstartbackend.board.service.BoardService
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.buddy.service.BuddyActionService.BuddyActionProposal
 import com.sprintstart.sprintstartbackend.buddy.service.BuddyActionService.ProposeOutcome
@@ -62,7 +63,8 @@ import java.util.UUID
 @Component
 @Suppress("TooManyFunctions") // Six actions, a propose and a perform each, and their shared readers.
 class BuddyBoardEditActions(
-    private val boardService: BoardService,
+    private val hireBoard: HireBoardApi,
+    private val boardActions: HireBoardActionsApi,
 ) {
     /** The six tools, offered alongside [BuddyBoardWriteActions]' own. */
     fun specs(): List<BuddyToolSpecDto> =
@@ -194,7 +196,7 @@ class BuddyBoardEditActions(
      *
      * The preview names what would be *lost* as well as what the list would say, because a line
      * that silently drops out of a long list is the one change a hire reading the new version would
-     * not notice. Lines that survive keep their ticks — `BoardService.editAuthoredCardForBuddy`
+     * not notice. Lines that survive keep their ticks — `HireBoardActionsApi.editCard`
      * matches them back by their words.
      */
     private fun proposeChecklistEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
@@ -301,7 +303,7 @@ class BuddyBoardEditActions(
         val url = payload.linkUrl?.trim().orEmpty()
         if (!url.isWebAddress()) return BuddyActionResponse(ok = false, message = "There was no link left to keep.")
 
-        boardService.addAuthoredCard(userId, projectId, linkRequest(url, payload.linkLabel), by = BoardActor.BUDDY)
+        boardActions.addCard(HireBoard(userId, projectId), linkRequest(url, payload.linkLabel))
         return BuddyActionResponse(ok = true, message = "Kept on your board. It's yours — edit it as you like.")
     }
 
@@ -352,7 +354,7 @@ class BuddyBoardEditActions(
      *
      * An edit replaces the card whole, and what the confirm showed — the new text, the lines that
      * would go, the refusal of a note longer than the buddy can see — was worked out against the
-     * card as it was then. [basedOn] is the fingerprint of that card; `BoardService` compares it
+     * card as it was then. [basedOn] is the fingerprint of that card; `HireBoardActionsApi.editCard` compares it
      * against the row it holds the lock on, because a check made here would leave a gap before
      * that lock is taken. A confirm that carries no fingerprint is refused the same way.
      */
@@ -363,7 +365,7 @@ class BuddyBoardEditActions(
         basedOn: String?,
         request: AuthoredCardRequest,
     ): BuddyActionResponse {
-        boardService.editAuthoredCardForBuddy(userId, projectId, cardId, request, basedOn)
+        boardActions.editCard(HireBoard(userId, projectId), cardId, request, basedOn)
         return BuddyActionResponse(
             ok = true,
             message = "Updated. The card shows it was your buddy's change, and it's still yours to edit.",
@@ -374,7 +376,7 @@ class BuddyBoardEditActions(
         val ids = cardIds.orEmpty().take(MAX_CARDS).map(::BoardCardId)
         if (ids.isEmpty()) return BuddyActionResponse(ok = false, message = "No cards were proposed to remove.")
 
-        return when (val gone = boardService.dismissForBuddy(userId, projectId, ids)) {
+        return when (val gone = boardActions.dismiss(HireBoard(userId, projectId), ids)) {
             0 -> BuddyActionResponse(ok = false, message = "Nothing changed — those cards are already off your board.")
             else -> BuddyActionResponse(
                 ok = true,
@@ -387,7 +389,7 @@ class BuddyBoardEditActions(
         val ids = cardIds.orEmpty().take(MAX_CARDS).map(::BoardCardId)
         if (ids.isEmpty()) return BuddyActionResponse(ok = false, message = "No order was proposed.")
 
-        return when (val moved = boardService.reorderForBuddy(userId, projectId, ids)) {
+        return when (val moved = boardActions.reorder(HireBoard(userId, projectId), ids)) {
             0 -> BuddyActionResponse(ok = true, message = "Your board was already in that order.")
             else -> BuddyActionResponse(ok = true, message = "Rearranged — $moved cards moved.")
         }
@@ -395,9 +397,8 @@ class BuddyBoardEditActions(
 
     /** What is on the hire's board, without creating one for somebody who has never opened it. */
     private fun cardsOn(scope: Scope): List<BoardCardResponse>? {
-        val user = UserId(scope.userId)
-        val project = ProjectId(scope.projectId)
-        return if (boardService.hasBoard(user, project)) boardService.getBoard(user, project)?.cards else null
+        val board = HireBoard(UserId(scope.userId), ProjectId(scope.projectId))
+        return if (hireBoard.hasBoard(board)) hireBoard.boardOf(board)?.cards else null
     }
 
     /** The one card of the hire's own of [kind] that the call's `card_id` names. */

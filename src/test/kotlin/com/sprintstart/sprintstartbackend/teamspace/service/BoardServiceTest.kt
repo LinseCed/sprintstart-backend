@@ -6,12 +6,15 @@ import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepService
 import com.sprintstart.sprintstartbackend.arrival.service.ArrivalSteps
 import com.sprintstart.sprintstartbackend.arrival.service.ResolvedArrivalStep
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
+import com.sprintstart.sprintstartbackend.board.external.BoardCardVersion
+import com.sprintstart.sprintstartbackend.board.external.BoardReading
 import com.sprintstart.sprintstartbackend.board.external.DiagramAiClient
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardActor
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardChange
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardState
+import com.sprintstart.sprintstartbackend.board.external.enums.PlacementOutcome
 import com.sprintstart.sprintstartbackend.board.model.entity.Board
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardCardPayload
@@ -36,9 +39,7 @@ import com.sprintstart.sprintstartbackend.board.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.board.repository.BoardDiagramRepository
 import com.sprintstart.sprintstartbackend.board.repository.BoardRepository
 import com.sprintstart.sprintstartbackend.board.service.BoardCardHydrator
-import com.sprintstart.sprintstartbackend.board.service.BoardCardVersion
 import com.sprintstart.sprintstartbackend.board.service.BoardDiagramService
-import com.sprintstart.sprintstartbackend.board.service.BoardReading
 import com.sprintstart.sprintstartbackend.board.service.BoardService
 import com.sprintstart.sprintstartbackend.board.service.OpenPullRequestReader
 import com.sprintstart.sprintstartbackend.board.service.decodedPayload
@@ -585,7 +586,7 @@ class BoardServiceTest {
 
         val outcome = service.place(hire, project, BoardCardKind.SUGGESTED_TASKS)
 
-        assertEquals(BoardService.PlacementOutcome.PLACED, outcome)
+        assertEquals(PlacementOutcome.PLACED, outcome)
         assertEquals(board.id, saved.captured.boardId)
         // Dated, because the board claims "your buddy added this" only about cards it actually did.
         assertNotNull(saved.captured.placedAt)
@@ -601,7 +602,7 @@ class BoardServiceTest {
         // Sticky removal has to bind the mentor too, or dismissing is a gesture the next
         // conversation undoes.
         assertEquals(
-            BoardService.PlacementOutcome.DISMISSED_BY_HIRE,
+            PlacementOutcome.DISMISSED_BY_HIRE,
             service.place(hire, project, BoardCardKind.SUGGESTED_TASKS),
         )
         verify(exactly = 0) { boardCardRepository.save(any()) }
@@ -616,7 +617,7 @@ class BoardServiceTest {
 
         // Re-placing would let the mentor reshuffle a board the hire has arranged.
         assertEquals(
-            BoardService.PlacementOutcome.ALREADY_THERE,
+            PlacementOutcome.ALREADY_THERE,
             service.place(hire, project, BoardCardKind.SUGGESTED_TASKS),
         )
         verify(exactly = 0) { boardCardRepository.save(any()) }
@@ -627,7 +628,7 @@ class BoardServiceTest {
         every { projectMembershipApi.getProjectMembers(projectId) } returns emptyList()
 
         assertEquals(
-            BoardService.PlacementOutcome.NOT_A_MEMBER,
+            PlacementOutcome.NOT_A_MEMBER,
             service.place(hire, project, BoardCardKind.SUGGESTED_TASKS),
         )
     }
@@ -646,7 +647,7 @@ class BoardServiceTest {
         )
 
         // Grabbing is the hire saying "this is what I'm working on", which is what the card says.
-        assertEquals(BoardService.PlacementOutcome.PLACED, outcome)
+        assertEquals(PlacementOutcome.PLACED, outcome)
         assertEquals(BoardCardState.ACTIVE, dismissed.state)
         verify { boardCardRepository.save(dismissed) }
     }
@@ -658,7 +659,7 @@ class BoardServiceTest {
         every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(dismissed)
 
         assertEquals(
-            BoardService.PlacementOutcome.DISMISSED_BY_HIRE,
+            PlacementOutcome.DISMISSED_BY_HIRE,
             service.place(hire, project, BoardCardKind.CURRENT_TASK),
         )
         assertEquals(BoardCardState.DISMISSED, dismissed.state)
@@ -1010,7 +1011,7 @@ class BoardServiceTest {
         existingBoard()
 
         assertEquals(
-            BoardService.PlacementOutcome.NEEDS_A_SUBJECT,
+            PlacementOutcome.NEEDS_A_SUBJECT,
             service.place(hire, project, BoardCardKind.PATH_STEP),
         )
     }
@@ -1021,7 +1022,7 @@ class BoardServiceTest {
         stubPath(onboardingStep("Set up your laptop"))
 
         assertEquals(
-            BoardService.PlacementOutcome.NO_SUCH_STEP,
+            PlacementOutcome.NO_SUCH_STEP,
             service.place(hire, project, BoardCardKind.PATH_STEP, "Learn the deploy pipeline"),
         )
         verify(exactly = 0) { boardCardRepository.save(any()) }
@@ -1042,7 +1043,7 @@ class BoardServiceTest {
             "  set up   YOUR laptop ",
         )
 
-        assertEquals(BoardService.PlacementOutcome.PLACED, outcome)
+        assertEquals(PlacementOutcome.PLACED, outcome)
         assertEquals(step.id.toString(), saved.captured.subject)
     }
 
@@ -1054,7 +1055,7 @@ class BoardServiceTest {
         every { boardCardRepository.findAllByBoardId(board.id) } returns listOf(pathStepCard(board, step))
 
         assertEquals(
-            BoardService.PlacementOutcome.ALREADY_THERE,
+            PlacementOutcome.ALREADY_THERE,
             service.place(hire, project, BoardCardKind.PATH_STEP, "SET UP YOUR LAPTOP"),
         )
         verify(exactly = 0) { boardCardRepository.save(any()) }
@@ -1069,7 +1070,7 @@ class BoardServiceTest {
             listOf(pathStepCard(board, step, state = BoardCardState.DISMISSED))
 
         assertEquals(
-            BoardService.PlacementOutcome.DISMISSED_BY_HIRE,
+            PlacementOutcome.DISMISSED_BY_HIRE,
             service.place(hire, project, BoardCardKind.PATH_STEP, "Set up your laptop"),
         )
         verify(exactly = 0) { boardCardRepository.save(any()) }

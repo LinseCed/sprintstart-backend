@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.board.service
 import com.sprintstart.sprintstartbackend.arrival.external.ArrivalReadApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
+import com.sprintstart.sprintstartbackend.board.external.MemoryRecapSource
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardDiagram

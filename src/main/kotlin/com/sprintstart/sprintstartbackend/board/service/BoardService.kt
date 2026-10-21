@@ -2,11 +2,14 @@ package com.sprintstart.sprintstartbackend.board.service
 
 import com.sprintstart.sprintstartbackend.arrival.external.ArrivalReadApi
 import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
+import com.sprintstart.sprintstartbackend.board.external.BoardCardVersion
+import com.sprintstart.sprintstartbackend.board.external.BoardReading
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardActor
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardChange
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardState
+import com.sprintstart.sprintstartbackend.board.external.enums.PlacementOutcome
 import com.sprintstart.sprintstartbackend.board.model.entity.Board
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardCardPayload
@@ -820,29 +823,6 @@ class BoardService(
     private fun boardOf(userId: UserId, projectId: ProjectId): Board =
         existingBoardOf(userId, projectId)
             ?: boardRepository.save(Board(userId = userId.value, projectId = projectId.value))
-
-    /**
-     * What placing a card did.
-     *
-     * Every outcome is reported rather than collapsed into a boolean, because the mentor has to say
-     * something afterwards and "I've put that on your board" is only true for one of them. A buddy
-     * that cannot tell a refusal from a success will claim the success.
-     */
-    enum class PlacementOutcome {
-        PLACED,
-        ALREADY_THERE,
-
-        /** The hire took this card off their board before; it is not going back. */
-        DISMISSED_BY_HIRE,
-
-        NOT_A_MEMBER,
-
-        /** A kind with [BoardCardKind.takesSubject] was asked for with no subject at all. */
-        NEEDS_A_SUBJECT,
-
-        /** A [BoardCardKind.PATH_STEP]'s subject named no real step of this hire's path. */
-        NO_SUCH_STEP,
-    }
 
     private companion object {
         /**

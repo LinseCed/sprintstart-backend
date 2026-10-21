@@ -6,6 +6,8 @@ import com.sprintstart.sprintstartbackend.board.model.request.board.AuthoredCard
 import com.sprintstart.sprintstartbackend.board.model.request.board.ChecklistCardRequest
 import com.sprintstart.sprintstartbackend.board.model.request.board.NoteCardRequest
 import com.sprintstart.sprintstartbackend.board.service.BoardService
+import com.sprintstart.sprintstartbackend.board.service.HireBoardActionsService
+import com.sprintstart.sprintstartbackend.board.service.hireBoardOver
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
@@ -40,7 +42,10 @@ import java.util.UUID
 class BuddyBoardWriteActionsTest {
     private val boardService: BoardService = mockk(relaxed = true)
     private val userApi: UserApi = mockk()
-    private val boardWrites = BuddyBoardWriteActions(boardService, BuddyBoardEditActions(boardService))
+    private val boardWrites = BuddyBoardWriteActions(
+        HireBoardActionsService(boardService),
+        BuddyBoardEditActions(hireBoardOver(boardService), HireBoardActionsService(boardService)),
+    )
 
     private val service = BuddyActionService(
         taskOrientationService = mockk(relaxed = true),

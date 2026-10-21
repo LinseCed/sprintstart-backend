@@ -2,13 +2,15 @@ package com.sprintstart.sprintstartbackend.buddy.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.board.external.BoardReading
+import com.sprintstart.sprintstartbackend.board.external.HireBoardActionsApi
+import com.sprintstart.sprintstartbackend.board.external.HireBoardApi
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardStage
+import com.sprintstart.sprintstartbackend.board.external.enums.PlacementOutcome
 import com.sprintstart.sprintstartbackend.board.external.model.BoardStructurePayload
+import com.sprintstart.sprintstartbackend.board.external.model.HireBoard
 import com.sprintstart.sprintstartbackend.board.model.response.board.BoardCardResponse
-import com.sprintstart.sprintstartbackend.board.service.BoardReading
-import com.sprintstart.sprintstartbackend.board.service.BoardService
-import com.sprintstart.sprintstartbackend.board.service.BoardStructureService
 import com.sprintstart.sprintstartbackend.path.external.HirePathApi
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
@@ -48,15 +50,15 @@ import java.util.UUID
  * mentor wrote from the facts rather than one this tool handed it.
  *
  * It does not say it "changes nothing", because reading a board is not free of consequence: the
- * read goes through [BoardService.getBoard], which is also what brings a board's baseline cards up
+ * read goes through [HireBoardApi.boardOf], which is also what brings a board's baseline cards up
  * to date. A board that does not exist yet is left alone entirely — see [readBoard] — so the one
  * effect a mentor could cause on its own, a board existing because somebody asked a question about
  * it, cannot happen.
  */
 @Component
 class BuddyBoardTools(
-    private val boardService: BoardService,
-    private val boardStructureService: BoardStructureService,
+    private val hireBoard: HireBoardApi,
+    private val boardActions: HireBoardActionsApi,
     private val userApi: UserApi,
     private val hirePathApi: HirePathApi,
 ) {
@@ -95,14 +97,15 @@ class BuddyBoardTools(
         // Asked first, because reading a board that does not exist is what creates it. A hire who
         // has never opened the page should not end up with a board because they asked the mentor a
         // question about one.
-        if (!boardService.hasBoard(userId, project.projectId)) {
+        if (!hireBoard.hasBoard(HireBoard(userId, project.projectId))) {
             return "The hire has not opened their board yet, so there is nothing on it to read. " +
                 "Talk about the work itself rather than about their board."
         }
 
-        val board = boardService.getBoard(userId, project.projectId)
+        val board = hireBoard.boardOf(HireBoard(userId, project.projectId))
             ?: return "The hire is not a member of that project, so there is no board to read."
-        val structure = boardStructureService.read(userId, project.projectId)?.structure ?: BoardStructurePayload()
+        val structure =
+            hireBoard.structureOf(HireBoard(userId, project.projectId))?.structure ?: BoardStructurePayload()
         val cards = board.cards
 
         if (cards.isEmpty()) {
@@ -269,24 +272,24 @@ class BuddyBoardTools(
             is ProjectChoice.One -> choice
         }
 
-        return when (boardService.place(userId, project.projectId, kind, call.subjectArg())) {
-            BoardService.PlacementOutcome.PLACED ->
+        return when (boardActions.place(HireBoard(userId, project.projectId), kind, call.subjectArg())) {
+            PlacementOutcome.PLACED ->
                 "Placed the $kind card on the hire's board for ${project.name}. Tell them it is " +
                     "there and will stay there — they can dismiss it if they do not want it."
-            BoardService.PlacementOutcome.ALREADY_THERE ->
+            PlacementOutcome.ALREADY_THERE ->
                 "That card is already on their board, so nothing changed. Point them at it rather " +
                     "than saying you added it."
-            BoardService.PlacementOutcome.DISMISSED_BY_HIRE ->
+            PlacementOutcome.DISMISSED_BY_HIRE ->
                 "The hire took that card off their board, so it was not put back. Do not add it " +
                     "again — if it matters, say it in the conversation instead."
-            BoardService.PlacementOutcome.NOT_A_MEMBER ->
+            PlacementOutcome.NOT_A_MEMBER ->
                 "The hire is not a member of that project, so there is no board to put a card on."
-            BoardService.PlacementOutcome.NEEDS_A_SUBJECT ->
+            PlacementOutcome.NEEDS_A_SUBJECT ->
                 "That kind needs a subject and none was given, so nothing was placed. For a " +
                     "diagram, try again with the question it should answer — for example \"how a " +
                     "request reaches the database\". For a path step, try again with the step's " +
                     "title."
-            BoardService.PlacementOutcome.NO_SUCH_STEP -> noSuchStepMessage(userId)
+            PlacementOutcome.NO_SUCH_STEP -> noSuchStepMessage(userId)
         }
     }
 
@@ -317,7 +320,7 @@ class BuddyBoardTools(
     /**
      * Reads the `subject` argument — the question a diagram answers, or the title of a path step.
      *
-     * Passed straight through to [BoardService.place], which ignores it for every kind that does not
+     * Passed straight through to [HireBoardActionsApi.place], which ignores it for every kind that does not
      * take one. A subject sent alongside `CURRENT_TASK` is not an error worth a sentence; it is a
      * model being verbose, and the card is unaffected either way.
      */
