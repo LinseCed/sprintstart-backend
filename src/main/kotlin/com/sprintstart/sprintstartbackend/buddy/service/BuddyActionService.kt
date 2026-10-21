@@ -4,6 +4,7 @@ import com.sprintstart.sprintstartbackend.arrival.external.HireArrivalApi
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.noArgumentsSchema
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.knowledge.external.HireKnowledgeApi
@@ -738,11 +739,6 @@ class BuddyActionService(
             BuddyActionType.REORDER_CARDS to "rearrange your board",
         )
 
-        private fun noArgs() = buildJsonObject {
-            put("type", "object")
-            put("properties", buildJsonObject { })
-        }
-
         val FLAG_TO_PM_SPEC = BuddyToolSpecDto(
             name = BuddyActionType.FLAG_TO_PM.toolName,
             description = "Offer to pass something from the hire to their project's PM. Two cases: " +
@@ -775,7 +771,7 @@ class BuddyActionService(
                 "step-by-step, cited guide to setting up, finding the code, making the change, and opening the " +
                 "PR. Proposes only; the hire confirms. Use when they ask how to start the task they have. Takes " +
                 "no arguments.",
-            parameters = noArgs(),
+            parameters = noArgumentsSchema(),
         )
 
         val CLAIM_GOAL_SPEC = BuddyToolSpecDto(

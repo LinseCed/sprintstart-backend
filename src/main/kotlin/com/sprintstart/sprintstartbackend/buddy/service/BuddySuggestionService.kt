@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAppGuideTools
+import com.sprintstart.sprintstartbackend.assistant.external.HireTool
 import com.sprintstart.sprintstartbackend.buddy.model.response.buddy.BuddySuggestionResponse
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import org.springframework.stereotype.Service
@@ -32,7 +33,14 @@ import java.util.UUID
 class BuddySuggestionService(
     private val buddyToolExecutor: BuddyToolExecutor,
     private val userApi: UserApi,
+    hireTools: List<HireTool>,
 ) {
+    /** The chips the features' own tools bring, by tool name. */
+    private val toolChips: Map<String, BuddySuggestionResponse> = hireTools
+        .mapNotNull { tool ->
+            tool.suggestion?.let { tool.spec.name to BuddySuggestionResponse(it.label, it.question) }
+        }.toMap()
+
     /** The chips for the caller behind [authId], or none when the auth id resolves to no user. */
     fun forMe(authId: String): List<BuddySuggestionResponse> =
         userApi
@@ -47,7 +55,7 @@ class BuddySuggestionService(
      * a chip — the wording for a hire is a separate decision from what the mentor can read.
      */
     fun forHire(userId: UUID): List<BuddySuggestionResponse> =
-        buddyToolExecutor.toolSpecs(userId).mapNotNull { CATALOG[it.name] }
+        buddyToolExecutor.toolSpecs(userId).mapNotNull { CATALOG[it.name] ?: toolChips[it.name] }
 
     private companion object {
         /**
@@ -68,10 +76,6 @@ class BuddySuggestionService(
             BuddyPathTools.READ_MY_PATH to BuddySuggestionResponse(
                 label = "Where am I on my path?",
                 question = "Where am I in my onboarding path, and what should I do next?",
-            ),
-            BuddyToolExecutor.GET_ARRIVAL_STEPS to BuddySuggestionResponse(
-                label = "What do I still need?",
-                question = "What do I still need to get set up?",
             ),
             // Asks for the pool and nothing else, so the mentor does not read it as the path's question.
             BuddyToolExecutor.GET_SUGGESTED_TASKS to BuddySuggestionResponse(

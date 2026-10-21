@@ -1,5 +1,6 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
+import com.sprintstart.sprintstartbackend.arrival.assistant.ArrivalStepsTool
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.arrival.model.entity.ArrivalStep
 import com.sprintstart.sprintstartbackend.arrival.service.ArrivalStepService
@@ -93,7 +94,7 @@ class BuddyToolExecutorTest {
         // its judgements now, and these tests are about the buddy still reporting them.
         hireBoardOver(openPullRequestReader = OpenPullRequestReader(artifactIngestionApi)),
         projectMembershipApi,
-        ArrivalSteps(arrivalStepService),
+        listOf(ArrivalStepsTool(ArrivalSteps(arrivalStepService))),
         // Pathless by default: every case here is about a tool that reads something other than the
         // onboarding path, and "no path" is what keeps the path tool out of their expectations.
         buddyPathTools,
