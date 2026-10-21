@@ -1,14 +1,15 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.path.assistant
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireAction
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionContext
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionOrder
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionOutcome
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionProposal
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
-import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
-import com.sprintstart.sprintstartbackend.path.assistant.hasPendingSkip
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionScope
 import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
 import com.sprintstart.sprintstartbackend.path.model.request.skip.CreateOnboardingSkipRequest
@@ -20,20 +21,28 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
+import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
 
 /**
  * The buddy's skip request: offering to ask the hire's PM to let them skip a step, and sending the
  * request once they confirm.
  *
- * [BuddyPathActions] routes to it and keeps the propose/confirm contract. The request goes through
+ * The request goes through
  * the hire's own skip route, which owns every rule about it; the PM decides.
  */
 @Component
-class BuddySkipActions(
+@Order(HireActionOrder.REQUEST_SKIP)
+class RequestSkipAction(
     private val myPathTool: MyPathTool,
     private val hirePathActionsApi: HirePathActionsApi,
-) {
+) : HireAction {
+    override val spec = SPEC
+    override val scope = HireActionScope.PERSON
+    override val gerund = "ask your PM to skip a step"
+
+    override fun isMountedFor(hire: UserId): Boolean = myPathTool.hasPath(hire.value)
+
     /**
      * Offers to send the hire's skip request for one step to their PM.
      *
@@ -45,11 +54,8 @@ class BuddySkipActions(
      * Checked here rather than left to the route, so the mentor hears "already asked" or "already
      * done" while it can still say something useful about it.
      */
-    fun propose(
-        call: BuddyToolCallDto,
-        type: BuddyActionType,
-        user: UserId,
-    ): HireActionOutcome {
+    override fun propose(call: BuddyToolCallDto, context: HireActionContext): HireActionOutcome {
+        val user = context.hire
         val stepId = call.uuidArgument("step_id")
             ?: return notProposed(
                 "No step_id was provided. Read get_my_onboarding_path and pass the step_id of the " +
@@ -99,7 +105,7 @@ class BuddySkipActions(
                 "is accepted it counts as done and unlocks what waits on it. Do not promise it will " +
                 "be accepted.$declinedBefore",
             proposal = HireActionProposal(
-                action = type.toolName,
+                action = REQUEST_SKIP,
                 label = "Ask your PM to skip “${step.title}”",
                 question = null,
                 stepId = step.id,
@@ -109,7 +115,12 @@ class BuddySkipActions(
     }
 
     /** Files the confirmed skip request through the hire's own route, which owns every rule about it. */
-    fun perform(authId: String, user: UserId, request: HireActionRequest): BuddyActionResponse {
+    override suspend fun perform(
+        request: HireActionRequest,
+        context: HireActionContext,
+        authId: AuthId,
+    ): BuddyActionResponse {
+        val user = context.hire
         val stepId = request.stepId
         val reason = request.reason
         if (stepId == null || reason.isNullOrBlank()) {
@@ -118,7 +129,7 @@ class BuddySkipActions(
         val step = myPathTool.findStep(user.value, stepId)
             ?: return BuddyActionResponse(ok = false, message = "That step isn't on your path.")
 
-        hirePathActionsApi.requestSkip(AuthId(authId), StepId(stepId), CreateOnboardingSkipRequest(reason = reason))
+        hirePathActionsApi.requestSkip(authId, StepId(stepId), CreateOnboardingSkipRequest(reason = reason))
         return BuddyActionResponse(
             ok = true,
             message = "Sent — your PM will decide on skipping “${step.title}”. Until then it stays on " +
@@ -127,8 +138,10 @@ class BuddySkipActions(
     }
 
     companion object {
+        const val REQUEST_SKIP = "request_skip"
+
         val SPEC = BuddyToolSpecDto(
-            name = BuddyActionType.REQUEST_SKIP.toolName,
+            name = REQUEST_SKIP,
             description = "Offer to send the hire's request to skip one step of their onboarding path " +
                 "to their PM. Read get_my_onboarding_path for the step_id. Use it when THEY want to " +
                 "skip a step — never suggest skipping to get through the path faster, and never for a " +

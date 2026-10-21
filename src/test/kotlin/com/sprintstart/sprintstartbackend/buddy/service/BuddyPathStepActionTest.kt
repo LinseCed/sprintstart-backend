@@ -4,7 +4,12 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
+import com.sprintstart.sprintstartbackend.path.assistant.AddPathStepAction
+import com.sprintstart.sprintstartbackend.path.assistant.AnswerQuestionAction
+import com.sprintstart.sprintstartbackend.path.assistant.CompleteStepAction
+import com.sprintstart.sprintstartbackend.path.assistant.CompleteTaskAction
 import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
+import com.sprintstart.sprintstartbackend.path.assistant.RequestSkipAction
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.SkipStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepOrigin
@@ -70,22 +75,23 @@ class BuddyPathStepActionTest {
         questionAttemptService,
     )
 
-    private val pathActions = BuddyPathActions(
-        myPathTool = myPathTool,
-        hirePathActionsApi = hirePathActions,
-        edits = BuddyPathEditActions(myPathTool, hirePathActions),
-        hirePathApi = HirePathService(mockk(), onboardingTaskService, mockk(), mockk()),
-        questions = BuddyQuestionActions(myPathTool, hirePathActions),
-        skips = BuddySkipActions(myPathTool, hirePathActions),
-        userApi = userApi,
+    private val pathActions = listOf(
+        CompleteStepAction(myPathTool, hirePathActions),
+        CompleteTaskAction(
+            myPathTool,
+            hirePathActions,
+            HirePathService(mockk(), onboardingTaskService, mockk(), mockk()),
+        ),
+        AnswerQuestionAction(myPathTool, hirePathActions),
+        AddPathStepAction(myPathTool, hirePathActions),
+        RequestSkipAction(myPathTool, hirePathActions),
     )
 
     private val service = BuddyActionService(
         hireKnowledgeApi = mockk(relaxed = true),
         userApi = userApi,
         hireArrivalApi = mockk(relaxed = true),
-        hireActions = emptyList(),
-        buddyPathActions = pathActions,
+        hireActions = pathActions,
         boardWrites = BuddyBoardWriteActions(
             mockk(relaxed = true),
             BuddyBoardEditActions(mockk(relaxed = true), mockk(relaxed = true)),

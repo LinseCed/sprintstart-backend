@@ -1,14 +1,16 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.path.assistant
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireAction
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionContext
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionOrder
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionOutcome
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionProposal
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionScope
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
-import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
 import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.model.request.question.SubmitQuestionAttemptRequest
@@ -22,20 +24,31 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
+import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
 
 /**
  * The buddy's knowledge-check action: offering to send the hire's own answer to a question on
  * their path, and sending it once they confirm.
  *
- * [BuddyPathActions] routes to it and keeps the propose/confirm contract; the line it does not
- * cross is the same: it writes to the hire's own attempts, never to the question.
+ * The hire's words, never the mentor's. The mentor is not told which option is correct (see
+ * [MyPathTool]), so it cannot answer for them even if it tried — and the button shows the answer that
+ * will be sent, because an attempt is recorded whether it is right or not.
+ *
+ * Like every path action it writes to the hire's own attempts, never to the question.
  */
 @Component
-class BuddyQuestionActions(
+@Order(HireActionOrder.ANSWER_QUESTION)
+class AnswerQuestionAction(
     private val myPathTool: MyPathTool,
     private val hirePathActionsApi: HirePathActionsApi,
-) {
+) : HireAction {
+    override val spec = SPEC
+    override val scope = HireActionScope.PERSON
+    override val gerund = "send an answer to a question"
+
+    override fun isMountedFor(hire: UserId): Boolean = myPathTool.hasPath(hire.value)
+
     /**
      * Offers to send the hire's own answer to a knowledge question.
      *
@@ -59,11 +72,8 @@ class BuddyQuestionActions(
      * A match that cannot be made comes back naming the options, so the mentor asks again instead of
      * guessing on the hire's behalf.
      */
-    fun propose(
-        call: BuddyToolCallDto,
-        type: BuddyActionType,
-        userId: UserId,
-    ): HireActionOutcome {
+    override fun propose(call: BuddyToolCallDto, context: HireActionContext): HireActionOutcome {
+        val userId = context.hire
         val questionId = call.uuidArgument("question_id")
             ?: return notProposed(
                 "No question_id was provided. Read get_my_onboarding_path and pass the question_id " +
@@ -121,7 +131,7 @@ class BuddyQuestionActions(
                 "make sure it is the answer they meant — and do not tell them whether it is correct, " +
                 "because you have not been told either.",
             proposal = HireActionProposal(
-                action = type.toolName,
+                action = ANSWER_QUESTION,
                 label = "Send this answer: “${shown.take(ANSWER_LABEL_LIMIT)}”",
                 question = null,
                 questionId = question.id,
@@ -139,7 +149,12 @@ class BuddyQuestionActions(
      * shown as a failed action would read as the buddy having broken rather than as the hire having
      * missed, on the one surface where missing is supposed to be ordinary.
      */
-    fun perform(authId: String, userId: UserId, request: HireActionRequest): BuddyActionResponse {
+    override suspend fun perform(
+        request: HireActionRequest,
+        context: HireActionContext,
+        authId: AuthId,
+    ): BuddyActionResponse {
+        val userId = context.hire
         val questionId = request.questionId
         val answer = request.answer
         if (questionId == null || answer.isNullOrBlank()) {
@@ -179,7 +194,7 @@ class BuddyQuestionActions(
             SubmitQuestionAttemptRequest(textAnswer = answer)
         }
 
-        val result = hirePathActionsApi.answerCheck(AuthId(authId), CheckQuestionId(questionId), submission)
+        val result = hirePathActionsApi.answerCheck(authId, CheckQuestionId(questionId), submission)
         // The submit response is the one user-facing place correct answers are revealed, and the
         // hire's own page shows them there. Relaying the same thing keeps the two surfaces telling
         // one story; withholding it here would make the conversation the worse place to answer.
@@ -227,11 +242,13 @@ class BuddyQuestionActions(
         options.joinToString(", ") { it.label.trim() }
 
     companion object {
+        const val ANSWER_QUESTION = "answer_question"
+
         /** How many characters of an answer the confirm button shows before it is cut. */
         private const val ANSWER_LABEL_LIMIT = 60
 
         val SPEC = BuddyToolSpecDto(
-            name = BuddyActionType.ANSWER_QUESTION.toolName,
+            name = ANSWER_QUESTION,
             description = "Offer to send the hire's answer to one knowledge-check question on their " +
                 "path. Read get_my_onboarding_path for the question_id and the options they are " +
                 "looking at. Pass THEIR answer, in their words — for a multiple-choice question, " +

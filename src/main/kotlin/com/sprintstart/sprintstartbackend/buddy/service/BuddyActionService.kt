@@ -46,9 +46,9 @@ import java.util.UUID
  *
  * Six wrapped actions live here, each with a propose and a perform half — hence the suppressed
  * function count. The five that put the mentor's *own words* on a board are in
- * [BuddyBoardWriteActions], and the ones that walk the hire's path are in [BuddyPathActions]: what
- * the actions here do is wrap an existing `/me/...` operation one for one, and those do something
- * different enough to be worth reading on their own.
+ * [BuddyBoardWriteActions]: what the actions here do is wrap an existing `/me/...` operation one for one,
+ * and those do something different enough to be worth reading on their own. The features' own actions,
+ * the path's among them, arrive as [HireAction] beans.
  */
 @Service
 @Suppress("TooManyFunctions")
@@ -56,7 +56,6 @@ class BuddyActionService(
     private val hireKnowledgeApi: HireKnowledgeApi,
     private val userApi: UserApi,
     private val hireArrivalApi: HireArrivalApi,
-    private val buddyPathActions: BuddyPathActions,
     private val boardWrites: BuddyBoardWriteActions,
     private val hireActions: List<HireAction>,
 ) {
@@ -69,8 +68,7 @@ class BuddyActionService(
      */
     fun actionSpecs(userId: UUID): List<BuddyToolSpecDto> =
         listOf(FLAG_TO_PM_SPEC, REQUEST_ATTESTATION_SPEC, SET_GITHUB_LOGIN_SPEC) +
-            hireActions.filter { it.isMountedFor(UserId(userId)) }.map { it.spec } +
-            buddyPathActions.specs(userId) + boardWrites.specs()
+            hireActions.filter { it.isMountedFor(UserId(userId)) }.map { it.spec } + boardWrites.specs()
 
     /** Whether [toolName] is an action tool (handled by [propose]) rather than a read-only tool. */
     fun isAction(toolName: String): Boolean =
@@ -96,11 +94,6 @@ class BuddyActionService(
         // no project yet.
         if (type == BuddyActionType.SET_GITHUB_LOGIN) {
             return proposeGithubLogin(call, type)
-        }
-
-        // Before the project gate as well: an onboarding path belongs to a person, not to a project.
-        if (buddyPathActions.handles(type)) {
-            return buddyPathActions.propose(call, type, userId)
         }
 
         val project = when (val resolution = resolveProject(userId)) {
@@ -260,17 +253,6 @@ class BuddyActionService(
             }
         }
 
-        // And again: a path belongs to a person, not to a project. See the note in `propose`.
-        if (buddyPathActions.handles(type)) {
-            return try {
-                withContext(Dispatchers.IO) { buddyPathActions.perform(type, authId, request) }
-            } catch (ex: ResponseStatusException) {
-                // A precondition the underlying route owns (a step that is already finished, a
-                // question that is not theirs). Relay its sentence rather than failing the confirm.
-                BuddyActionResponse(ok = false, message = ex.reason ?: "That didn't go through.")
-            }
-        }
-
         val context = withContext(Dispatchers.IO) { resolveContext(authId) }
         val resolved = when (context) {
             is CallerContext.Resolved -> context
@@ -333,15 +315,8 @@ class BuddyActionService(
                             basedOn = request.basedOn,
                         ),
                     )
-                    // Not project-scoped, so these return before the project gate this dispatch
-                    // sits behind.
-                    BuddyActionType.SET_GITHUB_LOGIN,
-                    BuddyActionType.COMPLETE_STEP,
-                    BuddyActionType.COMPLETE_TASK,
-                    BuddyActionType.ANSWER_QUESTION,
-                    BuddyActionType.ADD_PATH_STEP,
-                    BuddyActionType.REQUEST_SKIP,
-                    -> error("handled above")
+                    // Not project-scoped, so it returns before the project gate this dispatch sits behind.
+                    BuddyActionType.SET_GITHUB_LOGIN -> error("handled above")
                 }
             }
         }
@@ -532,13 +507,8 @@ class BuddyActionService(
         when (this) {
             BuddyActionType.FLAG_TO_PM -> "flag this to a PM"
             BuddyActionType.REQUEST_ATTESTATION -> "ask somebody to confirm your work"
-            // The next three never reach the no-project reason lines: they are not project-scoped.
+            // Never reaches the no-project reason lines: it is not project-scoped.
             BuddyActionType.SET_GITHUB_LOGIN -> "save a GitHub username"
-            BuddyActionType.COMPLETE_STEP -> "tick a step off your path"
-            BuddyActionType.COMPLETE_TASK -> "tick a line off your checklist"
-            BuddyActionType.ANSWER_QUESTION -> "send an answer to a question"
-            BuddyActionType.ADD_PATH_STEP -> "add a step to your path"
-            BuddyActionType.REQUEST_SKIP -> "ask your PM to skip a step"
             else -> BOARD_WRITE_GERUNDS.getValue(this)
         }
 
