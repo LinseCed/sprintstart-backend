@@ -6,8 +6,8 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.board.service.OpenPullRequestReader
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
+import com.sprintstart.sprintstartbackend.insights.external.InsightsReadApi
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
-import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsService
 import com.sprintstart.sprintstartbackend.knowledge.external.HireKnowledgeApi
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
@@ -37,7 +37,7 @@ import java.util.UUID
 @Suppress("TooManyFunctions")
 @Component
 class BuddyToolExecutor(
-    private val onboardingMetricsService: OnboardingMetricsService,
+    private val insightsRead: InsightsReadApi,
     private val hireStarterWork: HireStarterWorkApi,
     private val hireKnowledgeApi: HireKnowledgeApi,
     private val userApi: UserApi,
@@ -270,8 +270,8 @@ class BuddyToolExecutor(
             return "You are not a member of any project yet, so there are no work metrics."
         }
         val described = projects.mapNotNull { project ->
-            onboardingMetricsService
-                .getHireTimeline(userId, project.projectId)
+            insightsRead
+                .hireTimeline(UserId(userId), ProjectId(project.projectId))
                 ?.let { describe(project.name, it) }
         }
         return described

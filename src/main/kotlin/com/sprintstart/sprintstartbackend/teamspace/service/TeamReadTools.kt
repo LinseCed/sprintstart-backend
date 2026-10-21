@@ -4,9 +4,8 @@ import com.sprintstart.sprintstartbackend.arrival.external.ArrivalReadApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.insights.external.InsightsReadApi
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.AttentionSeverity
-import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsService
-import com.sprintstart.sprintstartbackend.insights.service.ProjectAttentionService
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.starterwork.external.HireStarterWorkApi
@@ -27,8 +26,7 @@ import java.util.UUID
  */
 @Component
 class TeamReadTools(
-    private val projectAttentionService: ProjectAttentionService,
-    private val onboardingMetricsService: OnboardingMetricsService,
+    private val insightsRead: InsightsReadApi,
     private val hireStarterWork: HireStarterWorkApi,
     private val arrivalSteps: ArrivalReadApi,
     private val projectMembershipApi: ProjectMembershipApi,
@@ -53,7 +51,7 @@ class TeamReadTools(
 
     /** Each line says whose move it is: a pull request waiting on review is the reviewer's, not the author's. */
     private fun teamAttention(projectId: UUID): String {
-        val attention = projectAttentionService.getAttention(projectId)
+        val attention = insightsRead.attentionOn(ProjectId(projectId))
         if (attention.items.isEmpty()) {
             return "Nobody on this project (${attention.memberCount} members) is waiting on a review or has " +
                 "stalled right now."
@@ -154,7 +152,7 @@ class TeamReadTools(
     }
 
     private fun contributionsFor(memberId: UUID, projectId: UUID): String {
-        val timeline = onboardingMetricsService.getHireTimeline(memberId, projectId)
+        val timeline = insightsRead.hireTimeline(UserId(memberId), ProjectId(projectId))
             ?: return "No onboarding metrics exist for them on this project yet."
         return buildString {
             appendLine("- Open pull requests: ${timeline.openContributionCount}")
