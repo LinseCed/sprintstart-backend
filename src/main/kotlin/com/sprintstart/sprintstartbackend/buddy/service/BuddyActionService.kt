@@ -390,7 +390,7 @@ class BuddyActionService(
                 when (type) {
                     BuddyActionType.FLAG_TO_PM -> flagToPm(authId, resolved.projectId, request.question)
                     BuddyActionType.CLAIM_GOAL ->
-                        claimGoal(authId, resolved.projectId, request.taskId)
+                        claimGoal(AuthId(authId), ProjectId(resolved.projectId), request.taskId)
                     BuddyActionType.REQUEST_ATTESTATION ->
                         requestAttestation(resolved, request.title, request.attesterId)
                     BuddyActionType.PLACE_CHECKLIST,
@@ -472,8 +472,8 @@ class BuddyActionService(
     }
 
     private fun claimGoal(
-        authId: String,
-        projectId: UUID,
+        authId: AuthId,
+        projectId: ProjectId,
         taskId: UUID?,
     ): BuddyActionResponse {
         if (taskId == null) {
@@ -481,12 +481,7 @@ class BuddyActionService(
         }
         // Claiming also pins the current-task card (see `HireStarterWorkActionsApi.claimGoal`), so the
         // message below can promise it is on the board.
-        val goal = hireStarterWorkActions.claimGoal(
-            AuthId(authId),
-            ProjectId(projectId),
-            StarterWorkTaskId(taskId),
-            GoalClaimant.BUDDY,
-        )
+        val goal = hireStarterWorkActions.claimGoal(authId, projectId, StarterWorkTaskId(taskId), GoalClaimant.BUDDY)
         return BuddyActionResponse(
             ok = true,
             message = "You're now working toward “${goal.title}” — I'll shape your next steps around it. " +
