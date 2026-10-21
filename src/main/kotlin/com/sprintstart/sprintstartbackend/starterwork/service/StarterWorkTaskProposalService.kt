@@ -601,10 +601,7 @@ class StarterWorkTaskProposalService(
      * repository is already in the identifier and needs no extra lookup.
      */
     private fun repositoryOf(sourceId: SourceId): String? =
-        sourceId.value
-            .split(':')
-            .getOrNull(1)
-            ?.takeIf { it.contains('/') }
+        with(sourceId.value) { split(':').getOrNull(1)?.takeIf { it.contains('/') } }
 
     companion object {
         // Matches the AI service's operation name and the frontend consumer's switch.
