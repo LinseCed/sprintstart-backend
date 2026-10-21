@@ -54,15 +54,14 @@ class OpenOrientationAction(
     /**
      * Why there is no packet, said only as far as this knows.
      *
-     * Three states used to collapse into one sentence, and the sentence was a claim about the
-     * hire's work rather than about this call: a hire whose packet had failed to assemble was told
-     * they had no current task, which they could see on their own board was untrue. Being told a
-     * false thing about your own state is worse than being told nothing — it is the hire's word
+     * Three different states, three sentences, because each is a claim about the hire's own work: telling a
+     * hire whose packet failed to assemble that they have no current task contradicts their own board.
+     * Being told a false thing about your own state is worse than being told nothing — it is the hire's word
      * against the system's, and the hire stops trusting the surface rather than the sentence.
      *
-     * So the no-task line is now only used where [MyOrientationResponse.taskId] really is null.
-     * With a task and no packet, the honest answer names the task and says the packet is what is
-     * missing, which is also the difference between "claim something" and "try again".
+     * So the no-task line is only for a [MyOrientationResponse.taskId] that really is null. With a task and
+     * no packet, the answer names the task and says the packet is what is missing, which is also the
+     * difference between "claim something" and "try again".
      */
     private fun noPacketReason(orientation: MyOrientationResponse): String = when {
         orientation.reason != null -> orientation.reason
