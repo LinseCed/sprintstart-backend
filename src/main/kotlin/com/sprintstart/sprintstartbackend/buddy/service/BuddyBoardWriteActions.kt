@@ -3,11 +3,11 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.board.external.enums.BoardActor
+import com.sprintstart.sprintstartbackend.board.external.HireBoardActionsApi
+import com.sprintstart.sprintstartbackend.board.external.model.HireBoard
 import com.sprintstart.sprintstartbackend.board.model.request.board.ChecklistCardRequest
 import com.sprintstart.sprintstartbackend.board.model.request.board.ChecklistItemRequest
 import com.sprintstart.sprintstartbackend.board.model.request.board.NoteCardRequest
-import com.sprintstart.sprintstartbackend.board.service.BoardService
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
 import com.sprintstart.sprintstartbackend.buddy.service.BuddyActionService.BuddyActionProposal
 import com.sprintstart.sprintstartbackend.buddy.service.BuddyActionService.ProposeOutcome
@@ -52,7 +52,7 @@ import java.util.UUID
 @Component
 @Suppress("TooManyFunctions")
 class BuddyBoardWriteActions(
-    private val boardService: BoardService,
+    private val boardActions: HireBoardActionsApi,
     private val edits: BuddyBoardEditActions,
 ) {
     /** Every board write tool, offered by [BuddyActionService] alongside its own. */
@@ -179,14 +179,12 @@ class BuddyBoardWriteActions(
             return BuddyActionResponse(ok = false, message = "There was no list left to keep.")
         }
 
-        boardService.addAuthoredCard(
-            userId,
-            projectId,
+        boardActions.addCard(
+            HireBoard(userId, projectId),
             ChecklistCardRequest(
                 title = title?.trim()?.take(MAX_CHECKLIST_TITLE)?.ifBlank { null },
                 items = lines.map { ChecklistItemRequest(text = it, done = false) },
             ),
-            by = BoardActor.BUDDY,
         )
         return BuddyActionResponse(
             ok = true,
@@ -200,7 +198,7 @@ class BuddyBoardWriteActions(
      *
      * Takes only the *new* lines, never the whole list. The mentor is not asked to send back what
      * is already on the card, so there is no version of this where it quietly rewords or drops one
-     * — see `BoardService.appendChecklistItems`, which is where that guarantee lives.
+     * — see `HireBoardActionsApi.appendChecklistItems`, which is where that guarantee lives.
      *
      * The card id comes from `read_board`, which is the only place the mentor learns that a
      * checklist exists at all.
@@ -278,7 +276,7 @@ class BuddyBoardWriteActions(
         }
 
         return try {
-            when (val ticked = boardService.tickChecklistItems(userId, projectId, card, lines)) {
+            when (val ticked = boardActions.tickChecklistItems(HireBoard(userId, projectId), card, lines)) {
                 0 -> BuddyActionResponse(
                     ok = false,
                     // Says which of the two it was, because they need different answers: one is
@@ -340,7 +338,7 @@ class BuddyBoardWriteActions(
         val reworded = after.take(MAX_CHECKLIST_ITEM_LENGTH)
 
         return try {
-            if (boardService.rewordChecklistItem(userId, projectId, BoardCardId(cardId), before, reworded)) {
+            if (boardActions.rewordChecklistItem(HireBoard(userId, projectId), BoardCardId(cardId), before, reworded)) {
                 BuddyActionResponse(
                     ok = true,
                     message = "Reworded. It keeps its place and its tick; nothing else changed.",
@@ -399,7 +397,7 @@ class BuddyBoardWriteActions(
         }
 
         return try {
-            boardService.appendChecklistItems(userId, projectId, card, lines)
+            boardActions.appendChecklistItems(HireBoard(userId, projectId), card, lines)
             BuddyActionResponse(
                 ok = true,
                 message = "Added ${lines.size} to that list. Nothing else on it changed.",
@@ -417,7 +415,7 @@ class BuddyBoardWriteActions(
             return BuddyActionResponse(ok = false, message = "There was no note left to keep.")
         }
 
-        boardService.addAuthoredCard(userId, projectId, NoteCardRequest(text = body), by = BoardActor.BUDDY)
+        boardActions.addCard(HireBoard(userId, projectId), NoteCardRequest(text = body))
         return BuddyActionResponse(ok = true, message = "Kept on your board. It's yours — edit it as you like.")
     }
 
