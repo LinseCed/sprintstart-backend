@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.board.service
+package com.sprintstart.sprintstartbackend.board.external
 
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardStage

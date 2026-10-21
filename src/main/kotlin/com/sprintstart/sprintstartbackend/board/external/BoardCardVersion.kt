@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.board.service
+package com.sprintstart.sprintstartbackend.board.external
 
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardCardPayload
 import com.sprintstart.sprintstartbackend.board.model.entity.ChecklistPayload
@@ -20,7 +20,7 @@ import java.util.Locale
  * lock on ([of] on the stored payload). Ticks are left out on purpose: an edit keeps them, so
  * ticking a line between the offer and the click changes nothing the confirm showed.
  */
-internal object BoardCardVersion {
+object BoardCardVersion {
     fun of(content: BoardCardContent?): String? = when (content) {
         is NoteContent -> digest(listOf("note", content.text))
         is LinkContent -> digest(listOf("link", content.url, content.label.orEmpty()))
@@ -28,7 +28,7 @@ internal object BoardCardVersion {
         else -> null
     }
 
-    fun of(payload: BoardCardPayload?): String? = when (payload) {
+    internal fun of(payload: BoardCardPayload?): String? = when (payload) {
         is NotePayload -> digest(listOf("note", payload.text))
         is LinkPayload -> digest(listOf("link", payload.url, payload.label.orEmpty()))
         is ChecklistPayload -> digest(listOf("checklist", payload.title.orEmpty()) + payload.items.map { it.text })

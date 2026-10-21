@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.arrival.service.ResolvedArrivalStep
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.board.service.OpenPullRequestReader
+import com.sprintstart.sprintstartbackend.board.service.hireBoardOver
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.AuthoredPullRequest
 import com.sprintstart.sprintstartbackend.insights.model.dto.response.metrics.HireTimelineResponse
@@ -88,7 +89,7 @@ class BuddyToolExecutorTest {
         buddyBoardTools,
         // The real reader, not a mock: which pull requests count as open and which one leads are
         // its judgements now, and these tests are about the buddy still reporting them.
-        OpenPullRequestReader(artifactIngestionApi),
+        hireBoardOver(openPullRequestReader = OpenPullRequestReader(artifactIngestionApi)),
         projectMembershipApi,
         ArrivalSteps(arrivalStepService),
         // Pathless by default: every case here is about a tool that reads something other than the
