@@ -16,12 +16,11 @@ import java.util.UUID
  * can see. Each tool is executed strictly on behalf of the resolved caller — the agent never
  * supplies whose data to read, so one hire can never read another's metrics through the buddy.
  *
- * The tools come from the features as [HireTool] beans, each mounted on its own condition and in its own
- * order, the path first. The board's tools are still the Buddy's own.
+ * Every tool comes from a feature as a [HireTool] bean, mounted on its own condition and in its own
+ * order, the path first. This only mounts, snapshots and dispatches them.
  */
 @Component
 class BuddyToolExecutor(
-    private val buddyBoardTools: BuddyBoardTools,
     private val hireTools: List<HireTool>,
 ) {
     /**
@@ -41,10 +40,8 @@ class BuddyToolExecutor(
      * team tool re-checks that the person it reads is on that project. None of these tools is ever
      * mounted here.
      */
-    fun toolSpecs(userId: UUID): List<BuddyToolSpecDto> = buildList {
-        hireTools.filter { it.isMountedFor(UserId(userId)) }.forEach { add(it.spec) }
-        addAll(buddyBoardTools.toolSpecs())
-    }
+    fun toolSpecs(userId: UUID): List<BuddyToolSpecDto> =
+        hireTools.filter { it.isMountedFor(UserId(userId)) }.map { it.spec }
 
     /**
      * A plain-text snapshot of the hire's own state, for the buddy's opening greeting to ground
@@ -68,13 +65,9 @@ class BuddyToolExecutor(
      *
      * @param currentPage The app path the caller was on when they spoke, for the app guide.
      */
-    fun execute(call: BuddyToolCallDto, userId: UUID, currentPage: String? = null): String {
+    fun execute(call: BuddyToolCallDto, userId: UUID, currentPage: String? = null): String =
         hireTools
             .firstOrNull { it.spec.name == call.name }
-            ?.let { return it.execute(call, HireToolContext(UserId(userId), currentPage)) }
-        return when {
-            buddyBoardTools.handles(call.name) -> buddyBoardTools.execute(call, userId)
-            else -> "Unknown tool: ${call.name}."
-        }
-    }
+            ?.execute(call, HireToolContext(UserId(userId), currentPage))
+            ?: "Unknown tool: ${call.name}."
 }

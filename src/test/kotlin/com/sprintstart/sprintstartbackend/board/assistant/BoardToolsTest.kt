@@ -1,6 +1,8 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.board.assistant
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireTool
+import com.sprintstart.sprintstartbackend.assistant.external.HireToolContext
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.board.external.enums.HighlightColor
@@ -36,18 +38,24 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
-class BuddyBoardToolsTest {
+class BoardToolsTest {
     private val boardService: BoardService = mockk()
     private val boardStructureService: BoardStructureService = mockk(relaxed = true)
     private val userApi: UserApi = mockk()
     private val pathStepReader: PathStepReader = mockk()
-    private val tools =
-        BuddyBoardTools(
-            hireBoardOver(boardService, boardStructureService),
+    private val tools: List<HireTool> = listOf(
+        PlaceCardTool(
             HireBoardActionsService(boardService),
             userApi,
             HirePathService(mockk(), mockk(), pathStepReader, mockk()),
-        )
+        ),
+        ReadBoardTool(hireBoardOver(boardService, boardStructureService), userApi),
+    )
+
+    private fun List<HireTool>.toolSpecs() = map { it.spec }
+
+    private fun List<HireTool>.execute(call: BuddyToolCallDto, userId: UUID) =
+        first { it.spec.name == call.name }.execute(call, HireToolContext(UserId(userId)))
 
     private val userId = UUID.randomUUID()
     private val projectId = UUID.randomUUID()

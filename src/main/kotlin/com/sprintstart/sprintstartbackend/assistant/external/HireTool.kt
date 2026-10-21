@@ -80,8 +80,10 @@ object HireToolOrder {
     const val CANONICAL_ANSWERS = 800
     const val TEAMMATES = 900
 
-    /** Last of the hire tools: it is about the app rather than the hire's onboarding. */
+    /** After the hire's state: it is about the app rather than the hire's onboarding. */
     const val APP_GUIDE = 1000
+    const val PLACE_CARD = 1100
+    const val READ_BOARD = 1200
 }
 
 /** Where each section of the opening greeting's snapshot sits, lowest first. */

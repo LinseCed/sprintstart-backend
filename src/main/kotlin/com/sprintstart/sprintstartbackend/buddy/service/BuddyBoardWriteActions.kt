@@ -26,15 +26,15 @@ import java.util.UUID
 /**
  * The actions that put the mentor's own words on a hire's board.
  *
- * Split out of [BuddyActionService] once there were four of them, for the reason [BuddyBoardTools]
- * is split out of [BuddyToolExecutor]: the rest of that class wraps existing `/me/...` operations
- * one for one, and these five do something different enough to be worth reading on their own.
+ * Split out of [BuddyActionService] once there were four of them: the rest of that class wraps
+ * existing `/me/...` operations one for one, and these five do something different enough to be worth
+ * reading on their own.
  *
  * **What they have in common is the guarantee, not the card kind.** Each one only ever *proposes*:
  * the tool call writes nothing, the hire sees a button with the content on it, and the confirm is
  * what reaches the board. That gate is what lets the mentor author content at all — the
  * no-confirm `place_card` tool stays limited to live reads whose contents it does not choose (see
- * [BuddyBoardTools]). Widening that tool would be the hole; these are not one.
+ * the board's `PlaceCardTool`). Widening that tool would be the hole; these are not one.
  *
  * The gate is also what lets the buddy reach past adding. [BuddyBoardEditActions] holds the ones
  * that edit, clear and rearrange what the hire already has, offered through here so the whole

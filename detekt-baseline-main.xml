@@ -18,9 +18,9 @@
     <ID>CyclomaticComplexMethod:BoardCardHydrator.kt:BoardCardHydrator$private fun hydrate( card: BoardCard, member: ProjectMember, projectId: ProjectId, diagram: BoardDiagram?, arrivalSteps: List&lt;ArrivalStepResponse&gt;, pathSteps: Map&lt;UUID, ResolvedPathStep&gt;, matches: () -&gt; List&lt;RankedStarterWorkTaskResponse&gt;, ): BoardCardContent</ID>
     <ID>CyclomaticComplexMethod:BoardService.kt:BoardService$@Transactional fun place( userId: UserId, projectId: ProjectId, kind: BoardCardKind, subject: String? = null, by: BoardActor = BoardActor.BUDDY, ): PlacementOutcome</ID>
     <ID>CyclomaticComplexMethod:BoardService.kt:BoardService$private fun editableCardOrThrow( userId: UserId, cardId: BoardCardId, kind: BoardCardKind, ): Pair&lt;BoardCard, Board&gt;</ID>
+    <ID>CyclomaticComplexMethod:BoardTools.kt:ReadBoardTool$private fun readBoard(userId: UserId): String</ID>
     <ID>CyclomaticComplexMethod:BuddyActionService.kt:BuddyActionService$suspend fun perform(request: BuddyActionRequest, jwt: Jwt): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
-    <ID>CyclomaticComplexMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UserId): String</ID>
     <ID>CyclomaticComplexMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>CyclomaticComplexMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun perform(authId: String, userId: UserId, request: BuddyActionRequest): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, userId: UserId, ): BuddyActionService.ProposeOutcome</ID>
@@ -80,13 +80,13 @@
     <ID>LongMethod:BlueprintSeeder.kt:BlueprintSeeder$fun seed()</ID>
     <ID>LongMethod:BoardDiagramService.kt:BoardDiagramService$private fun store( context: DiagramContext, outcome: DiagramOutcome, schema: DiagramSchema, ): DiagramContent</ID>
     <ID>LongMethod:BoardService.kt:BoardService$@Transactional fun place( userId: UserId, projectId: ProjectId, kind: BoardCardKind, subject: String? = null, by: BoardActor = BoardActor.BUDDY, ): PlacementOutcome</ID>
+    <ID>LongMethod:BoardTools.kt:ReadBoardTool$private fun readBoard(userId: UserId): String</ID>
     <ID>LongMethod:BuddyActionService.kt:BuddyActionService$@Suppress("CyclomaticComplexMethod") // The person-scoped gates first, then one branch per action. fun propose(call: BuddyToolCallDto, userId: UUID): ProposeOutcome</ID>
     <ID>LongMethod:BuddyActionService.kt:BuddyActionService$private suspend fun dispatch( type: BuddyActionType, resolved: CallerContext.Resolved, authId: String, request: BuddyActionRequest, ): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyActionService.kt:BuddyActionService$suspend fun perform(request: BuddyActionRequest, jwt: Jwt): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
     <ID>LongMethod:BuddyBoardEditActions.kt:BuddyBoardEditActions$private fun namedCards(call: BuddyToolCallDto, scope: Scope): Found&lt;List&lt;BoardCardResponse&gt;&gt;</ID>
     <ID>LongMethod:BuddyBoardEditActions.kt:BuddyBoardEditActions$private fun proposeChecklistEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome</ID>
-    <ID>LongMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UserId): String</ID>
     <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeCompleteStep( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeCompleteTask( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun perform(authId: String, user: UserId, request: BuddyActionRequest): BuddyActionResponse</ID>
