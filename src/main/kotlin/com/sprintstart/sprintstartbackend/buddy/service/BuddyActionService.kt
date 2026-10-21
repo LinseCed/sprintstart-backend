@@ -44,11 +44,9 @@ import java.util.UUID
  * project, re-resolved server-side at confirm time — a client can never confirm an action against a
  * project the buddy did not scope it to, nor act as another hire.
  *
- * Six wrapped actions live here, each with a propose and a perform half — hence the suppressed
- * function count. The five that put the mentor's *own words* on a board are in
- * [BuddyBoardWriteActions]: what the actions here do is wrap an existing `/me/...` operation one for one,
- * and those do something different enough to be worth reading on their own. The features' own actions,
- * the path's among them, arrive as [HireAction] beans.
+ * The three actions left here each wrap an existing `/me/...` operation one for one, with a propose and
+ * a perform half — hence the suppressed function count. The features' own actions, the path's and the
+ * board's among them, arrive as [HireAction] beans.
  */
 @Service
 @Suppress("TooManyFunctions")
@@ -56,7 +54,6 @@ class BuddyActionService(
     private val hireKnowledgeApi: HireKnowledgeApi,
     private val userApi: UserApi,
     private val hireArrivalApi: HireArrivalApi,
-    private val boardWrites: BuddyBoardWriteActions,
     private val hireActions: List<HireAction>,
 ) {
     /**
@@ -68,7 +65,7 @@ class BuddyActionService(
      */
     fun actionSpecs(userId: UUID): List<BuddyToolSpecDto> =
         listOf(FLAG_TO_PM_SPEC, REQUEST_ATTESTATION_SPEC, SET_GITHUB_LOGIN_SPEC) +
-            hireActions.filter { it.isMountedFor(UserId(userId)) }.map { it.spec } + boardWrites.specs()
+            hireActions.filter { it.isMountedFor(UserId(userId)) }.map { it.spec }
 
     /** Whether [toolName] is an action tool (handled by [propose]) rather than a read-only tool. */
     fun isAction(toolName: String): Boolean =
@@ -124,16 +121,8 @@ class BuddyActionService(
                 }
             }
             BuddyActionType.REQUEST_ATTESTATION -> proposeAttestation(call, type, project.name)
-            else ->
-                if (boardWrites.handles(type)) {
-                    boardWrites.propose(
-                        call,
-                        type,
-                        BuddyBoardWriteActions.Scope(userId, project.projectId, project.name),
-                    )
-                } else {
-                    proposed(type, project.name, question = null)
-                }
+            // Not project-scoped, so it returns before the project gate.
+            BuddyActionType.SET_GITHUB_LOGIN -> error("handled above")
         }
     }
 
@@ -281,43 +270,12 @@ class BuddyActionService(
         authId: String,
         request: HireActionRequest,
     ): BuddyActionResponse =
-        when (type) {
-            else -> withContext(Dispatchers.IO) {
-                when (type) {
-                    BuddyActionType.FLAG_TO_PM -> flagToPm(authId, resolved.projectId, request.question)
-                    BuddyActionType.REQUEST_ATTESTATION ->
-                        requestAttestation(resolved, request.title, request.attesterId)
-                    BuddyActionType.PLACE_CHECKLIST,
-                    BuddyActionType.AMEND_CHECKLIST,
-                    BuddyActionType.PLACE_NOTE,
-                    BuddyActionType.TICK_CHECKLIST_ITEMS,
-                    BuddyActionType.REWORD_CHECKLIST_ITEM,
-                    BuddyActionType.PLACE_LINK,
-                    BuddyActionType.EDIT_NOTE,
-                    BuddyActionType.EDIT_LINK,
-                    BuddyActionType.EDIT_CHECKLIST,
-                    BuddyActionType.DISMISS_CARDS,
-                    BuddyActionType.REORDER_CARDS,
-                    -> boardWrites.perform(
-                        type,
-                        resolved.userId,
-                        resolved.projectId,
-                        BuddyBoardWriteActions.BoardWritePayload(
-                            checklistTitle = request.checklistTitle,
-                            checklistItems = request.checklistItems,
-                            cardId = request.cardId,
-                            noteText = request.noteText,
-                            lineBefore = request.lineBefore,
-                            lineAfter = request.lineAfter,
-                            linkUrl = request.linkUrl,
-                            linkLabel = request.linkLabel,
-                            cardIds = request.cardIds,
-                            basedOn = request.basedOn,
-                        ),
-                    )
-                    // Not project-scoped, so it returns before the project gate this dispatch sits behind.
-                    BuddyActionType.SET_GITHUB_LOGIN -> error("handled above")
-                }
+        withContext(Dispatchers.IO) {
+            when (type) {
+                BuddyActionType.FLAG_TO_PM -> flagToPm(authId, resolved.projectId, request.question)
+                BuddyActionType.REQUEST_ATTESTATION -> requestAttestation(resolved, request.title, request.attesterId)
+                // Not project-scoped, so it returns before the project gate this dispatch sits behind.
+                BuddyActionType.SET_GITHUB_LOGIN -> error("handled above")
             }
         }
 
@@ -502,14 +460,12 @@ class BuddyActionService(
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "No user found with authId: $authId") }
 
     /** A verb phrase for the reason lines, e.g. "claim a goal", "flag this to a PM". */
-    @Suppress("CyclomaticComplexMethod") // One flat branch per action type, and the enum is exhaustive.
     private fun BuddyActionType.gerund(): String =
         when (this) {
             BuddyActionType.FLAG_TO_PM -> "flag this to a PM"
             BuddyActionType.REQUEST_ATTESTATION -> "ask somebody to confirm your work"
             // Never reaches the no-project reason lines: it is not project-scoped.
             BuddyActionType.SET_GITHUB_LOGIN -> "save a GitHub username"
-            else -> BOARD_WRITE_GERUNDS.getValue(this)
         }
 
     private sealed interface ProjectResolution {
@@ -536,21 +492,6 @@ class BuddyActionService(
     }
 
     private companion object {
-        /** [gerund] for every board write, in the words the no-project reason lines use. */
-        val BOARD_WRITE_GERUNDS = mapOf(
-            BuddyActionType.PLACE_CHECKLIST to "keep a checklist on your board",
-            BuddyActionType.AMEND_CHECKLIST to "add to a checklist on your board",
-            BuddyActionType.PLACE_NOTE to "keep a note on your board",
-            BuddyActionType.TICK_CHECKLIST_ITEMS to "tick something off your board",
-            BuddyActionType.REWORD_CHECKLIST_ITEM to "reword a line on your board",
-            BuddyActionType.PLACE_LINK to "keep a link on your board",
-            BuddyActionType.EDIT_NOTE to "update a note on your board",
-            BuddyActionType.EDIT_LINK to "update a link on your board",
-            BuddyActionType.EDIT_CHECKLIST to "update a list on your board",
-            BuddyActionType.DISMISS_CARDS to "clear cards off your board",
-            BuddyActionType.REORDER_CARDS to "rearrange your board",
-        )
-
         val FLAG_TO_PM_SPEC = BuddyToolSpecDto(
             name = BuddyActionType.FLAG_TO_PM.toolName,
             description = "Offer to pass something from the hire to their project's PM. Two cases: " +

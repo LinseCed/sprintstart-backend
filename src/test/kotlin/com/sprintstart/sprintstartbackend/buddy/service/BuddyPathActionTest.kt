@@ -94,10 +94,6 @@ class BuddyPathActionTest {
         userApi = userApi,
         hireArrivalApi = mockk(relaxed = true),
         hireActions = pathActions,
-        boardWrites = BuddyBoardWriteActions(
-            mockk(relaxed = true),
-            BuddyBoardEditActions(mockk(relaxed = true), mockk(relaxed = true)),
-        ),
     )
 
     private val userId = UUID.randomUUID()

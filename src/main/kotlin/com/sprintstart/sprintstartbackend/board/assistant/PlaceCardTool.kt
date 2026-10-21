@@ -130,8 +130,8 @@ class PlaceCardTool(
          *
          * **That is the line, and it is about the confirm rather than about the kind.** The mentor
          * can do anything to the hire's board that the hire can — write a note, link or checklist,
-         * edit one, tick it, take cards off, rearrange them — through the board actions in
-         * `BuddyBoardWriteActions` and `BuddyBoardEditActions`. Each of those proposes, shows the
+         * edit one, tick it, take cards off, rearrange them — through the board's own actions in
+         * this package. Each of those proposes, shows the
          * hire what would change, writes only on their click, and marks the card as the mentor's
          * change afterwards. So the no-confirm tool stays limited to live reads, whose contents it
          * does not choose, and every change to content arrives through a gate the hire opens.

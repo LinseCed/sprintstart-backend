@@ -3,9 +3,8 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.arrival.service.AttestationService
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
+import com.sprintstart.sprintstartbackend.board.assistant.boardActionsOver
 import com.sprintstart.sprintstartbackend.board.service.BoardService
-import com.sprintstart.sprintstartbackend.board.service.HireBoardActionsService
-import com.sprintstart.sprintstartbackend.board.service.hireBoardOver
 import com.sprintstart.sprintstartbackend.knowledge.service.HireKnowledgeService
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
 import com.sprintstart.sprintstartbackend.starterwork.assistant.ClaimGoalAction
@@ -63,15 +62,11 @@ class BuddyActionServiceTest {
         HireKnowledgeService(knowledgeBaseService),
         userApi,
         attestationService,
-        BuddyBoardWriteActions(
-            HireBoardActionsService(boardService),
-            BuddyBoardEditActions(hireBoardOver(boardService), HireBoardActionsService(boardService)),
-        ),
         listOf(
             OpenOrientationAction(hireStarterWork),
             ClaimGoalAction(hireStarterWorkActions),
             RecordAssessmentAction(hireStarterWork, hireStarterWorkActions),
-        ),
+        ) + boardActionsOver(boardService),
     )
 
     private val userId = UUID.randomUUID()

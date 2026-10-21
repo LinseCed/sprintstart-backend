@@ -2,13 +2,12 @@ package com.sprintstart.sprintstartbackend.buddy.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
+import com.sprintstart.sprintstartbackend.board.assistant.boardActionsOver
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardActor
 import com.sprintstart.sprintstartbackend.board.model.request.board.AuthoredCardRequest
 import com.sprintstart.sprintstartbackend.board.model.request.board.ChecklistCardRequest
 import com.sprintstart.sprintstartbackend.board.model.request.board.NoteCardRequest
 import com.sprintstart.sprintstartbackend.board.service.BoardService
-import com.sprintstart.sprintstartbackend.board.service.HireBoardActionsService
-import com.sprintstart.sprintstartbackend.board.service.hireBoardOver
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
@@ -42,17 +41,11 @@ import java.util.UUID
 class BuddyBoardWriteActionsTest {
     private val boardService: BoardService = mockk(relaxed = true)
     private val userApi: UserApi = mockk()
-    private val boardWrites = BuddyBoardWriteActions(
-        HireBoardActionsService(boardService),
-        BuddyBoardEditActions(hireBoardOver(boardService), HireBoardActionsService(boardService)),
-    )
-
     private val service = BuddyActionService(
         hireKnowledgeApi = mockk(relaxed = true),
         userApi = userApi,
         hireArrivalApi = mockk(relaxed = true),
-        hireActions = emptyList(),
-        boardWrites = boardWrites,
+        hireActions = boardActionsOver(boardService),
     )
 
     private val userId = UUID.randomUUID()

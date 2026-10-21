@@ -64,14 +64,12 @@
     <ID>LongMethod:BitbucketUpdatesService.kt:BitbucketUpdatesService$private suspend fun updateConnection(connection: BitbucketConnection): UUID</ID>
     <ID>LongMethod:BlueprintPathCopyFactory.kt:BlueprintPathCopyFactory$fun createCopyFrom( path: BlueprintPath, blueprintKey: UUID, projectId: UUID?, status: BlueprintStatus, version: Int, ): BlueprintPath</ID>
     <ID>LongMethod:BlueprintSeeder.kt:BlueprintSeeder$fun seed()</ID>
+    <ID>LongMethod:BoardActionSupport.kt:internal fun HireBoardApi.namedCards(call: BuddyToolCallDto, board: HireBoard): Found&lt;List&lt;BoardCardResponse&gt;&gt;</ID>
     <ID>LongMethod:BoardDiagramService.kt:BoardDiagramService$private fun store( context: DiagramContext, outcome: DiagramOutcome, schema: DiagramSchema, ): DiagramContent</ID>
     <ID>LongMethod:BoardService.kt:BoardService$@Transactional fun place( userId: UserId, projectId: ProjectId, kind: BoardCardKind, subject: String? = null, by: BoardActor = BoardActor.BUDDY, ): PlacementOutcome</ID>
     <ID>LongMethod:BuddyActionService.kt:BuddyActionService$@Suppress("CyclomaticComplexMethod") // The person-scoped gates first, then one branch per action. fun propose(call: BuddyToolCallDto, userId: UUID): HireActionOutcome</ID>
-    <ID>LongMethod:BuddyActionService.kt:BuddyActionService$private suspend fun dispatch( type: BuddyActionType, resolved: CallerContext.Resolved, authId: String, request: HireActionRequest, ): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyActionService.kt:BuddyActionService$suspend fun perform(request: HireActionRequest, jwt: Jwt): BuddyActionResponse</ID>
     <ID>LongMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
-    <ID>LongMethod:BuddyBoardEditActions.kt:BuddyBoardEditActions$private fun namedCards(call: BuddyToolCallDto, scope: Scope): Found&lt;List&lt;BoardCardResponse&gt;&gt;</ID>
-    <ID>LongMethod:BuddyBoardEditActions.kt:BuddyBoardEditActions$private fun proposeChecklistEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): HireActionOutcome</ID>
     <ID>LongMethod:BuddyReplyStream.kt:internal suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.relayAgentTurn( events: Flow&lt;BuddyAgentStreamEvent&gt;, emittedContent: StringBuilder, ): BuddyAgentResponse</ID>
     <ID>LongMethod:BuddyService.kt:BuddyService$@Suppress("CyclomaticComplexMethod", "ThrowsCount") suspend fun sendMessageForMe( authId: String, sessionId: UUID?, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters?, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>LongMethod:BuddyService.kt:BuddyService$private suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.runToolCall( call: BuddyToolCallDto, userId: UUID, currentPage: String?, ): String</ID>
@@ -90,6 +88,7 @@
     <ID>LongMethod:ContentTeamTools.kt:ContentTeamTools$private fun memberPath(memberId: UUID?, projectId: UUID): String</ID>
     <ID>LongMethod:CreateArrivalStepsAction.kt:CreateArrivalStepsAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>LongMethod:CreateArrivalStepsAction.kt:CreateArrivalStepsAction$private fun preview(drafted: List&lt;DraftedStep&gt;): String</ID>
+    <ID>LongMethod:EditChecklistAction.kt:EditChecklistAction$override fun propose(call: BuddyToolCallDto, context: HireActionContext): HireActionOutcome</ID>
     <ID>LongMethod:FaqConsolidationService.kt:FaqConsolidationService$@Tracked("Merging duplicate FAQ entries") suspend fun mergeDuplicates(projectId: UUID)</ID>
     <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubCommitFetchedEvent): GithubArtifactCommand</ID>
     <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubFileFetchedEvent): GithubArtifactCommand</ID>
