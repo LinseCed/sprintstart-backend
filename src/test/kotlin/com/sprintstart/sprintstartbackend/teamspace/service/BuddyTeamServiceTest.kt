@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDt
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyCitationDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenStreamEvent
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpeningStream
@@ -18,6 +19,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
 import com.sprintstart.sprintstartbackend.assistant.external.FALLBACK_REPLY
 import com.sprintstart.sprintstartbackend.assistant.external.MAX_AGENT_STEPS
+import com.sprintstart.sprintstartbackend.assistant.external.ResolvedArtifact
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.buddy.service.reasoning
 import com.sprintstart.sprintstartbackend.buddy.service.result
@@ -184,6 +186,51 @@ class BuddyTeamServiceTest {
 
         assertThat(requests).hasSize(2)
         assertThat(requests).allMatch { it.teamMode && it.projectIds == listOf(projectId.toString()) }
+    }
+
+    @Test
+    fun `cites only the sources it can resolve, with their file names`() = runTest {
+        val found = UUID.randomUUID()
+        val gone = UUID.randomUUID()
+        every { artifactLookupService.resolve(found) } returns
+            ResolvedArtifact(filename = "runbook.md", sourceUrl = null)
+        every { artifactLookupService.resolve(gone) } returns null
+        coEvery { agentAiClient.buddyAgentTurnStream(any()) } returnsStream BuddyAgentResponse(
+            final = true,
+            text = "See the runbook.",
+            citations = listOf(
+                BuddyCitationDto(artifactId = found.toString(), startLine = 12),
+                BuddyCitationDto(artifactId = gone.toString()),
+                BuddyCitationDto(artifactId = "not-an-id"),
+            ),
+        )
+
+        val events = service.sendMessageForMe(authId, projectId, "how do we deploy?").toList()
+
+        val citations = events.filter { it.type == "citation" }
+        assertThat(citations).hasSize(1)
+        assertThat(citations.single().artifactId).isEqualTo(found.toString())
+        assertThat(citations.single().filename).isEqualTo("runbook.md")
+        assertThat(citations.single().startLine).isEqualTo(12)
+    }
+
+    @Test
+    fun `sends the memory note on the first hop only`() = runTest {
+        session.summary = "They asked about reviews last week."
+        val requests = mutableListOf<BuddyAgentRequest>()
+        coEvery { agentAiClient.buddyAgentTurnStream(capture(requests)) } returnsStreams listOf(
+            BuddyAgentResponse(
+                final = false,
+                messages = listOf(BuddyAgentMessageDto(role = "assistant")),
+                pendingToolCalls = listOf(BuddyToolCallDto(id = "c1", name = TeamReadTools.GET_TEAM_ATTENTION)),
+            ),
+            finalReply("Sam is waiting on a review."),
+        )
+        every { buddyTeamTools.execute(any(), any(), any()) } returns "Sam is waiting."
+
+        service.sendMessageForMe(authId, projectId, "who is stuck?").toList()
+
+        assertThat(requests.map { it.priorSummary }).containsExactly("They asked about reviews last week.", null)
     }
 
     /** The AI narrows retrieval whichever mode it is in, so a hop that dropped the filters would silently widen it. */

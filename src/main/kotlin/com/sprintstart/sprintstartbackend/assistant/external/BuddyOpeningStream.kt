@@ -103,6 +103,6 @@ class BuddyOpeningStream(
 }
 
 /** The messages of the current visit: everything from the last opening on, or all of them if none was opened. */
-fun <T> List<T>.sinceLastOpening(isOpening: (T) -> Boolean): List<T> = drop(
+internal fun <T> List<T>.sinceLastOpening(isOpening: (T) -> Boolean): List<T> = drop(
     indexOfLast(isOpening).coerceAtLeast(0),
 )
