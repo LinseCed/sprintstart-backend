@@ -46,7 +46,8 @@ import java.util.Optional
 import java.util.UUID
 
 /**
- * The actions that let a conversation move somebody along their onboarding path.
+ * The path actions that let a conversation move somebody along their onboarding path, offered and
+ * confirmed through the Buddy (`path/assistant`).
  *
  * The through-line, and the reason each of these is a *proposal*: **the mentor may say what it
  * thinks, and the hire is the one who changes their own onboarding.** Three rules follow, and every
@@ -57,7 +58,7 @@ import java.util.UUID
  * 3. A refusal is addressed to the mentor and says what to do instead -- a tool result that only
  *    says "no" is one the model relays to the hire as a broken feature.
  */
-class BuddyPathActionTest {
+class BuddyPathProgressTest {
     private val myPathTool: MyPathTool = mockk()
     private val onboardingStepService: OnboardingStepService = mockk()
     private val onboardingStepPlacementService: OnboardingStepPlacementService = mockk()
