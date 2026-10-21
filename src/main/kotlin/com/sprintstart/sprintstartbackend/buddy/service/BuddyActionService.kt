@@ -4,19 +4,18 @@ import com.sprintstart.sprintstartbackend.arrival.external.HireArrivalApi
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.assistant.external.noArgumentsSchema
+import com.sprintstart.sprintstartbackend.assistant.external.HireAction
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionContext
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionOutcome
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionScope
+import com.sprintstart.sprintstartbackend.assistant.external.HireProject
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.knowledge.external.HireKnowledgeApi
 import com.sprintstart.sprintstartbackend.shared.ids.AuthId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
-import com.sprintstart.sprintstartbackend.shared.ids.StarterWorkTaskId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
-import com.sprintstart.sprintstartbackend.starterwork.external.HireStarterWorkActionsApi
-import com.sprintstart.sprintstartbackend.starterwork.external.HireStarterWorkApi
-import com.sprintstart.sprintstartbackend.starterwork.external.enums.GoalClaimant
-import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProficiencyLevel
-import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.MyOrientationResponse
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -54,13 +53,12 @@ import java.util.UUID
 @Service
 @Suppress("TooManyFunctions")
 class BuddyActionService(
-    private val hireStarterWork: HireStarterWorkApi,
     private val hireKnowledgeApi: HireKnowledgeApi,
-    private val hireStarterWorkActions: HireStarterWorkActionsApi,
     private val userApi: UserApi,
     private val hireArrivalApi: HireArrivalApi,
     private val buddyPathActions: BuddyPathActions,
     private val boardWrites: BuddyBoardWriteActions,
+    private val hireActions: List<HireAction>,
 ) {
     /**
      * The action tools the AI reasoner is told it may propose, alongside the read-only tools.
@@ -70,40 +68,34 @@ class BuddyActionService(
      * with no onboarding path will offer to tick a step off a plan they have not got.
      */
     fun actionSpecs(userId: UUID): List<BuddyToolSpecDto> =
-        listOf(
-            FLAG_TO_PM_SPEC,
-            OPEN_ORIENTATION_SPEC,
-            CLAIM_GOAL_SPEC,
-            REQUEST_ATTESTATION_SPEC,
-            SET_GITHUB_LOGIN_SPEC,
-            RECORD_ASSESSMENT_SPEC,
-        ) + buddyPathActions.specs(userId) + boardWrites.specs()
+        listOf(FLAG_TO_PM_SPEC, REQUEST_ATTESTATION_SPEC, SET_GITHUB_LOGIN_SPEC) +
+            hireActions.filter { it.isMountedFor(UserId(userId)) }.map { it.spec } +
+            buddyPathActions.specs(userId) + boardWrites.specs()
 
     /** Whether [toolName] is an action tool (handled by [propose]) rather than a read-only tool. */
-    fun isAction(toolName: String): Boolean = BuddyActionType.fromToolName(toolName) != null
+    fun isAction(toolName: String): Boolean =
+        BuddyActionType.fromToolName(toolName) != null || hireActions.any { it.spec.name == toolName }
 
     /**
      * Turns an action tool call into a proposal for the hire to confirm — without mutating.
      *
-     * Returns the [ProposeOutcome.toolResult] to feed back to the AI (so it relays "I can do X —
-     * confirm below", never "done"), and a [ProposeOutcome.proposal] to emit to the client when the
+     * Returns the [HireActionOutcome.toolResult] to feed back to the AI (so it relays "I can do X —
+     * confirm below", never "done"), and a [HireActionOutcome.proposal] to emit to the client when the
      * action can be offered. When it can't (no project, or a missing question), there is no proposal
      * and the tool result is the legible reason.
      */
     @Suppress("CyclomaticComplexMethod") // The person-scoped gates first, then one branch per action.
-    fun propose(call: BuddyToolCallDto, userId: UUID): ProposeOutcome {
+    fun propose(call: BuddyToolCallDto, userId: UUID): HireActionOutcome {
+        hireActions.firstOrNull { it.spec.name == call.name }?.let {
+            return proposeContributed(it, call, UserId(userId))
+        }
         val type = BuddyActionType.fromToolName(call.name)
-            ?: return ProposeOutcome("Unknown action: ${call.name}.", null)
+            ?: return HireActionOutcome("Unknown action: ${call.name}.", null)
 
         // Before the project gate: a GitHub login is a fact about a person, and a hire on day one may be on
         // no project yet.
         if (type == BuddyActionType.SET_GITHUB_LOGIN) {
             return proposeGithubLogin(call, type)
-        }
-
-        // Before the project gate as well: the competency ledger is global.
-        if (type == BuddyActionType.RECORD_ASSESSMENT) {
-            return proposeAssessment(call, type)
         }
 
         // Before the project gate as well: an onboarding path belongs to a person, not to a project.
@@ -114,12 +106,12 @@ class BuddyActionService(
         val project = when (val resolution = resolveProject(userId)) {
             is ProjectResolution.Resolved -> resolution
             ProjectResolution.None ->
-                return ProposeOutcome(
+                return HireActionOutcome(
                     "The hire is not on a project yet, so there is nothing to ${type.gerund()} for them.",
                     null,
                 )
             ProjectResolution.Ambiguous ->
-                return ProposeOutcome(
+                return HireActionOutcome(
                     "The hire is onboarding on more than one project. Ask which one before offering to " +
                         "${type.gerund()}.",
                     null,
@@ -130,24 +122,12 @@ class BuddyActionService(
             BuddyActionType.FLAG_TO_PM -> {
                 val question = call.textArgument("question")
                 if (question.isBlank()) {
-                    ProposeOutcome(
+                    HireActionOutcome(
                         "No question was provided to flag. Ask the hire what they want answered first.",
                         null,
                     )
                 } else {
                     proposed(type, project.name, question = question)
-                }
-            }
-            BuddyActionType.CLAIM_GOAL -> {
-                val taskId = call.uuidArgument("task_id")
-                if (taskId == null) {
-                    ProposeOutcome(
-                        "No task_id was provided. Read the suggested tasks and offer to claim one " +
-                            "by its task_id.",
-                        null,
-                    )
-                } else {
-                    proposed(type, project.name, question = null, taskId = taskId)
                 }
             }
             BuddyActionType.REQUEST_ATTESTATION -> proposeAttestation(call, type, project.name)
@@ -173,20 +153,20 @@ class BuddyActionService(
      * those rules for every other writer, and a second opinion here would be one more place for
      * them to drift.
      */
-    private fun proposeGithubLogin(call: BuddyToolCallDto, type: BuddyActionType): ProposeOutcome {
+    private fun proposeGithubLogin(call: BuddyToolCallDto, type: BuddyActionType): HireActionOutcome {
         val login = call.textArgument("login")
         if (login.isBlank()) {
-            return ProposeOutcome(
+            return HireActionOutcome(
                 "No username was provided. Ask the hire for their GitHub username before offering " +
                     "to save it.",
                 null,
             )
         }
-        return ProposeOutcome(
+        return HireActionOutcome(
             toolResult = "Proposed to the hire: save “$login” as their GitHub username. They will " +
                 "see a confirm button; it is saved only if they click it. Offer it — do not claim " +
                 "it is done.",
-            proposal = BuddyActionProposal(
+            proposal = HireActionProposal(
                 action = type.toolName,
                 label = type.label,
                 question = null,
@@ -227,68 +207,6 @@ class BuddyActionService(
     }
 
     /**
-     * Offers to record where the conversation placed the hire on one competency, without writing.
-     *
-     * Both halves are resolved *here*, not at confirm time, and that is the point of doing it
-     * before the button rather than after it. A key nothing matches or a level that is not one of
-     * the four words comes back as a correction the mentor can act on mid-conversation; discovered
-     * at confirm time it would instead be a hire clicking a button and being told no.
-     *
-     * The button names the competency and the level rather than saying "save this". A hire is
-     * confirming a judgement about their own skill, and the label is the last thing they read
-     * before it becomes a record.
-     */
-    private fun proposeAssessment(call: BuddyToolCallDto, type: BuddyActionType): ProposeOutcome {
-        val key = call.textArgument("competency_key")
-        val label = key.takeIf { it.isNotBlank() }?.let { hireStarterWork.competencyLabel(it) }
-            ?: return ProposeOutcome(
-                "No competency matched “$key”. Read get_competencies_to_assess and pass a " +
-                    "competency_key exactly as it appears there.",
-                null,
-            )
-
-        val level = ProficiencyLevel.fromWord(call.textArgument("level"))
-            ?: return ProposeOutcome(
-                "That is not a level I can record. Use one of: ${ProficiencyLevel.WORDS.joinToString(", ")}.",
-                null,
-            )
-
-        return ProposeOutcome(
-            toolResult = "Proposed to the hire: place them at ${level.word} on “$label”. They will " +
-                "see a confirm button; nothing is recorded unless they click it. Tell them what you " +
-                "concluded and why — do not claim it is saved.",
-            proposal = BuddyActionProposal(
-                action = type.toolName,
-                label = "Save: $label — ${level.word}",
-                question = null,
-                competencyKey = key,
-                level = level.word,
-            ),
-        )
-    }
-
-    /**
-     * Writes the placement the hire confirmed.
-     *
-     * The level is re-read from the word here rather than trusted as a rank, so a client cannot
-     * confirm a level the scale does not have. [HireStarterWorkActionsApi] owns every rule about
-     * what a placement may overwrite; this only relays the sentence it produced.
-     */
-    private fun recordAssessment(authId: String, competencyKey: String?, level: String?): BuddyActionResponse {
-        if (competencyKey.isNullOrBlank()) {
-            return BuddyActionResponse(ok = false, message = "No skill was proposed to record.")
-        }
-        val resolvedLevel = level?.let { ProficiencyLevel.fromWord(it) }
-            ?: return BuddyActionResponse(ok = false, message = "No level was proposed to record.")
-
-        val userId = userApi.getUserIdByAuthId(authId).orElse(null)
-            ?: return BuddyActionResponse(ok = false, message = "I couldn't find your account.")
-
-        val outcome = hireStarterWorkActions.recordPlacement(UserId(userId), competencyKey, resolvedLevel)
-        return BuddyActionResponse(ok = outcome.recorded, message = outcome.message)
-    }
-
-    /**
      * Both halves of an attestation proposal must be real before the hire sees a button: what work,
      * and which teammate. A missing one comes back as guidance the buddy can act on rather than a
      * proposal it cannot honour.
@@ -297,14 +215,14 @@ class BuddyActionService(
         call: BuddyToolCallDto,
         type: BuddyActionType,
         projectName: String,
-    ): ProposeOutcome {
+    ): HireActionOutcome {
         val title = call.textArgument("title")
         val attesterId = call.uuidArgument("attester_id")
         return when {
             title.isBlank() ->
-                ProposeOutcome("No title was provided. Ask the hire what work they want confirmed.", null)
+                HireActionOutcome("No title was provided. Ask the hire what work they want confirmed.", null)
             attesterId == null ->
-                ProposeOutcome(
+                HireActionOutcome(
                     "No attester_id was provided. Read get_teammates and ask the hire which of " +
                         "them should confirm it, then pass that person's id.",
                     null,
@@ -321,9 +239,12 @@ class BuddyActionService(
      * line to relay. Only a genuinely unexpected failure propagates. Blocking work runs on the IO
      * dispatcher; opening orientation is itself suspend and manages its own transactions.
      */
-    suspend fun perform(request: BuddyActionRequest, jwt: Jwt): BuddyActionResponse {
+    suspend fun perform(request: HireActionRequest, jwt: Jwt): BuddyActionResponse {
         val authId = jwt.subject
 
+        hireActions.firstOrNull { it.spec.name == request.action }?.let {
+            return performContributed(it, request, AuthId(authId))
+        }
         val type = BuddyActionType.fromToolName(request.action)
             ?: return BuddyActionResponse(ok = false, message = "That action isn't recognised.")
 
@@ -336,13 +257,6 @@ class BuddyActionService(
                 // claims it. Both are things the hire can act on, so they come back as the
                 // sentence GithubLoginService wrote rather than as a failed confirm.
                 BuddyActionResponse(ok = false, message = ex.reason ?: "That username could not be saved.")
-            }
-        }
-
-        // Same reason again: the ledger is global, so there is no project to resolve first.
-        if (type == BuddyActionType.RECORD_ASSESSMENT) {
-            return withContext(Dispatchers.IO) {
-                recordAssessment(authId, request.competencyKey, request.level)
             }
         }
 
@@ -383,15 +297,12 @@ class BuddyActionService(
         type: BuddyActionType,
         resolved: CallerContext.Resolved,
         authId: String,
-        request: BuddyActionRequest,
+        request: HireActionRequest,
     ): BuddyActionResponse =
         when (type) {
-            BuddyActionType.OPEN_ORIENTATION -> openOrientation(resolved.userId, resolved.projectId)
             else -> withContext(Dispatchers.IO) {
                 when (type) {
                     BuddyActionType.FLAG_TO_PM -> flagToPm(authId, resolved.projectId, request.question)
-                    BuddyActionType.CLAIM_GOAL ->
-                        claimGoal(AuthId(authId), ProjectId(resolved.projectId), request.taskId)
                     BuddyActionType.REQUEST_ATTESTATION ->
                         requestAttestation(resolved, request.title, request.attesterId)
                     BuddyActionType.PLACE_CHECKLIST,
@@ -422,11 +333,9 @@ class BuddyActionService(
                             basedOn = request.basedOn,
                         ),
                     )
-                    BuddyActionType.OPEN_ORIENTATION,
                     // Not project-scoped, so these return before the project gate this dispatch
                     // sits behind.
                     BuddyActionType.SET_GITHUB_LOGIN,
-                    BuddyActionType.RECORD_ASSESSMENT,
                     BuddyActionType.COMPLETE_STEP,
                     BuddyActionType.COMPLETE_TASK,
                     BuddyActionType.ANSWER_QUESTION,
@@ -436,59 +345,6 @@ class BuddyActionService(
                 }
             }
         }
-
-    private suspend fun openOrientation(userId: UUID, projectId: UUID): BuddyActionResponse {
-        val orientation = hireStarterWork.orientationFor(UserId(userId), ProjectId(projectId))
-        return if (orientation.packet != null) {
-            BuddyActionResponse(
-                ok = true,
-                message = "I've put together your task orientation for “${orientation.taskTitle}” — " +
-                    "the step-by-step, cited guide is right here in our conversation.",
-            )
-        } else {
-            BuddyActionResponse(ok = false, message = noPacketReason(orientation))
-        }
-    }
-
-    /**
-     * Why there is no packet, said only as far as this knows.
-     *
-     * Three states used to collapse into one sentence, and the sentence was a claim about the
-     * hire's work rather than about this call: a hire whose packet had failed to assemble was told
-     * they had no current task, which they could see on their own board was untrue. Being told a
-     * false thing about your own state is worse than being told nothing — it is the hire's word
-     * against the system's, and the hire stops trusting the surface rather than the sentence.
-     *
-     * So the no-task line is now only used where [MyOrientationResponse.taskId] really is null.
-     * With a task and no packet, the honest answer names the task and says the packet is what is
-     * missing, which is also the difference between "claim something" and "try again".
-     */
-    private fun noPacketReason(orientation: MyOrientationResponse): String = when {
-        orientation.reason != null -> orientation.reason
-        orientation.taskId == null ->
-            "There's no current task to open a packet for yet — claim one and I'll put it together."
-        else ->
-            "I couldn't put a packet together for “${orientation.taskTitle}” just now. " +
-                "Nothing is wrong with the task — ask me again in a moment."
-    }
-
-    private fun claimGoal(
-        authId: AuthId,
-        projectId: ProjectId,
-        taskId: UUID?,
-    ): BuddyActionResponse {
-        if (taskId == null) {
-            return BuddyActionResponse(ok = false, message = "No task was proposed to claim.")
-        }
-        // Claiming also pins the current-task card (see `HireStarterWorkActionsApi.claimGoal`), so the
-        // message below can promise it is on the board.
-        val goal = hireStarterWorkActions.claimGoal(authId, projectId, StarterWorkTaskId(taskId), GoalClaimant.BUDDY)
-        return BuddyActionResponse(
-            ok = true,
-            message = "You're now working toward “${goal.title}” — I'll shape your next steps around it. " +
-                "It's on your board too, so you won't have to go looking for it.",
-        )
-    }
 
     /**
      * Asks a named colleague to confirm a piece of the hire's work.
@@ -564,15 +420,15 @@ class BuddyActionService(
         checklistItems: List<String>? = null,
         cardId: UUID? = null,
         noteText: String? = null,
-    ): ProposeOutcome =
-        ProposeOutcome(
+    ): HireActionOutcome =
+        HireActionOutcome(
             toolResult = "Proposed to the hire on $projectName: “${type.label}”. They will see a confirm " +
                 "button; the action runs only if they click it. Offer it — do not claim it is done. " +
                 "You will never be told whether they confirmed it or what came of it, and a confirmed " +
                 "proposal leaves the screen. So do not describe the button, tell them where to find " +
                 "it, or ask them to click it again. If they say nothing happened or they cannot see " +
                 "it, believe them and call this tool again to offer it afresh.",
-            proposal = BuddyActionProposal(
+            proposal = HireActionProposal(
                 action = type.toolName,
                 label = type.label,
                 question = question,
@@ -586,6 +442,61 @@ class BuddyActionService(
                 noteText = noteText,
             ),
         )
+
+    /** Offers a feature's [action], resolving the hire's one project first when the action needs it. */
+    private fun proposeContributed(action: HireAction, call: BuddyToolCallDto, hire: UserId): HireActionOutcome {
+        val project = if (action.scope == HireActionScope.PERSON) {
+            null
+        } else {
+            when (val resolution = resolveProject(hire.value)) {
+                is ProjectResolution.Resolved -> HireProject(ProjectId(resolution.projectId), resolution.name)
+                ProjectResolution.None -> return HireActionOutcome(
+                    "The hire is not on a project yet, so there is nothing to ${action.gerund} for them.",
+                    null,
+                )
+                ProjectResolution.Ambiguous -> return HireActionOutcome(
+                    "The hire is onboarding on more than one project. Ask which one before offering to " +
+                        "${action.gerund}.",
+                    null,
+                )
+            }
+        }
+        return action.propose(call, HireActionContext(hire, project))
+    }
+
+    /**
+     * Runs a feature's confirmed [action] for the caller behind [authId], with the same project gate as
+     * [proposeContributed]. A precondition the action's service refuses comes back as its sentence.
+     */
+    private suspend fun performContributed(
+        action: HireAction,
+        request: HireActionRequest,
+        authId: AuthId,
+    ): BuddyActionResponse {
+        val userId = withContext(Dispatchers.IO) { userApi.getUserIdByAuthId(authId.value).orElse(null) }
+            ?: return BuddyActionResponse(ok = false, message = "I couldn't find your account.")
+        val project = if (action.scope == HireActionScope.PERSON) {
+            null
+        } else {
+            when (val resolution = withContext(Dispatchers.IO) { resolveProject(userId) }) {
+                is ProjectResolution.Resolved -> HireProject(ProjectId(resolution.projectId), resolution.name)
+                ProjectResolution.None -> return BuddyActionResponse(
+                    ok = false,
+                    message = "You're not on a project yet.",
+                )
+                ProjectResolution.Ambiguous -> return BuddyActionResponse(
+                    ok = false,
+                    message = "You're onboarding on more than one project — tell me which one and I'll set it up.",
+                )
+            }
+        }
+        val context = HireActionContext(UserId(userId), project)
+        return try {
+            withContext(Dispatchers.IO) { action.perform(request, context, authId) }
+        } catch (ex: ResponseStatusException) {
+            BuddyActionResponse(ok = false, message = ex.reason ?: "That didn't go through — try again in a moment.")
+        }
+    }
 
     private fun resolveProject(userId: UUID): ProjectResolution {
         val projects = userApi
@@ -620,12 +531,9 @@ class BuddyActionService(
     private fun BuddyActionType.gerund(): String =
         when (this) {
             BuddyActionType.FLAG_TO_PM -> "flag this to a PM"
-            BuddyActionType.OPEN_ORIENTATION -> "open a task packet"
-            BuddyActionType.CLAIM_GOAL -> "claim a goal"
             BuddyActionType.REQUEST_ATTESTATION -> "ask somebody to confirm your work"
             // The next three never reach the no-project reason lines: they are not project-scoped.
             BuddyActionType.SET_GITHUB_LOGIN -> "save a GitHub username"
-            BuddyActionType.RECORD_ASSESSMENT -> "record where a chat placed you"
             BuddyActionType.COMPLETE_STEP -> "tick a step off your path"
             BuddyActionType.COMPLETE_TASK -> "tick a line off your checklist"
             BuddyActionType.ANSWER_QUESTION -> "send an answer to a question"
@@ -633,72 +541,6 @@ class BuddyActionService(
             BuddyActionType.REQUEST_SKIP -> "ask your PM to skip a step"
             else -> BOARD_WRITE_GERUNDS.getValue(this)
         }
-
-    /** The result of proposing an action: what to tell the AI, and the proposal to show the hire (if any). */
-    data class ProposeOutcome(
-        val toolResult: String,
-        val proposal: BuddyActionProposal?,
-    )
-
-    /** A proposed action for the hire to confirm — carried on the stream as an `action_proposal` event. */
-    data class BuddyActionProposal(
-        val action: String,
-        val label: String,
-        val question: String?,
-        /**
-         * The goal-claim target. This and the confirm payloads below are echoed back verbatim by the client,
-         * so a confirmed action targets what the buddy proposed.
-         */
-        val taskId: UUID? = null,
-        val title: String? = null,
-        val attesterId: String? = null,
-        val githubLogin: String? = null,
-        /** `record_assessment` confirm payload: which competency, and the level in words. */
-        val competencyKey: String? = null,
-        val level: String? = null,
-        /**
-         * Path-action confirm payloads: the node of the hire's own path the action names, the answer
-         * `answer_question` would send in the hire's own words, and the description of a step
-         * `add_path_step` would add.
-         */
-        val stepId: UUID? = null,
-        val questionId: UUID? = null,
-        val phaseId: UUID? = null,
-        /** The checklist line `complete_task` would tick off. See the request DTO for why not [taskId]. */
-        val onboardingTaskId: UUID? = null,
-        val answer: String? = null,
-        /** The options a multiple-choice `answer_question` [answer] stands for. See the request DTO. */
-        val optionIds: List<UUID> = emptyList(),
-        val description: String? = null,
-        /** The reason `request_skip` would send to the PM. */
-        val reason: String? = null,
-        /** Where `add_path_step` would put the step in its phase's graph. */
-        val waitsOnIds: List<UUID> = emptyList(),
-        val unlocksIds: List<UUID> = emptyList(),
-        /** `place_checklist` confirm payload: the list as the hire will read it before confirming. */
-        val checklistTitle: String? = null,
-        val checklistItems: List<String>? = null,
-        /** `amend_checklist`: the card being added to, and only the lines being added. */
-        val cardId: UUID? = null,
-        /** `place_note` confirm payload. */
-        val noteText: String? = null,
-        /** `reword_checklist_item`: the line as it reads now, and as it would read. */
-        val lineBefore: String? = null,
-        val lineAfter: String? = null,
-        /** `place_link` / `edit_link`: where the link points, and what it is called. */
-        val linkUrl: String? = null,
-        val linkLabel: String? = null,
-        /** `dismiss_cards` / `reorder_cards`: the cards, in order, and their names for display. */
-        val cardIds: List<UUID>? = null,
-        val cardNames: List<String>? = null,
-        /**
-         * `edit_note` / `edit_link` / `edit_checklist`: a fingerprint of the card's words as the
-         * proposal read them, echoed back so a confirm can tell the card changed in between.
-         */
-        val basedOn: String? = null,
-        /** The board edits: what confirming would change, as one sentence the hire can read. */
-        val preview: String? = null,
-    )
 
     private sealed interface ProjectResolution {
         data class Resolved(
@@ -765,34 +607,6 @@ class BuddyActionService(
             },
         )
 
-        val OPEN_ORIENTATION_SPEC = BuddyToolSpecDto(
-            name = BuddyActionType.OPEN_ORIENTATION.toolName,
-            description = "Offer to assemble the task orientation packet for the task the hire claimed — a " +
-                "step-by-step, cited guide to setting up, finding the code, making the change, and opening the " +
-                "PR. Proposes only; the hire confirms. Use when they ask how to start the task they have. Takes " +
-                "no arguments.",
-            parameters = noArgumentsSchema(),
-        )
-
-        val CLAIM_GOAL_SPEC = BuddyToolSpecDto(
-            name = BuddyActionType.CLAIM_GOAL.toolName,
-            description = "Offer to claim a suggested starter-work task as the hire's goal — the " +
-                "contribution their learning plan then aims at. This does NOT claim anything by " +
-                "itself; it shows the hire a confirm button and runs only if they click. Use when " +
-                "the hire picks one of the tasks get_suggested_tasks returned, passing that " +
-                "task's task_id.",
-            parameters = buildJsonObject {
-                put("type", "object")
-                putJsonObject("properties") {
-                    putJsonObject("task_id") {
-                        put("type", "string")
-                        put("description", "The task_id of the suggested task the hire picked.")
-                    }
-                }
-                putJsonArray("required") { add("task_id") }
-            },
-        )
-
         val SET_GITHUB_LOGIN_SPEC = BuddyToolSpecDto(
             name = BuddyActionType.SET_GITHUB_LOGIN.toolName,
             description = "Offer to save the hire's GitHub username. Use this the moment they tell " +
@@ -810,42 +624,6 @@ class BuddyActionService(
                     }
                 }
                 putJsonArray("required") { add("login") }
-            },
-        )
-
-        val RECORD_ASSESSMENT_SPEC = BuddyToolSpecDto(
-            name = BuddyActionType.RECORD_ASSESSMENT.toolName,
-            description = "Offer to record where this conversation placed the hire on ONE " +
-                "competency. Call it as you finish talking about each skill, not once at the end. " +
-                "Only ever after actually asking them something about it: a placement nobody was " +
-                "asked about is a guess in a permanent record. Pass the competency_key exactly as " +
-                "get_competencies_to_assess gave it, and a level of " +
-                "${ProficiencyLevel.WORDS.joinToString("/")} — beginner is the honest answer when " +
-                "they have seen it but not used it. This does NOT record anything by itself; the " +
-                "hire sees a confirm button naming the skill and the level, and only they can " +
-                "save it. Tell them what you concluded and why before you offer it, and take a " +
-                "correction as the answer — it is their skill, not your verdict. What they say " +
-                "here is a starting point that their accepted work will outrank later, so never " +
-                "present it as final or as a score.",
-            parameters = buildJsonObject {
-                put("type", "object")
-                putJsonObject("properties") {
-                    putJsonObject("competency_key") {
-                        put("type", "string")
-                        put("description", "The competency_key from get_competencies_to_assess.")
-                    }
-                    putJsonObject("level") {
-                        put("type", "string")
-                        put(
-                            "description",
-                            "Where the conversation placed them: ${ProficiencyLevel.WORDS.joinToString(", ")}.",
-                        )
-                    }
-                }
-                putJsonArray("required") {
-                    add("competency_key")
-                    add("level")
-                }
             },
         )
 

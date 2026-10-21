@@ -3,6 +3,8 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionOutcome
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionProposal
 import com.sprintstart.sprintstartbackend.board.external.BoardCardVersion
 import com.sprintstart.sprintstartbackend.board.external.BoardReading
 import com.sprintstart.sprintstartbackend.board.external.HireBoardActionsApi
@@ -20,8 +22,6 @@ import com.sprintstart.sprintstartbackend.board.model.response.board.ChecklistCo
 import com.sprintstart.sprintstartbackend.board.model.response.board.LinkContent
 import com.sprintstart.sprintstartbackend.board.model.response.board.NoteContent
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyActionService.BuddyActionProposal
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyActionService.ProposeOutcome
 import com.sprintstart.sprintstartbackend.buddy.service.BuddyBoardWriteActions.BoardWritePayload
 import com.sprintstart.sprintstartbackend.buddy.service.BuddyBoardWriteActions.Scope
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
@@ -80,7 +80,7 @@ class BuddyBoardEditActions(
     fun handles(type: BuddyActionType): Boolean = type in HANDLED
 
     /** Turns one of these tool calls into a proposal, or into the reason there is none. */
-    fun propose(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome =
+    fun propose(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): HireActionOutcome =
         when (type) {
             BuddyActionType.PLACE_LINK -> proposeLink(call, type, scope)
             BuddyActionType.EDIT_NOTE -> proposeNoteEdit(call, type, scope)
@@ -112,7 +112,7 @@ class BuddyBoardEditActions(
             BuddyActionResponse(ok = false, message = ex.reason ?: "That change could not be made.")
         }
 
-    private fun proposeLink(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
+    private fun proposeLink(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): HireActionOutcome {
         val url = call.textArgument("url")
         val label = call.textArgument("label").take(MAX_LABEL).ifBlank { null }
         if (!url.isWebAddress()) return refused(NOT_A_WEB_ADDRESS)
@@ -120,7 +120,7 @@ class BuddyBoardEditActions(
         return offer(
             type,
             scope,
-            BuddyActionProposal(
+            HireActionProposal(
                 action = type.toolName,
                 label = type.label,
                 question = null,
@@ -131,7 +131,7 @@ class BuddyBoardEditActions(
         )
     }
 
-    private fun proposeNoteEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
+    private fun proposeNoteEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): HireActionOutcome {
         val text = call.textArgument("text").take(MAX_NOTE_LENGTH)
         val card = when (val found = ownCard(call, scope, BoardCardKind.NOTE)) {
             is Found.Refused -> return refused(found.reason)
@@ -150,7 +150,7 @@ class BuddyBoardEditActions(
         return offer(
             type,
             scope,
-            BuddyActionProposal(
+            HireActionProposal(
                 action = type.toolName,
                 label = type.label,
                 question = null,
@@ -162,7 +162,7 @@ class BuddyBoardEditActions(
         )
     }
 
-    private fun proposeLinkEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
+    private fun proposeLinkEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): HireActionOutcome {
         val url = call.textArgument("url")
         val label = call.textArgument("label").take(MAX_LABEL).ifBlank { null }
         val card = when (val found = ownCard(call, scope, BoardCardKind.LINK)) {
@@ -177,7 +177,7 @@ class BuddyBoardEditActions(
         return offer(
             type,
             scope,
-            BuddyActionProposal(
+            HireActionProposal(
                 action = type.toolName,
                 label = type.label,
                 question = null,
@@ -199,7 +199,7 @@ class BuddyBoardEditActions(
      * not notice. Lines that survive keep their ticks — `HireBoardActionsApi.editCard`
      * matches them back by their words.
      */
-    private fun proposeChecklistEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
+    private fun proposeChecklistEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): HireActionOutcome {
         val title = call.textArgument("title").take(MAX_CHECKLIST_TITLE).ifBlank { null }
         val items = call.textListArgument("items").map { it.take(MAX_CHECKLIST_ITEM_LENGTH) }.take(MAX_CHECKLIST_ITEMS)
         val card = when (val found = ownCard(call, scope, BoardCardKind.CHECKLIST)) {
@@ -227,7 +227,7 @@ class BuddyBoardEditActions(
         return offer(
             type,
             scope,
-            BuddyActionProposal(
+            HireActionProposal(
                 action = type.toolName,
                 label = type.label,
                 question = null,
@@ -240,7 +240,7 @@ class BuddyBoardEditActions(
         )
     }
 
-    private fun proposeDismissal(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
+    private fun proposeDismissal(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): HireActionOutcome {
         val cards = when (val found = namedCards(call, scope)) {
             is Found.Refused -> return refused(found.reason)
             is Found.Ok -> found.value
@@ -250,7 +250,7 @@ class BuddyBoardEditActions(
         return offer(
             type,
             scope,
-            BuddyActionProposal(
+            HireActionProposal(
                 action = type.toolName,
                 label = type.label,
                 question = null,
@@ -262,7 +262,7 @@ class BuddyBoardEditActions(
         )
     }
 
-    private fun proposeOrder(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome {
+    private fun proposeOrder(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): HireActionOutcome {
         val cards = when (val found = namedCards(call, scope)) {
             is Found.Refused -> return refused(found.reason)
             is Found.Ok -> found.value
@@ -272,7 +272,7 @@ class BuddyBoardEditActions(
         return offer(
             type,
             scope,
-            BuddyActionProposal(
+            HireActionProposal(
                 action = type.toolName,
                 label = type.label,
                 question = null,
@@ -474,10 +474,10 @@ class BuddyBoardEditActions(
         ) : Found<Nothing>
     }
 
-    private fun offer(type: BuddyActionType, scope: Scope, proposal: BuddyActionProposal): ProposeOutcome =
-        ProposeOutcome(toolResult = offeredOnBoard(type, scope.projectName), proposal = proposal)
+    private fun offer(type: BuddyActionType, scope: Scope, proposal: HireActionProposal): HireActionOutcome =
+        HireActionOutcome(toolResult = offeredOnBoard(type, scope.projectName), proposal = proposal)
 
-    private fun refused(reason: String) = ProposeOutcome(reason, null)
+    private fun refused(reason: String) = HireActionOutcome(reason, null)
 
     private fun linkRequest(url: String, label: String?) =
         LinkCardRequest(url = url, label = label?.trim()?.take(MAX_LABEL)?.ifBlank { null })

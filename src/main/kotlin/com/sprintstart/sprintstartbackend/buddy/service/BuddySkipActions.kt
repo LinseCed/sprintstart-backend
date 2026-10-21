@@ -3,8 +3,10 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionOutcome
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
 import com.sprintstart.sprintstartbackend.path.assistant.hasPendingSkip
 import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
@@ -47,7 +49,7 @@ class BuddySkipActions(
         call: BuddyToolCallDto,
         type: BuddyActionType,
         user: UserId,
-    ): BuddyActionService.ProposeOutcome {
+    ): HireActionOutcome {
         val stepId = call.uuidArgument("step_id")
             ?: return notProposed(
                 "No step_id was provided. Read get_my_onboarding_path and pass the step_id of the " +
@@ -90,13 +92,13 @@ class BuddySkipActions(
                     " — make sure this reason addresses that."
             }.orEmpty()
 
-        return BuddyActionService.ProposeOutcome(
+        return HireActionOutcome(
             toolResult = "Proposed to the hire: ask their PM to skip “${step.title}”, with the reason " +
                 "“$reason”. They see a confirm button showing that reason, and nothing is sent unless " +
                 "they click it. Their PM decides; until then the step stays on their path, and if it " +
                 "is accepted it counts as done and unlocks what waits on it. Do not promise it will " +
                 "be accepted.$declinedBefore",
-            proposal = BuddyActionService.BuddyActionProposal(
+            proposal = HireActionProposal(
                 action = type.toolName,
                 label = "Ask your PM to skip “${step.title}”",
                 question = null,
@@ -107,7 +109,7 @@ class BuddySkipActions(
     }
 
     /** Files the confirmed skip request through the hire's own route, which owns every rule about it. */
-    fun perform(authId: String, user: UserId, request: BuddyActionRequest): BuddyActionResponse {
+    fun perform(authId: String, user: UserId, request: HireActionRequest): BuddyActionResponse {
         val stepId = request.stepId
         val reason = request.reason
         if (stepId == null || reason.isNullOrBlank()) {

@@ -1,9 +1,9 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
-import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
 import com.sprintstart.sprintstartbackend.path.external.enums.StepStatus
@@ -83,11 +83,10 @@ class BuddyPathActionTest {
     )
 
     private val service = BuddyActionService(
-        hireStarterWork = mockk(relaxed = true),
         hireKnowledgeApi = mockk(relaxed = true),
-        hireStarterWorkActions = mockk(relaxed = true),
         userApi = userApi,
         hireArrivalApi = mockk(relaxed = true),
+        hireActions = emptyList(),
         buddyPathActions = pathActions,
         boardWrites = BuddyBoardWriteActions(
             mockk(relaxed = true),
@@ -178,7 +177,7 @@ class BuddyPathActionTest {
         every { onboardingStepService.completeOnboardingStepForMe(authId, step.id) } returns
             completed("Clone the repository")
 
-        val result = service.perform(BuddyActionRequest(action = "complete_step", stepId = step.id), jwt)
+        val result = service.perform(HireActionRequest(action = "complete_step", stepId = step.id), jwt)
 
         assertThat(result.ok).isTrue()
         assertThat(result.message).contains("Clone the repository")
@@ -195,7 +194,7 @@ class BuddyPathActionTest {
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
         every { myPathTool.findStep(userId, step.id) } returns step
 
-        val result = service.perform(BuddyActionRequest(action = "complete_step", stepId = step.id), jwt)
+        val result = service.perform(HireActionRequest(action = "complete_step", stepId = step.id), jwt)
 
         assertThat(result.ok).isFalse()
         assertThat(result.message).contains("locked")
@@ -273,7 +272,7 @@ class BuddyPathActionTest {
         } returns updatedTask(task.title)
 
         val result = service.perform(
-            BuddyActionRequest(action = "complete_task", onboardingTaskId = task.id),
+            HireActionRequest(action = "complete_task", onboardingTaskId = task.id),
             jwt,
         )
 
@@ -374,7 +373,7 @@ class BuddyPathActionTest {
         } returns graded(correct = true, explanation = "Scope is agreed in planning.")
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "answer_question",
                 questionId = question.id,
                 answer = "Sprint planning",
@@ -400,7 +399,7 @@ class BuddyPathActionTest {
             graded(correct = false, feedback = "Not the product owner.")
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "answer_question",
                 questionId = question.id,
                 answer = "The PO",
@@ -425,7 +424,7 @@ class BuddyPathActionTest {
         every { myPathTool.findQuestion(userId, question.id) } returns question
 
         val result = service.perform(
-            BuddyActionRequest(action = "answer_question", questionId = question.id, answer = "The SM"),
+            HireActionRequest(action = "answer_question", questionId = question.id, answer = "The SM"),
             jwt,
         )
 
@@ -469,7 +468,7 @@ class BuddyPathActionTest {
         assertThat(proposal.label).isEqualTo("Send this answer: “Git, Docker”")
 
         service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "answer_question",
                 questionId = question.id,
                 answer = proposal.answer,
@@ -520,7 +519,7 @@ class BuddyPathActionTest {
         every { myPathTool.findQuestion(userId, now.id) } returns now
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "answer_question",
                 questionId = now.id,
                 answer = "Sprint planning",
@@ -541,7 +540,7 @@ class BuddyPathActionTest {
         every { myPathTool.findQuestion(userId, question.id) } returns question
 
         val result = service.perform(
-            BuddyActionRequest(action = "answer_question", questionId = question.id, answer = "The SM"),
+            HireActionRequest(action = "answer_question", questionId = question.id, answer = "The SM"),
             jwt,
         )
 
@@ -561,7 +560,7 @@ class BuddyPathActionTest {
         } returns graded(correct = true)
 
         service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "answer_question",
                 questionId = question.id,
                 answer = "Reviewed, merged and deployed.",

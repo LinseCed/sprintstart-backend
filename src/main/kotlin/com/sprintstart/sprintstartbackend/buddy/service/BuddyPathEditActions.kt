@@ -3,9 +3,11 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionOutcome
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.StepType
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
 import com.sprintstart.sprintstartbackend.path.assistant.PathStepPlacement
 import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
@@ -53,7 +55,7 @@ class BuddyPathEditActions(
         call: BuddyToolCallDto,
         type: BuddyActionType,
         user: UserId,
-    ): BuddyActionService.ProposeOutcome {
+    ): HireActionOutcome {
         val phaseId = call.uuidArgument("phase_id")
             ?: return notProposed(
                 "No phase_id was provided. Read get_my_onboarding_path and pass the phase_id of the " +
@@ -105,13 +107,13 @@ class BuddyPathEditActions(
                     "done — say so before they click."
             }.orEmpty()
 
-        return BuddyActionService.ProposeOutcome(
+        return HireActionOutcome(
             toolResult = "Proposed to the hire: add the step “$title” to the phase " +
                 "“${phase.title}” of their own path. They see a confirm button; nothing is added " +
                 "unless they click it. This changes their copy only — their PM's blueprint is " +
                 "untouched — and they can edit or remove it afterwards. Say what the step is for " +
                 "and where it goes before you offer it.$connection$entry$relocks",
-            proposal = BuddyActionService.BuddyActionProposal(
+            proposal = HireActionProposal(
                 action = type.toolName,
                 label = if (where.isEmpty()) "Add “$title” to your path" else "Add “$title” $where",
                 question = null,
@@ -144,7 +146,7 @@ class BuddyPathEditActions(
             "phase they are standing in instead."
     }
 
-    fun perform(authId: String, user: UserId, request: BuddyActionRequest): BuddyActionResponse {
+    fun perform(authId: String, user: UserId, request: HireActionRequest): BuddyActionResponse {
         val phaseId = request.phaseId
         val title = request.title
         if (phaseId == null || title.isNullOrBlank()) {

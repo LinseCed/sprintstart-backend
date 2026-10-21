@@ -3,14 +3,14 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionOutcome
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionProposal
 import com.sprintstart.sprintstartbackend.board.external.HireBoardActionsApi
 import com.sprintstart.sprintstartbackend.board.external.model.HireBoard
 import com.sprintstart.sprintstartbackend.board.model.request.board.ChecklistCardRequest
 import com.sprintstart.sprintstartbackend.board.model.request.board.ChecklistItemRequest
 import com.sprintstart.sprintstartbackend.board.model.request.board.NoteCardRequest
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyActionService.BuddyActionProposal
-import com.sprintstart.sprintstartbackend.buddy.service.BuddyActionService.ProposeOutcome
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
@@ -69,7 +69,7 @@ class BuddyBoardWriteActions(
     fun handles(type: BuddyActionType): Boolean = type in HANDLED || edits.handles(type)
 
     /** Turns one of these tool calls into a proposal, or into the reason there is none. */
-    fun propose(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome =
+    fun propose(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): HireActionOutcome =
         when (type) {
             BuddyActionType.PLACE_CHECKLIST -> proposeChecklist(call, type, scope.projectName)
             BuddyActionType.AMEND_CHECKLIST -> proposeAmendment(call, type, scope.projectName)
@@ -138,12 +138,12 @@ class BuddyBoardWriteActions(
         call: BuddyToolCallDto,
         type: BuddyActionType,
         projectName: String,
-    ): ProposeOutcome {
+    ): HireActionOutcome {
         val title = call.textArgument("title").take(MAX_CHECKLIST_TITLE).ifBlank { null }
         val items = call.textListArgument("items")
         return when {
             items.size < MIN_CHECKLIST_ITEMS ->
-                ProposeOutcome(
+                HireActionOutcome(
                     "A checklist needs at least $MIN_CHECKLIST_ITEMS items, and these were " +
                         "${items.size}. Say it in the reply instead — one line is not a list.",
                     null,
@@ -207,18 +207,18 @@ class BuddyBoardWriteActions(
         call: BuddyToolCallDto,
         type: BuddyActionType,
         projectName: String,
-    ): ProposeOutcome {
+    ): HireActionOutcome {
         val cardId = call.uuidArgument("card_id")
         val items = call.textListArgument("items")
         return when {
             cardId == null ->
-                ProposeOutcome(
+                HireActionOutcome(
                     "No card_id was provided. Read read_board to find the checklist you mean, and " +
                         "pass its id.",
                     null,
                 )
             items.isEmpty() ->
-                ProposeOutcome("No lines were provided to add.", null)
+                HireActionOutcome("No lines were provided to add.", null)
             else -> offer(
                 type,
                 projectName,
@@ -240,18 +240,18 @@ class BuddyBoardWriteActions(
         call: BuddyToolCallDto,
         type: BuddyActionType,
         projectName: String,
-    ): ProposeOutcome {
+    ): HireActionOutcome {
         val cardId = call.uuidArgument("card_id")
         val items = call.textListArgument("items")
         return when {
             cardId == null ->
-                ProposeOutcome(
+                HireActionOutcome(
                     "No card_id was provided. Read read_board to find the checklist you mean, and " +
                         "pass its id.",
                     null,
                 )
             items.isEmpty() ->
-                ProposeOutcome("No lines were named to tick off.", null)
+                HireActionOutcome("No lines were named to tick off.", null)
             else -> offer(
                 type,
                 projectName,
@@ -305,21 +305,21 @@ class BuddyBoardWriteActions(
         call: BuddyToolCallDto,
         type: BuddyActionType,
         projectName: String,
-    ): ProposeOutcome {
+    ): HireActionOutcome {
         val cardId = call.uuidArgument("card_id")
         val before = call.textArgument("line")
         val after = call.textArgument("reworded").take(MAX_CHECKLIST_ITEM_LENGTH)
         return when {
             cardId == null ->
-                ProposeOutcome(
+                HireActionOutcome(
                     "No card_id was provided. Read read_board to find the checklist you mean, and " +
                         "pass its id.",
                     null,
                 )
             before.isEmpty() || after.isEmpty() ->
-                ProposeOutcome("Both the line and its rewording are needed.", null)
+                HireActionOutcome("Both the line and its rewording are needed.", null)
             before.equals(after, ignoreCase = true) ->
-                ProposeOutcome("That is what the line already says — there is nothing to change.", null)
+                HireActionOutcome("That is what the line already says — there is nothing to change.", null)
             else -> offer(type, projectName, cardId = cardId, lineBefore = before, lineAfter = after)
         }
     }
@@ -366,11 +366,11 @@ class BuddyBoardWriteActions(
         call: BuddyToolCallDto,
         type: BuddyActionType,
         projectName: String,
-    ): ProposeOutcome {
+    ): HireActionOutcome {
         val text = call.textArgument("text")
         return when {
             text.length < MIN_NOTE_LENGTH ->
-                ProposeOutcome(
+                HireActionOutcome(
                     "That is too short to be worth a card of its own — say it in the reply instead.",
                     null,
                 )
@@ -437,10 +437,10 @@ class BuddyBoardWriteActions(
         noteText: String? = null,
         lineBefore: String? = null,
         lineAfter: String? = null,
-    ): ProposeOutcome =
-        ProposeOutcome(
+    ): HireActionOutcome =
+        HireActionOutcome(
             toolResult = offeredOnBoard(type, projectName),
-            proposal = BuddyActionProposal(
+            proposal = HireActionProposal(
                 action = type.toolName,
                 label = type.label,
                 question = null,

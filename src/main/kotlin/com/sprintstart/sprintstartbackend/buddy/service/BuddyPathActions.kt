@@ -3,8 +3,10 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionOutcome
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
 import com.sprintstart.sprintstartbackend.path.assistant.hasPendingSkip
 import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
@@ -103,7 +105,7 @@ class BuddyPathActions(
         call: BuddyToolCallDto,
         type: BuddyActionType,
         userId: UUID,
-    ): BuddyActionService.ProposeOutcome =
+    ): HireActionOutcome =
         when (type) {
             BuddyActionType.COMPLETE_STEP -> proposeCompleteStep(call, type, userId)
             BuddyActionType.COMPLETE_TASK -> proposeCompleteTask(call, type, userId)
@@ -117,7 +119,7 @@ class BuddyPathActions(
     fun perform(
         type: BuddyActionType,
         authId: String,
-        request: BuddyActionRequest,
+        request: HireActionRequest,
     ): BuddyActionResponse =
         when (type) {
             BuddyActionType.COMPLETE_STEP -> completeStep(authId, request.stepId)
@@ -139,7 +141,7 @@ class BuddyPathActions(
         call: BuddyToolCallDto,
         type: BuddyActionType,
         userId: UUID,
-    ): BuddyActionService.ProposeOutcome {
+    ): HireActionOutcome {
         val stepId = call.uuidArgument("step_id")
             ?: return notProposed(
                 "No step_id was provided. Read get_my_onboarding_path and pass the step_id of the " +
@@ -176,11 +178,11 @@ class BuddyPathActions(
             ""
         }
 
-        return BuddyActionService.ProposeOutcome(
+        return HireActionOutcome(
             toolResult = "Proposed to the hire: mark “${step.title}” as done. They see a confirm " +
                 "button and nothing changes unless they click it. Ask whether they have actually " +
                 "done it — never say that it is done.$withdraws",
-            proposal = BuddyActionService.BuddyActionProposal(
+            proposal = HireActionProposal(
                 action = type.toolName,
                 label = if (pendingSkip) {
                     "Mark “${step.title}” as done (withdraws your skip request)"
@@ -205,7 +207,7 @@ class BuddyPathActions(
         call: BuddyToolCallDto,
         type: BuddyActionType,
         userId: UUID,
-    ): BuddyActionService.ProposeOutcome {
+    ): HireActionOutcome {
         val taskId = call.uuidArgument("task_id")
             ?: return notProposed(
                 "No task_id was provided. Read get_my_onboarding_path for the checklist of the step " +
@@ -231,11 +233,11 @@ class BuddyPathActions(
             )
         }
 
-        return BuddyActionService.ProposeOutcome(
+        return HireActionOutcome(
             toolResult = "Proposed to the hire: tick “${task.title}” off their checklist. They see a " +
                 "confirm button and nothing changes unless they click it. Ask whether they have done " +
                 "it; ticking a line because the conversation covered it is not the same thing.",
-            proposal = BuddyActionService.BuddyActionProposal(
+            proposal = HireActionProposal(
                 action = type.toolName,
                 label = "Tick off “${task.title}”",
                 question = null,

@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionOutcome
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -18,7 +19,7 @@ private const val NOT_PROPOSED = "NOT PROPOSED — no button was shown to the hi
  * reads a lot like "offered". The prefix says the one thing it has to know -- that nothing is on
  * screen -- before the advice it should act on.
  */
-internal fun notProposed(reason: String) = BuddyActionService.ProposeOutcome(NOT_PROPOSED + reason, null)
+internal fun notProposed(reason: String) = HireActionOutcome(NOT_PROPOSED + reason, null)
 
 /** Reads a list of strings the model passed, tolerating a single string where a list was asked for. */
 internal fun BuddyToolCallDto.lenientTextListArgument(name: String): List<String> =

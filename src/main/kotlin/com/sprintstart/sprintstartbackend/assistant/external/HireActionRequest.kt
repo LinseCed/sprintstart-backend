@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.buddy.model.request.buddy
+package com.sprintstart.sprintstartbackend.assistant.external
 
 import java.util.UUID
 
@@ -13,7 +13,7 @@ import java.util.UUID
  * suggested goal; each field's own doc names the action it belongs to. All are ignored by the
  * actions that don't use them.
  */
-data class BuddyActionRequest(
+data class HireActionRequest(
     val action: String,
     val question: String? = null,
     val taskId: UUID? = null,

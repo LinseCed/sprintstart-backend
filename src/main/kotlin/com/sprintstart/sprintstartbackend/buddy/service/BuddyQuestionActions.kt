@@ -3,9 +3,11 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionOutcome
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
 import com.sprintstart.sprintstartbackend.blueprint.external.enums.CheckQuestionType
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyActionType
-import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.path.assistant.MyPathTool
 import com.sprintstart.sprintstartbackend.path.external.HirePathActionsApi
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
@@ -61,7 +63,7 @@ class BuddyQuestionActions(
         call: BuddyToolCallDto,
         type: BuddyActionType,
         userId: UserId,
-    ): BuddyActionService.ProposeOutcome {
+    ): HireActionOutcome {
         val questionId = call.uuidArgument("question_id")
             ?: return notProposed(
                 "No question_id was provided. Read get_my_onboarding_path and pass the question_id " +
@@ -112,13 +114,13 @@ class BuddyQuestionActions(
         }
         val shown = if (isChoice) shownChoice(chosen) else answer
 
-        return BuddyActionService.ProposeOutcome(
+        return HireActionOutcome(
             toolResult = "Proposed to the hire: send “$shown” as their answer to " +
                 "“${question.question}”. They see a confirm button showing that answer, and nothing " +
                 "is recorded unless they click it. An attempt is kept whether it is right or not, so " +
                 "make sure it is the answer they meant — and do not tell them whether it is correct, " +
                 "because you have not been told either.",
-            proposal = BuddyActionService.BuddyActionProposal(
+            proposal = HireActionProposal(
                 action = type.toolName,
                 label = "Send this answer: “${shown.take(ANSWER_LABEL_LIMIT)}”",
                 question = null,
@@ -137,7 +139,7 @@ class BuddyQuestionActions(
      * shown as a failed action would read as the buddy having broken rather than as the hire having
      * missed, on the one surface where missing is supposed to be ordinary.
      */
-    fun perform(authId: String, userId: UserId, request: BuddyActionRequest): BuddyActionResponse {
+    fun perform(authId: String, userId: UserId, request: HireActionRequest): BuddyActionResponse {
         val questionId = request.questionId
         val answer = request.answer
         if (questionId == null || answer.isNullOrBlank()) {
