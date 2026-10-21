@@ -9,7 +9,7 @@ import com.sprintstart.sprintstartbackend.insights.service.OnboardingMetricsServ
 import com.sprintstart.sprintstartbackend.insights.service.ProjectAttentionService
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
-import com.sprintstart.sprintstartbackend.starterwork.service.MyCompetencyService
+import com.sprintstart.sprintstartbackend.starterwork.external.HireStarterWorkApi
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
@@ -29,7 +29,7 @@ import java.util.UUID
 class TeamReadTools(
     private val projectAttentionService: ProjectAttentionService,
     private val onboardingMetricsService: OnboardingMetricsService,
-    private val myCompetencyService: MyCompetencyService,
+    private val hireStarterWork: HireStarterWorkApi,
     private val arrivalSteps: ArrivalReadApi,
     private val projectMembershipApi: ProjectMembershipApi,
 ) {
@@ -173,7 +173,7 @@ class TeamReadTools(
 
     /** Level-0 rows are placed-but-unknown, not evidence, so they are excluded as on the hire's own tool. */
     private fun competenciesFor(memberId: UUID): String {
-        val ledger = myCompetencyService.getCompetenciesForUser(memberId).filter { it.level > 0 }
+        val ledger = hireStarterWork.competenciesOf(UserId(memberId)).filter { it.level > 0 }
         if (ledger.isEmpty()) {
             return "Nothing demonstrated on their competency ledger yet — normal early on."
         }

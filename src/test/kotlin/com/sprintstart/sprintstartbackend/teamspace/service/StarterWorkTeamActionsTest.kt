@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.buddy.service.result
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.IngestedIssue
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.starterwork.external.model.PoolReconciliation
 import com.sprintstart.sprintstartbackend.starterwork.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.starterwork.model.request.starterwork.PromoteStarterWorkCandidateRequest
 import com.sprintstart.sprintstartbackend.starterwork.repository.StarterWorkTaskProposalRepository
@@ -13,6 +14,7 @@ import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPool
 import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPoolReconciler
 import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkScope
 import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
+import com.sprintstart.sprintstartbackend.starterwork.service.starterWorkReviewOver
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -40,10 +42,10 @@ class StarterWorkTeamActionsTest {
 
     private val pool = StarterWorkPool(repository, scope)
 
-    private val review = MarkStarterWorkReviewedAction(pool, service)
-    private val reject = RejectStarterWorkAction(pool, service)
-    private val promote = PromoteCandidateAction(ingestion, pool, service, scope)
-    private val taskZero = SetTaskZeroEligibleAction(pool, starterWorkTaskProposalService)
+    private val review = MarkStarterWorkReviewedAction(pool, starterWorkReviewOver(service))
+    private val reject = RejectStarterWorkAction(pool, starterWorkReviewOver(service))
+    private val promote = PromoteCandidateAction(ingestion, pool, starterWorkReviewOver(service))
+    private val taskZero = SetTaskZeroEligibleAction(pool, starterWorkReviewOver(starterWorkTaskProposalService))
 
     private val mineSource = "github:acme/shop:ISSUE:42"
 
@@ -336,9 +338,9 @@ class StarterWorkTeamActionsTest {
 
     @Test
     fun `reconciling is bulk, says it covers the whole pool, and reports what changed`() = runTest {
-        val reconcile = ReconcileStarterWorkAction(reconciler)
+        val reconcile = ReconcileStarterWorkAction(starterWorkReviewOver(starterWorkPoolReconciler = reconciler))
         every { reconciler.reconcile() } returns
-            StarterWorkPoolReconciler.Outcome(
+            PoolReconciliation(
                 examined = 12,
                 markedStale = 2,
                 revived = 1,

@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.starterwork
 
 import com.sprintstart.sprintstartbackend.shared.scheduler.ScheduledExecutor
+import com.sprintstart.sprintstartbackend.starterwork.external.model.PoolReconciliation
 import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkPoolReconciler
 import io.mockk.every
 import io.mockk.mockk
@@ -23,7 +24,7 @@ class StarterWorkReconciliationTriggerTest {
     private val scheduledExecutor = ScheduledExecutor(TestScope(UnconfinedTestDispatcher()))
     private val trigger = StarterWorkReconciliationTrigger(scheduledExecutor, reconciler)
 
-    private val outcome = StarterWorkPoolReconciler.Outcome(0, 0, 0, 0)
+    private val outcome = PoolReconciliation(0, 0, 0, 0)
 
     /** Counts passes, and runs [duringFirstPass] inside the first one to simulate overlap. */
     private fun countingReconciler(duringFirstPass: () -> Unit = {}): () -> Int {

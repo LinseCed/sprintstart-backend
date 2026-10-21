@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.starterwork.controller
 
 import com.sprintstart.sprintstartbackend.path.external.model.AiProgressEvent
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.starterwork.external.model.PoolReconciliation
 import com.sprintstart.sprintstartbackend.starterwork.model.request.competency.RejectProposalRequest
 import com.sprintstart.sprintstartbackend.starterwork.model.request.starterwork.ClaimGoalRequest
 import com.sprintstart.sprintstartbackend.starterwork.model.request.starterwork.CreateStarterWorkTaskRequest
@@ -279,7 +280,7 @@ class StarterWorkController(
     @ResponseStatus(HttpStatus.OK)
     @PostMapping("/reconcile")
     @PreAuthorize("hasAnyRole('ADMIN', 'PM')")
-    fun reconcile(): StarterWorkPoolReconciler.Outcome = starterWorkPoolReconciler.reconcile()
+    fun reconcile(): PoolReconciliation = starterWorkPoolReconciler.reconcile()
 
     /**
      * Records that somebody has looked at a starter-work task and is happy with it.

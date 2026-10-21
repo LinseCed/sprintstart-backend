@@ -28,9 +28,7 @@ import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.OnboardingTaskId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
-import com.sprintstart.sprintstartbackend.starterwork.service.CurrentTaskReader
-import com.sprintstart.sprintstartbackend.starterwork.service.StarterWorkTaskProposalService
-import com.sprintstart.sprintstartbackend.starterwork.service.currentTaskOf
+import com.sprintstart.sprintstartbackend.starterwork.external.HireStarterWorkApi
 import com.sprintstart.sprintstartbackend.user.external.ProjectMember
 import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import org.springframework.http.HttpStatus
@@ -53,8 +51,7 @@ class BoardService(
     private val boardRepository: BoardRepository,
     private val boardCardRepository: BoardCardRepository,
     private val projectMembershipApi: ProjectMembershipApi,
-    private val currentTaskReader: CurrentTaskReader,
-    private val starterWorkTaskProposalService: StarterWorkTaskProposalService,
+    private val hireStarterWork: HireStarterWorkApi,
     private val boardDiagramRepository: BoardDiagramRepository,
     private val hydrator: BoardCardHydrator,
     private val arrivalSteps: ArrivalReadApi,
@@ -94,8 +91,8 @@ class BoardService(
         val arrivalSteps = arrivalSteps.forHire(userId)
         val cards = ensureRelevantCards(board, arrivalSteps.isNotEmpty())
         // Whether the hire is on a task at all, for the pin. Read through the same
-        // [CurrentTaskReader] the card's content comes from, so the pin and the card agree.
-        val onATask = currentTaskReader.currentTaskOf(userId, projectId) != null
+        // [HireStarterWorkApi.currentTaskOf] the card's content comes from, so the pin and the card agree.
+        val onATask = hireStarterWork.currentTaskOf(userId, projectId) != null
         // One query for every diagram on the board, and the stored picture rather than a fresh one:
         // assembling costs a model call. The client revalidates afterwards.
         val diagrams = boardDiagramRepository
@@ -109,7 +106,7 @@ class BoardService(
         }
         // One ranking per read, shared by the suggestions and pool cards so they agree and the board pays
         // once; lazy, so a board with neither pays nothing.
-        val matches by lazy { starterWorkTaskProposalService.matchForUserId(userId.value, projectId.value) }
+        val matches by lazy { hireStarterWork.rankedTasksFor(userId, projectId) }
 
         return BoardResponse(
             boardId = board.id,

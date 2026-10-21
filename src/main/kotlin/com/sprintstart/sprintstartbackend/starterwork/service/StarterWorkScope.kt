@@ -1,34 +1,12 @@
 package com.sprintstart.sprintstartbackend.starterwork.service
 
 import com.sprintstart.sprintstartbackend.connectors.git.github.external.GithubRepositoryApi
+import com.sprintstart.sprintstartbackend.starterwork.external.model.GITHUB_SOURCE_PREFIX
+import com.sprintstart.sprintstartbackend.starterwork.external.model.GithubRepositoryName
+import com.sprintstart.sprintstartbackend.starterwork.external.model.githubRepositoryOf
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
-
-/** A GitHub repository as a starter-work source id names it. */
-data class GithubRepositoryName(
-    val owner: String,
-    val name: String,
-) {
-    override fun toString(): String = "$owner/$name"
-}
-
-private const val GITHUB_SOURCE_PREFIX = "github:"
-
-/**
- * The repository a source id of the shape `github:<owner>/<name>:<TYPE>:<unique>` points at.
- *
- * Null for every other shape — a hand-authored task (`authored:`), a Jira issue, or anything
- * malformed — so none of those is ever mistaken for a repository's work.
- */
-internal fun githubRepositoryOf(sourceId: String): GithubRepositoryName? {
-    if (!sourceId.startsWith(GITHUB_SOURCE_PREFIX)) return null
-    val parts = sourceId.removePrefix(GITHUB_SOURCE_PREFIX).split(':')
-    if (parts.size < 3) return null
-    val ownerAndName = parts[0].split('/')
-    if (ownerAndName.size != 2 || ownerAndName.any { it.isBlank() }) return null
-    return GithubRepositoryName(ownerAndName[0], ownerAndName[1])
-}
 
 /**
  * Which starter work belongs to a project, for team mode.

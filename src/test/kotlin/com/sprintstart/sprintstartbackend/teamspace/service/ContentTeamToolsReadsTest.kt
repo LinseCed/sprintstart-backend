@@ -20,6 +20,7 @@ import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation
 import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.OrientationCitationResponse
 import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.OrientationPacketResponse
 import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.OrientationSectionResponse
+import com.sprintstart.sprintstartbackend.starterwork.service.OrientationAuthoringService
 import com.sprintstart.sprintstartbackend.starterwork.service.TaskOrientationService
 import io.mockk.every
 import io.mockk.mockk
@@ -41,7 +42,7 @@ class ContentTeamToolsReadsTest {
         f.review(skips = skipService, feedback = feedbackService),
         StepAuthoringService(mockk(relaxed = true), mockk(relaxed = true)),
         PhaseAuthoringService(mockk(relaxed = true), questionService),
-        orientationService,
+        OrientationAuthoringService(orientationService),
     )
 
     private fun read(name: String, vararg args: Pair<String, Any?>) = tools.execute(f.call(name, *args), f.context)

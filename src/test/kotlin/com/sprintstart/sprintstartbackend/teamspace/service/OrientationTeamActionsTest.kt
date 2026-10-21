@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.starterwork.external.enums.Orientation
 import com.sprintstart.sprintstartbackend.starterwork.model.request.orientation.AuthorOrientationRequest
 import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.MyOrientationResponse
 import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.OrientationPacketResponse
+import com.sprintstart.sprintstartbackend.starterwork.service.OrientationAuthoringService
 import com.sprintstart.sprintstartbackend.starterwork.service.TaskOrientationService
 import io.mockk.every
 import io.mockk.mockk
@@ -58,7 +59,7 @@ class OrientationTeamActionsTest {
 
     @Nested
     inner class Author {
-        private val action = AuthorOrientationPacketAction(f.scope, service)
+        private val action = AuthorOrientationPacketAction(f.scope, OrientationAuthoringService(service))
 
         private fun author(taskId: UUID, vararg sections: JsonObject, summary: String? = null) =
             f.call(
@@ -236,7 +237,7 @@ class OrientationTeamActionsTest {
 
     @Nested
     inner class Revert {
-        private val action = RevertOrientationPacketAction(f.scope, service)
+        private val action = RevertOrientationPacketAction(f.scope, OrientationAuthoringService(service))
 
         @Test
         fun `is destructive`() {

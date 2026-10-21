@@ -3,6 +3,7 @@ package com.sprintstart.sprintstartbackend.starterwork.service
 import com.sprintstart.sprintstartbackend.ingestion.external.ArtifactIngestionApi
 import com.sprintstart.sprintstartbackend.ingestion.external.model.dto.IngestedIssue
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProposalStatus
+import com.sprintstart.sprintstartbackend.starterwork.external.model.PoolReconciliation
 import com.sprintstart.sprintstartbackend.starterwork.model.entity.StarterWorkTaskProposal
 import com.sprintstart.sprintstartbackend.starterwork.repository.StarterWorkTaskProposalRepository
 import io.mockk.every
@@ -226,7 +227,7 @@ class StarterWorkPoolReconcilerTest {
 
         val outcome = reconciler.reconcile()
 
-        assertEquals(StarterWorkPoolReconciler.Outcome(0, 0, 0, 0, 0), outcome)
+        assertEquals(PoolReconciliation(0, 0, 0, 0, 0), outcome)
         verify(exactly = 0) { artifactIngestionApi.getIssues(any()) }
         verify(exactly = 0) { artifactIngestionApi.getIssue(any()) }
     }

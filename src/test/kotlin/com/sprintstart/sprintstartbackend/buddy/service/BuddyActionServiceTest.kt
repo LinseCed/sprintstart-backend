@@ -11,11 +11,14 @@ import com.sprintstart.sprintstartbackend.knowledge.service.HireKnowledgeService
 import com.sprintstart.sprintstartbackend.knowledge.service.KnowledgeBaseService
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.GoalClaimant
 import com.sprintstart.sprintstartbackend.starterwork.external.enums.ProficiencyLevel
+import com.sprintstart.sprintstartbackend.starterwork.external.model.PlacementResult
 import com.sprintstart.sprintstartbackend.starterwork.model.response.goal.GoalView
 import com.sprintstart.sprintstartbackend.starterwork.model.response.orientation.MyOrientationResponse
 import com.sprintstart.sprintstartbackend.starterwork.service.CompetencyPlacementService
 import com.sprintstart.sprintstartbackend.starterwork.service.TaskOrientationService
 import com.sprintstart.sprintstartbackend.starterwork.service.UserGoalService
+import com.sprintstart.sprintstartbackend.starterwork.service.hireStarterWorkActionsOver
+import com.sprintstart.sprintstartbackend.starterwork.service.hireStarterWorkOver
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import com.sprintstart.sprintstartbackend.user.external.dto.ProjectDto
 import com.sprintstart.sprintstartbackend.user.external.dto.UserDto
@@ -56,12 +59,14 @@ class BuddyActionServiceTest {
         every { handles(any()) } returns false
     }
     private val service = BuddyActionService(
-        taskOrientationService,
+        hireStarterWorkOver(
+            taskOrientationService = taskOrientationService,
+            competencyPlacementService = competencyPlacementService,
+        ),
         HireKnowledgeService(knowledgeBaseService),
-        userGoalService,
+        hireStarterWorkActionsOver(userGoalService, competencyPlacementService),
         userApi,
         attestationService,
-        competencyPlacementService,
         buddyPathActions,
         BuddyBoardWriteActions(
             HireBoardActionsService(boardService),
@@ -348,7 +353,7 @@ class BuddyActionServiceTest {
     fun `confirming a placement records it and relays what the ledger said`() = runTest {
         asHire()
         every { competencyPlacementService.record(userId, "kotlin", ProficiencyLevel.INTERMEDIATE) } returns
-            CompetencyPlacementService.PlacementOutcome(recorded = true, message = "Noted — “Kotlin”.")
+            PlacementResult(recorded = true, message = "Noted — “Kotlin”.")
 
         val result = service.perform(
             BuddyActionRequest(action = "record_assessment", competencyKey = "kotlin", level = "intermediate"),
@@ -363,7 +368,7 @@ class BuddyActionServiceTest {
     fun `confirming a placement needs no project`() = runTest {
         asHire()
         every { competencyPlacementService.record(any(), any(), any()) } returns
-            CompetencyPlacementService.PlacementOutcome(recorded = true, message = "Noted.")
+            PlacementResult(recorded = true, message = "Noted.")
 
         val result = service.perform(
             BuddyActionRequest(action = "record_assessment", competencyKey = "kotlin", level = "beginner"),
@@ -394,7 +399,7 @@ class BuddyActionServiceTest {
     fun `a placement the ledger declines comes back as its own reason`() = runTest {
         asHire()
         every { competencyPlacementService.record(userId, "kotlin", ProficiencyLevel.EXPERT) } returns
-            CompetencyPlacementService.PlacementOutcome(
+            PlacementResult(
                 recorded = false,
                 message = "Your own accepted work already proves “Kotlin”.",
             )
