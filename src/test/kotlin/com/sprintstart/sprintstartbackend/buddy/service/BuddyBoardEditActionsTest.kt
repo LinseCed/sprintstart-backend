@@ -1,6 +1,8 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionProposal
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
 import com.sprintstart.sprintstartbackend.board.external.BoardCardVersion
 import com.sprintstart.sprintstartbackend.board.external.BoardReading
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardActor
@@ -22,7 +24,6 @@ import com.sprintstart.sprintstartbackend.board.model.response.board.NoteContent
 import com.sprintstart.sprintstartbackend.board.service.BoardService
 import com.sprintstart.sprintstartbackend.board.service.HireBoardActionsService
 import com.sprintstart.sprintstartbackend.board.service.hireBoardOver
-import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
@@ -60,8 +61,6 @@ class BuddyBoardEditActionsTest {
 
     private val service = BuddyActionService(
         mockk(relaxed = true),
-        mockk(relaxed = true),
-        mockk(relaxed = true),
         userApi,
         mockk(relaxed = true),
         mockk(relaxed = true),
@@ -69,6 +68,7 @@ class BuddyBoardEditActionsTest {
             HireBoardActionsService(boardService),
             BuddyBoardEditActions(hireBoardOver(boardService), HireBoardActionsService(boardService)),
         ),
+        emptyList(),
     )
 
     private val userId = UUID.randomUUID()
@@ -150,7 +150,7 @@ class BuddyBoardEditActionsTest {
         every { userApi.getUserIdByAuthId(authId) } returns Optional.of(userId)
     }
 
-    private fun proposeEdit(name: String, arguments: JsonObject): BuddyActionService.BuddyActionProposal =
+    private fun proposeEdit(name: String, arguments: JsonObject): HireActionProposal =
         service.propose(call(name, arguments), userId).proposal ?: error("no proposal for $name")
 
     private fun editedNote(text: String) = buildJsonObject {
@@ -329,7 +329,7 @@ class BuddyBoardEditActionsTest {
         } returns 2
 
         val result = service.perform(
-            BuddyActionRequest(action = "dismiss_cards", cardIds = listOf(noteId, linkId)),
+            HireActionRequest(action = "dismiss_cards", cardIds = listOf(noteId, linkId)),
             jwt,
         )
 
@@ -351,7 +351,7 @@ class BuddyBoardEditActionsTest {
             boardService.reorderForBuddy(UserId(userId), project, listOf(checklistId).map(::BoardCardId))
         } returns 3
 
-        val result = service.perform(BuddyActionRequest(action = "reorder_cards", cardIds = listOf(checklistId)), jwt)
+        val result = service.perform(HireActionRequest(action = "reorder_cards", cardIds = listOf(checklistId)), jwt)
 
         assertThat(result.ok).isTrue()
         assertThat(result.message).contains("3 cards moved")
@@ -516,7 +516,7 @@ class BuddyBoardEditActionsTest {
         val proposal = proposeEdit("edit_note", editedNote("Deploys run on Tuesdays"))
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "edit_note",
                 cardId = noteId,
                 noteText = "Deploys run on Tuesdays",
@@ -545,7 +545,7 @@ class BuddyBoardEditActionsTest {
         val proposal = proposeEdit("edit_checklist", editedChecklist("Run it locally", "Open a PR"))
 
         service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "edit_checklist",
                 cardId = checklistId,
                 checklistTitle = "First week",
@@ -583,7 +583,7 @@ class BuddyBoardEditActionsTest {
             ResponseStatusException(HttpStatus.CONFLICT, BoardCardVersion.CARD_CHANGED)
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "edit_checklist",
                 cardId = checklistId,
                 checklistItems = listOf("Run it locally", "Fix it"),
@@ -615,7 +615,7 @@ class BuddyBoardEditActionsTest {
         every { boardService.editAuthoredCardForBuddy(any(), any(), any(), any(), any()) } throws
             ResponseStatusException(HttpStatus.NOT_FOUND, "No such note on your board")
 
-        val result = service.perform(BuddyActionRequest(action = "edit_note", cardId = noteId, noteText = "New"), jwt)
+        val result = service.perform(HireActionRequest(action = "edit_note", cardId = noteId, noteText = "New"), jwt)
 
         assertThat(result.ok).isFalse()
         assertThat(result.message).isEqualTo("No such note on your board")
@@ -642,7 +642,7 @@ class BuddyBoardEditActionsTest {
         asHire()
 
         val result = service.perform(
-            BuddyActionRequest(action = "place_link", linkUrl = "https://wiki/runbook", linkLabel = "Runbook"),
+            HireActionRequest(action = "place_link", linkUrl = "https://wiki/runbook", linkLabel = "Runbook"),
             jwt,
         )
 
@@ -665,7 +665,7 @@ class BuddyBoardEditActionsTest {
         asHire()
 
         val result = service.perform(
-            BuddyActionRequest(action = "edit_link", cardId = linkId, linkUrl = "file:///etc/passwd"),
+            HireActionRequest(action = "edit_link", cardId = linkId, linkUrl = "file:///etc/passwd"),
             jwt,
         )
 

@@ -2,8 +2,8 @@ package com.sprintstart.sprintstartbackend.buddy.controller
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyActionResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
 import com.sprintstart.sprintstartbackend.buddy.external.TeamModeConversation
-import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.CreateSessionRequest
 import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.SendBuddyMessageRequest
 import com.sprintstart.sprintstartbackend.buddy.model.response.buddy.BuddyMessageResponse
@@ -315,7 +315,7 @@ class BuddyController(
     suspend fun performAction(
         @Parameter(hidden = true)
         @AuthenticationPrincipal jwt: Jwt,
-        @Valid @RequestBody request: BuddyActionRequest,
+        @Valid @RequestBody request: HireActionRequest,
     ): BuddyActionResponse = buddyActionService.perform(request, jwt)
 
     @Operation(

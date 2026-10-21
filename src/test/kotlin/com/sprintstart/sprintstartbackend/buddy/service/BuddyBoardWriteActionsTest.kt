@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireActionRequest
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardActor
 import com.sprintstart.sprintstartbackend.board.model.request.board.AuthoredCardRequest
 import com.sprintstart.sprintstartbackend.board.model.request.board.ChecklistCardRequest
@@ -8,7 +9,6 @@ import com.sprintstart.sprintstartbackend.board.model.request.board.NoteCardRequ
 import com.sprintstart.sprintstartbackend.board.service.BoardService
 import com.sprintstart.sprintstartbackend.board.service.HireBoardActionsService
 import com.sprintstart.sprintstartbackend.board.service.hireBoardOver
-import com.sprintstart.sprintstartbackend.buddy.model.request.buddy.BuddyActionRequest
 import com.sprintstart.sprintstartbackend.shared.ids.BoardCardId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
@@ -48,11 +48,10 @@ class BuddyBoardWriteActionsTest {
     )
 
     private val service = BuddyActionService(
-        hireStarterWork = mockk(relaxed = true),
         hireKnowledgeApi = mockk(relaxed = true),
-        hireStarterWorkActions = mockk(relaxed = true),
         userApi = userApi,
         hireArrivalApi = mockk(relaxed = true),
+        hireActions = emptyList(),
         buddyPathActions = mockk(relaxed = true),
         boardWrites = boardWrites,
     )
@@ -130,7 +129,7 @@ class BuddyBoardWriteActionsTest {
         onOneProject()
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "place_checklist",
                 checklistTitle = "Getting started",
                 checklistItems = listOf("Find the component", "Run it locally"),
@@ -155,7 +154,7 @@ class BuddyBoardWriteActionsTest {
         onOneProject()
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "place_checklist",
                 checklistTitle = "Getting started",
                 checklistItems = listOf("   ", ""),
@@ -223,7 +222,7 @@ class BuddyBoardWriteActionsTest {
         val cardId = UUID.randomUUID()
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "amend_checklist",
                 cardId = cardId,
                 checklistItems = listOf("Write the test"),
@@ -252,7 +251,7 @@ class BuddyBoardWriteActionsTest {
             ResponseStatusException(HttpStatus.NOT_FOUND, "No such card on your board")
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "amend_checklist",
                 cardId = cardId,
                 checklistItems = listOf("Write the test"),
@@ -289,7 +288,7 @@ class BuddyBoardWriteActionsTest {
             "once the smoke tests are green. Nobody deploys on a Friday."
 
         val result = service.perform(
-            BuddyActionRequest(action = "place_note", noteText = text),
+            HireActionRequest(action = "place_note", noteText = text),
             jwt,
         )
 
@@ -346,7 +345,7 @@ class BuddyBoardWriteActionsTest {
         } returns 1
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "tick_checklist_items",
                 cardId = cardId,
                 checklistItems = listOf("Reproduce it locally"),
@@ -370,7 +369,7 @@ class BuddyBoardWriteActionsTest {
         every { boardService.tickChecklistItems(any(), any(), any(), any()) } returns 0
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "tick_checklist_items",
                 cardId = cardId,
                 checklistItems = listOf("something it made up"),
@@ -429,7 +428,7 @@ class BuddyBoardWriteActionsTest {
         } returns true
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "reword_checklist_item",
                 cardId = cardId,
                 lineBefore = "Fix it",
@@ -450,7 +449,7 @@ class BuddyBoardWriteActionsTest {
         every { boardService.rewordChecklistItem(any(), any(), any(), any(), any()) } returns false
 
         val result = service.perform(
-            BuddyActionRequest(
+            HireActionRequest(
                 action = "reword_checklist_item",
                 cardId = UUID.randomUUID(),
                 lineBefore = "Fix it",
