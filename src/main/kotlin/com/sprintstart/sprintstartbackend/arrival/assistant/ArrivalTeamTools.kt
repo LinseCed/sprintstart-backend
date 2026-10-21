@@ -1,10 +1,13 @@
-package com.sprintstart.sprintstartbackend.teamspace.service
+package com.sprintstart.sprintstartbackend.arrival.assistant
 
 import com.sprintstart.sprintstartbackend.arrival.external.ArrivalAuthoringApi
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor
 import com.sprintstart.sprintstartbackend.arrival.model.response.arrival.ArrivalStepResponse
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.TeamArea
+import com.sprintstart.sprintstartbackend.assistant.external.TeamAreaTools
+import com.sprintstart.sprintstartbackend.assistant.external.TeamToolContext
 import com.sprintstart.sprintstartbackend.assistant.external.noArgumentsSchema
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import org.springframework.stereotype.Component

@@ -1,9 +1,15 @@
-package com.sprintstart.sprintstartbackend.teamspace.service
+package com.sprintstart.sprintstartbackend.arrival.assistant
 
 import com.sprintstart.sprintstartbackend.arrival.external.ArrivalAuthoringApi
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyProposalRisk
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.TeamActionDraft
+import com.sprintstart.sprintstartbackend.assistant.external.TeamArea
+import com.sprintstart.sprintstartbackend.assistant.external.TeamToolContext
+import com.sprintstart.sprintstartbackend.assistant.external.TypedTeamAction
+import com.sprintstart.sprintstartbackend.assistant.external.forLabel
+import com.sprintstart.sprintstartbackend.assistant.external.stringFields
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import kotlinx.serialization.Serializable
 import org.springframework.stereotype.Component

@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.teamspace.service
+package com.sprintstart.sprintstartbackend.arrival.assistant
 
 import com.sprintstart.sprintstartbackend.arrival.external.enums.ArrivalDerivation
 import com.sprintstart.sprintstartbackend.arrival.external.enums.Rigor

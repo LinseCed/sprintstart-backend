@@ -1,4 +1,4 @@
-package com.sprintstart.sprintstartbackend.teamspace.service
+package com.sprintstart.sprintstartbackend.assistant.external
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject

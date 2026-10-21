@@ -2,6 +2,9 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.TeamArea
+import com.sprintstart.sprintstartbackend.assistant.external.TeamAreaTools
+import com.sprintstart.sprintstartbackend.assistant.external.TeamToolContext
 import com.sprintstart.sprintstartbackend.knowledge.external.KnowledgeReviewApi
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import kotlinx.serialization.json.buildJsonObject
