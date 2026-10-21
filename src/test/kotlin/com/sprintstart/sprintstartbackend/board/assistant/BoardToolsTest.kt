@@ -1,6 +1,8 @@
-package com.sprintstart.sprintstartbackend.buddy.service
+package com.sprintstart.sprintstartbackend.board.assistant
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
+import com.sprintstart.sprintstartbackend.assistant.external.HireTool
+import com.sprintstart.sprintstartbackend.assistant.external.HireToolContext
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.board.external.enums.HighlightColor
@@ -36,18 +38,24 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
-class BuddyBoardToolsTest {
+class BoardToolsTest {
     private val boardService: BoardService = mockk()
     private val boardStructureService: BoardStructureService = mockk(relaxed = true)
     private val userApi: UserApi = mockk()
     private val pathStepReader: PathStepReader = mockk()
-    private val tools =
-        BuddyBoardTools(
-            hireBoardOver(boardService, boardStructureService),
+    private val tools: List<HireTool> = listOf(
+        PlaceCardTool(
             HireBoardActionsService(boardService),
             userApi,
             HirePathService(mockk(), mockk(), pathStepReader, mockk()),
-        )
+        ),
+        ReadBoardTool(hireBoardOver(boardService, boardStructureService), userApi),
+    )
+
+    private fun List<HireTool>.toolSpecs() = map { it.spec }
+
+    private fun List<HireTool>.execute(call: BuddyToolCallDto, userId: UUID) =
+        first { it.spec.name == call.name }.execute(call, HireToolContext(UserId(userId)))
 
     private val userId = UUID.randomUUID()
     private val projectId = UUID.randomUUID()
@@ -188,6 +196,41 @@ class BuddyBoardToolsTest {
     }
 
     @Test
+    fun `a long path's step titles are capped and the cut is said`() {
+        every {
+            boardService.place(UserId(userId), ProjectId(projectId), BoardCardKind.PATH_STEP, "Deploy pipeline")
+        } returns PlacementOutcome.NO_SUCH_STEP
+        every { pathStepReader.titlesFor(userId) } returns (1..LIST_LIMIT + 1).map { "Step $it" }
+
+        val result = tools.execute(placeCall("PATH_STEP", "Deploy pipeline"), userId)
+
+        assertThat(result).contains("Step $LIST_LIMIT, and more.")
+        assertThat(result).doesNotContain("Step ${LIST_LIMIT + 1}")
+    }
+
+    @Test
+    fun `a hire with no path is told there is no step to place`() {
+        every {
+            boardService.place(UserId(userId), ProjectId(projectId), BoardCardKind.PATH_STEP, "Deploy pipeline")
+        } returns PlacementOutcome.NO_SUCH_STEP
+        every { pathStepReader.titlesFor(userId) } returns emptyList()
+
+        assertThat(tools.execute(placeCall("PATH_STEP", "Deploy pipeline"), userId))
+            .isEqualTo("The hire has no path yet, so there is no step to put on their board.")
+    }
+
+    /** Both tools are mounted for every hire, add nothing to the greeting and offer no chip. */
+    @Test
+    fun `the board tools are always mounted, quiet in the greeting and chipless`() {
+        tools.forEach { tool ->
+            assertThat(tool.isMountedFor(UserId(userId))).isTrue()
+            assertThat(tool.snapshotFor(UserId(userId))).isNull()
+            assertThat(tool.snapshotPosition).isEqualTo(Int.MAX_VALUE)
+            assertThat(tool.suggestion).isNull()
+        }
+    }
+
+    @Test
     fun `places a card and tells the mentor it will stay there`() {
         every { boardService.place(UserId(userId), ProjectId(projectId), BoardCardKind.SUGGESTED_TASKS) } returns
             PlacementOutcome.PLACED
@@ -297,6 +340,38 @@ class BuddyBoardToolsTest {
         // that the mentor can ask about that part instead of the whole card.
         assertThat(result).contains("Deploys are on Thursdays")
         assertThat(result).contains("on Thursdays")
+    }
+
+    /** A highlight is quoted whole up to the limit, and cut with an ellipsis past it — never silently. */
+    @Test
+    fun `a highlight is quoted whole up to the limit and cut past it`() {
+        val atLimit = UUID.randomUUID()
+        val pastLimit = UUID.randomUUID()
+        val fits = "a".repeat(ReadBoardTool.QUOTE_LIMIT)
+        val tooLong = "b".repeat(ReadBoardTool.QUOTE_LIMIT) + "c"
+        every { boardService.hasBoard(UserId(userId), ProjectId(projectId)) } returns true
+        every { boardService.getBoard(UserId(userId), ProjectId(projectId)) } returns
+            BoardResponse(
+                boardId = UUID.randomUUID(),
+                projectId = projectId,
+                cards = listOf(note(atLimit, "First"), note(pastLimit, "Second")),
+            )
+        every { boardStructureService.read(UserId(userId), ProjectId(projectId)) } returns
+            BoardStructureResponse(
+                BoardStructurePayload(
+                    marks = mapOf(
+                        atLimit.toString() to listOf(CardMarkPayload(fits, HighlightColor.GREEN)),
+                        pastLimit.toString() to listOf(CardMarkPayload(tooLong, HighlightColor.GREEN)),
+                    ),
+                ),
+                null,
+            )
+
+        val result = tools.execute(readCall(), userId)
+
+        assertThat(result).contains("\"$fits\"")
+        assertThat(result).contains("\"" + "b".repeat(ReadBoardTool.QUOTE_LIMIT) + "…\"")
+        assertThat(result).doesNotContain("c\"")
     }
 
     private fun note(id: UUID, text: String) = BoardCardResponse(

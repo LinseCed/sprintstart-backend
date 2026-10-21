@@ -64,7 +64,6 @@ class BuddyToolExecutorTest {
     private val userApi: UserApi = mockk {
         every { getGithubLoginByUserId(any()) } returns "sam"
     }
-    private val buddyBoardTools: BuddyBoardTools = mockk(relaxed = true)
     private val buddyAppGuideTools: BuddyAppGuideTools = spyk(BuddyAppGuideTools(userApi))
     private val artifactIngestionApi: ArtifactIngestionApi = mockk()
     private val projectMembershipApi: ProjectMembershipApi = mockk()
@@ -99,7 +98,6 @@ class BuddyToolExecutorTest {
     // The real tools, in their @Order order, over the same mocks: these cases are about what the
     // buddy is handed and what it reads, wherever the tool now lives.
     private val executor = BuddyToolExecutor(
-        buddyBoardTools,
         listOf(
             myPathTool,
             ArrivalStepsTool(ArrivalSteps(arrivalStepService)),

@@ -20,7 +20,6 @@
     <ID>CyclomaticComplexMethod:BoardService.kt:BoardService$private fun editableCardOrThrow( userId: UserId, cardId: BoardCardId, kind: BoardCardKind, ): Pair&lt;BoardCard, Board&gt;</ID>
     <ID>CyclomaticComplexMethod:BuddyActionService.kt:BuddyActionService$suspend fun perform(request: BuddyActionRequest, jwt: Jwt): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
-    <ID>CyclomaticComplexMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UserId): String</ID>
     <ID>CyclomaticComplexMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, user: UserId, ): BuddyActionService.ProposeOutcome</ID>
     <ID>CyclomaticComplexMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun perform(authId: String, userId: UserId, request: BuddyActionRequest): BuddyActionResponse</ID>
     <ID>CyclomaticComplexMethod:BuddyQuestionActions.kt:BuddyQuestionActions$fun propose( call: BuddyToolCallDto, type: BuddyActionType, userId: UserId, ): BuddyActionService.ProposeOutcome</ID>
@@ -41,6 +40,7 @@
     <ID>CyclomaticComplexMethod:PhaseText.kt:internal fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
     <ID>CyclomaticComplexMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Evaluating project industry automatically") override suspend fun evaluateIndustryAutomatically(projectId: UUID)</ID>
     <ID>CyclomaticComplexMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Getting or lazily evaluating project industry") override suspend fun getOrEvaluateIndustry(projectId: UUID): String?</ID>
+    <ID>CyclomaticComplexMethod:ReadBoardTool.kt:ReadBoardTool$private fun readBoard(userId: UserId): String</ID>
     <ID>CyclomaticComplexMethod:StarterWorkPoolReconciler.kt:StarterWorkPoolReconciler$@Transactional fun reconcile(): PoolReconciliation</ID>
     <ID>CyclomaticComplexMethod:StepTeamActions.kt:AddStepAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>CyclomaticComplexMethod:StepTeamActions.kt:UpdateStepAction$private fun badArgument(call: BuddyToolCallDto, slots: Int): String?</ID>
@@ -86,7 +86,6 @@
     <ID>LongMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
     <ID>LongMethod:BuddyBoardEditActions.kt:BuddyBoardEditActions$private fun namedCards(call: BuddyToolCallDto, scope: Scope): Found&lt;List&lt;BoardCardResponse&gt;&gt;</ID>
     <ID>LongMethod:BuddyBoardEditActions.kt:BuddyBoardEditActions$private fun proposeChecklistEdit(call: BuddyToolCallDto, type: BuddyActionType, scope: Scope): ProposeOutcome</ID>
-    <ID>LongMethod:BuddyBoardTools.kt:BuddyBoardTools$private fun readBoard(userId: UserId): String</ID>
     <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeCompleteStep( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyPathActions.kt:BuddyPathActions$private fun proposeCompleteTask( call: BuddyToolCallDto, type: BuddyActionType, userId: UUID, ): BuddyActionService.ProposeOutcome</ID>
     <ID>LongMethod:BuddyPathEditActions.kt:BuddyPathEditActions$fun perform(authId: String, user: UserId, request: BuddyActionRequest): BuddyActionResponse</ID>
@@ -152,6 +151,7 @@
     <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Evaluating project industry automatically") override suspend fun evaluateIndustryAutomatically(projectId: UUID)</ID>
     <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Getting or lazily evaluating project industry") override suspend fun getOrEvaluateIndustry(projectId: UUID): String?</ID>
     <ID>LongMethod:ProjectRoleService.kt:ProjectRoleService$@Tracked("Suggesting skills for project role") suspend fun suggestSkillsForRole( roleId: UUID, request: SuggestSkillsRequest? = null, ): List&lt;SkillSuggestionItemResponse&gt;</ID>
+    <ID>LongMethod:ReadBoardTool.kt:ReadBoardTool$private fun readBoard(userId: UserId): String</ID>
     <ID>LongMethod:RunArtifactsIngestionService.kt:RunArtifactsIngestionService$@Tracked("Dispatching AI sync for run") suspend fun ingestRunArtifacts(runId: UUID)</ID>
     <ID>LongMethod:StarterWorkMatcher.kt:StarterWorkMatcher$@Suppress("CyclomaticComplexMethod") fun score( profile: HireProfile, task: TaskFeatures, responsiveness: Responsiveness?, ): Score</ID>
     <ID>LongMethod:StarterWorkPoolReconciler.kt:StarterWorkPoolReconciler$@Transactional fun reconcile(): PoolReconciliation</ID>

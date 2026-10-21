@@ -30,10 +30,10 @@ import java.util.UUID
 /**
  * The actions that let a conversation move the hire along their onboarding path.
  *
- * A component of its own rather than more branches in [BuddyActionService], for the reason
- * [BuddyBoardTools] is one: they share a subject that the rest of the catalog does not touch, and
- * they come as a set. [BuddyActionService] still owns the propose/confirm contract — it routes to
- * this and emits what comes back — so there is exactly one place where an action becomes a button.
+ * A component of its own rather than more branches in [BuddyActionService]: they share a subject
+ * that the rest of the catalog does not touch, and they come as a set. [BuddyActionService] still owns
+ * the propose/confirm contract — it routes to this and emits what comes back — so there is exactly one
+ * place where an action becomes a button.
  *
  * ### The line these do not cross
  *
