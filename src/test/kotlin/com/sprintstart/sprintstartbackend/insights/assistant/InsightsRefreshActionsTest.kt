@@ -50,4 +50,12 @@ class InsightsRefreshActionsTest {
 
         assertThat(result).contains("9 components").contains("2 are missing documentation")
     }
+
+    /** Nothing can change between the offer and the confirm, so neither refresh ever refuses at the confirm. */
+    @Test
+    fun `a refresh never refuses at the confirm`() {
+        listOf(RefreshFaqAction(insightsRefreshApi), RefreshKnowledgeGapsAction(insightsRefreshApi)).forEach {
+            assertThat(it.recheck(JsonObject(emptyMap()), context)).isNull()
+        }
+    }
 }

@@ -35,36 +35,11 @@ class RefreshFaqAction(
                 "questions, replacing the current groups. It asks the AI service and can take a while.",
         )
 
+    /** A refresh rebuilds from what is there at the confirm, so nothing can have gone stale since the offer. */
+    override fun recheck(params: JsonObject, context: TeamToolContext): String? = null
+
     override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
         val groups = insightsRefreshApi.refreshFaq(context.projectId)
         return "Refreshed the FAQ: $groups recurring-question groups."
-    }
-}
-
-/** Offers to rescan the project's components for missing documentation. */
-@Component
-class RefreshKnowledgeGapsAction(
-    private val insightsRefreshApi: InsightsRefreshApi,
-) : TeamActionHandler {
-    override val area = TeamArea.KNOWLEDGE
-    override val risk = BuddyProposalRisk.BULK
-    override val spec = BuddyToolSpecDto(
-        name = "refresh_knowledge_gaps",
-        description = "Offer to rescan this project's components for missing documentation. It asks the AI " +
-            "service and takes a while. Takes no arguments.",
-        parameters = stringFields(required = emptyList()),
-    )
-
-    override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft =
-        TeamActionDraft.Proposed(
-            params = JsonObject(emptyMap()),
-            label = "Rescan for documentation gaps",
-            preview = "Rescan this project's components for missing documentation, replacing the current list " +
-                "of gaps. It asks the AI service and can take a while.",
-        )
-
-    override suspend fun perform(params: JsonObject, context: TeamToolContext): String {
-        val refresh = insightsRefreshApi.refreshKnowledgeGaps(context.projectId)
-        return "Rescanned ${refresh.componentCount} components: ${refresh.gapCount} are missing documentation."
     }
 }
