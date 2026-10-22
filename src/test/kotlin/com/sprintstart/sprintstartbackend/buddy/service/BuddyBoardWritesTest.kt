@@ -35,8 +35,8 @@ import java.util.UUID
  * The board actions that put the mentor's own words on a board, offered and confirmed through the
  * Buddy (`board/assistant`).
  *
- * What these assert is a different promise from the rest of the catalog — not "the right operation ran" but "nothing was
- * written that the hire had not read, and nothing of theirs changed underneath it".
+ * What these assert is a different promise from the rest of the catalog — not "the right operation ran" but "nothing
+ * was written that the hire had not read, and nothing of theirs changed underneath it".
  */
 class BuddyBoardWritesTest {
     private val boardService: BoardService = mockk(relaxed = true)
