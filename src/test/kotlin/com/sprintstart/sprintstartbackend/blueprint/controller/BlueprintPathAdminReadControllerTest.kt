@@ -25,6 +25,15 @@ class BlueprintPathAdminReadControllerTest : BlueprintControllerTestSupport() {
             status = BlueprintStatus.DRAFT,
             blueprintPhases = emptyList(),
         )
+    private val overviewResponse =
+        GetBlueprintPathOverviewResponse(
+            id = pathId,
+            blueprintKey = blueprintKey,
+            version = 0,
+            revision = 0L,
+            title = "title",
+            status = BlueprintStatus.DRAFT,
+        )
     private val service: BlueprintPathService = mockk()
     private val graphNodeService: BlueprintGraphNodeService = mockk()
     override val controller = BlueprintPathAdminReadController(service, graphNodeService)
@@ -36,7 +45,7 @@ class BlueprintPathAdminReadControllerTest : BlueprintControllerTestSupport() {
                 name = "GET /",
                 request = get("/api/v1/onboarding/blueprints"),
                 expectedStatus = 200,
-                response = emptyList<GetBlueprintPathOverviewResponse>(),
+                response = listOf(overviewResponse),
                 serviceCall = {
                     service.getBlueprintPathOverviewsGroupedByBlueprintKey(BlueprintScope.Global)
                 },
@@ -46,7 +55,7 @@ class BlueprintPathAdminReadControllerTest : BlueprintControllerTestSupport() {
                 name = "GET /{blueprintKey}",
                 request = get("/api/v1/onboarding/blueprints/$blueprintKey"),
                 expectedStatus = 200,
-                response = emptyList<GetBlueprintPathResponse>(),
+                response = listOf(pathResponse),
                 serviceCall = {
                     service.getBlueprintPathHistoryByBlueprintKey(BlueprintScope.Global, blueprintKey)
                 },
