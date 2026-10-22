@@ -48,11 +48,11 @@ import java.util.UUID
 
 /**
  * The two path actions that change what is *on* the path rather than ticking something off it:
- * asking the PM to skip a step, and adding one. Split from [BuddyPathActionTest] for size; the same
+ * asking the PM to skip a step, and adding one. Split from [BuddyPathProgressTest] for size; the same
  * rules hold -- nothing written before a confirm, every precondition checked before the button, and
  * every refusal addressed to the mentor.
  */
-class BuddyPathStepActionTest {
+class BuddyPathEditsTest {
     // No other phase waits on the ones in these cases unless a case says so.
     private val myPathTool: MyPathTool = mockk {
         every { phasesOf(any()) } returns emptyList()

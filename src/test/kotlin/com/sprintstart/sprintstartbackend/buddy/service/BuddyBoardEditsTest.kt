@@ -48,13 +48,14 @@ import java.util.Optional
 import java.util.UUID
 
 /**
- * The board actions that reach past adding: editing, clearing and rearranging what the hire has.
+ * The board actions that reach past adding: editing, clearing and rearranging what the hire has,
+ * offered and confirmed through the Buddy (`board/assistant`).
  *
  * What these pin is the bargain that lets the buddy do this at all: nothing is written on
  * proposal, the names a confirm shows come from the board rather than from the model, the
  * one-project scoping still refuses, and every confirmed write lands as the buddy's.
  */
-class BuddyBoardEditActionsTest {
+class BuddyBoardEditsTest {
     private val boardService: BoardService = mockk(relaxed = true)
     private val userApi: UserApi = mockk()
 
