@@ -26,6 +26,15 @@ class BlueprintPathReadControllerTest : BlueprintControllerTestSupport() {
             status = BlueprintStatus.DRAFT,
             blueprintPhases = emptyList(),
         )
+    private val overviewResponse =
+        GetBlueprintPathOverviewResponse(
+            id = pathId,
+            blueprintKey = blueprintKey,
+            version = 0,
+            revision = 0L,
+            title = "title",
+            status = BlueprintStatus.DRAFT,
+        )
     private val service: BlueprintPathService = mockk()
     private val graphNodeService: BlueprintGraphNodeService = mockk()
     override val controller = BlueprintPathReadController(service, graphNodeService)
@@ -38,7 +47,7 @@ class BlueprintPathReadControllerTest : BlueprintControllerTestSupport() {
                 name = "GET /",
                 request = get("/api/v1/projects/$projectId/onboarding/blueprints"),
                 expectedStatus = 200,
-                response = emptyList<GetBlueprintPathOverviewResponse>(),
+                response = listOf(overviewResponse),
                 serviceCall = {
                     service.getBlueprintPathOverviewsGroupedByBlueprintKey(BlueprintScope.Project(projectId))
                 },
@@ -48,7 +57,7 @@ class BlueprintPathReadControllerTest : BlueprintControllerTestSupport() {
                 name = "GET /{blueprintKey}",
                 request = get("/api/v1/projects/$projectId/onboarding/blueprints/$blueprintKey"),
                 expectedStatus = 200,
-                response = emptyList<GetBlueprintPathResponse>(),
+                response = listOf(pathResponse),
                 serviceCall = {
                     service.getBlueprintPathHistoryByBlueprintKey(BlueprintScope.Project(projectId), blueprintKey)
                 },
@@ -58,7 +67,7 @@ class BlueprintPathReadControllerTest : BlueprintControllerTestSupport() {
                 name = "GET /paths",
                 request = get("/api/v1/projects/$projectId/onboarding/blueprints/paths"),
                 expectedStatus = 200,
-                response = emptyList<GetBlueprintPathOverviewResponse>(),
+                response = listOf(overviewResponse),
                 serviceCall = {
                     service.getBlueprintPathOverviewsForProjectId(projectId)
                 },
