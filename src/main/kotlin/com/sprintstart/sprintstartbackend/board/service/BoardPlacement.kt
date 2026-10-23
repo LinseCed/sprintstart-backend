@@ -55,7 +55,7 @@ internal class BoardPlacement(
         subject: String? = null,
         by: BoardActor = BoardActor.BUDDY,
     ): PlacementOutcome {
-        val member = access.memberOrNull(userId, projectId) ?: return PlacementOutcome.NOT_A_MEMBER
+        access.memberOrNull(userId, projectId) ?: return PlacementOutcome.NOT_A_MEMBER
 
         val cleanSubject = subject?.let { normaliseSubject(it) }?.takeIf { it.isNotBlank() }
         if (kind.takesSubject && cleanSubject == null) return PlacementOutcome.NEEDS_A_SUBJECT
