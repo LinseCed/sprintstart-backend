@@ -6,6 +6,7 @@ import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardState
 import com.sprintstart.sprintstartbackend.board.external.enums.PlacementOutcome
+import com.sprintstart.sprintstartbackend.board.external.model.HireBoard
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.board.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.path.external.PathReadApi
@@ -49,12 +50,12 @@ internal class BoardPlacement(
      * @return What happened, in a form the caller can turn into a line for the model.
      */
     fun place(
-        userId: UserId,
-        projectId: ProjectId,
+        hire: HireBoard,
         kind: BoardCardKind,
         subject: String? = null,
         by: BoardActor = BoardActor.BUDDY,
     ): PlacementOutcome {
+        val (userId, projectId) = hire
         access.memberOrNull(userId, projectId) ?: return PlacementOutcome.NOT_A_MEMBER
 
         val cleanSubject = subject?.let { normaliseSubject(it) }?.takeIf { it.isNotBlank() }
@@ -121,7 +122,7 @@ internal class BoardPlacement(
         by: BoardActor,
     ): PlacementOutcome {
         require(!kind.takesSubject) { "$kind is identified by its subject; revive it through place()" }
-        val outcome = place(userId, projectId, kind, by = by)
+        val outcome = place(HireBoard(userId, projectId), kind, by = by)
         if (outcome != PlacementOutcome.DISMISSED_BY_HIRE) return outcome
 
         val board = access.existingBoardOf(userId, projectId) ?: return outcome

@@ -8,6 +8,7 @@ import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardState
 import com.sprintstart.sprintstartbackend.board.external.enums.PlacementOutcome
+import com.sprintstart.sprintstartbackend.board.external.model.HireBoard
 import com.sprintstart.sprintstartbackend.board.model.entity.Board
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.board.model.request.board.AuthoredCardRequest
@@ -245,7 +246,7 @@ class BoardService(
         kind: BoardCardKind,
         subject: String? = null,
         by: BoardActor = BoardActor.BUDDY,
-    ): PlacementOutcome = placement.place(userId, projectId, kind, subject, by)
+    ): PlacementOutcome = placement.place(HireBoard(userId, projectId), kind, subject, by)
 
     /** See [BoardPlacement.placeOrRevive]. */
     @Transactional
@@ -307,7 +308,7 @@ class BoardService(
         cardId: BoardCardId,
         before: String,
         after: String,
-    ): Boolean = authoredCards.rewordChecklistItem(userId, projectId, cardId, before, after)
+    ): Boolean = authoredCards.rewordChecklistItem(HireBoard(userId, projectId), cardId, before, after)
 
     /** See [BoardAuthoredCards.editAuthoredCardForBuddy]. */
     @Transactional
@@ -317,5 +318,6 @@ class BoardService(
         cardId: BoardCardId,
         request: AuthoredCardRequest,
         basedOn: String?,
-    ): BoardCardResponse = authoredCards.editAuthoredCardForBuddy(userId, projectId, cardId, request, basedOn)
+    ): BoardCardResponse =
+        authoredCards.editAuthoredCardForBuddy(HireBoard(userId, projectId), cardId, request, basedOn)
 }

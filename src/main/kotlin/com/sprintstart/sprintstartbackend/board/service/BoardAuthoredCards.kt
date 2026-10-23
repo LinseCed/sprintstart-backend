@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardChange
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardKind
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardState
+import com.sprintstart.sprintstartbackend.board.external.model.HireBoard
 import com.sprintstart.sprintstartbackend.board.model.entity.Board
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardCardPayload
@@ -194,13 +195,8 @@ internal class BoardAuthoredCards(
      * @throws ResponseStatusException 404 when they are not a member of [projectId], or the card is
      * not an active checklist of theirs on that project's board.
      */
-    fun rewordChecklistItem(
-        userId: UserId,
-        projectId: ProjectId,
-        cardId: BoardCardId,
-        before: String,
-        after: String,
-    ): Boolean {
+    fun rewordChecklistItem(hire: HireBoard, cardId: BoardCardId, before: String, after: String): Boolean {
+        val (userId, projectId) = hire
         val (card, _) = buddyEditableCardOrThrow(userId, projectId, cardId, BoardCardKind.CHECKLIST)
         val existing = card.checklistOrThrow()
         val wanted = before.trim().lowercase()
@@ -238,12 +234,12 @@ internal class BoardAuthoredCards(
      * read, so that replacing it whole would lose what the proposal never showed.
      */
     fun editAuthoredCardForBuddy(
-        userId: UserId,
-        projectId: ProjectId,
+        hire: HireBoard,
         cardId: BoardCardId,
         request: AuthoredCardRequest,
         basedOn: String?,
     ): BoardCardResponse {
+        val (userId, projectId) = hire
         val (card, member) = buddyEditableCardOrThrow(userId, projectId, cardId, request.kind)
         // Decided on the row this transaction holds the lock on, so nothing can change it between
         // this check and the replace below. A missing fingerprint cannot vouch for anything.
