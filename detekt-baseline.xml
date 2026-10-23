@@ -41,7 +41,6 @@
     <ID>CyclomaticComplexMethod:StarterWorkPoolReconciler.kt:StarterWorkPoolReconciler$@Transactional fun reconcile(): PoolReconciliation</ID>
     <ID>CyclomaticComplexMethod:StepTeamActions.kt:AddStepAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>CyclomaticComplexMethod:StepTeamActions.kt:UpdateStepAction$private fun badArgument(call: BuddyToolCallDto, slots: Int): String?</ID>
-    <ID>LargeClass:BlueprintPathController.kt:BlueprintPathController</ID>
     <ID>LargeClass:OnboardingPersonalizationService.kt:OnboardingPersonalizationService</ID>
     <ID>LongMethod:AddPathStepAction.kt:AddPathStepAction$override fun propose(call: BuddyToolCallDto, context: HireActionContext): HireActionOutcome</ID>
     <ID>LongMethod:AddPathStepAction.kt:AddPathStepAction$override suspend fun perform( request: HireActionRequest, context: HireActionContext, authId: AuthId, ): BuddyActionResponse</ID>

@@ -58,7 +58,6 @@
     <ID>InjectDispatcher:SyncExecution.kt:SyncExecution$IO</ID>
     <ID>InjectDispatcher:TaskOrientationService.kt:TaskOrientationService$IO</ID>
     <ID>InstanceOfCheckForException:NotionWorkspaceIngestionService.kt:NotionWorkspaceIngestionService$exception is NotionPageSyncException</ID>
-    <ID>LargeClass:BlueprintPathController.kt:BlueprintPathController</ID>
     <ID>LargeClass:OnboardingPersonalizationService.kt:OnboardingPersonalizationService</ID>
     <ID>LongMethod:AddPathStepAction.kt:AddPathStepAction$override fun propose(call: BuddyToolCallDto, context: HireActionContext): HireActionOutcome</ID>
     <ID>LongMethod:AddPathStepAction.kt:AddPathStepAction$override suspend fun perform( request: HireActionRequest, context: HireActionContext, authId: AuthId, ): BuddyActionResponse</ID>
