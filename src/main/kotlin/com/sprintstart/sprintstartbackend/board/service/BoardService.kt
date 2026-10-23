@@ -248,10 +248,10 @@ class BoardService(
         by: BoardActor = BoardActor.BUDDY,
     ): PlacementOutcome = placement.place(HireBoard(userId, projectId), kind, subject, by)
 
-    /** See [BoardPlacement.placeOrRevive]. */
+    /** See [BoardPlacement.placeRevivingDismissed]. */
     @Transactional
     fun placeOrRevive(userId: UserId, projectId: ProjectId, kind: BoardCardKind, by: BoardActor): PlacementOutcome =
-        placement.placeOrRevive(userId, projectId, kind, by)
+        placement.placeRevivingDismissed(userId, projectId, kind, by)
 
     /** See [BoardArrangement.dismiss]. */
     @Transactional

@@ -115,7 +115,7 @@ internal class BoardPlacement(
      * @param by Who placed or brought back the card: the hire for a grab by hand, the buddy for one
      *   the hire confirmed. Recorded as the card's latest change either way.
      */
-    fun placeOrRevive(
+    fun placeRevivingDismissed(
         userId: UserId,
         projectId: ProjectId,
         kind: BoardCardKind,
