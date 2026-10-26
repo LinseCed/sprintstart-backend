@@ -134,8 +134,6 @@
     <ID>LongMethod:StepTeamActions.kt:AddStepAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>LongMethod:StepTeamActions.kt:UpdateStepAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>LongMethod:StreamExecution.kt:StreamExecution$@Suppress("CyclomaticComplexMethod") inline fun &lt;reified T&gt; perform( terminationMarkers: Set&lt;String&gt; = setOf("[DONE]"), crossinline onChunkError: (raw: String, error: Throwable) -&gt; Boolean = { raw, err -&gt; System.err.println("WebClient stream: failed to deserialize chunk '$raw': ${err.message}") true // skip and continue by default }, ): Flow&lt;T&gt;</ID>
-    <ID>LongMethod:TaskOrientationService.kt:TaskOrientationService$private fun persistHumanPacket( proposal: StarterWorkTaskProposal, projectId: UUID, request: AuthorOrientationRequest, ): OrientationPacketResponse</ID>
-    <ID>LongMethod:TaskOrientationService.kt:TaskOrientationService$private fun store( context: TaskContext, outcome: OrientationOutcome, schema: OrientationPacketSchema, ): TaskOrientationPacket</ID>
     <ID>LongMethod:TaskOrientationService.kt:TaskOrientationService$suspend fun streamForHire(hireId: UUID, projectId: UUID): Flow&lt;AiProgressEvent&gt;</ID>
     <ID>LongMethod:TaskTeamActions.kt:AddTaskAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>LongMethod:TeamMemberActions.kt:AddMembersAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
