@@ -48,7 +48,6 @@
     <ID>LongMethod:ArtifactService.kt:ArtifactService$@Transactional(readOnly = true) @Tracked("Retrieving content of artifact") fun getArtifactContent(projectId: UUID, artifactId: UUID, authId: String): ArtifactContentResult</ID>
     <ID>LongMethod:BitbucketArtifactMapper.kt:BitbucketArtifactMapper$fun toCommand(event: BitbucketFileFetchedEvent): BitbucketArtifactCommand</ID>
     <ID>LongMethod:BitbucketArtifactMapper.kt:BitbucketArtifactMapper$fun toCommand(event: BitbucketWorkspaceMetadataFetchedEvent): BitbucketArtifactCommand</ID>
-    <ID>LongMethod:BitbucketArtifactProviderService.kt:BitbucketArtifactProviderService$private fun applyChange(artifact: Artifact, command: BitbucketArtifactCommand): BitbucketArtifactChange</ID>
     <ID>LongMethod:BitbucketConnectionService.kt:BitbucketConnectionService$@Suppress("ThrowsCount") @Tracked("Connecting a bitbucket repository if valid") suspend fun connectRepositoryIfExists( authId: String, request: ConnectBitbucketRepositoryRequest, ): ConnectBitbucketRepositoryResponse</ID>
     <ID>LongMethod:BitbucketConnectionService.kt:BitbucketConnectionService$private suspend fun connectRepository( authId: String, request: ConnectBitbucketRepositoryRequest, transactionId: UUID, ): UUID</ID>
     <ID>LongMethod:BitbucketFileService.kt:BitbucketFileService$@Tracked("Fetching and ingesting files of Bitbucket repository") suspend fun fetchAndIngestFilesOfRepository(repositoryId: UUID, transactionId: UUID)</ID>
@@ -82,7 +81,6 @@
     <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubIssueFetchedEvent): GithubArtifactCommand</ID>
     <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubOrgMetadataFetchedEvent): GithubArtifactCommand</ID>
     <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubPullRequestFetchedEvent): GithubArtifactCommand</ID>
-    <ID>LongMethod:GithubArtifactProviderService.kt:GithubArtifactProviderService$private fun applyChange(artifact: Artifact, command: GithubArtifactCommand): ArtifactChange</ID>
     <ID>LongMethod:GithubConnectorService.kt:GithubConnectorService$private suspend fun connectNewRepository( authId: String, request: ConnectRepositoryRequest, transactionId: UUID, ): RepositoryConnectionOutcome</ID>
     <ID>LongMethod:GithubConnectorService.kt:GithubConnectorService$private suspend fun connectRepository(repository: GithubRepositoryConnection, transactionId: UUID): UUID</ID>
     <ID>LongMethod:GithubFileService.kt:GithubFileService$private suspend fun ingestFiles(githubRepository: GithubRepositoryConnection, transactionId: UUID)</ID>
@@ -96,7 +94,6 @@
     <ID>LongMethod:IngestionRunService.kt:IngestionRunService$private fun buildProjectPredicate( root: Root&lt;IngestionRun&gt;, cb: CriteriaBuilder, projectId: UUID, projectSources: ProjectSources?, ): Predicate</ID>
     <ID>LongMethod:IngestionSourceStatusService.kt:IngestionSourceStatusService$@Transactional(readOnly = true) @Tracked("Retrieving ingestion status per source instance") fun getStatusPerSourceInstance(projectId: UUID? = null): List&lt;SourceInstanceIngestionStatusResponse&gt;</ID>
     <ID>LongMethod:JiraArtifactMapper.kt:JiraArtifactMapper$fun toCommand(event: JiraIssueFetchedEvent): JiraArtifactCommand</ID>
-    <ID>LongMethod:JiraArtifactProviderService.kt:JiraArtifactProviderService$@Transactional fun persistArtifact(command: JiraArtifactCommand)</ID>
     <ID>LongMethod:JiraService.kt:JiraService$private suspend fun connectNewInstance( authId: String, request: ConnectJiraInstanceRequest, transactionId: UUID, ): UUID</ID>
     <ID>LongMethod:KeycloakEventService.kt:KeycloakEventService$@Transactional @Tracked("Handling Keycloak event") fun handleEvent(request: KeycloakEventRequest)</ID>
     <ID>LongMethod:MyPathTool.kt:MyPathTool$fun execute(userId: UUID): String</ID>
@@ -122,7 +119,6 @@
     <ID>LongMethod:StreamExecution.kt:StreamExecution$@Suppress("CyclomaticComplexMethod") inline fun &lt;reified T&gt; perform( terminationMarkers: Set&lt;String&gt; = setOf("[DONE]"), crossinline onChunkError: (raw: String, error: Throwable) -&gt; Boolean = { raw, err -&gt; System.err.println("WebClient stream: failed to deserialize chunk '$raw': ${err.message}") true // skip and continue by default }, ): Flow&lt;T&gt;</ID>
     <ID>LongMethod:TaskOrientationService.kt:TaskOrientationService$suspend fun streamForHire(hireId: UUID, projectId: UUID): Flow&lt;AiProgressEvent&gt;</ID>
     <ID>LongMethod:UploadArtifactMapper.kt:UploadArtifactMapper$fun toCommand(event: ArtifactUploadedEvent): UploadArtifactCommand</ID>
-    <ID>LongMethod:UploadArtifactProviderService.kt:UploadArtifactProviderService$@Transactional fun persistArtifact(command: UploadArtifactCommand)</ID>
     <ID>LongMethod:UploadService.kt:UploadService$@Transactional @Tracked("Deleting a batch of project artifacts") fun deleteUpload( authId: String, artifactIds: Set&lt;UUID&gt;, projectId: UUID, ): DeleteUploadsResponse</ID>
     <ID>LongMethod:UploadService.kt:UploadService$@Transactional @Tracked("Uploading a new batch of project artifacts") fun upload( authId: String, files: List&lt;MultipartFile&gt;, projectId: UUID, ): List&lt;UploadArtifactResponse&gt;</ID>
     <ID>LongMethod:UploadService.kt:UploadService$private fun uploadSingle( file: MultipartFile, uploaderId: UUID, projectId: UUID, transactionId: UUID, outcomes: MutableSet&lt;UploadArtifactOperationOutcome&gt;, ): UploadResult</ID>
