@@ -50,8 +50,6 @@
     <ID>LongMethod:ArtifactFilterPredicates.kt:ArtifactFilterPredicates$private fun buildUploadFormatPredicate( cb: CriteriaBuilder, root: Root&lt;Artifact&gt;, format: UploadFormat, ): Predicate</ID>
     <ID>LongMethod:ArtifactFacetCounter.kt:ArtifactFacetCounter$private fun computeRepositoryFacets(projectId: UUID, criteria: ArtifactFilterCriteria): List&lt;FacetCountResponse&gt;</ID>
     <ID>LongMethod:ArtifactService.kt:ArtifactService$@Transactional(readOnly = true) @Tracked("Retrieving content of artifact") fun getArtifactContent(projectId: UUID, artifactId: UUID, authId: String): ArtifactContentResult</ID>
-    <ID>LongMethod:BitbucketArtifactMapper.kt:BitbucketArtifactMapper$fun toCommand(event: BitbucketFileFetchedEvent): BitbucketArtifactCommand</ID>
-    <ID>LongMethod:BitbucketArtifactMapper.kt:BitbucketArtifactMapper$fun toCommand(event: BitbucketWorkspaceMetadataFetchedEvent): BitbucketArtifactCommand</ID>
     <ID>LongMethod:BitbucketArtifactProviderService.kt:BitbucketArtifactProviderService$private fun applyChange(artifact: Artifact, command: BitbucketArtifactCommand): BitbucketArtifactChange</ID>
     <ID>LongMethod:BitbucketConnectionService.kt:BitbucketConnectionService$@Suppress("ThrowsCount") @Tracked("Connecting a bitbucket repository if valid") suspend fun connectRepositoryIfExists( authId: String, request: ConnectBitbucketRepositoryRequest, ): ConnectBitbucketRepositoryResponse</ID>
     <ID>LongMethod:BitbucketConnectionService.kt:BitbucketConnectionService$private suspend fun connectRepository( authId: String, request: ConnectBitbucketRepositoryRequest, transactionId: UUID, ): UUID</ID>
@@ -83,11 +81,6 @@
     <ID>LongMethod:CreateArrivalStepsAction.kt:CreateArrivalStepsAction$private fun preview(drafted: List&lt;DraftedStep&gt;): String</ID>
     <ID>LongMethod:EditChecklistAction.kt:EditChecklistAction$override fun propose(call: BuddyToolCallDto, context: HireActionContext): HireActionOutcome</ID>
     <ID>LongMethod:FaqConsolidationService.kt:FaqConsolidationService$@Tracked("Merging duplicate FAQ entries") suspend fun mergeDuplicates(projectId: UUID)</ID>
-    <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubCommitFetchedEvent): GithubArtifactCommand</ID>
-    <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubFileFetchedEvent): GithubArtifactCommand</ID>
-    <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubIssueFetchedEvent): GithubArtifactCommand</ID>
-    <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubOrgMetadataFetchedEvent): GithubArtifactCommand</ID>
-    <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubPullRequestFetchedEvent): GithubArtifactCommand</ID>
     <ID>LongMethod:GithubArtifactProviderService.kt:GithubArtifactProviderService$private fun applyChange(artifact: Artifact, command: GithubArtifactCommand): ArtifactChange</ID>
     <ID>LongMethod:GithubConnectorService.kt:GithubConnectorService$private suspend fun connectNewRepository( authId: String, request: ConnectRepositoryRequest, transactionId: UUID, ): RepositoryConnectionOutcome</ID>
     <ID>LongMethod:GithubConnectorService.kt:GithubConnectorService$private suspend fun connectRepository(repository: GithubRepositoryConnection, transactionId: UUID): UUID</ID>
@@ -101,7 +94,6 @@
     <ID>LongMethod:GithubUpdatesService.kt:GithubUpdatesService$private fun performRepositoryUpdate( githubRepository: GithubRepositoryConnection, transactionId: UUID, )</ID>
     <ID>LongMethod:IngestionRunService.kt:IngestionRunService$private fun buildProjectPredicate( root: Root&lt;IngestionRun&gt;, cb: CriteriaBuilder, projectId: UUID, projectSources: ProjectSources?, ): Predicate</ID>
     <ID>LongMethod:IngestionSourceStatusService.kt:IngestionSourceStatusService$@Transactional(readOnly = true) @Tracked("Retrieving ingestion status per source instance") fun getStatusPerSourceInstance(projectId: UUID? = null): List&lt;SourceInstanceIngestionStatusResponse&gt;</ID>
-    <ID>LongMethod:JiraArtifactMapper.kt:JiraArtifactMapper$fun toCommand(event: JiraIssueFetchedEvent): JiraArtifactCommand</ID>
     <ID>LongMethod:JiraArtifactProviderService.kt:JiraArtifactProviderService$@Transactional fun persistArtifact(command: JiraArtifactCommand)</ID>
     <ID>LongMethod:JiraService.kt:JiraService$private suspend fun connectNewInstance( authId: String, request: ConnectJiraInstanceRequest, transactionId: UUID, ): UUID</ID>
     <ID>LongMethod:KeycloakEventService.kt:KeycloakEventService$@Transactional @Tracked("Handling Keycloak event") fun handleEvent(request: KeycloakEventRequest)</ID>
@@ -133,7 +125,6 @@
     <ID>LongMethod:TaskOrientationService.kt:TaskOrientationService$suspend fun streamForHire(hireId: UUID, projectId: UUID): Flow&lt;AiProgressEvent&gt;</ID>
     <ID>LongMethod:TaskTeamActions.kt:AddTaskAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>LongMethod:TeamMemberActions.kt:AddMembersAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
-    <ID>LongMethod:UploadArtifactMapper.kt:UploadArtifactMapper$fun toCommand(event: ArtifactUploadedEvent): UploadArtifactCommand</ID>
     <ID>LongMethod:UploadArtifactProviderService.kt:UploadArtifactProviderService$@Transactional fun persistArtifact(command: UploadArtifactCommand)</ID>
     <ID>LongMethod:UploadService.kt:UploadService$@Transactional @Tracked("Deleting a batch of project artifacts") fun deleteUpload( authId: String, artifactIds: Set&lt;UUID&gt;, projectId: UUID, ): DeleteUploadsResponse</ID>
     <ID>LongMethod:UploadService.kt:UploadService$@Transactional @Tracked("Uploading a new batch of project artifacts") fun upload( authId: String, files: List&lt;MultipartFile&gt;, projectId: UUID, ): List&lt;UploadArtifactResponse&gt;</ID>
