@@ -43,7 +43,7 @@ import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 import kotlin.test.assertTrue
 
-@WebMvcTest(StarterWorkController::class)
+@WebMvcTest(StarterWorkController::class, MyStarterWorkController::class)
 @Import(SecurityConfig::class)
 @AutoConfigureMockMvc
 class StarterWorkControllerTest(
