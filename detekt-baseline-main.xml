@@ -71,7 +71,6 @@
     <ID>LongMethod:BitbucketFileService.kt:BitbucketFileService$@Tracked("Fetching and ingesting files of Bitbucket repository") suspend fun fetchAndIngestFilesOfRepository(repositoryId: UUID, transactionId: UUID)</ID>
     <ID>LongMethod:BitbucketPullRequestsService.kt:private fun PullRequest.asEvent( connection: BitbucketConnection, comments: List&lt;PullRequestComment&gt;, transactionId: UUID, ): BitbucketPullRequestFetchedEvent</ID>
     <ID>LongMethod:BitbucketUpdatesService.kt:BitbucketUpdatesService$private suspend fun updateConnection(connection: BitbucketConnection): UUID</ID>
-    <ID>LongMethod:BlueprintPathCopyFactory.kt:BlueprintPathCopyFactory$fun createCopyFrom( path: BlueprintPath, blueprintKey: UUID, projectId: UUID?, status: BlueprintStatus, version: Int, ): BlueprintPath</ID>
     <ID>LongMethod:BlueprintSeeder.kt:BlueprintSeeder$fun seed()</ID>
     <ID>LongMethod:BoardActionSupport.kt:internal fun HireBoardApi.namedCards(call: BuddyToolCallDto, board: HireBoard): Found&lt;List&lt;BoardCardResponse&gt;&gt;</ID>
     <ID>LongMethod:BoardDiagramService.kt:BoardDiagramService$private fun store( context: DiagramContext, outcome: DiagramOutcome, schema: DiagramSchema, ): DiagramContent</ID>
@@ -122,13 +121,8 @@
     <ID>LongMethod:NotionCredentialPersistenceService.kt:NotionCredentialPersistenceService$private fun applyWorkspace(credential: NotionCredential, workspace: NotionTokenIdentity)</ID>
     <ID>LongMethod:NotionWorkspaceIngestionService.kt:NotionWorkspaceIngestionService$private suspend fun syncWorkspace( runId: UUID, connection: NotionWorkspaceConnection, forceRefresh: Boolean, ): NotionIngestionResult</ID>
     <ID>LongMethod:NotionWorkspaceMigration.kt:NotionWorkspaceMigration$private fun migrate(old: LegacyNotionConnection)</ID>
-    <ID>LongMethod:OnboardingMetricsService.kt:OnboardingMetricsService$private fun timelineFor(member: ProjectMember, projectId: UUID): HireTimelineResponse</ID>
-    <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$fun createFrom( blueprint: BlueprintSnapshot, userId: UUID, projectRoleIds: Set&lt;UUID&gt; = emptySet(), skillIds: Set&lt;UUID&gt; = emptySet(), generatedContentByBlueprintPhaseId: Map&lt;UUID, GeneratedPhaseContent&gt; = emptyMap(), generationStatusByBlueprintPhaseId: Map&lt;UUID, GenerationStatus&gt; = emptyMap(), ): OnboardingPath</ID>
-    <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun BlueprintPhaseSnapshot.copyTo( onboardingPath: OnboardingPath, nodesByBlueprintId: MutableMap&lt;UUID, OnboardingSubGraphNode&gt;, generated: GeneratedPhaseContent? = null, generationStatus: GenerationStatus? = null, ): CopiedPhase</ID>
-    <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun GeneratedPhaseContent.copyInto(onboardingPhase: OnboardingPhase)</ID>
     <ID>LongMethod:OnboardingPersonalizationService.kt:OnboardingPersonalizationService$@Tracked("Creating onboarding path from blueprint") fun personalize(authId: String, projectId: UUID): Flow&lt;OnboardingSseEvent&gt;</ID>
     <ID>LongMethod:PathItemText.kt:internal fun StringBuilder.appendQuestion( question: GetOnboardingQuestionForUserResponse, phase: GetOnboardingPhaseForUserResponse, graph: PhaseGraph, lastAnswer: String?, )</ID>
-    <ID>LongMethod:PhaseReadingOrder.kt:PhaseReadingOrder$fun of(nodes: List&lt;Pair&lt;UUID, Set&lt;UUID&gt;&gt;&gt;): List&lt;UUID&gt;</ID>
     <ID>LongMethod:PhaseText.kt:internal fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
     <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Evaluating project industry automatically") override suspend fun evaluateIndustryAutomatically(projectId: UUID)</ID>
     <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Getting or lazily evaluating project industry") override suspend fun getOrEvaluateIndustry(projectId: UUID): String?</ID>
