@@ -502,7 +502,7 @@ ConfluenceConnectionService.kt: ConfluenceConnectionService.getConnection(connec
 ConfluenceConnectionService.kt: ConfluenceConnectionService.getConnection(projectId: UUID)
 ConfluenceConnectionService.kt: ConfluenceConnectionService.getConnections(authId: String)
 ConfluenceConnectionService.kt: ConfluenceConnectionService.getConnections(projectId: UUID)
-ConfluenceConnectionService.kt: ConfluenceConnectionService.normalizeSpaceId(rawSpaceId: String)
+ConfluenceConnectionService.kt: normalizeSpaceId(rawSpaceId: String)
 ConfluenceConnectionService.kt: ConfluenceConnectionService.rejectDuplicate(projectId: UUID)
 ConfluenceConnectionService.kt: ConfluenceConnectionService.rejectDuplicate(spaceId: String)
 ConfluenceConnectionService.kt: ConfluenceConnectionService.requireProjectAccess(authId: String)
