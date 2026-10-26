@@ -58,7 +58,7 @@ class UploadArtifactProviderService(
         if (linked || contentChanged) {
             val ingestionRun = lockedRun(command.ingestionRunId)
             if (contentChanged) ingestionRun.updatedCount++
-            // Stored by an earlier run, so the AI sync would otherwise never see this change.
+            // The artifact belongs to the run that stored it, so the AI sync would otherwise miss this change.
             ingestionRun.artifactIdsToReingest.add(artifact.id)
         }
     }
