@@ -17,10 +17,13 @@ import com.sprintstart.sprintstartbackend.shared.ids.BlueprintId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.user.external.ProjectIndustryApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
+import com.sprintstart.sprintstartbackend.user.external.UserOnboardingProfile
 import jakarta.persistence.EntityManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
@@ -99,115 +102,122 @@ class OnboardingPersonalizationService(
             .toSet()
         val skillIds = profile.skills.map { it.skillId }.toSet()
 
-        return channelFlow {
-            val industry = projectIndustryApi.getOrEvaluateIndustry(projectId)
-            val blueprint = loadBlueprintSelection(projectId, projectRoleIds, skillIds)
-            logger.info(
-                "Starting onboarding personalization for user {} in project {} from blueprint {}",
-                profile.id,
-                projectId,
-                blueprint.id,
-            )
+        return channelFlow { personalizeInto(profile, projectId, projectRoleIds, skillIds) }
+            .catch { error -> reportFailure(error, authId, projectId) }
+    }
 
-            val generated = mutableMapOf<UUID, GeneratedPhaseContent>()
-            val generationStatuses = mutableMapOf<UUID, GenerationStatus>()
-            val phases = blueprint.aiEnhancedPhases
-            logger.info(
-                "Blueprint {} contains {} included AI-enhanced phase(s)",
-                blueprint.id,
-                phases.size,
-            )
+    private suspend fun ProducerScope<OnboardingSseEvent>.personalizeInto(
+        profile: UserOnboardingProfile,
+        project: UUID,
+        projectRoleIds: Set<UUID>,
+        skillIds: Set<UUID>,
+    ) {
+        val industry = projectIndustryApi.getOrEvaluateIndustry(project)
+        val blueprint = loadBlueprintSelection(project, projectRoleIds, skillIds)
+        logger.info("Personalizing user {} in project {} from blueprint {}", profile.id, project, blueprint.id)
 
-            val sendEvent: suspend (OnboardingSseEvent) -> Unit = { event -> send(event) }
-            val limits = PhaseLimits(
-                phaseTimeoutMillis = applicationConfig.onboarding.phaseTimeoutSeconds * 1_000L,
-                totalTimeoutMillis = applicationConfig.onboarding.totalTimeoutSeconds * 1_000L,
-                semaphore = Semaphore(applicationConfig.onboarding.phaseConcurrency),
-            )
+        val generated = generatePhases(blueprint.aiEnhancedPhases, project, industry) { event -> send(event) }
 
-            supervisorScope {
-                phases.forEach { phase ->
-                    logger.info(
-                        "Requesting AI content for blueprint phase {} ('{}') in project {}",
-                        phase.id,
-                        phase.title,
-                        projectId,
-                    )
-                    launch {
-                        try {
-                            val result = phaseAssembler.generatePhase(
-                                job = PhaseJob(phase, ProjectId(projectId), industry),
-                                limits = limits,
-                                emitStage = { detail ->
-                                    sendEvent(
-                                        OnboardingSseEvent(type = "stage", name = phase.title, detail = detail),
-                                    )
-                                },
-                            )
-                            generated[phase.id] = result.content
-                            generationStatuses[phase.id] = result.status
-                        } catch (cause: CancellationException) {
-                            throw cause
-                        } catch (cause: Throwable) {
-                            logger.error(
-                                "Phase generation failed for '{}' ({}) on project {}",
-                                phase.title,
-                                phase.id,
-                                projectId,
-                                cause,
-                            )
-                            generated[phase.id] = GeneratedPhaseContent()
-                            generationStatuses[phase.id] = GenerationStatus.FAILED
-                        }
-                    }
+        logger.info("Persisting path for user {} ({} generated phase(s))", profile.id, generated.content.size)
+        val response = persistPath(
+            blueprint = blueprint,
+            userId = profile.id,
+            projectRoleIds = projectRoleIds,
+            skillIds = skillIds,
+            generated = generated.content,
+            generationStatuses = generated.statuses,
+        )
+        logger.info("Persisted path {} for user {} ({} phase(s))", response.id, profile.id, response.phases.size)
+        send(OnboardingSseEvent(type = "path", path = response))
+        send(OnboardingSseEvent(type = "done"))
+    }
+
+    private suspend fun generatePhases(
+        phases: List<PhaseAssemblyTarget>,
+        project: UUID,
+        industry: String?,
+        send: suspend (OnboardingSseEvent) -> Unit,
+    ): GeneratedPhases {
+        logger.info("Generating {} AI-enhanced phase(s) in project {}", phases.size, project)
+        val generated = GeneratedPhases()
+        val limits = PhaseLimits(
+            phaseTimeoutMillis = applicationConfig.onboarding.phaseTimeoutSeconds * 1_000L,
+            totalTimeoutMillis = applicationConfig.onboarding.totalTimeoutSeconds * 1_000L,
+            semaphore = Semaphore(applicationConfig.onboarding.phaseConcurrency),
+        )
+
+        supervisorScope {
+            phases.forEach { phase ->
+                logger.info(
+                    "Requesting AI content for blueprint phase {} ('{}') in project {}",
+                    phase.id,
+                    phase.title,
+                    project,
+                )
+                launch {
+                    val result = generateOne(PhaseJob(phase, ProjectId(project), industry), limits, send)
+                    generated.content[phase.id] = result.content
+                    generated.statuses[phase.id] = result.status
                 }
             }
+        }
+        return generated
+    }
 
-            logger.info(
-                "Persisting personalized path for user {} with generated results for {} phase(s)",
-                profile.id,
-                generated.size,
+    /** Assembles one phase; whatever goes wrong, the phase ends as an empty, failed one rather than the run. */
+    private suspend fun generateOne(
+        job: PhaseJob,
+        limits: PhaseLimits,
+        send: suspend (OnboardingSseEvent) -> Unit,
+    ): PhaseGenerationResult =
+        try {
+            phaseAssembler.generatePhase(
+                job = job,
+                limits = limits,
+                emitStage = { detail ->
+                    send(OnboardingSseEvent(type = "stage", name = job.phase.title, detail = detail))
+                },
             )
-            val response = persistPath(
-                blueprint = blueprint,
-                userId = profile.id,
-                projectRoleIds = projectRoleIds,
-                skillIds = skillIds,
-                generated = generated,
-                generationStatuses = generationStatuses,
+        } catch (cause: CancellationException) {
+            throw cause
+        } catch (cause: Throwable) {
+            logger.error(
+                "Phase generation failed for '{}' ({}) on project {}",
+                job.phase.title,
+                job.phase.id,
+                job.project.value,
+                cause,
             )
-            logger.info(
-                "Personalized onboarding path {} persisted for user {} with {} phase(s)",
-                response.id,
-                profile.id,
-                response.phases.size,
+            PhaseGenerationResult(GeneratedPhaseContent(), GenerationStatus.FAILED)
+        }
+
+    private suspend fun FlowCollector<OnboardingSseEvent>.reportFailure(
+        error: Throwable,
+        subject: String,
+        project: UUID,
+    ) {
+        if (error is EmptyOnboardingPathException) {
+            logger.warn(
+                "Onboarding personalization for subject {} in project {} produced no phases ({})",
+                subject,
+                project,
+                error.reason,
             )
-            sendEvent(OnboardingSseEvent(type = "path", path = response))
-            sendEvent(OnboardingSseEvent(type = "done"))
-        }.catch { error ->
-            if (error is EmptyOnboardingPathException) {
-                logger.warn(
-                    "Onboarding personalization for authId {} in project {} produced no phases ({})",
-                    authId,
-                    projectId,
-                    error.reason,
-                )
-            } else {
-                logger.error(
-                    "Onboarding personalization failed for authId {} in project {}",
-                    authId,
-                    projectId,
-                    error,
-                )
-            }
-            emit(
-                OnboardingSseEvent(
-                    type = "error",
-                    reason = (error as? EmptyOnboardingPathException)?.reason,
-                    message = error.message,
-                ),
+        } else {
+            logger.error(
+                "Onboarding personalization failed for subject {} in project {}",
+                subject,
+                project,
+                error,
             )
         }
+        emit(
+            OnboardingSseEvent(
+                type = "error",
+                reason = (error as? EmptyOnboardingPathException)?.reason,
+                message = error.message,
+            ),
+        )
     }
 
     /** Selects the active blueprint and picks out the phases the slow AI step has to assemble. */
@@ -286,4 +296,9 @@ class OnboardingPersonalizationService(
         val id: UUID,
         val aiEnhancedPhases: List<PhaseAssemblyTarget>,
     )
+}
+
+private class GeneratedPhases {
+    val content = mutableMapOf<UUID, GeneratedPhaseContent>()
+    val statuses = mutableMapOf<UUID, GenerationStatus>()
 }

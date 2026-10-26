@@ -80,21 +80,7 @@ class FaqConsolidationService(
             return
         }
 
-        txTemplate.executeWithoutResult { _ ->
-            val byId = faqGroupRepository
-                .findAllByProjectIdOrderByOccurrenceCountDesc(projectId)
-                .associateBy { it.id.toString() }
-
-            merges.forEach { merge ->
-                val target = byId[merge.into] ?: return@forEach
-                val sources = merge.sources.mapNotNull { byId[it] }
-                if (sources.isEmpty()) return@forEach
-
-                sources.forEach { source -> absorb(target, source) }
-                faqGroupRepository.save(target)
-                faqGroupRepository.deleteAll(sources)
-            }
-        }
+        applyMerges(projectId, merges)
 
         logger.info("Merged {} duplicate FAQ entry sets in project {}", merges.size, projectId)
     }
@@ -129,6 +115,24 @@ class FaqConsolidationService(
             if (knownDocuments.add(document.documentRef)) {
                 document.group = target
                 target.documents.add(document)
+            }
+        }
+    }
+
+    private fun applyMerges(project: UUID, merges: List<AiFaqMerge>) {
+        txTemplate.executeWithoutResult { _ ->
+            val byId = faqGroupRepository
+                .findAllByProjectIdOrderByOccurrenceCountDesc(project)
+                .associateBy { it.id.toString() }
+
+            merges.forEach { merge ->
+                val target = byId[merge.into] ?: return@forEach
+                val sources = merge.sources.mapNotNull { byId[it] }
+                if (sources.isEmpty()) return@forEach
+
+                sources.forEach { source -> absorb(target, source) }
+                faqGroupRepository.save(target)
+                faqGroupRepository.deleteAll(sources)
             }
         }
     }
