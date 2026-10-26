@@ -96,8 +96,6 @@
     <ID>LongMethod:ConfluencePageIngestionService.kt:ConfluencePageIngestionService$private fun mapEligiblePages( connection: ConfluenceConnectionIngestionSnapshot, pages: List&lt;ConfluencePage&gt;, relationshipIndex: RelationshipIndex, failures: MutableList&lt;ConfluenceIngestionFailure&gt;, ): List&lt;ConfluencePageArtifactCommand&gt;</ID>
     <ID>LongMethod:ConfluencePageIngestionService.kt:ConfluencePageIngestionService$suspend fun ingest(projectId: UUID, connectionId: UUID): ConfluenceIngestionResult</ID>
     <ID>LongMethod:ContentTeamTools.kt:ContentTeamTools$private fun memberPath(memberId: UUID?, projectId: UUID): String</ID>
-    <ID>LongMethod:CreateArrivalStepsAction.kt:CreateArrivalStepsAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
-    <ID>LongMethod:CreateArrivalStepsAction.kt:CreateArrivalStepsAction$private fun preview(drafted: List&lt;DraftedStep&gt;): String</ID>
     <ID>LongMethod:EditChecklistAction.kt:EditChecklistAction$override fun propose(call: BuddyToolCallDto, context: HireActionContext): HireActionOutcome</ID>
     <ID>LongMethod:FaqConsolidationService.kt:FaqConsolidationService$@Tracked("Merging duplicate FAQ entries") suspend fun mergeDuplicates(projectId: UUID)</ID>
     <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubCommitFetchedEvent): GithubArtifactCommand</ID>
@@ -145,12 +143,8 @@
     <ID>LongMethod:RunArtifactsIngestionService.kt:RunArtifactsIngestionService$@Tracked("Dispatching AI sync for run") suspend fun ingestRunArtifacts(runId: UUID)</ID>
     <ID>LongMethod:StarterWorkMatcher.kt:StarterWorkMatcher$@Suppress("CyclomaticComplexMethod") fun score( profile: HireProfile, task: TaskFeatures, responsiveness: Responsiveness?, ): Score</ID>
     <ID>LongMethod:StarterWorkPoolReconciler.kt:StarterWorkPoolReconciler$@Transactional fun reconcile(): PoolReconciliation</ID>
-    <ID>LongMethod:StepTeamActions.kt:AddStepAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
-    <ID>LongMethod:StepTeamActions.kt:UpdateStepAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>LongMethod:StreamExecution.kt:StreamExecution$@Suppress("CyclomaticComplexMethod") inline fun &lt;reified T&gt; perform( terminationMarkers: Set&lt;String&gt; = setOf("[DONE]"), crossinline onChunkError: (raw: String, error: Throwable) -&gt; Boolean = { raw, err -&gt; System.err.println("WebClient stream: failed to deserialize chunk '$raw': ${err.message}") true // skip and continue by default }, ): Flow&lt;T&gt;</ID>
     <ID>LongMethod:TaskOrientationService.kt:TaskOrientationService$suspend fun streamForHire(hireId: UUID, projectId: UUID): Flow&lt;AiProgressEvent&gt;</ID>
-    <ID>LongMethod:TaskTeamActions.kt:AddTaskAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
-    <ID>LongMethod:TeamMemberActions.kt:AddMembersAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>LongMethod:UploadArtifactMapper.kt:UploadArtifactMapper$fun toCommand(event: ArtifactUploadedEvent): UploadArtifactCommand</ID>
     <ID>LongMethod:UploadArtifactProviderService.kt:UploadArtifactProviderService$@Transactional fun persistArtifact(command: UploadArtifactCommand)</ID>
     <ID>LongMethod:UploadService.kt:UploadService$@Transactional @Tracked("Deleting a batch of project artifacts") fun deleteUpload( authId: String, artifactIds: Set&lt;UUID&gt;, projectId: UUID, ): DeleteUploadsResponse</ID>
