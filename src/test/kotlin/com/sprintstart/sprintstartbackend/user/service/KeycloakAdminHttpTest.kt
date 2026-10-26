@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
 import com.sprintstart.sprintstartbackend.shared.config.KeycloakAdminConfig
+import io.mockk.CapturingSlot
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -10,10 +11,13 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
+import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.nio.ByteBuffer
+import java.util.concurrent.Flow
 
 class KeycloakAdminHttpTest {
     private val httpClient = mockk<HttpClient>()
@@ -137,5 +141,120 @@ class KeycloakAdminHttpTest {
 
         assertThat(uris.encodePath("a b/c")).isEqualTo("a%20b%2Fc")
         assertThat(uris.urlEncode("a b")).isEqualTo("a+b")
+    }
+
+    private fun tokenProvider(
+        admin: KeycloakAdminConfig,
+        username: String = "",
+        password: String = "",
+    ): KeycloakAdminTokenProvider {
+        val config = mockk<ApplicationConfig>()
+        every { config.keycloak.admin } returns admin
+        return KeycloakAdminTokenProvider(httpClient, config, KeycloakAdminUris(config), username, password)
+    }
+
+    private fun sentTokenRequest(body: String, status: Int = 200): SentRequest {
+        val sent = slot<HttpRequest>()
+        val response = mockk<HttpResponse<String>> {
+            every { statusCode() } returns status
+            every { body() } returns body
+        }
+        every { httpClient.send(capture(sent), any<HttpResponse.BodyHandler<String>>()) } returns response
+        return SentRequest(sent)
+    }
+
+    private class SentRequest(
+        val sent: CapturingSlot<HttpRequest>,
+    )
+
+    private fun formOf(request: HttpRequest): String {
+        val out = ByteArrayOutputStream()
+        request.bodyPublisher().get().subscribe(
+            object : Flow.Subscriber<ByteBuffer> {
+                override fun onSubscribe(s: Flow.Subscription) = s.request(Long.MAX_VALUE)
+
+                override fun onNext(item: ByteBuffer) {
+                    val bytes = ByteArray(item.remaining())
+                    item.get(bytes)
+                    out.write(bytes)
+                }
+
+                override fun onError(t: Throwable) = throw t
+
+                override fun onComplete() = Unit
+            },
+        )
+        return out.toString(Charsets.UTF_8)
+    }
+
+    @Test
+    fun `a client secret asks for a client credentials token`() {
+        val holder = sentTokenRequest("""{"access_token":"abc"}""")
+        val provider = tokenProvider(KeycloakAdminConfig(baseUrl = "http://kc", clientSecret = "s3 cret"))
+
+        assertThat(provider.accessToken()).isEqualTo("abc")
+
+        val request = holder.sent.captured
+        assertThat(request.uri()).isEqualTo(URI.create("http://kc/realms/master/protocol/openid-connect/token"))
+        assertThat(header(request, "Content-Type")).isEqualTo("application/x-www-form-urlencoded")
+        assertThat(formOf(request))
+            .isEqualTo("grant_type=client_credentials&client_id=admin-cli&client_secret=s3+cret")
+    }
+
+    @Test
+    fun `without a secret a username and password ask for a password token, the config before the environment`() {
+        val holder = sentTokenRequest("""{"access_token":"abc"}""")
+        val provider = tokenProvider(
+            KeycloakAdminConfig(baseUrl = "http://kc", username = " admin ", password = null),
+            username = "env-user",
+            password = "env-pass",
+        )
+
+        provider.accessToken()
+
+        assertThat(formOf(holder.sent.captured))
+            .isEqualTo("grant_type=password&client_id=admin-cli&username=admin&password=env-pass")
+    }
+
+    @Test
+    fun `no credentials at all is a 502`() {
+        val provider = tokenProvider(KeycloakAdminConfig(baseUrl = "http://kc", username = "only-a-user"))
+
+        val error = assertThrows<ResponseStatusException> { provider.accessToken() }
+
+        assertThat(error.statusCode).isEqualTo(HttpStatus.BAD_GATEWAY)
+        assertThat(error.reason).contains("credentials are not configured")
+    }
+
+    @Test
+    fun `a failed token request is a 502 carrying what Keycloak said`() {
+        sentTokenRequest("denied", status = 401)
+        val provider = tokenProvider(KeycloakAdminConfig(baseUrl = "http://kc", clientSecret = "s"))
+
+        val error = assertThrows<ResponseStatusException> { provider.accessToken() }
+
+        assertThat(error.statusCode).isEqualTo(HttpStatus.BAD_GATEWAY)
+        assertThat(error.reason).contains("401").contains("denied")
+    }
+
+    @Test
+    fun `a token response without an access token is a 502`() {
+        sentTokenRequest("""{"other":"x"}""")
+        val provider = tokenProvider(KeycloakAdminConfig(baseUrl = "http://kc", clientSecret = "s"))
+
+        val error = assertThrows<ResponseStatusException> { provider.accessToken() }
+
+        assertThat(error.reason).contains("did not contain access_token")
+    }
+
+    @Test
+    fun `the uris and the token provider can be built from the configuration alone`() {
+        val config = mockk<ApplicationConfig>()
+        every { config.keycloak.admin } returns KeycloakAdminConfig(baseUrl = "http://kc")
+
+        val uris = KeycloakAdminUris(config)
+
+        assertThat(uris.adminUri("/u")).isEqualTo(URI.create("http://kc/admin/realms/sprintstart/u"))
+        assertThrows<ResponseStatusException> { KeycloakAdminTokenProvider(httpClient, config, uris).accessToken() }
     }
 }
