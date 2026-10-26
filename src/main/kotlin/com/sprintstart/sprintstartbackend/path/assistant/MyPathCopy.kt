@@ -65,9 +65,11 @@ internal object MyPathCopy {
             "It does not tell you which answer to a question is correct -- that is deliberate, " +
             "and you must not guess one aloud: explain the material and let the hire answer. " +
             "Reading it changes nothing. Takes no arguments -- it always reads the caller.",
-        parameters = buildJsonObject {
-            put("type", "object")
-            put("properties", JsonObject(emptyMap()))
-        },
+        parameters = noArguments(),
     )
+
+    private fun noArguments(): JsonObject = buildJsonObject {
+        put("type", "object")
+        put("properties", JsonObject(emptyMap()))
+    }
 }
