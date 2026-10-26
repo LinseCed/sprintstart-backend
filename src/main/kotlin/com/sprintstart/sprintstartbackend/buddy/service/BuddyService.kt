@@ -1,17 +1,11 @@
 package com.sprintstart.sprintstartbackend.buddy.service
 
-import com.sprintstart.sprintstartbackend.arrival.external.ContributionWording
 import com.sprintstart.sprintstartbackend.assistant.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.assistant.external.ArtifactLookupService
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
-import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyCitationDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
-import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEventType
-import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolCallDto
-import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
-import com.sprintstart.sprintstartbackend.assistant.external.BuddyVocabularyDto
 import com.sprintstart.sprintstartbackend.assistant.external.CONVERSATION_WINDOW
 import com.sprintstart.sprintstartbackend.assistant.external.MAX_AGENT_STEPS
 import com.sprintstart.sprintstartbackend.assistant.external.ResolvedBuddyCitation
@@ -21,10 +15,8 @@ import com.sprintstart.sprintstartbackend.assistant.external.emitCitationsAndDon
 import com.sprintstart.sprintstartbackend.assistant.external.endFailureWithErrorEvent
 import com.sprintstart.sprintstartbackend.assistant.external.relayAgentTurn
 import com.sprintstart.sprintstartbackend.assistant.external.sinceLastOpening
-import com.sprintstart.sprintstartbackend.assistant.external.toolUseEvent
 import com.sprintstart.sprintstartbackend.buddy.client.BuddyAiClient
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
-import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddyCitation
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddyMessage
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddySession
 import com.sprintstart.sprintstartbackend.buddy.model.entity.BuddySessionStatus
@@ -45,10 +37,8 @@ import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.QuestionId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
-import com.sprintstart.sprintstartbackend.shared.ids.parseUuidOrNull
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -87,6 +77,9 @@ class BuddyService(
     private val clock: Clock,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
+    private val projectScope = BuddyProjectScope(userApi)
+    private val replyStore = BuddyReplyStore(buddyMessageRepository, buddyCitationRepository, artifactLookupService)
+    private val toolCalls = BuddyToolCallRunner(buddyToolExecutor, buddyActionService)
 
     /** Finds a user's ongoing buddy sessions. */
     fun getSessions(authId: String): GetSessionsResponse {
@@ -134,7 +127,7 @@ class BuddyService(
         val userId = resolveUserId(authId)
         val session = BuddySession(
             userId = userId,
-            projectId = projectId ?: singleProjectOf(projectIdsFor(userId)),
+            projectId = projectId ?: projectScope.singleProjectOf(projectScope.projectIdsFor(UserId(userId))),
         )
         buddySessionRepository.save(session)
         return CreateSessionResponse(session.id)
@@ -152,7 +145,7 @@ class BuddyService(
      * and the AI admits nothing from an empty scope, so the turn would search nothing and reply as
      * though the project had no material — the worst moment to sound confident and the hardest
      * state for the hire to diagnose. They are told that instead, and what resolves it. See
-     * [projectIdsFor].
+     * [BuddyProjectScope.projectIdsFor].
      *
      * A session bound to a project the user has since left is rebound before anything else runs:
      * to the user's only project, or to none when there is no single one. Otherwise an old session
@@ -199,9 +192,9 @@ class BuddyService(
 
         // Resolved once per turn and reused for the retrieval scope below. A session whose project
         // the user has left is rebound before the question event, so the event names the right one.
-        val memberProjects = projectIdsFor(userId)
+        val memberProjects = projectScope.projectIdsFor(UserId(userId))
         if (session.projectId != null && session.projectId.toString() !in memberProjects) {
-            session.projectId = singleProjectOf(memberProjects)
+            session.projectId = projectScope.singleProjectOf(memberProjects)
             buddySessionRepository.save(session)
         }
 
@@ -244,14 +237,19 @@ class BuddyService(
             emptyList()
         }
 
-        // Both resolved once per turn, not per hop: neither can change mid-conversation, and
+        // Resolved once per turn, not per hop: neither can change mid-conversation, and
         // re-reading would cost a membership lookup on every step of the agent loop.
-        val vocabulary = vocabulary()
-        val projectIds = session.projectId?.let { listOf(it.toString()) } ?: memberProjects
+        val scope = BuddyTurnScope(
+            tools = tools,
+            vocabulary = buddyVocabulary(),
+            projectIds = session.projectId?.let { listOf(it.toString()) } ?: memberProjects,
+            capabilitiesEnabled = capabilitiesEnabled,
+            filters = filters,
+        )
 
         // A hire on no project has no retrieval scope, and the AI fails closed on an empty one, so the turn
         // is refused here with the one thing that resolves it. The message is already persisted.
-        if (projectIds.isEmpty()) {
+        if (scope.projectIds.isEmpty()) {
             return flow {
                 emitAgentReply(NO_PROJECT_REPLY, emptyList(), StringBuilder())
                 buddyMessageRepository.save(
@@ -276,16 +274,7 @@ class BuddyService(
                     step++
                     val response = relayAgentTurn(
                         agentAiClient.buddyAgentTurnStream(
-                            agentRequest(
-                                messages,
-                                tools,
-                                step,
-                                session,
-                                vocabulary,
-                                projectIds,
-                                capabilitiesEnabled,
-                                filters,
-                            ),
+                            buddyAgentRequest(messages, step, session, scope),
                         ),
                         emittedContent,
                     )
@@ -300,7 +289,7 @@ class BuddyService(
                             next.add(
                                 BuddyAgentMessageDto(
                                     role = BuddyAgentMessageDto.ROLE_TOOL,
-                                    content = runToolCall(call, userId, currentPage),
+                                    content = toolCalls.run(this, call, UserId(userId), currentPage),
                                     toolCallId = call.id,
                                 ),
                             )
@@ -311,205 +300,21 @@ class BuddyService(
 
                 completeReply(answer, emittedContent)
 
-                resolvedCitations = citations.mapNotNull { citation ->
-                    val artifactId = citation.artifactId?.let(::parseUuidOrNull)
-                    val resolved = artifactId?.let(artifactLookupService::resolve)
-
-                    if (artifactId == null || resolved == null) {
-                        logger.warn(
-                            "Could not resolve artifact {} for buddy citation",
-                            citation.artifactId,
-                        )
-                        null
-                    } else {
-                        ResolvedBuddyCitation(
-                            artifactId = artifactId,
-                            filename = resolved.filename,
-                            sourceUrl = resolved.sourceUrl,
-                            startLine = citation.startLine,
-                            startPage = citation.startPage,
-                        )
-                    }
-                }
-
+                resolvedCitations = replyStore.resolveCitations(citations)
                 emitCitationsAndDone(resolvedCitations)
             } catch (e: CancellationException) {
-                saveIncompleteReply(session, emittedContent.toString())
+                replyStore.saveIncompleteReply(session, emittedContent.toString())
                 throw e
             } catch (e: Exception) {
-                saveIncompleteReply(session, emittedContent.toString())
+                replyStore.saveIncompleteReply(session, emittedContent.toString())
                 throw e
             }
 
-            val message = buddyMessageRepository.save(
-                BuddyMessage(
-                    session = session,
-                    role = BuddyMessageRole.ASSISTANT,
-                    content = emittedContent.toString(),
-                ),
-            )
-
-            val citationEntities = resolvedCitations.map { citation ->
-                BuddyCitation(
-                    artifactId = citation.artifactId,
-                    filename = citation.filename,
-                    sourceUrl = citation.sourceUrl,
-                    startLine = citation.startLine,
-                    startPage = citation.startPage,
-                    message = message,
-                )
-            }
-
-            buddyCitationRepository.saveAll(citationEntities)
+            replyStore.saveReply(session, emittedContent.toString(), resolvedCitations)
             // Only now, with the reply persisted: folding must never delay the answer.
             compactionScheduler.foldHireConversation(UserId(userId), BuddySessionId(session.id))
         }.endFailureWithErrorEvent()
     }
-
-    private fun saveIncompleteReply(session: BuddySession, content: String) {
-        if (content.isBlank()) {
-            return
-        }
-
-        buddyMessageRepository.save(
-            BuddyMessage(
-                session = session,
-                role = BuddyMessageRole.ASSISTANT,
-                content = content,
-                isIncomplete = true,
-            ),
-        )
-    }
-
-    /** The contribution vocabulary, in the shape the AI service's persona skeleton expects. */
-    private fun vocabulary(): BuddyVocabularyDto =
-        BuddyVocabularyDto(
-            contributionNoun = ContributionWording.NOUN,
-            contributionNounPlural = ContributionWording.NOUN_PLURAL,
-            contributionVerbPast = ContributionWording.VERB_PAST,
-        )
-
-    /**
-     * Builds one agent request. The summary goes on the first hop only: after that the AI has
-     * folded it into the running conversation it returns, and re-sending would double-fold
-     * messages already inside it.
-     *
-     * Nothing here may ask the AI to fold, and neither side carries a field for it: a fold
-     * runs before the reply is composed, putting a model call in front of the answer. See
-     * [sendMessageForMe] and [BuddyCompactionService].
-     */
-    private fun agentRequest(
-        messages: List<BuddyAgentMessageDto>,
-        tools: List<BuddyToolSpecDto>,
-        step: Int,
-        session: BuddySession,
-        vocabulary: BuddyVocabularyDto,
-        projectIds: List<String>,
-        capabilitiesEnabled: Boolean,
-        filters: BuddySessionFilters?,
-    ): BuddyAgentRequest =
-        BuddyAgentRequest(
-            messages = messages,
-            backendTools = tools,
-            priorSummary = if (step == 1) session.summary else null,
-            // Sent on every hop, unlike the summary: the persona is rebuilt from scratch whenever
-            // the running conversation has no system message yet, so withholding it after the
-            // first hop would let a resumed turn fall back to the engineering wording.
-            vocabulary = vocabulary,
-            // Same reason, and the same every hop: retrieval happens on the AI side on any hop the
-            // model chooses to search, so a scope sent only on the first would silently widen.
-            projectIds = projectIds,
-            // Every hop too, and for the same reason as the persona: a resumed turn that lost the
-            // mode would rebuild a mentor offering to act, mid-conversation with a hire who asked
-            // it not to.
-            capabilitiesEnabled = capabilitiesEnabled,
-            filters = filters,
-        )
-
-    /**
-     * The projects whose material this hire may be shown, as ids.
-     *
-     * Every project they are on rather than one of them: the buddy is not a per-project surface,
-     * and a hire onboarding on two projects asking "how do we deploy" means either.
-     *
-     * An empty list is not "search everything": the AI service fails closed on an empty scope and
-     * admits nothing. That is the intended reading, not a limitation. The same empty list comes
-     * back from a user record that has not synced, a membership lookup that returned nothing, and
-     * an account mid-provisioning, so it is not evidence the hire may see everything — and reading
-     * it as intent would turn a missing value into an authorization decision. The failure modes are
-     * not symmetric: fail-open shows one project's material to somebody on another, while
-     * fail-closed returns an empty answer. [sendMessageForMe] refuses the turn and tells the hire
-     * rather than letting an empty scope pass silently.
-     */
-    private fun projectIdsFor(userId: UUID): List<String> =
-        userApi
-            .getUsersByIds(listOf(userId))
-            .firstOrNull()
-            ?.projects
-            .orEmpty()
-            .map { it.projectId.toString() }
-
-    /** The project to bind a session to: the only one the user is on, or null when there is no single one. */
-    private fun singleProjectOf(projectIds: List<String>): UUID? =
-        projectIds.singleOrNull()?.let { UUID.fromString(it) }
-
-    /**
-     * Runs one tool the AI asked for, emitting the event(s) the client needs to see, and returns
-     * the plain-text result fed back to the model. An action tool never mutates here: it produces
-     * a proposal the hire gates behind a confirm button, and the AI is told it was proposed.
-     */
-    private suspend fun FlowCollector<BuddyStreamEvent>.runToolCall(
-        call: BuddyToolCallDto,
-        userId: UUID,
-        currentPage: String?,
-    ): String =
-        if (buddyActionService.isAction(call.name)) {
-            val outcome = buddyActionService.propose(call, userId)
-            outcome.proposal?.let { proposal ->
-                emit(
-                    BuddyStreamEvent(
-                        type = BuddyStreamEventType.ACTION_PROPOSAL,
-                        action = proposal.action,
-                        label = proposal.label,
-                        question = proposal.question,
-                        taskId = proposal.taskId?.toString(),
-                        // Every field the proposal carries must be copied through; a dropped one
-                        // surfaces as the action politely refusing, not as an error.
-                        title = proposal.title,
-                        attesterId = proposal.attesterId,
-                        githubLogin = proposal.githubLogin,
-                        competencyKey = proposal.competencyKey,
-                        level = proposal.level,
-                        stepId = proposal.stepId?.toString(),
-                        questionId = proposal.questionId?.toString(),
-                        phaseId = proposal.phaseId?.toString(),
-                        onboardingTaskId = proposal.onboardingTaskId?.toString(),
-                        answer = proposal.answer,
-                        optionIds = proposal.optionIds.takeIf { it.isNotEmpty() }?.map { it.toString() },
-                        description = proposal.description,
-                        reason = proposal.reason,
-                        waitsOnIds = proposal.waitsOnIds.takeIf { it.isNotEmpty() }?.map { it.toString() },
-                        unlocksIds = proposal.unlocksIds.takeIf { it.isNotEmpty() }?.map { it.toString() },
-                        checklistTitle = proposal.checklistTitle,
-                        checklistItems = proposal.checklistItems,
-                        cardId = proposal.cardId?.toString(),
-                        noteText = proposal.noteText,
-                        lineBefore = proposal.lineBefore,
-                        lineAfter = proposal.lineAfter,
-                        linkUrl = proposal.linkUrl,
-                        linkLabel = proposal.linkLabel,
-                        cardIds = proposal.cardIds?.map { it.toString() },
-                        cardNames = proposal.cardNames,
-                        basedOn = proposal.basedOn,
-                        preview = proposal.preview,
-                    ),
-                )
-            }
-            outcome.toolResult
-        } else {
-            emit(toolUseEvent(call.name))
-            buddyToolExecutor.execute(call, userId, currentPage)
-        }
 
     private fun resolveUserId(authId: String): UUID =
         userApi
