@@ -583,7 +583,7 @@ GithubConnectorService.kt: GithubConnectorService.connectRepository(transactionI
 GithubConnectorService.kt: GithubConnectorService.connectRepositoryIfNecessary(authId: String)
 GithubConnectorService.kt: GithubConnectorService.getSourcesByProjectId(projectId: UUID)
 GithubConnectorService.kt: GithubConnectorService.reuseConnection(projectId: UUID)
-GithubConnectorService.kt: GithubRepositoryConnectionOrchestrator.connectRepositoriesIfExist(authId: String)
+GithubRepositoryConnectionOrchestrator.kt: GithubRepositoryConnectionOrchestrator.connectRepositoriesIfExist(authId: String)
 GithubFileService.kt: GithubFileService.fetchAndIngestAllFiles(githubRepositoryId: UUID)
 GithubFileService.kt: GithubFileService.fetchAndIngestAllFiles(transactionId: UUID)
 GithubFileService.kt: GithubFileService.fetchAndIngestFileUpdatesIncremental(transactionId: UUID)
