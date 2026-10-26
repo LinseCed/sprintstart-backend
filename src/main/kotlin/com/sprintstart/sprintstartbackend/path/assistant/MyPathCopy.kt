@@ -1,9 +1,9 @@
 package com.sprintstart.sprintstartbackend.path.assistant
 
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
 
 /** What [MyPathTool] says to the model: its tool description and the sentences for the paths it cannot walk. */
 internal object MyPathCopy {
@@ -67,7 +67,7 @@ internal object MyPathCopy {
             "Reading it changes nothing. Takes no arguments -- it always reads the caller.",
         parameters = buildJsonObject {
             put("type", "object")
-            putJsonObject("properties") {}
+            put("properties", JsonObject(emptyMap()))
         },
     )
 }
