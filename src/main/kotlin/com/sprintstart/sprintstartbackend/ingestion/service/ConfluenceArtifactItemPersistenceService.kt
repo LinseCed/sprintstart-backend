@@ -1,9 +1,7 @@
 package com.sprintstart.sprintstartbackend.ingestion.service
 
 import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluencePageArtifactCommand
-import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceRelationshipCommand
 import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceRelationshipType
-import com.sprintstart.sprintstartbackend.connectors.confluence.external.ingestion.ConfluenceSourceAclCommand
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.ArtifactCodeBlock
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.ArtifactRelationship
 import com.sprintstart.sprintstartbackend.ingestion.model.dto.ArtifactRelationshipType
@@ -88,26 +86,15 @@ internal class ConfluenceArtifactItemPersistenceService(
         existing.addProjectId(projectId)
     }
 
-    private fun aclJson(sourceAcl: ConfluenceSourceAclCommand): String =
-        objectMapper.writeValueAsString(
+    private fun metadataJson(command: ConfluencePageArtifactCommand): String {
+        val sourceAcl = command.metadata.sourceAcl
+        val aclJson = objectMapper.writeValueAsString(
             ConfluenceSourceAclPayload(
                 hasPageRestrictions = sourceAcl.userAccountIds.isNotEmpty() || sourceAcl.groupIds.isNotEmpty(),
                 users = sourceAcl.userAccountIds.distinct().sorted(),
                 groups = sourceAcl.groupIds.distinct().sorted(),
             ),
         )
-
-    private fun ConfluenceRelationshipCommand.toArtifactRelationship() =
-        ArtifactRelationship(
-            type = when (type) {
-                ConfluenceRelationshipType.PARENT_OF -> ArtifactRelationshipType.PARENT_OF
-                ConfluenceRelationshipType.CHILD_OF -> ArtifactRelationshipType.CHILD_OF
-            },
-            targetSourceArtifactId = targetSourceArtifactId,
-        )
-
-    private fun metadataJson(command: ConfluencePageArtifactCommand): String {
-        val aclJson = aclJson(command.metadata.sourceAcl)
         return metadataJsonMapper.toJson(
             ConfluenceArtifactMetadata(
                 connectionId = command.metadata.connectionId.toString(),
@@ -130,7 +117,15 @@ internal class ConfluenceArtifactItemPersistenceService(
                 relationships = command.metadata.relationships
                     .distinct()
                     .sortedWith(compareBy({ relationship -> relationship.type.name }, { it.targetSourceArtifactId }))
-                    .map { it.toArtifactRelationship() },
+                    .map { relationship ->
+                        ArtifactRelationship(
+                            type = when (relationship.type) {
+                                ConfluenceRelationshipType.PARENT_OF -> ArtifactRelationshipType.PARENT_OF
+                                ConfluenceRelationshipType.CHILD_OF -> ArtifactRelationshipType.CHILD_OF
+                            },
+                            targetSourceArtifactId = relationship.targetSourceArtifactId,
+                        )
+                    },
                 sourceAcl = aclJson,
             ),
         )

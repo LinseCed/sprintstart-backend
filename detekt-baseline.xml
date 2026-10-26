@@ -64,6 +64,8 @@
     <ID>LongMethod:BuddyService.kt:BuddyService$@Suppress("CyclomaticComplexMethod", "ThrowsCount") suspend fun sendMessageForMe( authId: String, sessionId: UUID?, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters?, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>LongMethod:BuddyTeamService.kt:BuddyTeamService$fun sendMessageForMe( authId: String, projectId: UUID, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters? = null, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>LongMethod:CompetencyPlacementService.kt:CompetencyPlacementService$@Transactional fun record(userId: UUID, competencyKey: String, level: ProficiencyLevel): PlacementResult</ID>
+    <ID>LongMethod:ConfluenceArtifactBatchService.kt:ConfluenceArtifactBatchService$fun persist(command: ConfluenceArtifactBatchCommand): ConfluenceArtifactBatchResult</ID>
+    <ID>LongMethod:ConfluenceArtifactItemPersistenceService.kt:ConfluenceArtifactItemPersistenceService$private fun metadataJson(command: ConfluencePageArtifactCommand): String</ID>
     <ID>LongMethod:ContentTeamTools.kt:ContentTeamTools$private fun memberPath(memberId: UUID?, projectId: UUID): String</ID>
     <ID>LongMethod:EditChecklistAction.kt:EditChecklistAction$override fun propose(call: BuddyToolCallDto, context: HireActionContext): HireActionOutcome</ID>
     <ID>LongMethod:CreateArrivalStepsAction.kt:CreateArrivalStepsAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
