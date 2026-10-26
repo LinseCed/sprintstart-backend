@@ -100,6 +100,9 @@
     <ID>LongMethod:KeycloakEventService.kt:KeycloakEventService$@Transactional @Tracked("Handling Keycloak event") fun handleEvent(request: KeycloakEventRequest)</ID>
     <ID>LongMethod:MyPathTool.kt:MyPathTool$fun execute(userId: UUID): String</ID>
     <ID>LongMethod:MyPathTool.kt:MyPathTool$fun snapshotFor(userId: UUID): String?</ID>
+    <ID>LongMethod:NotionCredentialPersistenceService.kt:NotionCredentialPersistenceService$@Transactional fun rename(authId: String, oldName: String, newName: String): NotionCredentialResponse</ID>
+    <ID>LongMethod:NotionCredentialPersistenceService.kt:NotionCredentialPersistenceService$private fun applyWorkspace(credential: NotionCredential, workspace: NotionTokenIdentity)</ID>
+    <ID>LongMethod:NotionWorkspaceIngestionService.kt:NotionWorkspaceIngestionService$private suspend fun syncWorkspace( runId: UUID, connection: NotionWorkspaceConnection, forceRefresh: Boolean, ): NotionIngestionResult</ID>
     <ID>LongMethod:OnboardingMetricsService.kt:OnboardingMetricsService$private fun timelineFor(member: ProjectMember, projectId: UUID): HireTimelineResponse</ID>
     <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$fun createFrom( blueprint: BlueprintSnapshot, userId: UUID, projectRoleIds: Set&lt;UUID&gt; = emptySet(), skillIds: Set&lt;UUID&gt; = emptySet(), generatedContentByBlueprintPhaseId: Map&lt;UUID, GeneratedPhaseContent&gt; = emptyMap(), generationStatusByBlueprintPhaseId: Map&lt;UUID, GenerationStatus&gt; = emptyMap(), ): OnboardingPath</ID>
     <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun BlueprintPhaseSnapshot.copyTo( onboardingPath: OnboardingPath, nodesByBlueprintId: MutableMap&lt;UUID, OnboardingSubGraphNode&gt;, generated: GeneratedPhaseContent? = null, generationStatus: GenerationStatus? = null, ): CopiedPhase</ID>

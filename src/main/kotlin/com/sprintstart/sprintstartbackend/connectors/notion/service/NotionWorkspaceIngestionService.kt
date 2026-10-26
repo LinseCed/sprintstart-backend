@@ -4,7 +4,6 @@ import com.sprintstart.sprintstartbackend.connectors.notion.client.NotionApiPage
 import com.sprintstart.sprintstartbackend.connectors.notion.client.NotionClient
 import com.sprintstart.sprintstartbackend.connectors.notion.client.NotionResourceNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.notion.external.ingestion.NotionArtifactIngestionApi
-import com.sprintstart.sprintstartbackend.connectors.notion.model.entity.NotionSyncedPage
 import com.sprintstart.sprintstartbackend.connectors.notion.model.entity.NotionWorkspaceConnection
 import com.sprintstart.sprintstartbackend.connectors.notion.model.ingestion.NotionIngestionFailure
 import com.sprintstart.sprintstartbackend.connectors.notion.model.ingestion.NotionIngestionFailureStage
@@ -83,8 +82,26 @@ internal class NotionWorkspaceIngestionService(
         val states = syncedPageService.findAll(connection.id).associateBy { it.pageId }
         val progress = NotionWorkspaceProgress()
 
-        val sync = WorkspaceSync(runId, connection, token, forceRefresh, progress)
-        syncPages(sync, discovered, states)
+        for (page in discovered.values) {
+            processPage(runId, connection, page.id, page.url, progress) {
+                pageSyncService.sync(runId, connection, token, page, states[page.id], forceRefresh)
+                progress.successful++
+            }
+        }
+        for (state in states.values.filter { it.pageId !in discovered && it.unlinkedAt == null }) {
+            processPage(runId, connection, state.pageId, state.pageUrl, progress) {
+                val page = findMissingPage(token, state.pageId)
+                if (page == null || page.inTrash || page.parent.type in DATA_SOURCE_PARENTS) {
+                    syncedPageService.prepareUnlink(connection.id, state.pageId)
+                    ingestionApi.unlinkPage(runId, connection.projectId, connection.id, state.pageId)
+                    syncedPageService.markUnlinked(connection.id, state.pageId)
+                    progress.removed++
+                } else {
+                    pageSyncService.sync(runId, connection, token, page, state, forceRefresh)
+                    progress.successful++
+                }
+            }
+        }
         connectionPersistenceService.recordSuccessfulSync(connection.projectId, connection.id)
         ingestionApi.finishRun(runId, progress.successful + progress.removed)
         return NotionIngestionResult(
@@ -102,41 +119,6 @@ internal class NotionWorkspaceIngestionService(
             notionClient.getPage(token, pageId)
         } catch (_: NotionResourceNotFoundException) {
             null
-        }
-    }
-
-    /** Syncs every discovered page, then reconciles the pages that were synced before and are gone now. */
-    private suspend fun syncPages(
-        sync: WorkspaceSync,
-        discovered: Map<String, NotionApiPageResponse>,
-        states: Map<String, NotionSyncedPage>,
-    ) {
-        val connection = sync.connection
-        for (page in discovered.values) {
-            processPage(sync.runId, connection, page.id, page.url, sync.progress) {
-                pageSyncService.sync(sync.runId, connection, sync.token, page, states[page.id], sync.forceRefresh)
-                sync.progress.successful++
-            }
-        }
-        for (state in states.values.filter { it.pageId !in discovered && it.unlinkedAt == null }) {
-            processPage(sync.runId, connection, state.pageId, state.pageUrl, sync.progress) {
-                reconcileMissing(sync, state)
-            }
-        }
-    }
-
-    /** Unlinks a page that is gone from the workspace, or syncs it when it is still there. */
-    private suspend fun reconcileMissing(sync: WorkspaceSync, state: NotionSyncedPage) {
-        val connection = sync.connection
-        val page = findMissingPage(sync.token, state.pageId)
-        if (page == null || page.inTrash || page.parent.type in DATA_SOURCE_PARENTS) {
-            syncedPageService.prepareUnlink(connection.id, state.pageId)
-            ingestionApi.unlinkPage(sync.runId, connection.projectId, connection.id, state.pageId)
-            syncedPageService.markUnlinked(connection.id, state.pageId)
-            sync.progress.removed++
-        } else {
-            pageSyncService.sync(sync.runId, connection, sync.token, page, state, sync.forceRefresh)
-            sync.progress.successful++
         }
     }
 
@@ -195,11 +177,3 @@ private class NotionWorkspaceProgress {
         }
     }
 }
-
-private class WorkspaceSync(
-    val runId: UUID,
-    val connection: NotionWorkspaceConnection,
-    val token: String,
-    val forceRefresh: Boolean,
-    val progress: NotionWorkspaceProgress,
-)

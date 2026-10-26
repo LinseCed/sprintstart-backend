@@ -4,7 +4,6 @@ import com.sprintstart.sprintstartbackend.connectors.notion.client.NotionTokenId
 import com.sprintstart.sprintstartbackend.connectors.notion.model.api.response.NotionCredentialResponse
 import com.sprintstart.sprintstartbackend.connectors.notion.model.entity.NotionCredential
 import com.sprintstart.sprintstartbackend.connectors.notion.model.entity.NotionCredentialId
-import com.sprintstart.sprintstartbackend.connectors.notion.model.entity.NotionWorkspaceConnection
 import com.sprintstart.sprintstartbackend.connectors.notion.model.exception.NotionCredentialAlreadyExistsException
 import com.sprintstart.sprintstartbackend.connectors.notion.model.exception.NotionCredentialNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.notion.model.exception.NotionCredentialStillInUseException
@@ -85,17 +84,39 @@ internal class NotionCredentialPersistenceService(
     /** Renames a credential and every workspace connection that references it in one transaction. */
     @Transactional
     fun rename(authId: String, oldName: String, newName: String): NotionCredentialResponse {
-        val newId = NotionCredentialId(authId = authId, name = newName)
+        val oldId = NotionCredentialId(
+            authId = authId,
+            name = oldName,
+        )
+        val newId = NotionCredentialId(
+            authId = authId,
+            name = newName,
+        )
         val oldCredential = credentialRepository
-            .findById(NotionCredentialId(authId = authId, name = oldName))
-            .orElseThrow { NotionCredentialNotFoundException(oldName) }
+            .findById(oldId)
+            .orElseThrow {
+                NotionCredentialNotFoundException(oldName)
+            }
         if (oldName == newName) {
             return oldCredential.toResponse()
         }
         if (credentialRepository.existsById(newId)) {
             throw NotionCredentialAlreadyExistsException(newName)
         }
-        val newCredential = copyUnder(oldCredential, newId)
+        val newCredential = try {
+            credentialRepository.saveAndFlush(
+                NotionCredential(
+                    id = newId,
+                    token = oldCredential.token,
+                    workspaceId = oldCredential.workspaceId,
+                    workspaceName = oldCredential.workspaceName,
+                    tokenOwnerId = oldCredential.tokenOwnerId,
+                    createdAt = oldCredential.createdAt,
+                ),
+            )
+        } catch (@Suppress("SwallowedException") exception: DataIntegrityViolationException) {
+            throw NotionCredentialAlreadyExistsException(newName)
+        }
 
         val connections = connectionRepository.findAllByCredentialAuthIdAndCredentialName(
             authId = authId,
@@ -149,57 +170,36 @@ internal class NotionCredentialPersistenceService(
         applyWorkspace(credential, workspace)
     }
 
-    private fun copyUnder(credential: NotionCredential, id: NotionCredentialId): NotionCredential =
-        try {
-            credentialRepository.saveAndFlush(
-                NotionCredential(
-                    id = id,
-                    token = credential.token,
-                    workspaceId = credential.workspaceId,
-                    workspaceName = credential.workspaceName,
-                    tokenOwnerId = credential.tokenOwnerId,
-                    createdAt = credential.createdAt,
-                ),
-            )
-        } catch (@Suppress("SwallowedException") exception: DataIntegrityViolationException) {
-            throw NotionCredentialAlreadyExistsException(id.name)
-        }
-
-    private fun requireSameIdentity(connections: List<NotionWorkspaceConnection>, workspace: NotionTokenIdentity) {
-        val changed = connections.any {
-            val differentWorkspace = workspace.workspaceId != null &&
-                it.workspaceId != null &&
-                it.workspaceId != workspace.workspaceId
-            val differentOwner = it.tokenOwnerId != null && it.tokenOwnerId != workspace.tokenOwnerId
-            differentWorkspace || differentOwner
-        }
-        if (changed) {
-            throw NotionWorkspaceConnectionConfigurationException(
-                "A connected credential must keep the same Notion token owner and workspace",
-            )
-        }
-    }
-
-    private fun rejectDuplicateWorkspace(connections: List<NotionWorkspaceConnection>, workspace: NotionTokenIdentity) {
-        val workspaceId = workspace.workspaceId ?: return
-        val duplicate = connections.firstOrNull { connection ->
-            connectionRepository.existsByProjectIdAndWorkspaceIdAndTokenOwnerIdAndIdNot(
-                connection.projectId,
-                workspaceId,
-                workspace.tokenOwnerId,
-                connection.id,
-            )
-        }
-        if (duplicate != null) throw NotionCredentialAlreadyExistsException(duplicate.credentialName)
-    }
-
     private fun applyWorkspace(credential: NotionCredential, workspace: NotionTokenIdentity) {
         val connections = connectionRepository.findAllByCredentialAuthIdAndCredentialName(
             credential.id.authId,
             credential.id.name,
         )
-        requireSameIdentity(connections, workspace)
-        rejectDuplicateWorkspace(connections, workspace)
+        if (connections.any {
+                val differentWorkspace = workspace.workspaceId != null &&
+                    it.workspaceId != null &&
+                    it.workspaceId != workspace.workspaceId
+                val differentOwner = it.tokenOwnerId != null && it.tokenOwnerId != workspace.tokenOwnerId
+                differentWorkspace || differentOwner
+            }
+        ) {
+            throw NotionWorkspaceConnectionConfigurationException(
+                "A connected credential must keep the same Notion token owner and workspace",
+            )
+        }
+        workspace.workspaceId?.let { workspaceId ->
+            connections
+                .firstOrNull { connection ->
+                    connectionRepository.existsByProjectIdAndWorkspaceIdAndTokenOwnerIdAndIdNot(
+                        connection.projectId,
+                        workspaceId,
+                        workspace.tokenOwnerId,
+                        connection.id,
+                    )
+                }?.let { duplicate ->
+                    throw NotionCredentialAlreadyExistsException(duplicate.credentialName)
+                }
+        }
         credential.workspaceId = workspace.workspaceId ?: credential.workspaceId
         credential.workspaceName = workspace.workspaceName ?: credential.workspaceName
         credential.tokenOwnerId = workspace.tokenOwnerId
