@@ -41,7 +41,7 @@ class MyStarterWorkController(
     /**
      * Ranks the live starter-work pool by fit against the authenticated user's competencies.
      *
-     * @param jwt Authenticated JWT used to resolve the current user.
+     * @param jwt Authenticated JWT that identifies the current user.
      */
     @Operation(
         summary = "Get current user's starter-work matches",
