@@ -36,10 +36,10 @@ internal class GithubGraphql(
      * This method sends a GraphQL request repeatedly until all pages of data have been fetched
      * by leveraging the pagination information available in the response.
      *
-     * @param query the GraphQL query used to fetch data.
+     * @param query the GraphQL query that fetches the data.
      * @param token the GitHub PAT used for authentication.
      * @param variablesBuilder a function that builds the variables map for the query. The function takes
-     * a cursor as input and returns a map of variables. The cursor is used to navigate through
+     * a cursor as input and returns a map of variables. The cursor pages through
      * the paginated results.
      * @return a list of all fetched entities of type [S].
      */
