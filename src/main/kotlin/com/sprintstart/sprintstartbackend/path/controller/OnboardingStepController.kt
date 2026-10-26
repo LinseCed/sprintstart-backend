@@ -42,7 +42,6 @@ import java.util.UUID
  * Steps are ordered within their parent phase by a numeric position. Insertions, updates,
  * and deletions automatically shift sibling steps to maintain a contiguous, gap-free ordering.
  */
-@Suppress("TooManyFunctions")
 @RestController
 @RequestMapping("/api/v1/onboarding")
 @Tag(

@@ -36,7 +36,6 @@ import java.util.UUID
  * Nesting depth for the onboarding hierarchy is `0 = path`, `1 = phases`, `2 = steps`, and `3 = tasks/resources`.
  * Steps are ordered within their phase by a numeric position; changes shift siblings to keep it gap-free.
  */
-@Suppress("TooManyFunctions")
 @RestController
 @RequestMapping("/api/v1/onboarding")
 @Tag(
