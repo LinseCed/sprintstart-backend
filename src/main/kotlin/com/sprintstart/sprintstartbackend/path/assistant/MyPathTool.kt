@@ -6,12 +6,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.HireTool
 import com.sprintstart.sprintstartbackend.assistant.external.HireToolContext
 import com.sprintstart.sprintstartbackend.assistant.external.HireToolOrder
 import com.sprintstart.sprintstartbackend.assistant.external.HireToolSuggestion
-import com.sprintstart.sprintstartbackend.path.assistant.MyPathCopy.CLOSING
-import com.sprintstart.sprintstartbackend.path.assistant.MyPathCopy.FINISHED_PATH
-import com.sprintstart.sprintstartbackend.path.assistant.MyPathCopy.FINISHED_VISIBLE
 import com.sprintstart.sprintstartbackend.path.assistant.MyPathCopy.NO_PATH
-import com.sprintstart.sprintstartbackend.path.assistant.MyPathCopy.NO_PHASES
-import com.sprintstart.sprintstartbackend.path.assistant.MyPathCopy.ONLY_EMPTY_PHASES
 import com.sprintstart.sprintstartbackend.path.assistant.MyPathCopy.READ_MY_PATH_SPEC
 import com.sprintstart.sprintstartbackend.path.external.HirePathApi
 import com.sprintstart.sprintstartbackend.path.external.enums.QuestionStatus
@@ -25,7 +20,6 @@ import com.sprintstart.sprintstartbackend.shared.ids.StepId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
-import java.util.Locale
 import java.util.UUID
 
 /**
@@ -106,54 +100,17 @@ class MyPathTool(
     fun execute(userId: UUID): String {
         val path = hirePathApi.pathOf(UserId(userId)) ?: return NO_PATH
         val phases = path.phases.sortedBy { it.position }
-        if (phases.isEmpty()) {
-            // Nothing visible is not the same as nothing there: every phase may have come back empty
-            // from generation, and those are hidden from `phases` but are exactly what add_path_step
-            // repairs. Only a path with no phases at all is the authoring problem NO_PHASES describes.
-            if (path.generationIssues.isEmpty()) return NO_PHASES
-            return buildString {
-                append(ONLY_EMPTY_PHASES)
-                appendEmptyPhases(path)
-                append(NEWLINE + CLOSING)
-            }
-        }
+        if (phases.isEmpty()) return noVisiblePhasesReading(path)
 
         return when (val where = PathStanding.of(phases)) {
-            // A path whose phases all came back empty was never started, let alone finished: say
-            // what is actually there, which is nothing, rather than congratulate them.
-            PathStanding.Finished -> if (phases.all { it.steps.isEmpty() && it.questions.isEmpty() }) {
-                buildString {
-                    appendCurrentPhase(phases.last(), phases.lastIndex, phases)
-                    appendEmptyPhases(path)
-                }
-            } else if (path.generationIssues.isEmpty()) {
-                FINISHED_PATH.format(Locale.ROOT, phases.size)
-            } else {
-                // Finished with what is visible, not with the path: phases that came back empty are
-                // still there to be filled, and "nothing left on it" would close the one door to that.
-                buildString {
-                    append(FINISHED_VISIBLE.format(Locale.ROOT, phases.size))
-                    appendEmptyPhases(path)
-                }
-            }
-            is PathStanding.Choosing -> buildString {
-                appendChoice(where.phases, phases)
-                appendEmptyPhases(path)
-                append(NEWLINE + CLOSING)
-            }
-            is PathStanding.In -> buildString {
-                val current = where.phase
-                val checklists = checklistsOf(current)
-                appendLine(standing(phases, current))
-                appendLine()
-                appendCurrentPhase(current, phases.indexOf(current), phases, lastWrongAnswers(userId, current))
-                appendReadyToClose(current, phases, checklists)
-                appendCurrentTasks(nextStepIn(current), checklists)
-                appendNextItem(current, readyToClose(current, checklists).firstOrNull())
-                appendAhead(phases, current)
-                appendEmptyPhases(path)
-                append(NEWLINE + CLOSING)
-            }
+            PathStanding.Finished -> finishedReading(path, phases)
+            is PathStanding.Choosing -> choosingReading(path, phases, where.phases)
+            is PathStanding.In -> inPhaseReading(
+                path,
+                where.phase,
+                checklistsOf(where.phase),
+                lastWrongAnswers(userId, where.phase),
+            )
         }
     }
 
@@ -186,50 +143,14 @@ class MyPathTool(
     fun snapshotFor(userId: UUID): String? {
         val path = hirePathApi.pathOf(UserId(userId)) ?: return null
         val phases = path.phases.sortedBy { it.position }
-        if (phases.isEmpty()) {
-            val empty = path.generationIssues
-            return if (empty.isEmpty()) {
-                "Onboarding path:\nTheir path has no phases in it, so there is nothing on it to do yet."
-            } else {
-                "Onboarding path:\nEvery one of their ${empty.size} phases came back with nothing in it, so " +
-                    "there is nothing on it to do yet -- but those phases can be worked out together and " +
-                    "filled in."
-            }
-        }
+        if (phases.isEmpty()) return noVisiblePhasesSnapshot(path)
 
         return buildString {
             appendLine("Onboarding path:")
             when (val where = PathStanding.of(phases)) {
-                PathStanding.Finished -> appendLine(
-                    if (path.generationIssues.isEmpty()) {
-                        "They have finished every phase of their path."
-                    } else {
-                        "They have finished every phase of their path that has something in it."
-                    },
-                )
-                is PathStanding.Choosing -> appendLine(
-                    "${where.phases.size} phases are open to them and nothing in them is started yet: " +
-                        where.phases.joinToString(", ") { quoted(it.title) } + ". Which one comes next is " +
-                        "their choice -- phases are not taken in number order.",
-                )
-                is PathStanding.In -> {
-                    val current = where.phase
-                    appendLine(
-                        "They are in phase ${phases.indexOf(current) + 1} of ${phases.size}: " +
-                            "${quoted(current.title)}.",
-                    )
-                    // First, when there is one: a step whose checklist is done but that was never
-                    // closed is what a greeting can usefully open on, because it is what is quietly
-                    // holding everything after it.
-                    readyToClose(current, checklistsOf(current)).firstOrNull()?.let {
-                        appendLine(
-                            "Every line of the checklist of ${quoted(it.title)} is ticked, but the step " +
-                                "itself is still open, so what comes after it has not unlocked. It is " +
-                                "worth asking whether they are done with it.",
-                        )
-                    }
-                    nextItemIn(current)?.let { appendLine("The next thing waiting for them is ${it.plain}.") }
-                }
+                PathStanding.Finished -> appendLine(finishedSnapshotLine(path))
+                is PathStanding.Choosing -> appendLine(choosingSnapshotLine(where.phases))
+                is PathStanding.In -> appendInPhaseSnapshot(phases, where.phase, checklistsOf(where.phase))
             }
             val empty = path.generationIssues
             if (empty.isNotEmpty()) {
