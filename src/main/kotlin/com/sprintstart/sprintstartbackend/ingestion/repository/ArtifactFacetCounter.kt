@@ -143,8 +143,6 @@ internal class ArtifactFacetCounter(
      * up, which is exactly what the repository filter returns for that value.
      */
     private fun computeRepositoryFacets(projectId: UUID, criteria: ArtifactFilterCriteria): List<FacetCountResponse> {
-        val repoCountsBySystem = mutableMapOf<Pair<SourceSystem, String>, Long>()
-        val orgCountsBySystem = mutableMapOf<Pair<SourceSystem, String>, Long>()
         val rows = facetRows(projectId, criteria, FacetKind.REPOSITORIES) { _, root ->
             val system = root.get<SourceSystem>("sourceSystem")
             FacetQuery(
@@ -152,41 +150,11 @@ internal class ArtifactFacetCounter(
                 conditions = listOf(system.`in`(REPOSITORY_SOURCE_SYSTEMS)),
             )
         }
+        val counts = RepositoryCounts()
         for (row in rows) {
-            val system = row[0] as SourceSystem
-            val sourceId = row[1] as String
-            val artifactType = row[2] as ArtifactType
-
-            if (artifactType == ArtifactType.ORG_METADATA) {
-                val owner = ArtifactFacetRepositoryImpl.extractOwnerFromOrgSourceId(system, sourceId)
-                if (owner != null) {
-                    val key = system to owner
-                    orgCountsBySystem[key] = (orgCountsBySystem[key] ?: 0L) + 1L
-                }
-            } else {
-                val repo = ArtifactFacetRepositoryImpl.extractRepositoryFromSourceId(system, sourceId)
-                if (repo != null) {
-                    val key = system to repo
-                    repoCountsBySystem[key] = (repoCountsBySystem[key] ?: 0L) + 1L
-                }
-            }
+            counts.add(row[0] as SourceSystem, row[1] as String, row[2] as ArtifactType)
         }
-
-        val repoCountsMap = mutableMapOf<String, Long>()
-        for ((key, count) in repoCountsBySystem) {
-            val (system, repo) = key
-            val owner = repo.substringBefore('/').trim().lowercase()
-            val orgCount = orgCountsBySystem[system to owner] ?: 0L
-            repoCountsMap[repo] = (repoCountsMap[repo] ?: 0L) + count + orgCount
-        }
-        criteria.repositories?.forEach { repo ->
-            repoCountsMap.putIfAbsent(repo, 0L)
-        }
-        return repoCountsMap
-            .filter { (repo, count) -> count > 0L || criteria.repositories?.contains(repo) == true }
-            .entries
-            .sortedBy { it.key }
-            .map { (repo, count) -> FacetCountResponse(repo, count) }
+        return counts.facets(criteria.repositories)
     }
 
     /**
@@ -208,5 +176,46 @@ internal class ArtifactFacetCounter(
             (row[0] as String) to (row[1] as Number).toLong()
         }
         return languageFacetOptions(counted, criteria.selectedLanguages())
+    }
+}
+
+/** How many artifacts each repository holds, with the artifacts of its organisation counted into it. */
+private class RepositoryCounts {
+    private val repoCountsBySystem = mutableMapOf<Pair<SourceSystem, String>, Long>()
+    private val orgCountsBySystem = mutableMapOf<Pair<SourceSystem, String>, Long>()
+
+    fun add(system: SourceSystem, sourceId: String, artifactType: ArtifactType) {
+        if (artifactType == ArtifactType.ORG_METADATA) {
+            val owner = ArtifactFacetRepositoryImpl.extractOwnerFromOrgSourceId(system, sourceId)
+            if (owner != null) {
+                val key = system to owner
+                orgCountsBySystem[key] = (orgCountsBySystem[key] ?: 0L) + 1L
+            }
+        } else {
+            val repo = ArtifactFacetRepositoryImpl.extractRepositoryFromSourceId(system, sourceId)
+            if (repo != null) {
+                val key = system to repo
+                repoCountsBySystem[key] = (repoCountsBySystem[key] ?: 0L) + 1L
+            }
+        }
+    }
+
+    /** The facet entries, selected repositories always present, sorted by name. */
+    fun facets(selected: Set<String>?): List<FacetCountResponse> {
+        val repoCountsMap = mutableMapOf<String, Long>()
+        for ((key, count) in repoCountsBySystem) {
+            val (system, repo) = key
+            val owner = repo.substringBefore('/').trim().lowercase()
+            val orgCount = orgCountsBySystem[system to owner] ?: 0L
+            repoCountsMap[repo] = (repoCountsMap[repo] ?: 0L) + count + orgCount
+        }
+        selected?.forEach { repo ->
+            repoCountsMap.putIfAbsent(repo, 0L)
+        }
+        return repoCountsMap
+            .filter { (repo, count) -> count > 0L || selected?.contains(repo) == true }
+            .entries
+            .sortedBy { it.key }
+            .map { (repo, count) -> FacetCountResponse(repo, count) }
     }
 }
