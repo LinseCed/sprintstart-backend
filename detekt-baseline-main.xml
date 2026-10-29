@@ -66,11 +66,6 @@
     <ID>LongMethod:BitbucketArtifactMapper.kt:BitbucketArtifactMapper$fun toCommand(event: BitbucketFileFetchedEvent): BitbucketArtifactCommand</ID>
     <ID>LongMethod:BitbucketArtifactMapper.kt:BitbucketArtifactMapper$fun toCommand(event: BitbucketWorkspaceMetadataFetchedEvent): BitbucketArtifactCommand</ID>
     <ID>LongMethod:BitbucketArtifactProviderService.kt:BitbucketArtifactProviderService$private fun applyChange(artifact: Artifact, command: BitbucketArtifactCommand): BitbucketArtifactChange</ID>
-    <ID>LongMethod:BitbucketConnectionService.kt:BitbucketConnectionService$@Suppress("ThrowsCount") @Tracked("Connecting a bitbucket repository if valid") suspend fun connectRepositoryIfExists( authId: String, request: ConnectBitbucketRepositoryRequest, ): ConnectBitbucketRepositoryResponse</ID>
-    <ID>LongMethod:BitbucketConnectionService.kt:BitbucketConnectionService$private suspend fun connectRepository( authId: String, request: ConnectBitbucketRepositoryRequest, transactionId: UUID, ): UUID</ID>
-    <ID>LongMethod:BitbucketFileService.kt:BitbucketFileService$@Tracked("Fetching and ingesting files of Bitbucket repository") suspend fun fetchAndIngestFilesOfRepository(repositoryId: UUID, transactionId: UUID)</ID>
-    <ID>LongMethod:BitbucketPullRequestsService.kt:private fun PullRequest.asEvent( connection: BitbucketConnection, comments: List&lt;PullRequestComment&gt;, transactionId: UUID, ): BitbucketPullRequestFetchedEvent</ID>
-    <ID>LongMethod:BitbucketUpdatesService.kt:BitbucketUpdatesService$private suspend fun updateConnection(connection: BitbucketConnection): UUID</ID>
     <ID>LongMethod:BlueprintPathCopyFactory.kt:BlueprintPathCopyFactory$fun createCopyFrom( path: BlueprintPath, blueprintKey: UUID, projectId: UUID?, status: BlueprintStatus, version: Int, ): BlueprintPath</ID>
     <ID>LongMethod:BlueprintSeeder.kt:BlueprintSeeder$fun seed()</ID>
     <ID>LongMethod:BoardActionSupport.kt:internal fun HireBoardApi.namedCards(call: BuddyToolCallDto, board: HireBoard): Found&lt;List&lt;BoardCardResponse&gt;&gt;</ID>
@@ -104,7 +99,6 @@
     <ID>LongMethod:NotionCredentialPersistenceService.kt:NotionCredentialPersistenceService$@Transactional fun rename(authId: String, oldName: String, newName: String): NotionCredentialResponse</ID>
     <ID>LongMethod:NotionCredentialPersistenceService.kt:NotionCredentialPersistenceService$private fun applyWorkspace(credential: NotionCredential, workspace: NotionTokenIdentity)</ID>
     <ID>LongMethod:NotionWorkspaceIngestionService.kt:NotionWorkspaceIngestionService$private suspend fun syncWorkspace( runId: UUID, connection: NotionWorkspaceConnection, forceRefresh: Boolean, ): NotionIngestionResult</ID>
-    <ID>LongMethod:NotionWorkspaceMigration.kt:NotionWorkspaceMigration$private fun migrate(old: LegacyNotionConnection)</ID>
     <ID>LongMethod:OnboardingMetricsService.kt:OnboardingMetricsService$private fun timelineFor(member: ProjectMember, projectId: UUID): HireTimelineResponse</ID>
     <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$fun createFrom( blueprint: BlueprintSnapshot, userId: UUID, projectRoleIds: Set&lt;UUID&gt; = emptySet(), skillIds: Set&lt;UUID&gt; = emptySet(), generatedContentByBlueprintPhaseId: Map&lt;UUID, GeneratedPhaseContent&gt; = emptyMap(), generationStatusByBlueprintPhaseId: Map&lt;UUID, GenerationStatus&gt; = emptyMap(), ): OnboardingPath</ID>
     <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun BlueprintPhaseSnapshot.copyTo( onboardingPath: OnboardingPath, nodesByBlueprintId: MutableMap&lt;UUID, OnboardingSubGraphNode&gt;, generated: GeneratedPhaseContent? = null, generationStatus: GenerationStatus? = null, ): CopiedPhase</ID>
