@@ -68,10 +68,6 @@
     <ID>LongMethod:BitbucketArtifactProviderService.kt:BitbucketArtifactProviderService$private fun applyChange(artifact: Artifact, command: BitbucketArtifactCommand): BitbucketArtifactChange</ID>
     <ID>LongMethod:BlueprintPathCopyFactory.kt:BlueprintPathCopyFactory$fun createCopyFrom( path: BlueprintPath, blueprintKey: UUID, projectId: UUID?, status: BlueprintStatus, version: Int, ): BlueprintPath</ID>
     <ID>LongMethod:BlueprintSeeder.kt:BlueprintSeeder$fun seed()</ID>
-    <ID>LongMethod:BoardActionSupport.kt:internal fun HireBoardApi.namedCards(call: BuddyToolCallDto, board: HireBoard): Found&lt;List&lt;BoardCardResponse&gt;&gt;</ID>
-    <ID>LongMethod:BoardDiagramService.kt:BoardDiagramService$private fun store( context: DiagramContext, outcome: DiagramOutcome, schema: DiagramSchema, ): DiagramContent</ID>
-    <ID>LongMethod:BoardPlacement.kt:BoardPlacement$fun place( hire: HireBoard, kind: BoardCardKind, subject: String? = null, by: BoardActor = BoardActor.BUDDY, ): PlacementOutcome</ID>
-    <ID>LongMethod:BuddyAppGuideTools.kt:BuddyAppGuideTools$fun guideFor(userId: UUID, currentPage: String?): String</ID>
     <ID>LongMethod:BuddyReplyStream.kt:internal suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.relayAgentTurn( events: Flow&lt;BuddyAgentStreamEvent&gt;, emittedContent: StringBuilder, ): BuddyAgentResponse</ID>
     <ID>LongMethod:BuddyService.kt:BuddyService$@Suppress("CyclomaticComplexMethod", "ThrowsCount") suspend fun sendMessageForMe( authId: String, sessionId: UUID?, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters?, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>LongMethod:BuddyTeamService.kt:BuddyTeamService$fun sendMessageForMe( authId: String, projectId: UUID, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters? = null, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
@@ -101,7 +97,6 @@
     <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun BlueprintPhaseSnapshot.copyTo( onboardingPath: OnboardingPath, nodesByBlueprintId: MutableMap&lt;UUID, OnboardingSubGraphNode&gt;, generated: GeneratedPhaseContent? = null, generationStatus: GenerationStatus? = null, ): CopiedPhase</ID>
     <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun GeneratedPhaseContent.copyInto(onboardingPhase: OnboardingPhase)</ID>
     <ID>LongMethod:OnboardingPersonalizationService.kt:OnboardingPersonalizationService$@Tracked("Creating onboarding path from blueprint") fun personalize(authId: String, projectId: UUID): Flow&lt;OnboardingSseEvent&gt;</ID>
-    <ID>LongMethod:ReadBoardTool.kt:ReadBoardTool$private fun readBoard(userId: UserId): String</ID>
     <ID>LongMethod:RunArtifactsIngestionService.kt:RunArtifactsIngestionService$@Tracked("Dispatching AI sync for run") suspend fun ingestRunArtifacts(runId: UUID)</ID>
     <ID>LongMethod:StreamExecution.kt:StreamExecution$@Suppress("CyclomaticComplexMethod") inline fun &lt;reified T&gt; perform( terminationMarkers: Set&lt;String&gt; = setOf("[DONE]"), crossinline onChunkError: (raw: String, error: Throwable) -&gt; Boolean = { raw, err -&gt; System.err.println("WebClient stream: failed to deserialize chunk '$raw': ${err.message}") true // skip and continue by default }, ): Flow&lt;T&gt;</ID>
     <ID>LongMethod:TaskOrientationService.kt:TaskOrientationService$suspend fun streamForHire(hireId: UUID, projectId: UUID): Flow&lt;AiProgressEvent&gt;</ID>

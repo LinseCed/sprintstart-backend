@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardOwner
 import com.sprintstart.sprintstartbackend.board.external.enums.BoardCardState
 import com.sprintstart.sprintstartbackend.board.external.enums.PlacementOutcome
 import com.sprintstart.sprintstartbackend.board.external.model.HireBoard
+import com.sprintstart.sprintstartbackend.board.model.entity.Board
 import com.sprintstart.sprintstartbackend.board.model.entity.BoardCard
 import com.sprintstart.sprintstartbackend.board.repository.BoardCardRepository
 import com.sprintstart.sprintstartbackend.path.external.PathReadApi
@@ -72,34 +73,7 @@ internal class BoardPlacement(
             cleanSubject
         }
 
-        val board = access.boardOf(userId, projectId)
-        val existing = boardCardRepository.findAllByBoardId(board.id)
-
-        // For a kind that takes no subject, one row per kind is the whole identity. A kind that
-        // does is identified by its subject as well: two subjects are two different cards, and
-        // repurposing an existing one into a new subject would take away something the hire kept.
-        existing.firstOrNull { it.kind == kind && it.matchesSubject(storedSubject) }?.let { card ->
-            return if (card.state == BoardCardState.DISMISSED) {
-                PlacementOutcome.DISMISSED_BY_HIRE
-            } else {
-                PlacementOutcome.ALREADY_THERE
-            }
-        }
-
-        val now = Instant.now()
-        boardCardRepository.save(
-            BoardCard(
-                boardId = board.id,
-                kind = kind,
-                owner = BoardCardOwner.AI,
-                position = (existing.maxOfOrNull { it.position } ?: -1) + 1,
-                // Dated, because the board says "your buddy put this here" only about cards it
-                // actually did.
-                placedAt = now,
-                subject = storedSubject.takeIf { kind.takesSubject },
-            ).apply { recordChange(BoardCardChange.CREATED, by, now) },
-        )
-        return PlacementOutcome.PLACED
+        return placeCard(access.boardOf(userId, projectId), kind, storedSubject, by)
     }
 
     /**
@@ -136,6 +110,41 @@ internal class BoardPlacement(
         card.placedAt = now
         card.recordChange(BoardCardChange.CREATED, by, now)
         boardCardRepository.save(card)
+        return PlacementOutcome.PLACED
+    }
+
+    private fun placeCard(
+        board: Board,
+        kind: BoardCardKind,
+        storedSubject: String?,
+        by: BoardActor,
+    ): PlacementOutcome {
+        val existing = boardCardRepository.findAllByBoardId(board.id)
+
+        // For a kind that takes no subject, one row per kind is the whole identity. A kind that
+        // does is identified by its subject as well: two subjects are two different cards, and
+        // repurposing an existing one into a new subject would take away something the hire kept.
+        existing.firstOrNull { it.kind == kind && it.matchesSubject(storedSubject) }?.let { card ->
+            return if (card.state == BoardCardState.DISMISSED) {
+                PlacementOutcome.DISMISSED_BY_HIRE
+            } else {
+                PlacementOutcome.ALREADY_THERE
+            }
+        }
+
+        val now = Instant.now()
+        boardCardRepository.save(
+            BoardCard(
+                boardId = board.id,
+                kind = kind,
+                owner = BoardCardOwner.AI,
+                position = (existing.maxOfOrNull { it.position } ?: -1) + 1,
+                // Dated, because the board says "your buddy put this here" only about cards it
+                // actually did.
+                placedAt = now,
+                subject = storedSubject.takeIf { kind.takesSubject },
+            ).apply { recordChange(BoardCardChange.CREATED, by, now) },
+        )
         return PlacementOutcome.PLACED
     }
 
