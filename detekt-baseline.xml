@@ -58,7 +58,6 @@
     <ID>LongMethod:BuddyReplyStream.kt:internal suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.relayAgentTurn( events: Flow&lt;BuddyAgentStreamEvent&gt;, emittedContent: StringBuilder, ): BuddyAgentResponse</ID>
     <ID>LongMethod:BuddyService.kt:BuddyService$@Suppress("CyclomaticComplexMethod", "ThrowsCount") suspend fun sendMessageForMe( authId: String, sessionId: UUID?, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters?, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>LongMethod:BuddyTeamService.kt:BuddyTeamService$fun sendMessageForMe( authId: String, projectId: UUID, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters? = null, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
-    <ID>LongMethod:CompetencyPlacementService.kt:CompetencyPlacementService$@Transactional fun record(userId: UUID, competencyKey: String, level: ProficiencyLevel): PlacementResult</ID>
     <ID>LongMethod:ConfluenceArtifactBatchService.kt:ConfluenceArtifactBatchService$fun persist(command: ConfluenceArtifactBatchCommand): ConfluenceArtifactBatchResult</ID>
     <ID>LongMethod:ConfluenceArtifactItemPersistenceService.kt:ConfluenceArtifactItemPersistenceService$private fun metadataJson(command: ConfluencePageArtifactCommand): String</ID>
     <ID>LongMethod:ContentTeamTools.kt:ContentTeamTools$private fun memberPath(memberId: UUID?, projectId: UUID): String</ID>
@@ -85,12 +84,8 @@
     <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun BlueprintPhaseSnapshot.copyTo( onboardingPath: OnboardingPath, nodesByBlueprintId: MutableMap&lt;UUID, OnboardingSubGraphNode&gt;, generated: GeneratedPhaseContent? = null, generationStatus: GenerationStatus? = null, ): CopiedPhase</ID>
     <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun GeneratedPhaseContent.copyInto(onboardingPhase: OnboardingPhase)</ID>
     <ID>LongMethod:OnboardingPersonalizationService.kt:OnboardingPersonalizationService$@Tracked("Creating onboarding path from blueprint") fun personalize(authId: String, projectId: UUID): Flow&lt;OnboardingSseEvent&gt;</ID>
-    <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Evaluating project industry automatically") override suspend fun evaluateIndustryAutomatically(projectId: UUID)</ID>
-    <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Getting or lazily evaluating project industry") override suspend fun getOrEvaluateIndustry(projectId: UUID): String?</ID>
     <ID>LongMethod:ReadBoardTool.kt:ReadBoardTool$private fun readBoard(userId: UserId): String</ID>
     <ID>LongMethod:RunArtifactsIngestionService.kt:RunArtifactsIngestionService$@Tracked("Dispatching AI sync for run") suspend fun ingestRunArtifacts(runId: UUID)</ID>
-    <ID>LongMethod:StarterWorkMatcher.kt:StarterWorkMatcher$@Suppress("CyclomaticComplexMethod") fun score( profile: HireProfile, task: TaskFeatures, responsiveness: Responsiveness?, ): Score</ID>
-    <ID>LongMethod:StarterWorkPoolReconciler.kt:StarterWorkPoolReconciler$@Transactional fun reconcile(): PoolReconciliation</ID>
     <ID>LongMethod:StreamExecution.kt:StreamExecution$@Suppress("CyclomaticComplexMethod") inline fun &lt;reified T&gt; perform( terminationMarkers: Set&lt;String&gt; = setOf("[DONE]"), crossinline onChunkError: (raw: String, error: Throwable) -&gt; Boolean = { raw, err -&gt; System.err.println("WebClient stream: failed to deserialize chunk '$raw': ${err.message}") true // skip and continue by default }, ): Flow&lt;T&gt;</ID>
     <ID>LongMethod:TaskOrientationService.kt:TaskOrientationService$suspend fun streamForHire(hireId: UUID, projectId: UUID): Flow&lt;AiProgressEvent&gt;</ID>
     <ID>LongMethod:UploadArtifactMapper.kt:UploadArtifactMapper$fun toCommand(event: ArtifactUploadedEvent): UploadArtifactCommand</ID>
