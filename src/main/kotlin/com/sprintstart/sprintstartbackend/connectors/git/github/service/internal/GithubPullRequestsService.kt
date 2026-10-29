@@ -18,7 +18,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.github.models.client.gr
 import com.sprintstart.sprintstartbackend.connectors.git.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.git.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
-import kotlinx.coroutines.CancellationException
+import com.sprintstart.sprintstartbackend.shared.failure.reportingFailure
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -68,7 +68,9 @@ class GithubPullRequestsService(
         // Publishing a fetched pull request runs the persistence listener synchronously, so a failure
         // while storing one surfaces here. It has to end the phase with a terminal event: the
         // ingestion run is only finalized once every phase has closed.
-        try {
+        reportingFailure(onFailure = { e ->
+            publishFailure(transactionId, repositoryOwner, repositoryName, e)
+        }) {
             if (performUpdate) {
                 pullRequests.forEach { pr ->
                     eventPublisher.publishEvent(
@@ -78,13 +80,6 @@ class GithubPullRequestsService(
             } else if (githubRepository != null && pullRequests.isNotEmpty()) {
                 markOutOfDate(githubRepository)
             }
-        } catch (e: CancellationException) {
-            // Cancellation abandons the run; reporting it as a failure would close a fetch that never
-            // happened.
-            throw e
-        } catch (e: Exception) {
-            publishFailure(transactionId, repositoryOwner, repositoryName, e)
-            throw e
         }
 
         eventPublisher.publishEvent(

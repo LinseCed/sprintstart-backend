@@ -23,6 +23,7 @@ import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraInstanc
 import com.sprintstart.sprintstartbackend.connectors.jira.repository.JiraInstanceRepository
 import com.sprintstart.sprintstartbackend.connectors.jira.service.internal.JiraIssueService
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.shared.failure.reportingFailure
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -239,13 +240,12 @@ internal class JiraService(
         request: ConnectJiraInstanceRequest,
         credentials: AtlassianCredentialSecret,
         transaction: UUID,
-    ) = try {
-        jiraClient.searchProjects(request.url, credentials)
-    } catch (e: Exception) {
+    ) = reportingFailure(onFailure = { e ->
         eventPublisher.publishEvent(
             JiraInstanceConnectionInitiationFailedEvent(transaction, e.message ?: "Unknown error", request.url),
         )
-        throw e
+    }) {
+        jiraClient.searchProjects(request.url, credentials)
     }
 
     /**

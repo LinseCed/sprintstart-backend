@@ -12,7 +12,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.utils.Bitbuck
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.utils.BitbucketGitProvider
 import com.sprintstart.sprintstartbackend.connectors.git.utils.GitIngestionEngine
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
-import kotlinx.coroutines.CancellationException
+import com.sprintstart.sprintstartbackend.shared.failure.reportingFailure
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -117,7 +117,20 @@ internal class BitbucketFileService(
         )
     }
 
-    private suspend fun ingestReportingFailure(connection: BitbucketConnection, transaction: UUID) = try {
+    private suspend fun ingestReportingFailure(
+        connection: BitbucketConnection,
+        transaction: UUID,
+    ) = reportingFailure(onFailure = { e ->
+        eventPublisher.publishEvent(
+            BitbucketFilesFetchingFailedEvent(
+                transactionId = transaction,
+                repositoryId = connection.id,
+                workspace = connection.workspace,
+                slug = connection.slug,
+                reason = e.message ?: "Unknown error",
+            ),
+        )
+    }) {
         ingestionEngine.ingestFileChangesSince(
             coordinates = coordinatesFactory.of(connection),
             fromRevision = connection.lastSha,
@@ -128,21 +141,6 @@ internal class BitbucketFileService(
                 sourceUrls = provider.descriptor.sourceUrls,
             ),
         )
-    } catch (e: CancellationException) {
-        // Cancellation abandons the run; reporting it as a failure would close a fetch that never
-        // happened.
-        throw e
-    } catch (e: Exception) {
-        eventPublisher.publishEvent(
-            BitbucketFilesFetchingFailedEvent(
-                transactionId = transaction,
-                repositoryId = connection.id,
-                workspace = connection.workspace,
-                slug = connection.slug,
-                reason = e.message ?: "Unknown error",
-            ),
-        )
-        throw e
     }
 
     private fun announceResync(connection: BitbucketConnection, transaction: UUID, visitedPaths: Set<String>) {

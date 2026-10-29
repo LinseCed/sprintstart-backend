@@ -28,6 +28,7 @@ import com.sprintstart.sprintstartbackend.buddy.repository.BuddyMessageRepositor
 import com.sprintstart.sprintstartbackend.buddy.repository.BuddySessionRepository
 import com.sprintstart.sprintstartbackend.knowledge.external.QuestionLogApi
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.shared.failure.afterFailure
 import com.sprintstart.sprintstartbackend.shared.ids.BuddySessionId
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.QuestionId
@@ -272,11 +273,10 @@ class BuddyService(
         val emittedContent = StringBuilder()
         // The whole loop is guarded, not only the last emission: the words now leave while the
         // loop runs, so a stop or a failure at any hop leaves a partial reply worth keeping.
-        val citations = try {
-            with(agentLoop) { run(turn, emittedContent) }
-        } catch (e: Exception) {
+        val citations = afterFailure(cleanup = {
             replyStore.saveIncompleteReply(turn.session, emittedContent.toString())
-            throw e
+        }) {
+            with(agentLoop) { run(turn, emittedContent) }
         }
 
         replyStore.saveReply(turn.session, emittedContent.toString(), citations)

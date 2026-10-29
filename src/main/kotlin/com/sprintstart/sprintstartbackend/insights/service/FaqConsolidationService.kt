@@ -7,6 +7,7 @@ import com.sprintstart.sprintstartbackend.insights.model.entity.FaqGroup
 import com.sprintstart.sprintstartbackend.insights.repository.FaqGroupRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
+import com.sprintstart.sprintstartbackend.shared.failure.recovering
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
@@ -48,10 +49,10 @@ class FaqConsolidationService(
      */
     @Tracked("Enforcing the FAQ entry limit")
     suspend fun enforceGroupLimit(projectId: UUID) {
-        try {
-            mergeDuplicates(projectId)
-        } catch (e: Exception) {
+        recovering(fallback = { e ->
             logger.warn("FAQ consolidation failed for project {}", projectId, e)
+        }) {
+            mergeDuplicates(projectId)
         }
     }
 

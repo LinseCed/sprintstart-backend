@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.assistant.external.endFailureWithError
 import com.sprintstart.sprintstartbackend.assistant.external.sinceLastOpening
 import com.sprintstart.sprintstartbackend.buddy.external.enums.BuddyMessageRole
 import com.sprintstart.sprintstartbackend.buddy.model.response.buddy.BuddyMessageResponse
+import com.sprintstart.sprintstartbackend.shared.failure.afterFailure
 import com.sprintstart.sprintstartbackend.shared.ids.ProjectId
 import com.sprintstart.sprintstartbackend.shared.ids.UserId
 import com.sprintstart.sprintstartbackend.teamspace.model.entity.BuddyTeamMessage
@@ -143,11 +144,8 @@ class BuddyTeamService(
     }
 
     private suspend fun FlowCollector<BuddyStreamEvent>.relayTurn(session: BuddyTeamSession, turn: TeamAgentTurn) {
-        try {
+        afterFailure(cleanup = { saveIncompleteReply(session, turn.emittedContent.toString(), turn.areas) }) {
             with(teamAgentLoop) { runTurn(turn) }
-        } catch (e: Exception) {
-            saveIncompleteReply(session, turn.emittedContent.toString(), turn.areas)
-            throw e
         }
 
         buddyTeamMessageRepository.save(

@@ -14,6 +14,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.service.inter
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.service.internal.BitbucketPullRequestsService
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.service.internal.BitbucketWorkspaceService
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.shared.failure.reportingFailure
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -179,11 +180,9 @@ internal class BitbucketUpdatesService(
     }
 
     private fun startUpdating(connection: BitbucketConnection, transaction: UUID) {
-        try {
-            connectionStateService.markUpdating(connection.id)
-        } catch (e: Exception) {
-            // Accepted but never started: without this the run would sit open forever, because no
-            // collector is launched and so no per-collector terminal event will ever arrive.
+        // Accepted but never started: without this the run would sit open forever, because no
+        // collector is launched and so no per-collector terminal event will ever arrive.
+        reportingFailure(onFailure = { e ->
             eventPublisher.publishEvent(
                 BitbucketRepositoryUpdateFailedEvent(
                     transactionId = transaction,
@@ -193,7 +192,8 @@ internal class BitbucketUpdatesService(
                     reason = e.message ?: "Unknown error",
                 ),
             )
-            throw e
+        }) {
+            connectionStateService.markUpdating(connection.id)
         }
     }
 
