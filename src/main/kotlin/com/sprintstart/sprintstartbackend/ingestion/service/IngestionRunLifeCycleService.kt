@@ -63,33 +63,33 @@ class IngestionRunLifeCycleService(
     }
 
     private class RunStart(
-        val transactionId: UUID,
+        val run: UUID,
         val sourceSystem: SourceSystem,
         val status: IngestionRunStatus,
         val failureReason: String?,
-        val sourceInstanceId: UUID?,
-        val sourceInstanceRef: String?,
+        val instance: UUID?,
+        val instanceRef: String?,
     ) {
         private val failed = status == IngestionRunStatus.FAILED
 
         fun toNewRun() = IngestionRun(
-            id = transactionId,
+            id = run,
             sourceSystem = sourceSystem,
-            sourceInstanceId = sourceInstanceId,
-            sourceInstanceRef = sourceInstanceRef,
+            sourceInstanceId = instance,
+            sourceInstanceRef = instanceRef,
             status = status,
             failureReason = failureReason.truncateToDbLimit(),
             finishedAt = if (failed) Instant.now() else null,
             aiSyncStatus = if (failed) AiSyncStatus.NOT_APPLICABLE else AiSyncStatus.PENDING,
         )
 
-        fun applyTo(run: IngestionRun) {
-            run.status = status
-            run.finishedAt = if (failed) Instant.now() else null
-            run.failureReason = failureReason.truncateToDbLimit()
-            if (failed) run.aiSyncStatus = AiSyncStatus.NOT_APPLICABLE
-            if (run.sourceInstanceId == null) run.sourceInstanceId = sourceInstanceId
-            if (run.sourceInstanceRef == null) run.sourceInstanceRef = sourceInstanceRef
+        fun applyTo(existing: IngestionRun) {
+            existing.status = status
+            existing.finishedAt = if (failed) Instant.now() else null
+            existing.failureReason = failureReason.truncateToDbLimit()
+            if (failed) existing.aiSyncStatus = AiSyncStatus.NOT_APPLICABLE
+            if (existing.sourceInstanceId == null) existing.sourceInstanceId = instance
+            if (existing.sourceInstanceRef == null) existing.sourceInstanceRef = instanceRef
         }
     }
 
