@@ -10,21 +10,13 @@
     <ID>CyclomaticComplexMethod:BoardAuthoredCards.kt:BoardAuthoredCards$private fun editableCardOrThrow( userId: UserId, cardId: BoardCardId, kind: BoardCardKind, ): Pair&lt;BoardCard, Board&gt;</ID>
     <ID>CyclomaticComplexMethod:ConfluenceRestrictionPageMetadata.kt:private fun validateSharedRestrictionMetadata( users: ConfluenceRestrictedUsersResponse, groups: ConfluenceRestrictedGroupsResponse, requestedStart: Int, requestedLimit: Int, requestContext: String, )</ID>
     <ID>CyclomaticComplexMethod:ConfluenceStorageFormatParser.kt:InlineMarkdown$fun renderNode(node: Node): String</ID>
-    <ID>CyclomaticComplexMethod:ContentTeamTools.kt:ContentTeamTools$private fun memberPath(memberId: UUID?, projectId: UUID): String</ID>
     <ID>CyclomaticComplexMethod:CustomAdfDeserializer.kt:CustomAdfDeserializer$private fun extractTextValue(element: JsonElement, sb: StringBuilder)</ID>
-    <ID>CyclomaticComplexMethod:NotionCredentialPersistenceService.kt:NotionCredentialPersistenceService$private fun applyWorkspace(credential: NotionCredential, workspace: NotionTokenIdentity)</ID>
     <ID>CyclomaticComplexMethod:PathElements.kt:PathElements$private fun containedIn(steps: List&lt;OnboardingStep&gt;, checks: Int, includeSteps: Boolean = true): String</ID>
     <ID>CyclomaticComplexMethod:StepTeamActions.kt:UpdateStepAction$private fun badArgument(call: BuddyToolCallDto, slots: Int): String?</ID>
     <ID>LongMethod:BlueprintSeeder.kt:BlueprintSeeder$fun seed()</ID>
     <ID>LongMethod:BuddyReplyStream.kt:internal suspend fun FlowCollector&lt;BuddyStreamEvent&gt;.relayAgentTurn( events: Flow&lt;BuddyAgentStreamEvent&gt;, emittedContent: StringBuilder, ): BuddyAgentResponse</ID>
     <ID>LongMethod:BuddyService.kt:BuddyService$@Suppress("CyclomaticComplexMethod", "ThrowsCount") suspend fun sendMessageForMe( authId: String, sessionId: UUID?, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters?, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>LongMethod:BuddyTeamService.kt:BuddyTeamService$fun sendMessageForMe( authId: String, projectId: UUID, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters? = null, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
-    <ID>LongMethod:ConfluenceArtifactBatchService.kt:ConfluenceArtifactBatchService$fun persist(command: ConfluenceArtifactBatchCommand): ConfluenceArtifactBatchResult</ID>
-    <ID>LongMethod:ConfluenceArtifactItemPersistenceService.kt:ConfluenceArtifactItemPersistenceService$private fun metadataJson(command: ConfluencePageArtifactCommand): String</ID>
-    <ID>LongMethod:ContentTeamTools.kt:ContentTeamTools$private fun memberPath(memberId: UUID?, projectId: UUID): String</ID>
-    <ID>LongMethod:NotionCredentialPersistenceService.kt:NotionCredentialPersistenceService$@Transactional fun rename(authId: String, oldName: String, newName: String): NotionCredentialResponse</ID>
-    <ID>LongMethod:NotionCredentialPersistenceService.kt:NotionCredentialPersistenceService$private fun applyWorkspace(credential: NotionCredential, workspace: NotionTokenIdentity)</ID>
-    <ID>LongMethod:NotionWorkspaceIngestionService.kt:NotionWorkspaceIngestionService$private suspend fun syncWorkspace( runId: UUID, connection: NotionWorkspaceConnection, forceRefresh: Boolean, ): NotionIngestionResult</ID>
     <ID>LongMethod:StreamExecution.kt:StreamExecution$@Suppress("CyclomaticComplexMethod") inline fun &lt;reified T&gt; perform( terminationMarkers: Set&lt;String&gt; = setOf("[DONE]"), crossinline onChunkError: (raw: String, error: Throwable) -&gt; Boolean = { raw, err -&gt; System.err.println("WebClient stream: failed to deserialize chunk '$raw': ${err.message}") true // skip and continue by default }, ): Flow&lt;T&gt;</ID>
     <ID>LongMethod:TaskOrientationService.kt:TaskOrientationService$suspend fun streamForHire(hireId: UUID, projectId: UUID): Flow&lt;AiProgressEvent&gt;</ID>
     <ID>TooGenericExceptionCaught:ArtifactAiStatusService.kt:ArtifactAiStatusService$e: Exception</ID>
