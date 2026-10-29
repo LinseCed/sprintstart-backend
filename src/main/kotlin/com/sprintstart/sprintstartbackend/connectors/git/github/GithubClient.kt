@@ -17,7 +17,6 @@ import com.sprintstart.sprintstartbackend.connectors.git.github.util.GithubQuery
 import com.sprintstart.sprintstartbackend.shared.config.ApplicationConfig
 import com.sprintstart.sprintstartbackend.shared.web.WebClient
 import com.sprintstart.sprintstartbackend.shared.web.WebClientException
-import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
 /**
@@ -48,7 +47,6 @@ class GithubClient(
 ) {
     private val graphql = GithubGraphql(webClient, applicationConfig)
     private val content = GithubRepositoryContent(graphql, queryLoader)
-    private val logger = LoggerFactory.getLogger(GithubClient::class.java)
 
     /**
      * Retrieves the list of members belonging to the specified GitHub organization.

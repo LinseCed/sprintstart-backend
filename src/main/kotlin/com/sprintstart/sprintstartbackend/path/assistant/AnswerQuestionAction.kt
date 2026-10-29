@@ -256,8 +256,7 @@ class AnswerQuestionAction(
         val labelContains = question.options.filter { it.label.contains(needle, ignoreCase = true) }
         if (labelContains.size == 1) return labelContains.single()
 
-        val answerContains = question.options.filter { needle.contains(it.label.trim(), ignoreCase = true) }
-        return answerContains.singleOrNull()
+        return question.options.singleOrNull { needle.contains(it.label.trim(), ignoreCase = true) }
     }
 
     /** What the confirm button shows for a set of options, and what the confirm checks it against. */

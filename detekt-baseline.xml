@@ -11,7 +11,6 @@
     <ID>TooGenericExceptionCaught:NotionWorkspaceIngestionService.kt:NotionWorkspaceIngestionService$@Suppress("SwallowedException") exception: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:OnboardingPersonalizationService.kt:OnboardingPersonalizationService$cause: Throwable</ID>
     <ID>TooGenericExceptionCaught:TrackedAspect.kt:TrackedAspect$ex: Throwable</ID>
-    <ID>TooGenericExceptionThrown:OnDiskOperations.kt:OnDiskOperations.Companion$throw RuntimeException("$command failed (exit $exitCode)$suffix")</ID>
     <ID>TooGenericExceptionThrown:StarterWorkTaskProposalServiceTest.kt:StarterWorkTaskProposalServiceTest.StreamGenerate$throw RuntimeException("ai down")</ID>
   </CurrentIssues>
 </SmellBaseline>

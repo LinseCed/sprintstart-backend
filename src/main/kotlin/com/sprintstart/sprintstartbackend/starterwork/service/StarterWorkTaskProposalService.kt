@@ -19,7 +19,6 @@ import com.sprintstart.sprintstartbackend.starterwork.model.response.starterwork
 import com.sprintstart.sprintstartbackend.starterwork.repository.CompetencyRepository
 import com.sprintstart.sprintstartbackend.starterwork.repository.StarterWorkTaskProposalRepository
 import com.sprintstart.sprintstartbackend.starterwork.repository.UserCompetencyStateRepository
-import com.sprintstart.sprintstartbackend.user.external.ProjectMembershipApi
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -56,7 +55,6 @@ class StarterWorkTaskProposalService(
     private val githubHistoryPriorService: GithubHistoryPriorService,
     private val artifactIngestionApi: ArtifactIngestionApi,
     private val userApi: UserApi,
-    private val projectMembershipApi: ProjectMembershipApi,
     private val starterWorkScope: StarterWorkScope,
     private val json: Json,
     transactionManager: PlatformTransactionManager,
