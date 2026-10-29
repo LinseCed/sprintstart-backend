@@ -3,8 +3,6 @@ package com.sprintstart.sprintstartbackend.connectors.git.github.service
 import com.sprintstart.sprintstartbackend.connectors.git.github.GithubClient
 import com.sprintstart.sprintstartbackend.connectors.git.github.external.events.GithubRepositoryResourcesFetchingStartedEvent
 import com.sprintstart.sprintstartbackend.connectors.git.github.external.events.initial.GithubRepositoryAlreadyConnectedEvent
-import com.sprintstart.sprintstartbackend.connectors.git.github.external.events.initial.GithubRepositoryConnectionInitiatedEvent
-import com.sprintstart.sprintstartbackend.connectors.git.github.external.events.initial.GithubRepositoryConnectionInitiationFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.git.github.external.events.projects.GithubRepositoryProjectLinkChangedEvent
 import com.sprintstart.sprintstartbackend.connectors.git.github.models.GithubRepositoryConfig
 import com.sprintstart.sprintstartbackend.connectors.git.github.models.GithubRepositoryConnection
@@ -15,9 +13,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.github.models.api.reque
 import com.sprintstart.sprintstartbackend.connectors.git.github.models.api.requests.DiscoverRepositoriesRequest
 import com.sprintstart.sprintstartbackend.connectors.git.github.models.api.responses.DiscoverRepositoriesResponse
 import com.sprintstart.sprintstartbackend.connectors.git.github.models.exceptions.GithubUserPatNotFoundException
-import com.sprintstart.sprintstartbackend.connectors.git.github.models.exceptions.RepositoryNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.git.github.models.exceptions.SourceNotFoundException
-import com.sprintstart.sprintstartbackend.connectors.git.github.models.exceptions.UserWithAuthIdNotFoundException
 import com.sprintstart.sprintstartbackend.connectors.git.github.repository.GithubRepositoryConfigRepository
 import com.sprintstart.sprintstartbackend.connectors.git.github.repository.GithubRepositoryConnectionRepository
 import com.sprintstart.sprintstartbackend.connectors.git.github.repository.GithubUserRepository
@@ -31,7 +27,6 @@ import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.springframework.context.ApplicationEventPublisher
 import org.springframework.http.HttpStatus
@@ -62,6 +57,17 @@ class GithubConnectorService(
     private val userApi: UserApi,
     private val visibilityService: GithubRepositoryVisibilityService,
 ) {
+    private val newConnection =
+        GithubNewConnection(githubUserRepository, githubClient, eventPublisher, userApi, Dispatchers.IO)
+    private val initialFetch = GithubInitialFetch(
+        applicationScope,
+        fileService,
+        commitsService,
+        issuesService,
+        pullRequestsService,
+        orgService,
+    )
+
     /**
      * Retrieves all 'sources' in the connector overview sense.
      *
@@ -222,39 +228,7 @@ class GithubConnectorService(
         request: ConnectRepositoryRequest,
         transactionId: UUID,
     ): RepositoryConnectionOutcome {
-        val userId = userApi.getUserIdByAuthId(authId).orElseThrow { UserWithAuthIdNotFoundException(authId) }
-
-        eventPublisher.publishEvent(
-            GithubRepositoryConnectionInitiatedEvent(transactionId, request.owner, request.name),
-        )
-
-        val user = withContext(Dispatchers.IO) {
-            githubUserRepository
-                .findById(GithubUserPat(authId = authId, name = request.tokenName))
-        }.orElseThrow {
-            GithubUserPatNotFoundException(request.tokenName, userId.toString())
-        }
-
-        val projectIds = mutableSetOf(request.projectId)
-        val repoConnection = GithubRepositoryConnection(
-            owner = request.owner,
-            name = request.name,
-            user = user,
-            projectIdsInternal = projectIds,
-        )
-
-        if (!githubClient.repositoryExists(repoConnection)) {
-            val ex = RepositoryNotFoundException(request.owner, request.name)
-            eventPublisher.publishEvent(
-                GithubRepositoryConnectionInitiationFailedEvent(
-                    transactionId,
-                    request.owner,
-                    request.name,
-                    ex.message,
-                ),
-            )
-            throw ex
-        }
+        val repoConnection = newConnection.accept(authId, request, transactionId)
 
         return RepositoryConnectionOutcome(connectRepository(repoConnection, transactionId), wasReused = false)
     }
@@ -321,15 +295,10 @@ class GithubConnectorService(
      * @return Returns the transaction ID associated with the repository connection process.
      */
     private suspend fun connectRepository(repository: GithubRepositoryConnection, transactionId: UUID): UUID {
-        val repoSnapshot = GithubRepositorySnapshot(
-            repository = repository,
-        )
-        val config = GithubRepositoryConfig(
-            repository = repository,
-        )
+        val config = GithubRepositoryConfig(repository = repository)
         config.nextSyncAt = GithubRepositoryConfigService.calculateNextSyncAt(config.schedule)
 
-        repository.snapshot = repoSnapshot
+        repository.snapshot = GithubRepositorySnapshot(repository = repository)
         withContext(Dispatchers.IO) {
             repoConnectionRepository.save(repository)
             repoConfigRepository.save(config)
@@ -344,36 +313,7 @@ class GithubConnectorService(
             ),
         )
 
-        applicationScope.launch {
-            fileService.fetchAndIngestAllFiles(
-                repository.id,
-                repository.owner,
-                repository.name,
-                transactionId,
-            )
-        }
-        applicationScope.launch {
-            commitsService.fetchAndIngestCommits(repository, transactionId)
-        }
-        applicationScope.launch {
-            issuesService.fetchAndIngestAllIssues(
-                repository.id,
-                repository.owner,
-                repository.name,
-                transactionId,
-            )
-        }
-        applicationScope.launch {
-            pullRequestsService.fetchAndIngestAllPullRequests(
-                repository.id,
-                repository.owner,
-                repository.name,
-                transactionId,
-            )
-        }
-        applicationScope.launch {
-            orgService.connectGithubOrgIfNecessary(repository.owner, repository.user.token, transactionId)
-        }
+        initialFetch.start(repository, transactionId)
 
         return transactionId
     }
