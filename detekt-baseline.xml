@@ -54,6 +54,7 @@
     <ID>LongMethod:BitbucketFileService.kt:BitbucketFileService$@Tracked("Fetching and ingesting files of Bitbucket repository") suspend fun fetchAndIngestFilesOfRepository(repositoryId: UUID, transactionId: UUID)</ID>
     <ID>LongMethod:BitbucketPullRequestsService.kt:private fun PullRequest.asEvent( connection: BitbucketConnection, comments: List&lt;PullRequestComment&gt;, transactionId: UUID, ): BitbucketPullRequestFetchedEvent</ID>
     <ID>LongMethod:BitbucketUpdatesService.kt:BitbucketUpdatesService$private suspend fun updateConnection(connection: BitbucketConnection): UUID</ID>
+    <ID>LongMethod:BlueprintPathCopyFactory.kt:BlueprintPathCopyFactory$fun createCopyFrom( path: BlueprintPath, blueprintKey: UUID, projectId: UUID?, status: BlueprintStatus, version: Int, ): BlueprintPath</ID>
     <ID>LongMethod:BlueprintSeeder.kt:BlueprintSeeder$fun seed()</ID>
     <ID>LongMethod:BoardActionSupport.kt:internal fun HireBoardApi.namedCards(call: BuddyToolCallDto, board: HireBoard): Found&lt;List&lt;BoardCardResponse&gt;&gt;</ID>
     <ID>LongMethod:BoardDiagramService.kt:BoardDiagramService$private fun store( context: DiagramContext, outcome: DiagramOutcome, schema: DiagramSchema, ): DiagramContent</ID>
@@ -65,12 +66,6 @@
     <ID>LongMethod:CompetencyPlacementService.kt:CompetencyPlacementService$@Transactional fun record(userId: UUID, competencyKey: String, level: ProficiencyLevel): PlacementResult</ID>
     <ID>LongMethod:ConfluenceArtifactBatchService.kt:ConfluenceArtifactBatchService$fun persist(command: ConfluenceArtifactBatchCommand): ConfluenceArtifactBatchResult</ID>
     <ID>LongMethod:ConfluenceArtifactItemPersistenceService.kt:ConfluenceArtifactItemPersistenceService$private fun metadataJson(command: ConfluencePageArtifactCommand): String</ID>
-    <ID>LongMethod:ConfluenceClient.kt:ConfluenceClient$private suspend fun fetchRestrictions( baseUrl: String, credentials: ConfluenceClientCredentials, pageId: String, ): ConfluencePageRestrictions</ID>
-    <ID>LongMethod:ConfluenceConnectionService.kt:ConfluenceConnectionService$suspend fun createConnection( authId: String, projectId: UUID, request: CreateConfluenceConnectionRequest, ): ConfluenceConnectionResponse</ID>
-    <ID>LongMethod:ConfluencePageArtifactMapper.kt:ConfluencePageArtifactMapper$fun toCommand( connection: ConfluenceConnectionIngestionSnapshot, page: ConfluencePage, parsedBody: ParsedConfluenceBody, relationships: List&lt;ConfluenceRelationshipCommand&gt;, ): ConfluencePageArtifactCommand</ID>
-    <ID>LongMethod:ConfluencePageIngestionService.kt:ConfluencePageIngestionService$private fun buildRelationshipIndex(pages: List&lt;ConfluencePage&gt;): RelationshipIndex</ID>
-    <ID>LongMethod:ConfluencePageIngestionService.kt:ConfluencePageIngestionService$private fun mapEligiblePages( connection: ConfluenceConnectionIngestionSnapshot, pages: List&lt;ConfluencePage&gt;, relationshipIndex: RelationshipIndex, failures: MutableList&lt;ConfluenceIngestionFailure&gt;, ): List&lt;ConfluencePageArtifactCommand&gt;</ID>
-    <ID>LongMethod:ConfluencePageIngestionService.kt:ConfluencePageIngestionService$suspend fun ingest(projectId: UUID, connectionId: UUID): ConfluenceIngestionResult</ID>
     <ID>LongMethod:ContentTeamTools.kt:ContentTeamTools$private fun memberPath(memberId: UUID?, projectId: UUID): String</ID>
     <ID>LongMethod:EditChecklistAction.kt:EditChecklistAction$override fun propose(call: BuddyToolCallDto, context: HireActionContext): HireActionOutcome</ID>
     <ID>LongMethod:CreateArrivalStepsAction.kt:CreateArrivalStepsAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
@@ -82,21 +77,10 @@
     <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubOrgMetadataFetchedEvent): GithubArtifactCommand</ID>
     <ID>LongMethod:GithubArtifactMapper.kt:GithubArtifactMapper$fun toCommand(event: GithubPullRequestFetchedEvent): GithubArtifactCommand</ID>
     <ID>LongMethod:GithubArtifactProviderService.kt:GithubArtifactProviderService$private fun applyChange(artifact: Artifact, command: GithubArtifactCommand): ArtifactChange</ID>
-    <ID>LongMethod:GithubConnectorService.kt:GithubConnectorService$private suspend fun connectNewRepository( authId: String, request: ConnectRepositoryRequest, transactionId: UUID, ): RepositoryConnectionOutcome</ID>
-    <ID>LongMethod:GithubConnectorService.kt:GithubConnectorService$private suspend fun connectRepository(repository: GithubRepositoryConnection, transactionId: UUID): UUID</ID>
-    <ID>LongMethod:GithubFileService.kt:GithubFileService$private suspend fun ingestFiles(githubRepository: GithubRepositoryConnection, transactionId: UUID)</ID>
-    <ID>LongMethod:GithubIssuesService.kt:GithubIssuesService$@Suppress("ThrowsCount") @Tracked("Fetching all issues from repository") internal suspend fun fetchAndIngestAllIssues( githubRepositoryId: UUID, repositoryOwner: String, repositoryName: String, transactionId: UUID, performUpdate: Boolean = true, since: Instant? = null, )</ID>
-    <ID>LongMethod:GithubOrgArtifactSyncService.kt:GithubOrgArtifactSyncService$@Tracked("Reconciling GitHub org artifact project memberships") suspend fun syncOrgArtifact(owner: String)</ID>
-    <ID>LongMethod:GithubOrgService.kt:GithubOrgService$private fun buildOrgMetadataFetchedEvent( transactionId: UUID, metadata: OrgMetadataResponse, teams: List&lt;Team&gt;, orgMembers: OrgMembersResponse, ): GithubOrgMetadataFetchedEvent</ID>
-    <ID>LongMethod:GithubPullRequestsService.kt:GithubPullRequestsService$@Suppress("ThrowsCount") @Tracked("Fetching all pull requests from repository") internal suspend fun fetchAndIngestAllPullRequests( githubRepositoryId: UUID, repositoryOwner: String, repositoryName: String, transactionId: UUID, performUpdate: Boolean = true, since: Instant? = null, )</ID>
-    <ID>LongMethod:GithubPullRequestsService.kt:GithubPullRequestsService$private fun PullRequest.asFetchedEvent( transactionId: UUID, repositoryId: UUID, owner: String, name: String, ): GithubPullRequestFetchedEvent</ID>
-    <ID>LongMethod:GithubUpdatesService.kt:GithubUpdatesService$private fun checkRepositoryForUpdates(githubRepository: GithubRepositoryConnection, transactionId: UUID)</ID>
-    <ID>LongMethod:GithubUpdatesService.kt:GithubUpdatesService$private fun performRepositoryUpdate( githubRepository: GithubRepositoryConnection, transactionId: UUID, )</ID>
     <ID>LongMethod:IngestionRunService.kt:IngestionRunService$private fun buildProjectPredicate( root: Root&lt;IngestionRun&gt;, cb: CriteriaBuilder, projectId: UUID, projectSources: ProjectSources?, ): Predicate</ID>
     <ID>LongMethod:IngestionSourceStatusService.kt:IngestionSourceStatusService$@Transactional(readOnly = true) @Tracked("Retrieving ingestion status per source instance") fun getStatusPerSourceInstance(projectId: UUID? = null): List&lt;SourceInstanceIngestionStatusResponse&gt;</ID>
     <ID>LongMethod:JiraArtifactMapper.kt:JiraArtifactMapper$fun toCommand(event: JiraIssueFetchedEvent): JiraArtifactCommand</ID>
     <ID>LongMethod:JiraArtifactProviderService.kt:JiraArtifactProviderService$@Transactional fun persistArtifact(command: JiraArtifactCommand)</ID>
-    <ID>LongMethod:JiraService.kt:JiraService$private suspend fun connectNewInstance( authId: String, request: ConnectJiraInstanceRequest, transactionId: UUID, ): UUID</ID>
     <ID>LongMethod:KeycloakEventService.kt:KeycloakEventService$@Transactional @Tracked("Handling Keycloak event") fun handleEvent(request: KeycloakEventRequest)</ID>
     <ID>LongMethod:MyPathTool.kt:MyPathTool$fun execute(userId: UUID): String</ID>
     <ID>LongMethod:MyPathTool.kt:MyPathTool$fun snapshotFor(userId: UUID): String?</ID>
@@ -104,6 +88,10 @@
     <ID>LongMethod:NotionCredentialPersistenceService.kt:NotionCredentialPersistenceService$private fun applyWorkspace(credential: NotionCredential, workspace: NotionTokenIdentity)</ID>
     <ID>LongMethod:NotionWorkspaceIngestionService.kt:NotionWorkspaceIngestionService$private suspend fun syncWorkspace( runId: UUID, connection: NotionWorkspaceConnection, forceRefresh: Boolean, ): NotionIngestionResult</ID>
     <ID>LongMethod:NotionWorkspaceMigration.kt:NotionWorkspaceMigration$private fun migrate(old: LegacyNotionConnection)</ID>
+    <ID>LongMethod:OnboardingMetricsService.kt:OnboardingMetricsService$private fun timelineFor(member: ProjectMember, projectId: UUID): HireTimelineResponse</ID>
+    <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$fun createFrom( blueprint: BlueprintSnapshot, userId: UUID, projectRoleIds: Set&lt;UUID&gt; = emptySet(), skillIds: Set&lt;UUID&gt; = emptySet(), generatedContentByBlueprintPhaseId: Map&lt;UUID, GeneratedPhaseContent&gt; = emptyMap(), generationStatusByBlueprintPhaseId: Map&lt;UUID, GenerationStatus&gt; = emptyMap(), ): OnboardingPath</ID>
+    <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun BlueprintPhaseSnapshot.copyTo( onboardingPath: OnboardingPath, nodesByBlueprintId: MutableMap&lt;UUID, OnboardingSubGraphNode&gt;, generated: GeneratedPhaseContent? = null, generationStatus: GenerationStatus? = null, ): CopiedPhase</ID>
+    <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun GeneratedPhaseContent.copyInto(onboardingPhase: OnboardingPhase)</ID>
     <ID>LongMethod:OnboardingPersonalizationService.kt:OnboardingPersonalizationService$@Tracked("Creating onboarding path from blueprint") fun personalize(authId: String, projectId: UUID): Flow&lt;OnboardingSseEvent&gt;</ID>
     <ID>LongMethod:PathItemText.kt:internal fun StringBuilder.appendQuestion( question: GetOnboardingQuestionForUserResponse, phase: GetOnboardingPhaseForUserResponse, graph: PhaseGraph, lastAnswer: String?, )</ID>
     <ID>LongMethod:PhaseText.kt:internal fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
@@ -115,13 +103,14 @@
     <ID>LongMethod:StarterWorkPoolReconciler.kt:StarterWorkPoolReconciler$@Transactional fun reconcile(): PoolReconciliation</ID>
     <ID>LongMethod:StreamExecution.kt:StreamExecution$@Suppress("CyclomaticComplexMethod") inline fun &lt;reified T&gt; perform( terminationMarkers: Set&lt;String&gt; = setOf("[DONE]"), crossinline onChunkError: (raw: String, error: Throwable) -&gt; Boolean = { raw, err -&gt; System.err.println("WebClient stream: failed to deserialize chunk '$raw': ${err.message}") true // skip and continue by default }, ): Flow&lt;T&gt;</ID>
     <ID>LongMethod:TaskOrientationService.kt:TaskOrientationService$suspend fun streamForHire(hireId: UUID, projectId: UUID): Flow&lt;AiProgressEvent&gt;</ID>
+    <ID>LongMethod:TaskTeamActions.kt:AddTaskAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
+    <ID>LongMethod:TeamMemberActions.kt:AddMembersAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>LongMethod:UploadArtifactMapper.kt:UploadArtifactMapper$fun toCommand(event: ArtifactUploadedEvent): UploadArtifactCommand</ID>
-    <ID>LongMethod:UploadArtifactProviderService.kt:UploadArtifactProviderService$@Transactional fun persistArtifact(command: UploadArtifactCommand)</ID>
     <ID>LongMethod:UploadService.kt:UploadService$@Transactional @Tracked("Deleting a batch of project artifacts") fun deleteUpload( authId: String, artifactIds: Set&lt;UUID&gt;, projectId: UUID, ): DeleteUploadsResponse</ID>
     <ID>LongMethod:UploadService.kt:UploadService$@Transactional @Tracked("Uploading a new batch of project artifacts") fun upload( authId: String, files: List&lt;MultipartFile&gt;, projectId: UUID, ): List&lt;UploadArtifactResponse&gt;</ID>
     <ID>LongMethod:UploadService.kt:UploadService$private fun uploadSingle( file: MultipartFile, uploaderId: UUID, projectId: UUID, transactionId: UUID, outcomes: MutableSet&lt;UploadArtifactOperationOutcome&gt;, ): UploadResult</ID>
+    <ID>LongMethod:UploadArtifactProviderService.kt:UploadArtifactProviderService$@Transactional fun persistArtifact(command: UploadArtifactCommand)</ID>
     <ID>LongMethod:UserApiMapper.kt:fun User.toUserApiDto(): UserDto</ID>
-    <ID>NestedBlockDepth:UploadService.kt:UploadService$@Transactional @Tracked("Uploading a new batch of project artifacts") fun upload( authId: String, files: List&lt;MultipartFile&gt;, projectId: UUID, ): List&lt;UploadArtifactResponse&gt;</ID>
     <ID>TooGenericExceptionCaught:ArtifactAiStatusService.kt:ArtifactAiStatusService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BitbucketCommitsService.kt:BitbucketCommitsService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BitbucketConnectionStateService.kt:BitbucketConnectionStateService$first: Exception</ID>

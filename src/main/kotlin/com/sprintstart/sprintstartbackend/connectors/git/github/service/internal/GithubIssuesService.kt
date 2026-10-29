@@ -27,6 +27,17 @@ class GithubIssuesService(
     private val eventPublisher: ApplicationEventPublisher,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
+    private fun publishFailure(transaction: UUID, owner: String, name: String, error: Throwable) {
+        eventPublisher.publishEvent(
+            GithubIssuesFetchFailedEvent(transaction, owner, name, error.message ?: "Unknown error"),
+        )
+    }
+
+    private suspend fun markOutOfDate(repository: GithubRepositoryConnection) {
+        repository.connectionState = ConnectionState.OUT_OF_DATE
+        withContext(ioDispatcher) { repoConnectionRepository.save(repository) }
+    }
+
     /**
      * Fetches and ingests **all** issues of a given GitHub repository.
      *
@@ -57,20 +68,9 @@ class GithubIssuesService(
                 repoConnectionRepository.findById(githubRepositoryId).orElseThrow()
             }
 
-            if (since == null) {
-                githubClient.fetchIssues(githubRepository)
-            } else {
-                githubClient.fetchIssues(githubRepository, since.toString())
-            }
+            githubClient.fetchIssues(githubRepository, since?.toString())
         }.onFailure {
-            eventPublisher.publishEvent(
-                GithubIssuesFetchFailedEvent(
-                    transactionId,
-                    repositoryOwner,
-                    repositoryName,
-                    it.message ?: "Unknown error",
-                ),
-            )
+            publishFailure(transactionId, repositoryOwner, repositoryName, it)
             throw it
         }.getOrNull() ?: return
 
@@ -84,28 +84,15 @@ class GithubIssuesService(
                         issue.toFetchedEvent(transactionId, githubRepositoryId, repositoryOwner, repositoryName),
                     )
                 }
-            } else {
-                if (githubRepository != null && issues.isNotEmpty()) {
-                    githubRepository.connectionState = ConnectionState.OUT_OF_DATE
-
-                    withContext(ioDispatcher) {
-                        repoConnectionRepository.save(githubRepository)
-                    }
-                }
+            } else if (githubRepository != null && issues.isNotEmpty()) {
+                markOutOfDate(githubRepository)
             }
         } catch (e: CancellationException) {
             // Cancellation abandons the run; reporting it as a failure would close a fetch that never
             // happened.
             throw e
         } catch (e: Exception) {
-            eventPublisher.publishEvent(
-                GithubIssuesFetchFailedEvent(
-                    transactionId,
-                    repositoryOwner,
-                    repositoryName,
-                    e.message ?: "Unknown error",
-                ),
-            )
+            publishFailure(transactionId, repositoryOwner, repositoryName, e)
             throw e
         }
 

@@ -10,6 +10,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.external.even
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.external.events.prs.BitbucketPullRequestsFetchingStartedEvent
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.external.events.prs.PrComment
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.external.events.prs.PrParticipant
+import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.model.client.BitbucketParticipant
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.model.client.PullRequest
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.model.client.PullRequestComment
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.model.entity.BitbucketConnection
@@ -170,29 +171,31 @@ private fun PullRequest.asEvent(
         this.description,
         this.closedOn,
         this.mergeCommit?.hash,
-        this.participants.map { pc ->
-            PrParticipant(
-                pc.user?.accountId,
-                pc.user?.nickname,
-                pc.user?.displayName,
-                pc.role,
-                pc.approved,
-                pc.participatedOn,
-                pc.state,
-            )
-        },
+        this.participants.map { it.toEventParticipant() },
         this.url ?: "Unknown",
-        comments.map {
-            PrComment(
-                it.id,
-                it.createdOn,
-                it.updatedOn,
-                it.content?.raw,
-                it.user?.accountId,
-                it.user?.nickname,
-                it.user?.displayName,
-                it.deleted,
-            )
-        },
+        comments.map { it.toEventComment() },
     )
 }
+
+private fun BitbucketParticipant.toEventParticipant() =
+    PrParticipant(
+        user?.accountId,
+        user?.nickname,
+        user?.displayName,
+        role,
+        approved,
+        participatedOn,
+        state,
+    )
+
+private fun PullRequestComment.toEventComment() =
+    PrComment(
+        id,
+        createdOn,
+        updatedOn,
+        content?.raw,
+        user?.accountId,
+        user?.nickname,
+        user?.displayName,
+        deleted,
+    )
