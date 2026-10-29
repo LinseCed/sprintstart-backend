@@ -52,13 +52,7 @@ internal object ArtifactFilterPredicates {
         val predicates = mutableListOf<Predicate>()
         predicates.add(cb.equal(projectJoin, projectId))
 
-        if (!criteria.search.isNullOrBlank()) {
-            val pattern = "%${criteria.search.trim().lowercase()}%"
-            val titleMatch = cb.like(cb.lower(root.get("title")), pattern)
-            val sourceIdMatch = cb.like(cb.lower(root.get("sourceId")), pattern)
-            val sourceUrlMatch = cb.like(cb.lower(root.get("sourceUrl")), pattern)
-            predicates.add(cb.or(titleMatch, sourceIdMatch, sourceUrlMatch))
-        }
+        searchPredicate(cb, root, criteria.search)?.let(predicates::add)
 
         if (exclude != FacetKind.TYPES && !criteria.types.isNullOrEmpty()) {
             predicates.add(root.get<ArtifactType>("artifactType").`in`(criteria.types))
@@ -75,19 +69,7 @@ internal object ArtifactFilterPredicates {
         }
 
         if (exclude != FacetKind.REPOSITORIES && !criteria.repositories.isNullOrEmpty()) {
-            val sourceSystem = root.get<SourceSystem>("sourceSystem")
-            // Artifacts of other systems are outside the repository facet's reach and always pass;
-            // within GitHub and Bitbucket the selection narrows strictly, each by its own source ids.
-            val outsideFacet = cb.not(sourceSystem.`in`(REPOSITORY_SOURCE_SYSTEMS))
-            val githubMatchesRepo = cb.and(
-                cb.equal(sourceSystem, SourceSystem.GITHUB),
-                buildGithubRepoPredicate(cb, root, criteria.repositories),
-            )
-            val bitbucketMatchesRepo = cb.and(
-                cb.equal(sourceSystem, SourceSystem.BITBUCKET),
-                buildBitbucketRepoPredicate(cb, root, criteria.repositories),
-            )
-            predicates.add(cb.or(outsideFacet, githubMatchesRepo, bitbucketMatchesRepo))
+            predicates.add(repositoryPredicate(cb, root, criteria.repositories))
         }
 
         val languages = criteria.selectedLanguages()
@@ -101,6 +83,32 @@ internal object ArtifactFilterPredicates {
         predicates.addAll(buildActivityWindowPredicates(cb, root, criteria.from, criteria.to))
 
         return predicates
+    }
+
+    private fun searchPredicate(cb: CriteriaBuilder, root: Root<Artifact>, search: String?): Predicate? {
+        if (search.isNullOrBlank()) return null
+
+        val pattern = "%${search.trim().lowercase()}%"
+        val titleMatch = cb.like(cb.lower(root.get("title")), pattern)
+        val sourceIdMatch = cb.like(cb.lower(root.get("sourceId")), pattern)
+        val sourceUrlMatch = cb.like(cb.lower(root.get("sourceUrl")), pattern)
+        return cb.or(titleMatch, sourceIdMatch, sourceUrlMatch)
+    }
+
+    private fun repositoryPredicate(cb: CriteriaBuilder, root: Root<Artifact>, repositories: Set<String>): Predicate {
+        val sourceSystem = root.get<SourceSystem>("sourceSystem")
+        // Artifacts of other systems are outside the repository facet's reach and always pass;
+        // within GitHub and Bitbucket the selection narrows strictly, each by its own source ids.
+        val outsideFacet = cb.not(sourceSystem.`in`(REPOSITORY_SOURCE_SYSTEMS))
+        val githubMatchesRepo = cb.and(
+            cb.equal(sourceSystem, SourceSystem.GITHUB),
+            buildGithubRepoPredicate(cb, root, repositories),
+        )
+        val bitbucketMatchesRepo = cb.and(
+            cb.equal(sourceSystem, SourceSystem.BITBUCKET),
+            buildBitbucketRepoPredicate(cb, root, repositories),
+        )
+        return cb.or(outsideFacet, githubMatchesRepo, bitbucketMatchesRepo)
     }
 
     /**
@@ -133,45 +141,15 @@ internal object ArtifactFilterPredicates {
         root: Root<Artifact>,
         format: UploadFormat,
     ): Predicate {
-        // Nullable columns fold to "" exactly as `classifyUploadFormat` does. Without the coalesce,
-        // `NOT(OR(...))` is NULL for a row with unset columns, and the OTHER bucket would match nothing.
-        val titleLower = cb.coalesce(cb.lower(root.get("title")), "")
-        val sourceUrlLower = cb.coalesce(cb.lower(root.get("sourceUrl")), "")
-        val sourceIdLower = cb.lower(root.get("sourceId"))
-        val mimeLower = cb.coalesce(cb.lower(root.get("mime")), "")
-        val languageLower = cb.coalesce(cb.lower(root.get("language")), "")
-
-        val isPdf = cb.or(
-            cb.equal(mimeLower, "application/pdf"),
-            cb.like(titleLower, "%.pdf"),
-            cb.like(sourceUrlLower, "%.pdf"),
-            cb.like(sourceIdLower, "%.pdf"),
-        )
-
-        val isMarkdown = cb.or(
-            languageLower.`in`("markdown", "md"),
-            cb.like(mimeLower, "%markdown%"),
-            cb.like(titleLower, "%.md"),
-            cb.like(titleLower, "%.markdown"),
-            cb.like(sourceUrlLower, "%.md"),
-            cb.like(sourceUrlLower, "%.markdown"),
-            cb.like(sourceIdLower, "%.md"),
-            cb.like(sourceIdLower, "%.markdown"),
-        )
-
-        val imageExtPredicates = ArtifactFacetRepositoryImpl.IMAGE_EXTENSIONS.flatMap { ext ->
-            listOf(cb.like(titleLower, "%$ext"), cb.like(sourceUrlLower, "%$ext"))
-        }
-        val isImage = cb.or(
-            cb.like(mimeLower, "image/%"),
-            *imageExtPredicates.toTypedArray(),
-        )
+        val columns = UploadColumns(cb, root)
+        val isPdf = columns.isPdf()
+        val isMarkdown = columns.isMarkdown()
 
         return when (format) {
             UploadFormat.PDF -> isPdf
             UploadFormat.MARKDOWN -> cb.and(cb.not(isPdf), isMarkdown)
-            UploadFormat.IMAGE -> cb.and(cb.not(cb.or(isPdf, isMarkdown)), isImage)
-            UploadFormat.OTHER -> cb.not(cb.or(isPdf, isMarkdown, isImage))
+            UploadFormat.IMAGE -> cb.and(cb.not(cb.or(isPdf, isMarkdown)), columns.isImage())
+            UploadFormat.OTHER -> cb.not(cb.or(isPdf, isMarkdown, columns.isImage()))
         }
     }
 
@@ -236,5 +214,49 @@ internal object ArtifactFilterPredicates {
         )
 
         return cb.or(isNonOrgRepoMatch, isWorkspaceMatch)
+    }
+}
+
+/**
+ * The columns an upload's format is read from, folded to lower case.
+ *
+ * Nullable columns fold to "" exactly as `classifyUploadFormat` does. Without the coalesce,
+ * `NOT(OR(...))` is NULL for a row with unset columns, and the OTHER bucket would match nothing.
+ */
+private class UploadColumns(
+    private val cb: CriteriaBuilder,
+    root: Root<Artifact>,
+) {
+    private val titleLower = cb.coalesce(cb.lower(root.get("title")), "")
+    private val sourceUrlLower = cb.coalesce(cb.lower(root.get("sourceUrl")), "")
+    private val sourceIdLower = cb.lower(root.get("sourceId"))
+    private val mimeLower = cb.coalesce(cb.lower(root.get("mime")), "")
+    private val languageLower = cb.coalesce(cb.lower(root.get("language")), "")
+
+    fun isPdf(): Predicate =
+        cb.or(
+            cb.equal(mimeLower, "application/pdf"),
+            cb.like(titleLower, "%.pdf"),
+            cb.like(sourceUrlLower, "%.pdf"),
+            cb.like(sourceIdLower, "%.pdf"),
+        )
+
+    fun isMarkdown(): Predicate =
+        cb.or(
+            languageLower.`in`("markdown", "md"),
+            cb.like(mimeLower, "%markdown%"),
+            cb.like(titleLower, "%.md"),
+            cb.like(titleLower, "%.markdown"),
+            cb.like(sourceUrlLower, "%.md"),
+            cb.like(sourceUrlLower, "%.markdown"),
+            cb.like(sourceIdLower, "%.md"),
+            cb.like(sourceIdLower, "%.markdown"),
+        )
+
+    fun isImage(): Predicate {
+        val imageExtPredicates = ArtifactFacetRepositoryImpl.IMAGE_EXTENSIONS.flatMap { ext ->
+            listOf(cb.like(titleLower, "%$ext"), cb.like(sourceUrlLower, "%$ext"))
+        }
+        return imageExtPredicates.fold(cb.like(mimeLower, "image/%")) { any, extension -> cb.or(any, extension) }
     }
 }
