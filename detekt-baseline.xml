@@ -117,11 +117,7 @@
     <ID>LongMethod:TeamMemberActions.kt:AddMembersAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>LongMethod:UploadArtifactMapper.kt:UploadArtifactMapper$fun toCommand(event: ArtifactUploadedEvent): UploadArtifactCommand</ID>
     <ID>LongMethod:UploadArtifactProviderService.kt:UploadArtifactProviderService$@Transactional fun persistArtifact(command: UploadArtifactCommand)</ID>
-    <ID>LongMethod:UploadService.kt:UploadService$@Transactional @Tracked("Deleting a batch of project artifacts") fun deleteUpload( authId: String, artifactIds: Set&lt;UUID&gt;, projectId: UUID, ): DeleteUploadsResponse</ID>
-    <ID>LongMethod:UploadService.kt:UploadService$@Transactional @Tracked("Uploading a new batch of project artifacts") fun upload( authId: String, files: List&lt;MultipartFile&gt;, projectId: UUID, ): List&lt;UploadArtifactResponse&gt;</ID>
-    <ID>LongMethod:UploadService.kt:UploadService$private fun uploadSingle( file: MultipartFile, uploaderId: UUID, projectId: UUID, transactionId: UUID, outcomes: MutableSet&lt;UploadArtifactOperationOutcome&gt;, ): UploadResult</ID>
     <ID>LongMethod:UserApiMapper.kt:fun User.toUserApiDto(): UserDto</ID>
-    <ID>NestedBlockDepth:UploadService.kt:UploadService$@Transactional @Tracked("Uploading a new batch of project artifacts") fun upload( authId: String, files: List&lt;MultipartFile&gt;, projectId: UUID, ): List&lt;UploadArtifactResponse&gt;</ID>
     <ID>TooGenericExceptionCaught:ArtifactAiStatusService.kt:ArtifactAiStatusService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BitbucketCommitsService.kt:BitbucketCommitsService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BitbucketConnectionStateService.kt:BitbucketConnectionStateService$first: Exception</ID>
