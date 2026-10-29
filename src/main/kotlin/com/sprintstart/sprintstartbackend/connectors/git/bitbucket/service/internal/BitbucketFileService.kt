@@ -5,6 +5,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.external.even
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.external.events.files.BitbucketFilesFetchingFailedEvent
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.external.events.files.BitbucketFilesFetchingStartedEvent
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.external.events.files.BitbucketFilesResyncedEvent
+import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.model.entity.BitbucketConnection
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.model.exceptions.BitbucketRepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.repository.BitbucketConnectionRepository
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.utils.BitbucketFileSink
@@ -66,42 +67,9 @@ internal class BitbucketFileService(
             connectionRepository.findById(repositoryId)
         }.orElseThrow { BitbucketRepositoryNotConnectedException(repositoryId) }
 
-        eventPublisher.publishEvent(
-            BitbucketFilesFetchingStartedEvent(
-                transactionId = transactionId,
-                repositoryId = connection.id,
-                workspace = connection.workspace,
-                slug = connection.slug,
-            ),
-        )
+        announceStarted(connection, transactionId)
 
-        val outcome = try {
-            ingestionEngine.ingestFileChangesSince(
-                coordinates = coordinatesFactory.of(connection),
-                fromRevision = connection.lastSha,
-                sink = BitbucketFileSink(
-                    eventPublisher = eventPublisher,
-                    connection = connection,
-                    transactionId = transactionId,
-                    sourceUrls = provider.descriptor.sourceUrls,
-                ),
-            )
-        } catch (e: CancellationException) {
-            // Cancellation abandons the run; reporting it as a failure would close a fetch that never
-            // happened.
-            throw e
-        } catch (e: Exception) {
-            eventPublisher.publishEvent(
-                BitbucketFilesFetchingFailedEvent(
-                    transactionId = transactionId,
-                    repositoryId = connection.id,
-                    workspace = connection.workspace,
-                    slug = connection.slug,
-                    reason = e.message ?: "Unknown error",
-                ),
-            )
-            throw e
-        }
+        val outcome = ingestReportingFailure(connection, transactionId)
 
         if (!outcome.complete) {
             logger.warn(
@@ -118,28 +86,73 @@ internal class BitbucketFileService(
             connectionRepository.updateFileCursor(connection.id, outcome.revision)
         }
 
-        outcome.resyncedPaths?.let { visitedPaths ->
-            eventPublisher.publishEvent(
-                BitbucketFilesResyncedEvent(
-                    transactionId = transactionId,
-                    repositoryId = connection.id,
-                    workspace = connection.workspace,
-                    slug = connection.slug,
-                    visitedPaths = visitedPaths,
-                ),
-            )
-        }
+        outcome.resyncedPaths?.let { announceResync(connection, transactionId, it) }
 
         withContext(ioDispatcher) {
             connectionRepository.updateFileCursor(connection.id, outcome.revision)
         }
 
+        announceCompleted(connection, transactionId)
+    }
+
+    private fun announceStarted(connection: BitbucketConnection, transaction: UUID) {
         eventPublisher.publishEvent(
-            BitbucketFilesFetchingCompletedEvent(
-                transactionId = transactionId,
+            BitbucketFilesFetchingStartedEvent(
+                transactionId = transaction,
                 repositoryId = connection.id,
                 workspace = connection.workspace,
                 slug = connection.slug,
+            ),
+        )
+    }
+
+    private fun announceCompleted(connection: BitbucketConnection, transaction: UUID) {
+        eventPublisher.publishEvent(
+            BitbucketFilesFetchingCompletedEvent(
+                transactionId = transaction,
+                repositoryId = connection.id,
+                workspace = connection.workspace,
+                slug = connection.slug,
+            ),
+        )
+    }
+
+    private suspend fun ingestReportingFailure(connection: BitbucketConnection, transaction: UUID) = try {
+        ingestionEngine.ingestFileChangesSince(
+            coordinates = coordinatesFactory.of(connection),
+            fromRevision = connection.lastSha,
+            sink = BitbucketFileSink(
+                eventPublisher = eventPublisher,
+                connection = connection,
+                transactionId = transaction,
+                sourceUrls = provider.descriptor.sourceUrls,
+            ),
+        )
+    } catch (e: CancellationException) {
+        // Cancellation abandons the run; reporting it as a failure would close a fetch that never
+        // happened.
+        throw e
+    } catch (e: Exception) {
+        eventPublisher.publishEvent(
+            BitbucketFilesFetchingFailedEvent(
+                transactionId = transaction,
+                repositoryId = connection.id,
+                workspace = connection.workspace,
+                slug = connection.slug,
+                reason = e.message ?: "Unknown error",
+            ),
+        )
+        throw e
+    }
+
+    private fun announceResync(connection: BitbucketConnection, transaction: UUID, visitedPaths: Set<String>) {
+        eventPublisher.publishEvent(
+            BitbucketFilesResyncedEvent(
+                transactionId = transaction,
+                repositoryId = connection.id,
+                workspace = connection.workspace,
+                slug = connection.slug,
+                visitedPaths = visitedPaths,
             ),
         )
     }
