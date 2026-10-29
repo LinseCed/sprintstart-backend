@@ -168,55 +168,7 @@ class GithubFileService(
      * @param transactionId The id of the overall transaction this fetch is part of.
      */
     private suspend fun ingestFiles(githubRepository: GithubRepositoryConnection, transactionId: UUID) {
-        val outcome = try {
-            val ingested = ingestionEngine.ingestFileChangesSince(
-                coordinates = coordinatesFactory.of(githubRepository),
-                fromRevision = githubRepository.lastSha,
-                sink = GithubFileSink(
-                    eventPublisher = eventPublisher,
-                    fileSnapshotRepository = fileSnapshotRepository,
-                    connection = githubRepository,
-                    transactionId = transactionId,
-                    sourceUrls = provider.descriptor.sourceUrls,
-                ),
-            )
-
-            // Inside the try so that a failed reconciliation or cursor write still ends the run
-            // with a terminal event.
-            ingested.resyncedPaths?.let { visitedPaths ->
-                eventPublisher.publishEvent(
-                    GithubFilesResyncedEvent(
-                        transactionId = transactionId,
-                        repositoryId = githubRepository.id,
-                        repositoryOwner = githubRepository.owner,
-                        repositoryName = githubRepository.name,
-                        visitedPaths = visitedPaths,
-                    ),
-                )
-            }
-
-            // Only the cursor column is written: this copy of the connection was read when the run
-            // started, and saving all of it would reset the commit cursor the parallel commit fetch
-            // has advanced since.
-            withContext(ioDispatcher) {
-                repoConnectionRepository.updateFileCursor(githubRepository.id, ingested.revision)
-            }
-            ingested
-        } catch (e: CancellationException) {
-            // Cancellation abandons the run; reporting it as a failure would close a fetch that never
-            // happened.
-            throw e
-        } catch (e: Exception) {
-            eventPublisher.publishEvent(
-                GithubFilesFetchFailedEvent(
-                    transactionId,
-                    githubRepository.owner,
-                    githubRepository.name,
-                    e.message ?: "Unknown error",
-                ),
-            )
-            throw e
-        }
+        val outcome = ingestReportingFailure(githubRepository, transactionId)
 
         if (!outcome.complete) {
             logger.warn(
@@ -231,6 +183,61 @@ class GithubFileService(
 
         eventPublisher.publishEvent(
             GithubFilesFetchCompletedEvent(transactionId, githubRepository.owner, githubRepository.name),
+        )
+    }
+
+    private suspend fun ingestReportingFailure(
+        githubRepository: GithubRepositoryConnection,
+        transaction: UUID,
+    ) = try {
+        val ingested = ingestionEngine.ingestFileChangesSince(
+            coordinates = coordinatesFactory.of(githubRepository),
+            fromRevision = githubRepository.lastSha,
+            sink = GithubFileSink(
+                eventPublisher = eventPublisher,
+                fileSnapshotRepository = fileSnapshotRepository,
+                connection = githubRepository,
+                transactionId = transaction,
+                sourceUrls = provider.descriptor.sourceUrls,
+            ),
+        )
+
+        // Inside the try so that a failed reconciliation or cursor write still ends the run
+        // with a terminal event.
+        ingested.resyncedPaths?.let { announceResync(githubRepository, transaction, it) }
+
+        // Only the cursor column is written: this copy of the connection was read when the run
+        // started, and saving all of it would reset the commit cursor the parallel commit fetch
+        // has advanced since.
+        withContext(ioDispatcher) {
+            repoConnectionRepository.updateFileCursor(githubRepository.id, ingested.revision)
+        }
+        ingested
+    } catch (e: CancellationException) {
+        // Cancellation abandons the run; reporting it as a failure would close a fetch that never
+        // happened.
+        throw e
+    } catch (e: Exception) {
+        eventPublisher.publishEvent(
+            GithubFilesFetchFailedEvent(
+                transaction,
+                githubRepository.owner,
+                githubRepository.name,
+                e.message ?: "Unknown error",
+            ),
+        )
+        throw e
+    }
+
+    private fun announceResync(repository: GithubRepositoryConnection, transaction: UUID, visitedPaths: Set<String>) {
+        eventPublisher.publishEvent(
+            GithubFilesResyncedEvent(
+                transactionId = transaction,
+                repositoryId = repository.id,
+                repositoryOwner = repository.owner,
+                repositoryName = repository.name,
+                visitedPaths = visitedPaths,
+            ),
         )
     }
 }
