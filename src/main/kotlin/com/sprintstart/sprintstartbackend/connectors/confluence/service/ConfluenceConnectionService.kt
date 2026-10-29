@@ -61,32 +61,7 @@ internal class ConfluenceConnectionService(
         request: CreateConfluenceConnectionRequest,
     ): ConfluenceConnectionResponse {
         requireProjectAccess(authId, projectId)
-        val normalizedBaseUrl = normalizeConfluenceBaseUrl(request.baseUrl)
-        val requestedSpaceId = normalizeSpaceId(request.spaceId)
-        val allowlist = normalizeConfluencePageIds(request.pageAllowlist, "page allowlist")
-        val denylist = normalizeConfluencePageIds(request.pageDenylist, "page denylist")
-        rejectDuplicate(projectId, normalizedBaseUrl, requestedSpaceId)
-        val credentials = resolveCredentials(authId, request.credentialName)
-        val space = retrieveSpace(normalizedBaseUrl, credentials, requestedSpaceId)
-        val canonicalSpaceId = normalizeSpaceId(space.id)
-        if (canonicalSpaceId != requestedSpaceId || space.key.isBlank()) {
-            throw ConfluenceConnectionConfigurationException(
-                "Confluence returned inconsistent space identity metadata",
-                httpStatus = 502,
-            )
-        }
-
-        val connection = ConfluenceSpaceConnection(
-            projectId = projectId,
-            baseUrl = normalizedBaseUrl,
-            spaceId = canonicalSpaceId,
-            spaceKey = space.key.trim(),
-            spaceName = space.name.trim().ifBlank { null },
-            credentialAuthId = authId,
-            credentialName = request.credentialName,
-            pageAllowlistInternal = allowlist.toMutableList(),
-            pageDenylistInternal = denylist.toMutableList(),
-        )
+        val connection = validatedConnection(authId, projectId, request)
 
         val saved = connectionPersistenceService.persist(connection)
         scheduledExecutor.launch("Initial ingestion for Confluence connection '${saved.id}'") {
@@ -153,6 +128,39 @@ internal class ConfluenceConnectionService(
         eventPublisher.publishEvent(ConfluenceSpaceConnectionDeletedEvent(connectionId, projectId))
     }
 
+    private suspend fun validatedConnection(
+        subject: String,
+        project: UUID,
+        request: CreateConfluenceConnectionRequest,
+    ): ConfluenceSpaceConnection {
+        val normalizedBaseUrl = normalizeConfluenceBaseUrl(request.baseUrl)
+        val requestedSpaceId = normalizeSpaceId(request.spaceId)
+        val allowlist = normalizeConfluencePageIds(request.pageAllowlist, "page allowlist")
+        val denylist = normalizeConfluencePageIds(request.pageDenylist, "page denylist")
+        rejectDuplicate(project, normalizedBaseUrl, requestedSpaceId)
+        val credentials = resolveCredentials(subject, request.credentialName)
+        val space = retrieveSpace(normalizedBaseUrl, credentials, requestedSpaceId)
+        val canonicalSpaceId = normalizeSpaceId(space.id)
+        if (canonicalSpaceId != requestedSpaceId || space.key.isBlank()) {
+            throw ConfluenceConnectionConfigurationException(
+                "Confluence returned inconsistent space identity metadata",
+                httpStatus = 502,
+            )
+        }
+
+        return ConfluenceSpaceConnection(
+            projectId = project,
+            baseUrl = normalizedBaseUrl,
+            spaceId = canonicalSpaceId,
+            spaceKey = space.key.trim(),
+            spaceName = space.name.trim().ifBlank { null },
+            credentialAuthId = subject,
+            credentialName = request.credentialName,
+            pageAllowlistInternal = allowlist.toMutableList(),
+            pageDenylistInternal = denylist.toMutableList(),
+        )
+    }
+
     private fun requireProjectAccess(authId: String, projectId: UUID) {
         if (!userApi.userHasAccessToProject(authId, projectId)) {
             throw ConfluenceProjectAccessDeniedException(projectId)
@@ -194,16 +202,14 @@ internal class ConfluenceConnectionService(
     } catch (@Suppress("SwallowedException") exception: ConfluenceInvalidResponseException) {
         throw ConfluenceConnectionConfigurationException("Confluence returned invalid space metadata", httpStatus = 502)
     }
+}
 
-    private fun normalizeSpaceId(rawSpaceId: String): String {
-        val spaceId = rawSpaceId.trim()
-        if (!spaceId.matches(NUMERIC_SPACE_ID)) {
-            throw ConfluenceConnectionConfigurationException("Confluence space ID must be numeric")
-        }
-        return spaceId
-    }
+private val NUMERIC_SPACE_ID = Regex("^[0-9]+$")
 
-    private companion object {
-        val NUMERIC_SPACE_ID = Regex("^[0-9]+$")
+private fun normalizeSpaceId(rawSpaceId: String): String {
+    val spaceId = rawSpaceId.trim()
+    if (!spaceId.matches(NUMERIC_SPACE_ID)) {
+        throw ConfluenceConnectionConfigurationException("Confluence space ID must be numeric")
     }
+    return spaceId
 }
