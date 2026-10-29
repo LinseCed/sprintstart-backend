@@ -21,6 +21,7 @@ import com.sprintstart.sprintstartbackend.teamspace.repository.BuddyTeamMessageR
 import com.sprintstart.sprintstartbackend.teamspace.repository.BuddyTeamSessionRepository
 import com.sprintstart.sprintstartbackend.user.external.UserApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -114,9 +115,7 @@ class BuddyTeamService(
         val history = transcript.drop(session.summarizedCount).map { it.toAgentMessage() }
         val carriedOver = transcript.areasStillOpen()
 
-        buddyTeamMessageRepository.save(
-            BuddyTeamMessage(session = session, role = BuddyMessageRole.USER, content = content),
-        )
+        saveUserMessage(session, content)
 
         return flow {
             val turn = TeamAgentTurn(
@@ -132,24 +131,33 @@ class BuddyTeamService(
                 messages = history + BuddyAgentMessageDto(role = BuddyAgentMessageDto.ROLE_USER, content = content),
                 areas = OpenAreas(carriedOver),
             )
-
-            try {
-                with(teamAgentLoop) { runTurn(turn) }
-            } catch (e: Exception) {
-                saveIncompleteReply(session, turn.emittedContent.toString(), turn.areas)
-                throw e
-            }
-
-            buddyTeamMessageRepository.save(
-                BuddyTeamMessage(
-                    session = session,
-                    role = BuddyMessageRole.ASSISTANT,
-                    content = turn.emittedContent.toString(),
-                    openedAreas = turn.areas.activeThisTurn.encoded(),
-                ),
-            )
+            relayTurn(session, turn)
             teamCompaction.foldInBackground(UserId(userId), ProjectId(projectId))
         }.endFailureWithErrorEvent()
+    }
+
+    private fun saveUserMessage(session: BuddyTeamSession, content: String) {
+        buddyTeamMessageRepository.save(
+            BuddyTeamMessage(session = session, role = BuddyMessageRole.USER, content = content),
+        )
+    }
+
+    private suspend fun FlowCollector<BuddyStreamEvent>.relayTurn(session: BuddyTeamSession, turn: TeamAgentTurn) {
+        try {
+            with(teamAgentLoop) { runTurn(turn) }
+        } catch (e: Exception) {
+            saveIncompleteReply(session, turn.emittedContent.toString(), turn.areas)
+            throw e
+        }
+
+        buddyTeamMessageRepository.save(
+            BuddyTeamMessage(
+                session = session,
+                role = BuddyMessageRole.ASSISTANT,
+                content = turn.emittedContent.toString(),
+                openedAreas = turn.areas.activeThisTurn.encoded(),
+            ),
+        )
     }
 
     /** Keeps a turn that was stopped or failed mid-answer, so the manager's read shows what they saw. */
