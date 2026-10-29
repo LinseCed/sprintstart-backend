@@ -4,7 +4,6 @@
   <CurrentIssues>
     <ID>AbstractClassCanBeConcreteClass:BlueprintSubGraphNode.kt:BlueprintSubGraphNode$BlueprintSubGraphNode</ID>
     <ID>AbstractClassCanBeConcreteClass:OnboardingSubGraphNode.kt:OnboardingSubGraphNode$OnboardingSubGraphNode</ID>
-    <ID>CognitiveComplexMethod:IngestionRunLifeCycleService.kt:IngestionRunLifeCycleService$@Transactional @Tracked("Starting ingestion run") fun startOrUpdateRun( transactionId: UUID, sourceSystem: SourceSystem, status: IngestionRunStatus, failureReason: String? = null, sourceInstanceId: UUID? = null, sourceInstanceRef: String? = null, )</ID>
     <ID>InjectDispatcher:BuddyActionService.kt:BuddyActionService$IO</ID>
     <ID>InjectDispatcher:CoroutineConfig.kt:CoroutineConfig$IO</ID>
     <ID>InjectDispatcher:GithubConnectorService.kt:GithubConnectorService$IO</ID>
