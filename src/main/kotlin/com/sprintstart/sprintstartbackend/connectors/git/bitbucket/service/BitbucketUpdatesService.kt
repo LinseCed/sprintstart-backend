@@ -168,6 +168,17 @@ internal class BitbucketUpdatesService(
             ),
         )
 
+        startUpdating(connection, transactionId)
+
+        applicationScope.launch {
+            val collectors = buildCollectors(connection, transactionId)
+            connectionStateService.awaitCollectorsAndFinalize(connection.id, collectors)
+        }
+
+        return transactionId
+    }
+
+    private fun startUpdating(connection: BitbucketConnection, transaction: UUID) {
         try {
             connectionStateService.markUpdating(connection.id)
         } catch (e: Exception) {
@@ -175,7 +186,7 @@ internal class BitbucketUpdatesService(
             // collector is launched and so no per-collector terminal event will ever arrive.
             eventPublisher.publishEvent(
                 BitbucketRepositoryUpdateFailedEvent(
-                    transactionId = transactionId,
+                    transactionId = transaction,
                     repositoryId = connection.id,
                     workspace = connection.workspace,
                     slug = connection.slug,
@@ -184,13 +195,6 @@ internal class BitbucketUpdatesService(
             )
             throw e
         }
-
-        applicationScope.launch {
-            val collectors = buildCollectors(connection, transactionId)
-            connectionStateService.awaitCollectorsAndFinalize(connection.id, collectors)
-        }
-
-        return transactionId
     }
 
     /**
