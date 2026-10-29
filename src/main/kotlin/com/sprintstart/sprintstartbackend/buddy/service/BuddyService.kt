@@ -3,9 +3,9 @@ package com.sprintstart.sprintstartbackend.buddy.service
 import com.sprintstart.sprintstartbackend.assistant.external.AgentAiClient
 import com.sprintstart.sprintstartbackend.assistant.external.ArtifactLookupService
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
-import com.sprintstart.sprintstartbackend.assistant.external.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyToolSpecDto
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyTurnOptions
 import com.sprintstart.sprintstartbackend.assistant.external.CONVERSATION_WINDOW
 import com.sprintstart.sprintstartbackend.assistant.external.emitAgentReply
 import com.sprintstart.sprintstartbackend.assistant.external.endFailureWithErrorEvent
@@ -132,7 +132,7 @@ class BuddyService(
     /**
      * Sends the authenticated user's message to the buddy and streams the reply.
      *
-     * With [capabilitiesEnabled] false the mentor answers from the project's material and does
+     * With [BuddyTurnOptions.capabilitiesEnabled] false the mentor answers from the project's material and does
      * nothing else: no tools are mounted, so none can be called, and the mode is enforced by what
      * the model was given rather than by what the prompt asked of it. Retrieval is unaffected —
      * `search_docs` runs AI-side — so this costs the hire nothing in what they can find.
@@ -172,9 +172,7 @@ class BuddyService(
         authId: String,
         sessionId: UUID?,
         content: String,
-        capabilitiesEnabled: Boolean = true,
-        filters: BuddySessionFilters?,
-        currentPage: String? = null,
+        options: BuddyTurnOptions = BuddyTurnOptions(),
     ): Flow<BuddyStreamEvent> {
         val userId = resolveUserId(authId)
         val user = UserId(userId)
@@ -193,11 +191,11 @@ class BuddyService(
         // Resolved once per turn, not per hop: neither can change mid-conversation, and
         // re-reading would cost a membership lookup on every step of the agent loop.
         val scope = BuddyTurnScope(
-            tools = toolsFor(user, capabilitiesEnabled),
+            tools = toolsFor(user, options.capabilitiesEnabled),
             vocabulary = buddyVocabulary(),
             projectIds = session.projectId?.let { listOf(it.toString()) } ?: memberProjects,
-            capabilitiesEnabled = capabilitiesEnabled,
-            filters = filters,
+            capabilitiesEnabled = options.capabilitiesEnabled,
+            filters = options.filters,
         )
 
         // A hire on no project has no retrieval scope, and the AI fails closed on an empty one, so the turn
@@ -205,7 +203,7 @@ class BuddyService(
         if (scope.projectIds.isEmpty()) {
             return refusalForNoProject(session)
         }
-        return replyStream(BuddyTurn(session, user, content, currentPage, history, scope))
+        return replyStream(BuddyTurn(session, user, content, options.currentPage, history, scope))
     }
 
     private fun ownedSession(requested: UUID?, owner: UserId): BuddySession {

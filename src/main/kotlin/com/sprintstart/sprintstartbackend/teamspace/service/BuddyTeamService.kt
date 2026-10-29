@@ -3,8 +3,8 @@ package com.sprintstart.sprintstartbackend.teamspace.service
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyAgentMessageDto
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpenRequest
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyOpeningStream
-import com.sprintstart.sprintstartbackend.assistant.external.BuddySessionFilters
 import com.sprintstart.sprintstartbackend.assistant.external.BuddyStreamEvent
+import com.sprintstart.sprintstartbackend.assistant.external.BuddyTurnOptions
 import com.sprintstart.sprintstartbackend.assistant.external.OpeningConversation
 import com.sprintstart.sprintstartbackend.assistant.external.TeamToolContext
 import com.sprintstart.sprintstartbackend.assistant.external.endFailureWithErrorEvent
@@ -96,8 +96,8 @@ class BuddyTeamService(
     /**
      * Sends the manager's message in team mode and streams the reply.
      *
-     * With [capabilitiesEnabled] false no tools are mounted. The [filters] are sent on every hop, because
-     * the AI service applies them on whichever hop the model searches.
+     * With [BuddyTurnOptions.capabilitiesEnabled] false no tools are mounted. The [BuddyTurnOptions.filters]
+     * are sent on every hop, because the AI service applies them on whichever hop the model searches.
      *
      * @throws ResponseStatusException 404 if the user does not exist; 403 if they do not manage the project.
      */
@@ -105,9 +105,7 @@ class BuddyTeamService(
         authId: String,
         projectId: UUID,
         content: String,
-        capabilitiesEnabled: Boolean = true,
-        filters: BuddySessionFilters? = null,
-        currentPage: String? = null,
+        options: BuddyTurnOptions = BuddyTurnOptions(),
     ): Flow<BuddyStreamEvent> {
         val userId = authorize(authId, projectId)
         val session = getOrCreateSession(userId, projectId)
@@ -124,10 +122,10 @@ class BuddyTeamService(
                     userId = userId,
                     authId = authId,
                     projectId = projectId,
-                    currentPage = currentPage,
+                    currentPage = options.currentPage,
                 ),
-                capabilitiesEnabled = capabilitiesEnabled,
-                filters = filters,
+                capabilitiesEnabled = options.capabilitiesEnabled,
+                filters = options.filters,
                 priorSummary = session.summary,
                 messages = history + BuddyAgentMessageDto(role = BuddyAgentMessageDto.ROLE_USER, content = content),
                 areas = OpenAreas(carriedOver),
