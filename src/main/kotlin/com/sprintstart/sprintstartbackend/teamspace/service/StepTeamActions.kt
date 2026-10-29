@@ -270,18 +270,27 @@ class UpdateStepAction(
 
     /** Why the call's type, length or place cannot be used, or null when each is either absent or fine. */
     private fun badArgument(call: BuddyToolCallDto, slots: Int): String? =
-        when {
-            call.textArgument("type").let { it.isNotEmpty() && stepTypeOf(it) == null } ->
-                "Type must be one of ${STEP_TYPES.joinToString(", ")}."
-            call.textArgument("estimated_minutes").let {
-                it.isNotEmpty() &&
-                    it.toIntOrNull()?.takeIf { m -> m > 0 } == null
-            } ->
-                "estimated_minutes must be a whole number of minutes above zero."
-            call.textArgument("place").let { it.isNotEmpty() && placeToPosition(it, slots) == null } ->
-                "Place must be a number from 1 to $slots."
-            else -> null
-        }
+        badType(call) ?: badMinutes(call) ?: badPlace(call, slots)
+
+    private fun badType(call: BuddyToolCallDto): String? {
+        val text = call.textArgument("type")
+        return "Type must be one of ${STEP_TYPES.joinToString(", ")}."
+            .takeIf { text.isNotEmpty() && stepTypeOf(text) == null }
+    }
+
+    private fun badMinutes(call: BuddyToolCallDto): String? {
+        val text = call.textArgument("estimated_minutes")
+        return "estimated_minutes must be a whole number of minutes above zero."
+            .takeIf { text.isNotEmpty() && minutesOf(text) == null }
+    }
+
+    private fun minutesOf(text: String): Int? = text.toIntOrNull()?.takeIf { it > 0 }
+
+    private fun badPlace(call: BuddyToolCallDto, slots: Int): String? {
+        val text = call.textArgument("place")
+        return "Place must be a number from 1 to $slots."
+            .takeIf { text.isNotEmpty() && placeToPosition(text, slots) == null }
+    }
 
     override fun recheckParams(params: UpdateStepParams, context: TeamToolContext): String? =
         scope.missing(PathElementKind.STEP, params.stepId, context.projectId)

@@ -81,11 +81,8 @@ class BoardCardHydrator(
         BoardCardKind.ARRIVAL_STEPS -> arrivalStepsContent(arrivalSteps)
         BoardCardKind.OPEN_PULL_REQUESTS -> openPullRequestsContent(member, projectId)
         BoardCardKind.CURRENT_TASK -> currentTaskContent(member, projectId)
-        BoardCardKind.SUGGESTED_TASKS -> BoardTaskCards.suggested(matches())
-        BoardCardKind.TASK_POOL -> BoardTaskCards.pool(
-            matches(),
-            currentTaskId = hireStarterWork.currentTaskOf(UserId(member.userId), projectId)?.id,
-        )
+        BoardCardKind.SUGGESTED_TASKS, BoardCardKind.TASK_POOL ->
+            rankedTasksContent(card.kind, member, projectId, matches)
         BoardCardKind.COMPETENCY_PROGRESS -> competencyProgressContent(member)
         BoardCardKind.MEMORY_RECAP -> memoryRecapSource.latestRecap(UserId(member.userId))
         // The one card served from a cache: its content costs a model call.
@@ -94,6 +91,21 @@ class BoardCardHydrator(
         BoardCardKind.PATH_STEP -> pathStepContent(card.subject, pathSteps)
         BoardCardKind.NOTE, BoardCardKind.LINK, BoardCardKind.CHECKLIST -> authoredContent(card.payload)
     }
+
+    private fun rankedTasksContent(
+        kind: BoardCardKind,
+        member: ProjectMember,
+        projectId: ProjectId,
+        matches: () -> List<RankedStarterWorkTaskResponse>,
+    ): BoardCardContent =
+        if (kind == BoardCardKind.TASK_POOL) {
+            BoardTaskCards.pool(
+                matches(),
+                currentTaskId = hireStarterWork.currentTaskOf(UserId(member.userId), projectId)?.id,
+            )
+        } else {
+            BoardTaskCards.suggested(matches())
+        }
 
     /**
      * What is still outstanding before this hire can work, counted by how each step was settled.

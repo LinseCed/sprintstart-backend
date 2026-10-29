@@ -35,6 +35,27 @@ internal fun ArtifactFilterCriteria.selectedLanguages(): List<String> =
         .filter { it.isNotEmpty() }
         .distinctBy { it.lowercase() }
 
+private fun typesFacet(root: Root<Artifact>, criteria: ArtifactFilterCriteria, exclude: FacetKind?): Predicate? {
+    if (exclude == FacetKind.TYPES || criteria.types.isNullOrEmpty()) return null
+    return root.get<ArtifactType>("artifactType").`in`(criteria.types)
+}
+
+private fun sourcesFacet(root: Root<Artifact>, criteria: ArtifactFilterCriteria, exclude: FacetKind?): Predicate? {
+    if (exclude in SOURCES_EXCLUDED_FACETS || criteria.sources.isNullOrEmpty()) return null
+    return root.get<SourceSystem>("sourceSystem").`in`(criteria.sources)
+}
+
+private fun languagesFacet(
+    cb: CriteriaBuilder,
+    root: Root<Artifact>,
+    criteria: ArtifactFilterCriteria,
+    exclude: FacetKind?,
+): Predicate? {
+    val languages = criteria.selectedLanguages()
+    if (exclude == FacetKind.LANGUAGES || languages.isEmpty()) return null
+    return cb.lower(root.get<String>("language")).`in`(languages.map { it.lowercase() })
+}
+
 /**
  * The WHERE clause of every artifact query: the project, the search text and each active filter.
  *
@@ -49,40 +70,38 @@ internal object ArtifactFilterPredicates {
         criteria: ArtifactFilterCriteria,
         exclude: FacetKind?,
     ): List<Predicate> {
-        val predicates = mutableListOf<Predicate>()
-        predicates.add(cb.equal(projectJoin, projectId))
-
-        searchPredicate(cb, root, criteria.search)?.let(predicates::add)
-
-        if (exclude != FacetKind.TYPES && !criteria.types.isNullOrEmpty()) {
-            predicates.add(root.get<ArtifactType>("artifactType").`in`(criteria.types))
-        }
-
-        if (exclude !in SOURCES_EXCLUDED_FACETS && !criteria.sources.isNullOrEmpty()) {
-            predicates.add(root.get<SourceSystem>("sourceSystem").`in`(criteria.sources))
-        }
-
-        if (exclude != FacetKind.FORMATS && criteria.format != null) {
-            val notUpload = cb.notEqual(root.get<SourceSystem>("sourceSystem"), SourceSystem.UPLOAD)
-            val uploadMatchesFormat = buildUploadFormatPredicate(cb, root, criteria.format)
-            predicates.add(cb.or(notUpload, uploadMatchesFormat))
-        }
-
-        if (exclude != FacetKind.REPOSITORIES && !criteria.repositories.isNullOrEmpty()) {
-            predicates.add(repositoryPredicate(cb, root, criteria.repositories))
-        }
-
-        val languages = criteria.selectedLanguages()
-        if (exclude != FacetKind.LANGUAGES && languages.isNotEmpty()) {
-            val languageLower = cb.lower(root.get("language"))
-            predicates.add(languageLower.`in`(languages.map { it.lowercase() }))
-        }
-
         // No facet counts the activity date, so the window applies to every query alike -- which is
         // what keeps facet counts equal to the list's totalElements under the same filter.
-        predicates.addAll(buildActivityWindowPredicates(cb, root, criteria.from, criteria.to))
+        return listOfNotNull(
+            cb.equal(projectJoin, projectId),
+            searchPredicate(cb, root, criteria.search),
+            typesFacet(root, criteria, exclude),
+            sourcesFacet(root, criteria, exclude),
+            formatFacet(cb, root, criteria, exclude),
+            repositoriesFacet(cb, root, criteria, exclude),
+            languagesFacet(cb, root, criteria, exclude),
+        ) + buildActivityWindowPredicates(cb, root, criteria.from, criteria.to)
+    }
 
-        return predicates
+    private fun formatFacet(
+        cb: CriteriaBuilder,
+        root: Root<Artifact>,
+        criteria: ArtifactFilterCriteria,
+        exclude: FacetKind?,
+    ): Predicate? {
+        if (exclude == FacetKind.FORMATS || criteria.format == null) return null
+        val notUpload = cb.notEqual(root.get<SourceSystem>("sourceSystem"), SourceSystem.UPLOAD)
+        return cb.or(notUpload, buildUploadFormatPredicate(cb, root, criteria.format))
+    }
+
+    private fun repositoriesFacet(
+        cb: CriteriaBuilder,
+        root: Root<Artifact>,
+        criteria: ArtifactFilterCriteria,
+        exclude: FacetKind?,
+    ): Predicate? {
+        if (exclude == FacetKind.REPOSITORIES || criteria.repositories.isNullOrEmpty()) return null
+        return repositoryPredicate(cb, root, criteria.repositories)
     }
 
     private fun searchPredicate(cb: CriteriaBuilder, root: Root<Artifact>, search: String?): Predicate? {
