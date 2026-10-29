@@ -17,7 +17,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.model.entity.
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.model.exceptions.BitbucketRepositoryNotConnectedException
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.repository.BitbucketConnectionRepository
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
-import kotlinx.coroutines.CancellationException
+import com.sprintstart.sprintstartbackend.shared.failure.reportingFailure
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -81,7 +81,9 @@ internal class BitbucketPullRequestsService(
         )
 
         val syncStartedAt = Instant.now()
-        try {
+        reportingFailure(onFailure = { e ->
+            eventPublisher.publishEvent(BitbucketPullRequestsFetchingFailedEvent(transactionId, e.message))
+        }) {
             val credential = resolveCredential(connection)
 
             fetchAndIngestPullRequests(connection, credential, transactionId)
@@ -89,13 +91,6 @@ internal class BitbucketPullRequestsService(
             withContext(ioDispatcher) {
                 connectionRepository.updatePullRequestsCursor(connection.id, syncStartedAt)
             }
-        } catch (e: CancellationException) {
-            // Cancellation abandons the run; reporting it as a failure would close a fetch that never
-            // happened.
-            throw e
-        } catch (e: Exception) {
-            eventPublisher.publishEvent(BitbucketPullRequestsFetchingFailedEvent(transactionId, e.message))
-            throw e
         }
 
         eventPublisher.publishEvent(BitbucketPullRequestsFetchingCompletedEvent(transactionId))

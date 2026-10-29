@@ -13,7 +13,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.github.util.GithubFileS
 import com.sprintstart.sprintstartbackend.connectors.git.github.util.GithubGitProvider
 import com.sprintstart.sprintstartbackend.connectors.git.utils.GitIngestionEngine
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
-import kotlinx.coroutines.CancellationException
+import com.sprintstart.sprintstartbackend.shared.failure.reportingFailure
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -189,7 +189,16 @@ class GithubFileService(
     private suspend fun ingestReportingFailure(
         githubRepository: GithubRepositoryConnection,
         transaction: UUID,
-    ) = try {
+    ) = reportingFailure(onFailure = { e ->
+        eventPublisher.publishEvent(
+            GithubFilesFetchFailedEvent(
+                transaction,
+                githubRepository.owner,
+                githubRepository.name,
+                e.message ?: "Unknown error",
+            ),
+        )
+    }) {
         val ingested = ingestionEngine.ingestFileChangesSince(
             coordinates = coordinatesFactory.of(githubRepository),
             fromRevision = githubRepository.lastSha,
@@ -213,20 +222,6 @@ class GithubFileService(
             repoConnectionRepository.updateFileCursor(githubRepository.id, ingested.revision)
         }
         ingested
-    } catch (e: CancellationException) {
-        // Cancellation abandons the run; reporting it as a failure would close a fetch that never
-        // happened.
-        throw e
-    } catch (e: Exception) {
-        eventPublisher.publishEvent(
-            GithubFilesFetchFailedEvent(
-                transaction,
-                githubRepository.owner,
-                githubRepository.name,
-                e.message ?: "Unknown error",
-            ),
-        )
-        throw e
     }
 
     private fun announceResync(repository: GithubRepositoryConnection, transaction: UUID, visitedPaths: Set<String>) {

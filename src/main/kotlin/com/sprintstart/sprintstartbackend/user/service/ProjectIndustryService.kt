@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.user.service
 
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.shared.failure.recovering
 import com.sprintstart.sprintstartbackend.user.external.ProjectIndustryAiClient
 import com.sprintstart.sprintstartbackend.user.external.ProjectIndustryApi
 import com.sprintstart.sprintstartbackend.user.external.model.AiIndustryEvaluationResponse
@@ -8,7 +9,6 @@ import com.sprintstart.sprintstartbackend.user.model.entity.Project
 import com.sprintstart.sprintstartbackend.user.model.mapper.toIndustryResponse
 import com.sprintstart.sprintstartbackend.user.model.response.project.ProjectIndustryResponse
 import com.sprintstart.sprintstartbackend.user.repository.ProjectRepository
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -109,7 +109,10 @@ class ProjectIndustryService(
             return existingProject.industry
         }
 
-        return try {
+        return recovering(fallback = { e ->
+            logger.warn("Lazy industry evaluation failed for project {}: {}", projectId, e.message)
+            null
+        }) {
             val response = projectIndustryAiClient.evaluateIndustry(projectId)
             if (isEligibleConfidence(response.confidence) && response.industry.isNotBlank()) {
                 persistLazily(projectId, response)
@@ -121,11 +124,6 @@ class ProjectIndustryService(
                 )
                 null
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            logger.warn("Lazy industry evaluation failed for project {}: {}", projectId, e.message)
-            null
         }
     }
 
@@ -138,7 +136,9 @@ class ProjectIndustryService(
      */
     @Tracked("Evaluating project industry automatically")
     override suspend fun evaluateIndustryAutomatically(projectId: UUID) {
-        try {
+        recovering(fallback = { e ->
+            logger.warn("Automatic industry evaluation failed for project {}: {}", projectId, e.message)
+        }) {
             val existingProject = withContext(ioDispatcher) { findProjectOrNull(projectId) } ?: run {
                 logger.warn("Cannot auto-evaluate industry for non-existent project {}", projectId)
                 return
@@ -163,10 +163,6 @@ class ProjectIndustryService(
             }
 
             persistAutomatically(projectId, response)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            logger.warn("Automatic industry evaluation failed for project {}: {}", projectId, e.message)
         }
     }
 

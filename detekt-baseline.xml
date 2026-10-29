@@ -19,43 +19,16 @@
     <ID>LongMethod:BuddyTeamService.kt:BuddyTeamService$fun sendMessageForMe( authId: String, projectId: UUID, content: String, capabilitiesEnabled: Boolean = true, filters: BuddySessionFilters? = null, currentPage: String? = null, ): Flow&lt;BuddyStreamEvent&gt;</ID>
     <ID>LongMethod:StreamExecution.kt:StreamExecution$@Suppress("CyclomaticComplexMethod") inline fun &lt;reified T&gt; perform( terminationMarkers: Set&lt;String&gt; = setOf("[DONE]"), crossinline onChunkError: (raw: String, error: Throwable) -&gt; Boolean = { raw, err -&gt; System.err.println("WebClient stream: failed to deserialize chunk '$raw': ${err.message}") true // skip and continue by default }, ): Flow&lt;T&gt;</ID>
     <ID>LongMethod:TaskOrientationService.kt:TaskOrientationService$suspend fun streamForHire(hireId: UUID, projectId: UUID): Flow&lt;AiProgressEvent&gt;</ID>
-    <ID>TooGenericExceptionCaught:ArtifactAiStatusService.kt:ArtifactAiStatusService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:BitbucketCommitsService.kt:BitbucketCommitsService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:BitbucketConnectionStateService.kt:BitbucketConnectionStateService$first: Exception</ID>
-    <ID>TooGenericExceptionCaught:BitbucketFileService.kt:BitbucketFileService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:BitbucketPullRequestsService.kt:BitbucketPullRequestsService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:BitbucketRepositoryProjectsListener.kt:BitbucketRepositoryProjectsListener$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:BitbucketUpdatesService.kt:BitbucketUpdatesService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:BitbucketWorkspaceService.kt:BitbucketWorkspaceService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:BuddyQuestionEventListener.kt:BuddyQuestionEventListener$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BuddyService.kt:BuddyService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BuddyTeamService.kt:BuddyTeamService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:ConfluencePageIngestionService.kt:ConfluencePageIngestionService$@Suppress("SwallowedException") exception: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:ConfluencePageIngestionService.kt:ConfluencePageIngestionService$exception: RuntimeException</ID>
-    <ID>TooGenericExceptionCaught:ConfluenceSpaceProjectsListener.kt:ConfluenceSpaceProjectsListener$e: Exception</ID>
     <ID>TooGenericExceptionCaught:CustomOnDiskCache.kt:CustomOnDiskCache$@Suppress("SwallowedException") e: RuntimeException</ID>
-    <ID>TooGenericExceptionCaught:FaqConsolidationService.kt:FaqConsolidationService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:GitRevisionState.kt:GitRevisionState$@Suppress("SwallowedException") e: RuntimeException</ID>
-    <ID>TooGenericExceptionCaught:GithubCommitsService.kt:GithubCommitsService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:GithubFileService.kt:GithubFileService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:GithubIssuesService.kt:GithubIssuesService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:GithubPullRequestsService.kt:GithubPullRequestsService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:GithubRepositoryProjectsListener.kt:GithubRepositoryProjectsListener$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:IngestionEventListener.kt:IngestionEventListener$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:IngestionIndustryEventListener.kt:IngestionIndustryEventListener$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:JiraInstanceProjectsListener.kt:JiraInstanceProjectsListener$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:JiraIssueService.kt:JiraIssueService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:JiraService.kt:JiraService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:JiraUpdateService.kt:JiraUpdateService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:KnowledgeGapsAutoRefreshService.kt:KnowledgeGapsAutoRefreshService$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:NotionPageProjectsListener.kt:NotionPageProjectsListener$exception: Exception</ID>
     <ID>TooGenericExceptionCaught:NotionPageSyncService.kt:NotionPageSyncService$exception: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:NotionWorkspaceIngestionService.kt:NotionWorkspaceIngestionService$@Suppress("SwallowedException") exception: RuntimeException</ID>
     <ID>TooGenericExceptionCaught:OnboardingPersonalizationService.kt:OnboardingPersonalizationService$cause: Throwable</ID>
-    <ID>TooGenericExceptionCaught:ProjectDeletedListener.kt:ProjectDeletedListener$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:ProjectIndustryService.kt:ProjectIndustryService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:TrackedAspect.kt:TrackedAspect$ex: Throwable</ID>
-    <ID>TooGenericExceptionCaught:UploadService.kt:UploadService$e: Exception</ID>
     <ID>TooGenericExceptionThrown:OnDiskOperations.kt:OnDiskOperations.Companion$throw RuntimeException("$command failed (exit $exitCode)$suffix")</ID>
     <ID>TooGenericExceptionThrown:StarterWorkTaskProposalServiceTest.kt:StarterWorkTaskProposalServiceTest.StreamGenerate$throw RuntimeException("ai down")</ID>
   </CurrentIssues>

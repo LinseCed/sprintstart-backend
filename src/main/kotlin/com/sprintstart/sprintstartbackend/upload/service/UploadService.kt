@@ -1,6 +1,7 @@
 package com.sprintstart.sprintstartbackend.upload.service
 
 import com.sprintstart.sprintstartbackend.shared.annotations.Tracked
+import com.sprintstart.sprintstartbackend.shared.failure.recovering
 import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.ArtifactUploadedEvent
 import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.UploadArtifactOperationOutcome
 import com.sprintstart.sprintstartbackend.upload.external.events.ingestion.UploadArtifactStatus
@@ -194,11 +195,11 @@ class UploadService(
         linkedImageRepository.deleteAllByMarkdownArtifactId(requested)
         linkedImageRepository.deleteAllByImageArtifactId(requested)
 
-        try {
-            storageService.delete(artifact.storagePath)
-        } catch (e: Exception) {
+        recovering(fallback = { e ->
             logger.warn("Storage delete failed for artifact {}: {}", requested, e.message)
             return batch.storageFailed(artifact, e, DELETE_FAILED_REASON)
+        }) {
+            storageService.delete(artifact.storagePath)
         }
 
         publisher.publishEvent(
