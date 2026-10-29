@@ -113,7 +113,8 @@ class BoardService(
                 .filter { it.state == BoardCardState.ACTIVE }
                 .sortedWith(attentionOrder(arrivalSteps, onATask))
                 .map {
-                    hydrator.render(it, member, projectId, diagrams[it.id], arrivalSteps, pathSteps) { matches }
+                    val shared = SharedBoardReads(diagrams[it.id], arrivalSteps, pathSteps) { matches }
+                    hydrator.render(it, member, projectId, shared)
                 },
         )
     }
@@ -241,12 +242,11 @@ class BoardService(
     /** See [BoardPlacement.place]. */
     @Transactional
     fun place(
-        userId: UserId,
-        projectId: ProjectId,
+        hire: HireBoard,
         kind: BoardCardKind,
         subject: String? = null,
         by: BoardActor = BoardActor.BUDDY,
-    ): PlacementOutcome = placement.place(HireBoard(userId, projectId), kind, subject, by)
+    ): PlacementOutcome = placement.place(hire, kind, subject, by)
 
     /** See [BoardPlacement.placeRevivingDismissed]. */
     @Transactional
@@ -302,22 +302,15 @@ class BoardService(
 
     /** See [BoardAuthoredCards.rewordChecklistItem]. */
     @Transactional
-    fun rewordChecklistItem(
-        userId: UserId,
-        projectId: ProjectId,
-        cardId: BoardCardId,
-        before: String,
-        after: String,
-    ): Boolean = authoredCards.rewordChecklistItem(HireBoard(userId, projectId), cardId, before, after)
+    fun rewordChecklistItem(hire: HireBoard, cardId: BoardCardId, before: String, after: String): Boolean =
+        authoredCards.rewordChecklistItem(hire, cardId, before, after)
 
     /** See [BoardAuthoredCards.editAuthoredCardForBuddy]. */
     @Transactional
     fun editAuthoredCardForBuddy(
-        userId: UserId,
-        projectId: ProjectId,
+        hire: HireBoard,
         cardId: BoardCardId,
         request: AuthoredCardRequest,
         basedOn: String?,
-    ): BoardCardResponse =
-        authoredCards.editAuthoredCardForBuddy(HireBoard(userId, projectId), cardId, request, basedOn)
+    ): BoardCardResponse = authoredCards.editAuthoredCardForBuddy(hire, cardId, request, basedOn)
 }

@@ -52,43 +52,42 @@ class BoardCardHydrator(
         card: BoardCard,
         member: ProjectMember,
         projectId: ProjectId,
-        diagram: BoardDiagram? = null,
-        // A single card rendered on its own reads for itself; a whole board shares one read of each.
-        arrivalSteps: List<ArrivalStepResponse> = this.arrivalSteps.forHire(UserId(member.userId)),
-        pathSteps: Map<UUID, ResolvedPathStep> = emptyMap(),
-        matches: () -> List<RankedStarterWorkTaskResponse> = {
-            hireStarterWork.rankedTasksFor(UserId(member.userId), projectId)
-        },
+        shared: SharedBoardReads = standaloneReads(member, projectId),
     ): BoardCardResponse = BoardCardResponse(
         id = card.id,
         kind = card.kind,
         owner = card.owner,
         position = card.position,
         placedAt = card.placedAt,
-        content = hydrate(card, member, projectId, diagram, arrivalSteps, pathSteps, matches),
+        content = hydrate(card, member, projectId, shared),
         lastChange = card.toLastChangeResponse(),
+    )
+
+    /** A single card rendered on its own reads for itself; a whole board shares one read of each. */
+    private fun standaloneReads(member: ProjectMember, projectId: ProjectId) = SharedBoardReads(
+        diagram = null,
+        arrivalSteps = arrivalSteps.forHire(UserId(member.userId)),
+        pathSteps = emptyMap(),
+        matches = { hireStarterWork.rankedTasksFor(UserId(member.userId), projectId) },
     )
 
     private fun hydrate(
         card: BoardCard,
         member: ProjectMember,
         projectId: ProjectId,
-        diagram: BoardDiagram?,
-        arrivalSteps: List<ArrivalStepResponse>,
-        pathSteps: Map<UUID, ResolvedPathStep>,
-        matches: () -> List<RankedStarterWorkTaskResponse>,
+        shared: SharedBoardReads,
     ): BoardCardContent = when (card.kind) {
-        BoardCardKind.ARRIVAL_STEPS -> arrivalStepsContent(arrivalSteps)
+        BoardCardKind.ARRIVAL_STEPS -> arrivalStepsContent(shared.arrivalSteps)
         BoardCardKind.OPEN_PULL_REQUESTS -> openPullRequestsContent(member, projectId)
         BoardCardKind.CURRENT_TASK -> currentTaskContent(member, projectId)
         BoardCardKind.SUGGESTED_TASKS, BoardCardKind.TASK_POOL ->
-            rankedTasksContent(card.kind, member, projectId, matches)
+            rankedTasksContent(card.kind, member, projectId, shared.matches)
         BoardCardKind.COMPETENCY_PROGRESS -> competencyProgressContent(member)
         BoardCardKind.MEMORY_RECAP -> memoryRecapSource.latestRecap(UserId(member.userId))
         // The one card served from a cache: its content costs a model call.
         // [BoardDiagramService] owns whether that cache is still valid.
-        BoardCardKind.DIAGRAM -> boardDiagramService.contentFor(card.subject.orEmpty(), diagram)
-        BoardCardKind.PATH_STEP -> pathStepContent(card.subject, pathSteps)
+        BoardCardKind.DIAGRAM -> boardDiagramService.contentFor(card.subject.orEmpty(), shared.diagram)
+        BoardCardKind.PATH_STEP -> pathStepContent(card.subject, shared.pathSteps)
         BoardCardKind.NOTE, BoardCardKind.LINK, BoardCardKind.CHECKLIST -> authoredContent(card.payload)
     }
 
@@ -191,3 +190,14 @@ class BoardCardHydrator(
         )
     }
 }
+
+/**
+ * What a whole board reads once and hands to every card — its diagram, the hire's arrival steps and
+ * path steps, one starter-work ranking — so the board pays for each read once.
+ */
+class SharedBoardReads(
+    val diagram: BoardDiagram?,
+    val arrivalSteps: List<ArrivalStepResponse>,
+    val pathSteps: Map<UUID, ResolvedPathStep>,
+    val matches: () -> List<RankedStarterWorkTaskResponse>,
+)
