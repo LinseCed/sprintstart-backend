@@ -275,18 +275,17 @@ internal class BoardAuthoredCards(
         // Locked, so a hire edit and a buddy edit of the same card cannot interleave their writes.
         val card = boardCardRepository.findLockedById(cardId.value)
         val board = card?.let { boardRepository.findById(it.boardId).orElse(null) }
-        val refusal = when {
-            card == null || board == null || board.userId != userId.value || card.owner != BoardCardOwner.HIRE ->
-                ResponseStatusException(HttpStatus.NOT_FOUND, "No such card on your board")
-            card.kind != kind ->
-                ResponseStatusException(HttpStatus.BAD_REQUEST, "That card is a ${card.kind}, not a $kind")
-            else -> null
+        if (card == null || board == null || !isHiresOwn(card, board, userId)) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "No such card on your board")
         }
-        if (refusal != null || card == null || board == null) {
-            throw refusal ?: ResponseStatusException(HttpStatus.NOT_FOUND, "No such card on your board")
+        if (card.kind != kind) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "That card is a ${card.kind}, not a $kind")
         }
         return card to board
     }
+
+    private fun isHiresOwn(card: BoardCard, board: Board, userId: UserId): Boolean =
+        board.userId == userId.value && card.owner == BoardCardOwner.HIRE
 
     /**
      * The card a buddy edit may change, locked until the edit commits.

@@ -3,14 +3,6 @@
   <ManuallySuppressedIssues/>
   <CurrentIssues>
     <ID>CognitiveComplexMethod:IngestionRunLifeCycleService.kt:IngestionRunLifeCycleService$@Transactional @Tracked("Starting ingestion run") fun startOrUpdateRun( transactionId: UUID, sourceSystem: SourceSystem, status: IngestionRunStatus, failureReason: String? = null, sourceInstanceId: UUID? = null, sourceInstanceRef: String? = null, )</ID>
-    <ID>CyclomaticComplexMethod:ArtifactFilterPredicates.kt:ArtifactFilterPredicates$fun predicates( cb: CriteriaBuilder, root: Root&lt;Artifact&gt;, projectJoin: Join&lt;Artifact, UUID&gt;, projectId: UUID, criteria: ArtifactFilterCriteria, exclude: FacetKind?, ): List&lt;Predicate&gt;</ID>
-    <ID>CyclomaticComplexMethod:BoardCardHydrator.kt:BoardCardHydrator$private fun hydrate( card: BoardCard, member: ProjectMember, projectId: ProjectId, diagram: BoardDiagram?, arrivalSteps: List&lt;ArrivalStepResponse&gt;, pathSteps: Map&lt;UUID, ResolvedPathStep&gt;, matches: () -&gt; List&lt;RankedStarterWorkTaskResponse&gt;, ): BoardCardContent</ID>
-    <ID>CyclomaticComplexMethod:BoardAuthoredCards.kt:BoardAuthoredCards$private fun editableCardOrThrow( userId: UserId, cardId: BoardCardId, kind: BoardCardKind, ): Pair&lt;BoardCard, Board&gt;</ID>
-    <ID>CyclomaticComplexMethod:ConfluenceRestrictionPageMetadata.kt:private fun validateSharedRestrictionMetadata( users: ConfluenceRestrictedUsersResponse, groups: ConfluenceRestrictedGroupsResponse, requestedStart: Int, requestedLimit: Int, requestContext: String, )</ID>
-    <ID>CyclomaticComplexMethod:ConfluenceStorageFormatParser.kt:InlineMarkdown$fun renderNode(node: Node): String</ID>
-    <ID>CyclomaticComplexMethod:CustomAdfDeserializer.kt:CustomAdfDeserializer$private fun extractTextValue(element: JsonElement, sb: StringBuilder)</ID>
-    <ID>CyclomaticComplexMethod:PathElements.kt:PathElements$private fun containedIn(steps: List&lt;OnboardingStep&gt;, checks: Int, includeSteps: Boolean = true): String</ID>
-    <ID>CyclomaticComplexMethod:StepTeamActions.kt:UpdateStepAction$private fun badArgument(call: BuddyToolCallDto, slots: Int): String?</ID>
     <ID>TooGenericExceptionCaught:ArtifactAiStatusService.kt:ArtifactAiStatusService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BitbucketCommitsService.kt:BitbucketCommitsService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BitbucketConnectionStateService.kt:BitbucketConnectionStateService$first: Exception</ID>
