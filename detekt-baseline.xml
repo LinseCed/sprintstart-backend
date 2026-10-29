@@ -77,8 +77,6 @@
     <ID>LongMethod:JiraArtifactMapper.kt:JiraArtifactMapper$fun toCommand(event: JiraIssueFetchedEvent): JiraArtifactCommand</ID>
     <ID>LongMethod:JiraArtifactProviderService.kt:JiraArtifactProviderService$@Transactional fun persistArtifact(command: JiraArtifactCommand)</ID>
     <ID>LongMethod:KeycloakEventService.kt:KeycloakEventService$@Transactional @Tracked("Handling Keycloak event") fun handleEvent(request: KeycloakEventRequest)</ID>
-    <ID>LongMethod:MyPathTool.kt:MyPathTool$fun execute(userId: UUID): String</ID>
-    <ID>LongMethod:MyPathTool.kt:MyPathTool$fun snapshotFor(userId: UUID): String?</ID>
     <ID>LongMethod:NotionCredentialPersistenceService.kt:NotionCredentialPersistenceService$@Transactional fun rename(authId: String, oldName: String, newName: String): NotionCredentialResponse</ID>
     <ID>LongMethod:NotionCredentialPersistenceService.kt:NotionCredentialPersistenceService$private fun applyWorkspace(credential: NotionCredential, workspace: NotionTokenIdentity)</ID>
     <ID>LongMethod:NotionWorkspaceIngestionService.kt:NotionWorkspaceIngestionService$private suspend fun syncWorkspace( runId: UUID, connection: NotionWorkspaceConnection, forceRefresh: Boolean, ): NotionIngestionResult</ID>
@@ -87,8 +85,6 @@
     <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun BlueprintPhaseSnapshot.copyTo( onboardingPath: OnboardingPath, nodesByBlueprintId: MutableMap&lt;UUID, OnboardingSubGraphNode&gt;, generated: GeneratedPhaseContent? = null, generationStatus: GenerationStatus? = null, ): CopiedPhase</ID>
     <ID>LongMethod:OnboardingPathFromBlueprintFactory.kt:OnboardingPathFromBlueprintFactory$private fun GeneratedPhaseContent.copyInto(onboardingPhase: OnboardingPhase)</ID>
     <ID>LongMethod:OnboardingPersonalizationService.kt:OnboardingPersonalizationService$@Tracked("Creating onboarding path from blueprint") fun personalize(authId: String, projectId: UUID): Flow&lt;OnboardingSseEvent&gt;</ID>
-    <ID>LongMethod:PathItemText.kt:internal fun StringBuilder.appendQuestion( question: GetOnboardingQuestionForUserResponse, phase: GetOnboardingPhaseForUserResponse, graph: PhaseGraph, lastAnswer: String?, )</ID>
-    <ID>LongMethod:PhaseText.kt:internal fun StringBuilder.appendCurrentPhase( phase: GetOnboardingPhaseForUserResponse, index: Int, phases: List&lt;GetOnboardingPhaseForUserResponse&gt;, lastAnswers: Map&lt;UUID, String&gt; = emptyMap(), )</ID>
     <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Evaluating project industry automatically") override suspend fun evaluateIndustryAutomatically(projectId: UUID)</ID>
     <ID>LongMethod:ProjectIndustryService.kt:ProjectIndustryService$@Tracked("Getting or lazily evaluating project industry") override suspend fun getOrEvaluateIndustry(projectId: UUID): String?</ID>
     <ID>LongMethod:ReadBoardTool.kt:ReadBoardTool$private fun readBoard(userId: UserId): String</ID>
@@ -97,13 +93,11 @@
     <ID>LongMethod:StarterWorkPoolReconciler.kt:StarterWorkPoolReconciler$@Transactional fun reconcile(): PoolReconciliation</ID>
     <ID>LongMethod:StreamExecution.kt:StreamExecution$@Suppress("CyclomaticComplexMethod") inline fun &lt;reified T&gt; perform( terminationMarkers: Set&lt;String&gt; = setOf("[DONE]"), crossinline onChunkError: (raw: String, error: Throwable) -&gt; Boolean = { raw, err -&gt; System.err.println("WebClient stream: failed to deserialize chunk '$raw': ${err.message}") true // skip and continue by default }, ): Flow&lt;T&gt;</ID>
     <ID>LongMethod:TaskOrientationService.kt:TaskOrientationService$suspend fun streamForHire(hireId: UUID, projectId: UUID): Flow&lt;AiProgressEvent&gt;</ID>
-    <ID>LongMethod:TaskTeamActions.kt:AddTaskAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
-    <ID>LongMethod:TeamMemberActions.kt:AddMembersAction$override fun draft(call: BuddyToolCallDto, context: TeamToolContext): TeamActionDraft</ID>
     <ID>LongMethod:UploadArtifactMapper.kt:UploadArtifactMapper$fun toCommand(event: ArtifactUploadedEvent): UploadArtifactCommand</ID>
+    <ID>LongMethod:UploadArtifactProviderService.kt:UploadArtifactProviderService$@Transactional fun persistArtifact(command: UploadArtifactCommand)</ID>
     <ID>LongMethod:UploadService.kt:UploadService$@Transactional @Tracked("Deleting a batch of project artifacts") fun deleteUpload( authId: String, artifactIds: Set&lt;UUID&gt;, projectId: UUID, ): DeleteUploadsResponse</ID>
     <ID>LongMethod:UploadService.kt:UploadService$@Transactional @Tracked("Uploading a new batch of project artifacts") fun upload( authId: String, files: List&lt;MultipartFile&gt;, projectId: UUID, ): List&lt;UploadArtifactResponse&gt;</ID>
     <ID>LongMethod:UploadService.kt:UploadService$private fun uploadSingle( file: MultipartFile, uploaderId: UUID, projectId: UUID, transactionId: UUID, outcomes: MutableSet&lt;UploadArtifactOperationOutcome&gt;, ): UploadResult</ID>
-    <ID>LongMethod:UploadArtifactProviderService.kt:UploadArtifactProviderService$@Transactional fun persistArtifact(command: UploadArtifactCommand)</ID>
     <ID>LongMethod:UserApiMapper.kt:fun User.toUserApiDto(): UserDto</ID>
     <ID>TooGenericExceptionCaught:ArtifactAiStatusService.kt:ArtifactAiStatusService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:BitbucketCommitsService.kt:BitbucketCommitsService$e: Exception</ID>
