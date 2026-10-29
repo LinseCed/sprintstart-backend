@@ -144,16 +144,8 @@ class TaskOrientationService(
                 labels = context.labels,
                 touchedPaths = emptyList(),
                 lastFingerprint = context.cachedFingerprint,
-            ).onEach { event ->
-                // Persist on `done`, before the event is relayed downstream, so the cache is committed
-                // by the time the client reacts. Decoding the same OrientationOutcome the sync path
-                // gets and running the same `apply` is what keeps the streamed result identical.
-                if (event.type == AiProgressEvent.DONE) {
-                    decodeOutcome(event)?.let { outcome ->
-                        withContext(Dispatchers.IO) { txTemplate.execute { apply(context, outcome) } }
-                    }
-                }
-            }.catch { cause ->
+            ).onEach { event -> persistOnDone(context, event) }
+            .catch { cause ->
                 logger.warn(
                     "Orientation stream failed for hire {} on project {}: {}",
                     hireId,
@@ -162,6 +154,18 @@ class TaskOrientationService(
                 )
                 emit(AiProgressEvent.error(ORIENTATION, "Orientation is temporarily unavailable"))
             }
+    }
+
+    /**
+     * Persists on `done`, before the event is relayed downstream, so the cache is committed by the
+     * time the client reacts. Decoding the same [OrientationOutcome] the sync path gets and running
+     * the same [apply] is what keeps the streamed result identical.
+     */
+    private suspend fun persistOnDone(context: TaskContext, event: AiProgressEvent) {
+        if (event.type != AiProgressEvent.DONE) return
+        decodeOutcome(event)?.let { outcome ->
+            withContext(Dispatchers.IO) { txTemplate.execute { apply(context, outcome) } }
+        }
     }
 
     private fun decodeOutcome(event: AiProgressEvent): OrientationOutcome? =
