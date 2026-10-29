@@ -10,6 +10,7 @@ import com.sprintstart.sprintstartbackend.connectors.notion.model.ingestion.Noti
 import com.sprintstart.sprintstartbackend.connectors.notion.model.ingestion.NotionIngestionFailureStage
 import com.sprintstart.sprintstartbackend.connectors.notion.model.ingestion.NotionIngestionOutcome
 import com.sprintstart.sprintstartbackend.connectors.notion.model.ingestion.NotionIngestionResult
+import com.sprintstart.sprintstartbackend.shared.ids.IngestionRunId
 import com.sprintstart.sprintstartbackend.shared.ids.SourceId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -82,7 +83,7 @@ internal class NotionWorkspaceIngestionService(
         val discovered = notionClient.discoverPages(token).associateBy { it.id }
         val states = syncedPageService.findAll(connection.id).associateBy { it.pageId }
         val progress = NotionWorkspaceProgress()
-        val run = NotionSyncRun(runId, connection, progress)
+        val run = NotionSyncRun(IngestionRunId(runId), connection, progress)
 
         for (page in discovered.values) {
             processPage(runId, connection, page.id, page.url, progress) {
@@ -102,9 +103,9 @@ internal class NotionWorkspaceIngestionService(
         val connection = run.connection
         val progress = run.progress
         connectionPersistenceService.recordSuccessfulSync(connection.projectId, connection.id)
-        ingestionApi.finishRun(run.runId, progress.successful + progress.removed)
+        ingestionApi.finishRun(run.runId.value, progress.successful + progress.removed)
         return NotionIngestionResult(
-            run.runId,
+            run.runId.value,
             connection.id,
             progress.outcome(),
             successfulPages = progress.successful,
@@ -123,11 +124,11 @@ internal class NotionWorkspaceIngestionService(
         val page = findMissingPage(token, state.pageId)
         if (page == null || page.inTrash || page.parent.type in DATA_SOURCE_PARENTS) {
             syncedPageService.prepareUnlink(connection.id, state.pageId)
-            ingestionApi.unlinkPage(run.runId, connection.projectId, connection.id, state.pageId)
+            ingestionApi.unlinkPage(run.runId.value, connection.projectId, connection.id, state.pageId)
             syncedPageService.markUnlinked(connection.id, state.pageId)
             run.progress.removed++
         } else {
-            pageSyncService.sync(run.runId, connection, token, page, state, forceRefresh)
+            pageSyncService.sync(run.runId.value, connection, token, page, state, forceRefresh)
             run.progress.successful++
         }
     }
@@ -183,7 +184,7 @@ internal class NotionWorkspaceIngestionService(
 }
 
 private class NotionSyncRun(
-    val runId: UUID,
+    val runId: IngestionRunId,
     val connection: NotionWorkspaceConnection,
     val progress: NotionWorkspaceProgress,
 )
