@@ -11,6 +11,7 @@ import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.utils.Bitbuck
 import com.sprintstart.sprintstartbackend.connectors.git.utils.GitCommitSink
 import com.sprintstart.sprintstartbackend.connectors.git.utils.GitIngestOutcome
 import com.sprintstart.sprintstartbackend.connectors.git.utils.GitIngestionEngine
+import com.sprintstart.sprintstartbackend.shared.git.CommitFiles
 import com.sprintstart.sprintstartbackend.shared.git.GitCommit
 import com.sprintstart.sprintstartbackend.shared.git.GitRepositoryCoordinates
 import io.mockk.Runs
@@ -83,11 +84,22 @@ class BitbucketCommitsServiceTest {
     @Test
     fun `advances from the commit cursor the last run stored`() = runTest {
         connection.lastCommitsSyncedSha = PREVIOUS_REVISION
+        connection.commitFilesRecorded = true
         givenIngestSucceeds()
 
         service.fetchAndIngestCommitsOfRepository(connection.id, transactionId)
 
         coVerify { ingestionEngine.ingestCommitsSince(coordinates, PREVIOUS_REVISION, any()) }
+    }
+
+    @Test
+    fun `reads the whole history again when the stored commits carry no files`() = runTest {
+        connection.lastCommitsSyncedSha = PREVIOUS_REVISION
+        givenIngestSucceeds()
+
+        service.fetchAndIngestCommitsOfRepository(connection.id, transactionId)
+
+        coVerify { ingestionEngine.ingestCommitsSince(coordinates, "", any()) }
     }
 
     @Test
@@ -123,7 +135,9 @@ class BitbucketCommitsServiceTest {
         service.fetchAndIngestCommitsOfRepository(connection.id, transactionId)
 
         val committedAt = Instant.parse("2026-03-04T05:06:07Z")
-        sink.captured.onCommit(GitCommit("sha-1", "Ada", committedAt, "Fix the bug"))
+        sink.captured.onCommit(
+            GitCommit("sha-1", "Ada", "ada@example.com", committedAt, "Fix the bug", CommitFiles.Listed(emptyList())),
+        )
 
         verify {
             eventPublisher.publishEvent(
@@ -131,6 +145,8 @@ class BitbucketCommitsServiceTest {
                     it is BitbucketCommitFetchedEvent &&
                         it.sha == "sha-1" &&
                         it.author == "Ada" &&
+                        it.authorEmail == "ada@example.com" &&
+                        it.files == CommitFiles.Listed(emptyList()) &&
                         it.subject == "Fix the bug" &&
                         it.committedAt == committedAt &&
                         it.repositoryId == connection.id &&

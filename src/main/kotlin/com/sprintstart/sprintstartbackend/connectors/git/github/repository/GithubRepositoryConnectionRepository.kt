@@ -64,10 +64,12 @@ interface GithubRepositoryConnectionRepository : JpaRepository<GithubRepositoryC
     )
 
     /**
-     * Advances only the commit cursor of one connection.
+     * Advances only the commit cursor of one connection and records that its commits carry their
+     * changed files.
      *
      * Narrow for the same reason as [updateFileCursor]: parallel collectors must never write each
-     * other's columns.
+     * other's columns. A successful ingest always read the commits with their files, so the flag
+     * is set here rather than by a separate write that could be skipped.
      *
      * @param repositoryId The connection whose commit cursor should advance.
      * @param sha The revision whose commits were last ingested.
@@ -77,12 +79,33 @@ interface GithubRepositoryConnectionRepository : JpaRepository<GithubRepositoryC
     @Query(
         """
         UPDATE GithubRepositoryConnection r
-        SET r.lastCommitsSyncedSha = :sha
+        SET r.lastCommitsSyncedSha = :sha, r.commitFilesRecorded = true
         WHERE r.id = :repositoryId
         """,
     )
     fun updateCommitsCursor(
         @Param("repositoryId") repositoryId: UUID,
         @Param("sha") sha: String,
+    )
+
+    /**
+     * Records that every pull request of one connection was read together with its files.
+     *
+     * Narrow for the same reason as [updateCommitsCursor]: parallel collectors must never write each
+     * other's columns.
+     *
+     * @param repositoryId The connection whose pull requests were read in full.
+     */
+    @Transactional
+    @Modifying
+    @Query(
+        """
+        UPDATE GithubRepositoryConnection r
+        SET r.pullRequestReviewsRecorded = true
+        WHERE r.id = :repositoryId
+        """,
+    )
+    fun markPullRequestReviewsRecorded(
+        @Param("repositoryId") repositoryId: UUID,
     )
 }
