@@ -2,6 +2,7 @@ package com.sprintstart.sprintstartbackend.connectors.git.bitbucket.utils
 
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.external.events.commits.BitbucketCommitFetchedEvent
 import com.sprintstart.sprintstartbackend.connectors.git.bitbucket.model.entity.BitbucketConnection
+import com.sprintstart.sprintstartbackend.shared.git.CommitFiles
 import com.sprintstart.sprintstartbackend.shared.git.GitCommit
 import io.mockk.mockk
 import io.mockk.verify
@@ -26,7 +27,9 @@ class BitbucketCommitSinkTest {
     fun `maps a commit onto a fetched event with a bitbucket source url`() = runTest {
         val committedAt = Instant.parse("2026-03-04T05:06:07Z")
 
-        sink.onCommit(GitCommit("sha-1", "Ada", committedAt, "Fix the bug"))
+        sink.onCommit(
+            GitCommit("sha-1", "Ada", "ada@example.com", committedAt, "Fix the bug", CommitFiles.Listed(emptyList())),
+        )
 
         verify {
             eventPublisher.publishEvent(
@@ -37,6 +40,8 @@ class BitbucketCommitSinkTest {
                         it.slug == "sprintstart-backend" &&
                         it.sha == "sha-1" &&
                         it.author == "Ada" &&
+                        it.authorEmail == "ada@example.com" &&
+                        it.files == CommitFiles.Listed(emptyList()) &&
                         it.committedAt == committedAt &&
                         it.subject == "Fix the bug" &&
                         it.sourceUrl == "https://bitbucket.org/sprintstart/sprintstart-backend/commits/sha-1"
